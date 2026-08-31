@@ -4,6 +4,8 @@ Run a Minecraft server on your own computer, without the terminal.
 
 ObserverLauncher is a desktop app for Windows and Linux. It handles the boring parts of hosting: downloading the server, installing Java, editing configs, opening the firewall, backing up your world. You pick a folder, choose a server type, press Start.
 
+> **Status: Experimental.** This project is under active development and is **not yet stable**. Things may change, break, or not work as expected. Use at your own risk. Bug reports and suggestions are welcome.
+
 ## Why not just do it manually?
 
 Hosting a Minecraft server usually means following a long tutorial:
@@ -179,6 +181,10 @@ Spigot needs Git installed on the system. Install Git and try again.
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## AI Contributions
+
+This project is developed with the assistance of AI tools (such as DeepSeek) for code generation, debugging, and documentation. AI contributions are used to accelerate development and improve code quality. All AI-generated code is reviewed and tested by humans before merging.
 
 ## Website
 
