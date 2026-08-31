@@ -1,6 +1,6 @@
 {
   "name": "observerlauncher",
-  "version": "0.1.0-alpha",
+  "version": "0.1.0",
   "description": "A beginner-friendly and advanced-capable desktop launcher for hosting local Minecraft servers on Windows and Linux.",
   "license": "MIT",
   "author": "ObserverLauncher contributors",
@@ -17,9 +17,9 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build:portable": "electron-builder --win portable",
-    "build:linux": "electron-builder --linux AppImage deb",
-    "build:all": "electron-builder --win portable --linux AppImage deb",
+    "build:win": "electron-builder --win nsis",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:all": "electron-builder --win nsis --linux AppImage",
     "test": "node tests/run.js"
   },
   "build": {
@@ -30,28 +30,33 @@
       "src/**/*",
       "package.json"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Kag4286",
+        "repo": "ObserverLauncher"
+      }
+    ],
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "portable"
+        "nsis"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "ObserverLauncher-${version}-setup.exe"
     },
     "linux": {
       "icon": "build/icon.png",
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "category": "Game"
     },
-    "portable": {
-      "artifactName": "ObserverLauncher-${version}-portable.exe"
-    },
     "appImage": {
       "artifactName": "ObserverLauncher-${version}.AppImage"
-    },
-    "deb": {
-      "artifactName": "ObserverLauncher-${version}.deb"
     }
   },
   "devDependencies": {
@@ -59,6 +64,7 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "prismarine-nbt": "^2.8.0"
   }
 }

@@ -229,6 +229,19 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') Object.assign(winOpts, { titleBarStyle: 'hidden', titleBarOverlay: { color: '#08090a', symbolColor: '#e9edf0', height: 42 } });
   win = new BrowserWindow(winOpts);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  // ===== AUTO-UPDATE =====
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.autoDownload = false; // để user tự bấm nút tải
+  autoUpdater.on('update-available', v => send('app:update-available', v));
+  autoUpdater.on('update-not-available', () => send('app:update-none', {}));
+  autoUpdater.on('download-progress', p => send('app:update-progress', p));
+  autoUpdater.on('update-downloaded', () => send('app:update-downloaded', {}));
+  if (app.isPackaged) autoUpdater.checkForUpdates(); // chỉ chạy khi đã build
+
+  ipcMain.handle('app:check-update', () => autoUpdater.checkForUpdates());
+  ipcMain.handle('app:download-update', () => autoUpdater.downloadUpdate());
+  ipcMain.handle('app:quit-install', () => autoUpdater.quitAndInstall());
+  // ===== END AUTO-UPDATE =====
   // tex:// icon serving — resolution order: on-demand cache (userData/textures/<mc-version>) →
   // bundled 26.2 set → lazy per-icon fetch from the PrismarineJS mirror. "auto" resolves to the
   // detected server's Minecraft version, so a future version's new items appear without a

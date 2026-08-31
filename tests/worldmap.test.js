@@ -2,7 +2,7 @@
 const fs = require('fs'), os = require('os'), path = require('path');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
-const wm = require('C:/Users/PC/Downloads/updated/src/main/worldmap.js');
+const wm = require('../src/main/worldmap.js');
 let pass = 0, fail = 0;
 const ck = (n, c) => c ? (pass++, console.log('PASS', n)) : (fail++, console.log('FAIL', n));
 
