@@ -19,7 +19,9 @@ npm start
 The app is plain Electron — no bundler, no build step for development. `src/main.js` is the Electron
 main process entry point (window creation, IPC wiring, stateful server/timer orchestration); the
 mostly-stateless logic it depends on lives in `src/main/` (`settings.js`, `fs-utils.js`, `http.js`,
-`java.js`, `server-files.js`, `network.js`, `paper-api.js`) — each of those is a plain module you can
+`java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
+`migrations.js`, plus `adapters/` for per-software download resolvers and `platform/` for
+Windows/Linux process-tree/metrics/firewall backends) — each of those is a plain module you can
 `require()` and test in isolation, with no dependency on a running Electron window. `src/renderer/` is
 the UI (`index.html` + `app.js` + `style.css` + `locales.js`), and `src/preload.js`
 is the only bridge between them (`contextIsolation` is on, so the renderer never touches Node APIs
