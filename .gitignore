@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-eclipse/
+*.exe
+*.AppImage
+*.deb
+build/release/
+
+# Design concept mockups (internal, not shipped)
+preview/
+
+# Logs & temp
+*.log
+.tmp/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Agent / internal docs (do not publish)
+.agent/
+
+# Editor
+.vscode/
+.idea/

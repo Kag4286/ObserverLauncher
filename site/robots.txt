@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap (add when you have a canonical domain)
+# Sitemap: https://observerlauncher.dev/sitemap.xml

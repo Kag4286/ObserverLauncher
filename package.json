@@ -1,0 +1,64 @@
+{
+  "name": "observerlauncher",
+  "version": "0.1.0-alpha",
+  "description": "A beginner-friendly and advanced-capable desktop launcher for hosting local Minecraft servers on Windows and Linux.",
+  "license": "MIT",
+  "author": "ObserverLauncher contributors",
+  "keywords": [
+    "minecraft",
+    "minecraft-server",
+    "server-launcher",
+    "electron",
+    "paper",
+    "purpur",
+    "fabric",
+    "forge"
+  ],
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:portable": "electron-builder --win portable",
+    "build:linux": "electron-builder --linux AppImage deb",
+    "build:all": "electron-builder --win portable --linux AppImage deb",
+    "test": "node tests/run.js"
+  },
+  "build": {
+    "appId": "dev.observerlauncher.minecraftservercontrol",
+    "electronDist": "node_modules/electron/dist",
+    "productName": "ObserverLauncher",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "portable"
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game"
+    },
+    "portable": {
+      "artifactName": "ObserverLauncher-${version}-portable.exe"
+    },
+    "appImage": {
+      "artifactName": "ObserverLauncher-${version}.AppImage"
+    },
+    "deb": {
+      "artifactName": "ObserverLauncher-${version}.deb"
+    }
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "prismarine-nbt": "^2.8.0"
+  }
+}
