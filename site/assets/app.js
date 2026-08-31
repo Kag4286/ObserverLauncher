@@ -1,8 +1,8 @@
-const SITE_CONFIG={github:'https://github.com/ObserverLauncher/ObserverLauncher',demoGif:'assets/demo.gif'};
+const SITE_CONFIG={github:'https://github.com/Kag4286/ObserverLauncher',demoGif:'assets/demo.gif'};
 const I18N={
 en:{
 'lang.switch':'VI',
-'nav.demo':'Demo','nav.features':'Features','nav.compare':'Compare','nav.how':'How it works','nav.roadmap':'Roadmap','nav.download':'Download','nav.faq':'FAQ',
+'nav.demo':'Demo','nav.features':'Features','nav.why':'Why','nav.compare':'Compare','nav.how':'How it works','nav.roadmap':'Roadmap','nav.download':'Download','nav.faq':'FAQ',
 'hero.eyebrow':'FREE · OPEN SOURCE · YOUR MACHINE',
 'hero.t1':'Run a Minecraft server<br><span class=\'accent\'>on your own machine.</span>',
 'hero.sub':'ObserverLauncher handles the Java version, the download, the config files, the firewall rule and the backups. You run the server and share the address. No accounts, no telemetry, no subscription — just a launcher that works on <strong>Windows</strong> and <strong>Linux</strong>.',
@@ -15,6 +15,13 @@ en:{
 'ft.f2':'Live monitoring','ft.f2d':'TPS, MSPT, CPU and RAM sampled once a second. The UI shows what each number means for your players.',
 'ft.f3':'Plugin marketplace','ft.f3d':'Modrinth, Hangar and Spigot in one search. Compatibility checks, version picker and per-file download progress.',
 'ft.f4':'Config editor','ft.f4d':'YAML, JSON, TOML and .properties with syntax highlighting, validation and conflict detection.',
+'wy.eyebrow':'WHY OBSERVERLAUNCHER','wy.t':'The easiest way to run your own Minecraft server.','wy.sub':'No terminal commands. No manual config editing. No separate downloads. Just a clean, modern interface that does the heavy lifting.',
+'wy.c1':'One-click setup','wy.c1d':'Choose your server type, pick a version, and press Start. The launcher downloads everything from official sources.',
+'wy.c2':'Live monitoring','wy.c2d':'Watch TPS, CPU, RAM and player count in real time. Understand what is happening on your server at a glance.',
+'wy.c3':'Built-in marketplace','wy.c3d':'Search and install plugins from Modrinth, Hangar and SpigotMC without leaving the launcher.',
+'wy.c4':'Config editor','wy.c4d':'Edit YAML, JSON, TOML and .properties files with syntax highlighting and validation. No more hunting through Notepad.',
+'wy.c5':'World backups','wy.c5d':'Create ZIP backups of your worlds on a schedule, safely. The server is saved before zipping.',
+'wy.c6':'Auto-update','wy.c6d':'Stay on the latest version automatically. The launcher checks for updates and installs them with one click.',
 'lm.eyebrow':'IN PLAIN WORDS','lm.t':'What the launcher does not do.','lm.sub':'A few things worth saying out loud so expectations match reality.',
 'lm.l1t':'It runs on your machine','lm.l1d':'This is a desktop launcher, not a hosting service. When your PC sleeps, the server stops. You provide the hardware and the network.',
 'lm.l2t':'Port forwarding is on you','lm.l2d':'The launcher opens the Windows Firewall for you, but your home router\'s port-forwarding rules are yours to set. The UI shows the exact address to share.',
@@ -41,8 +48,8 @@ en:{
 'tc.c4':'No phone-home','tc.c4d':'Zero analytics. The full list of network endpoints is on the right.',
 'tc.ep1':'version manifest + server jar','tc.ep2':'Paper & Folia builds','tc.ep3':'Fabric loader + meta','tc.ep4':'Forge / NeoForge','tc.ep5':'mod & plugin search','tc.ep6':'plugin downloads','tc.ep7':'Spigot builds',
 'tc.epnote':'every network endpoint the launcher talks to — nothing else',
-'dl.eyebrow':'GET IT','dl.t':'Download v0.1.0-alpha','dl.sub':'Portable builds — no installer, no admin rights required. Java is auto-installed on first run if missing.',
-'dl.win':'Download .exe','dl.app':'Download .AppImage','dl.deb':'Download .deb',
+'dl.eyebrow':'GET IT','dl.t':'Download v0.1.0','dl.sub':'Windows NSIS installer and Linux AppImage. Java is auto-installed on first run if missing.',
+'dl.win':'Download .exe','dl.app':'Download .AppImage','dl.deb':'Download .AppImage',
 'dl.req':'Requires Windows 10+ or a modern Linux distro. Java is detected or auto-installed by the launcher (no admin rights). The first run needs an internet connection to download the server jar.',
 'cp.copy':'copy','cp.done':'copied ✓',
 'rd.eyebrow':'STATUS','rd.t':'Roadmap, in plain sight.','rd.sub':'What shipped, what\'s being built, what\'s next. Updated with every release.',
@@ -110,6 +117,7 @@ vi:{
 'how.s2':'Chọn phần mềm & phiên bản','how.s2d':'Vanilla, Paper, Purpur, Fabric… và một bản build cụ thể. Tải từ API chính thức với tiến độ trực tiếp.',
 'how.s3':'Bấm Start & chia sẻ','how.s3d':'Launcher mở firewall và hiện đúng địa chỉ để bạn bè dán vào menu Multiplayer của Minecraft.',
 /*__JS3d__*/
+}
 
 
 

@@ -103,7 +103,7 @@ export function initUI() {
   const ghHero = document.getElementById('ghHero');
   const ghFoot = document.getElementById('ghFoot');
   const ghIssues = document.getElementById('ghIssues');
-  const ghUrl = 'https://github.com/ObserverLauncher/ObserverLauncher';
+  const ghUrl = 'https://github.com/Kag4286/ObserverLauncher';
   [ghLink, ghHero, ghFoot].forEach(el => {
     if (el) el.href = ghUrl;
   });

@@ -437,3 +437,299 @@ footer a:hover{color:var(--accent)}
 
 
 
+
+
+/* ================================================================
+   OBSERVERLAUNCHER v0.2 REDESIGN — Minimal, Modern, Brighter
+   Still black + cyan, but cleaner and more contemporary.
+   ================================================================ */
+
+:root {
+  /* Brighter palette — still black + cyan, but more refined */
+  --bg: #05070A;
+  --bg2: #0A0E13;
+  --panel: #0F141A;
+  --panel2: #131A22;
+  --field: #080B0F;
+  --border: #1F2A36;
+  --border2: #2A3949;
+  --border-hi: #3D4F63;
+  --text: #F2F6FA;
+  --muted: #A8B6C5;
+  --dim: #6E7F92;
+  --accent: #00E5FF;
+  --accent2: #00B8D4;
+  --accent-weak: rgba(0, 229, 255, 0.08);
+  --accent-glow: rgba(0, 229, 255, 0.25);
+  --ok: #2ED49A;
+  --warn: #FFC94D;
+  --bad: #FF5C6C;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --ui: 'Inter', 'Chakra Petch', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --px: 'Silkscreen', monospace;
+  --cut: 10px;
+}
+
+/* Base */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+}
+
+/* Remove overly-aggressive scanlines, keep subtle */
+.scanline-overlay {
+  opacity: 0.2;
+}
+
+/* Cleaner grid background */
+body::before {
+  background-image:
+    linear-gradient(rgba(168, 182, 197, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 182, 197, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 100%);
+}
+
+/* Nav — cleaner, more minimal */
+nav {
+  background: rgba(5, 7, 10, 0.85);
+  border-bottom: 1px solid var(--border);
+}
+nav.scrolled {
+  background: rgba(5, 7, 10, 0.95);
+}
+.nav-links a {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+.nav-links a:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.nav-links a.on {
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+.nav-links a.on::after {
+  display: none;
+}
+
+/* Buttons — more modern, less clipped-corner */
+.btn {
+  border-radius: 8px;
+  clip-path: none;
+  padding: 12px 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.btn.primary {
+  background: var(--accent);
+  color: #001418;
+  box-shadow: 0 4px 16px rgba(0, 229, 255, 0.2);
+}
+.btn.primary:hover {
+  box-shadow: 0 6px 24px rgba(0, 229, 255, 0.35);
+}
+.btn.ghost {
+  border: 1px solid var(--border2);
+  color: var(--text);
+  background: transparent;
+}
+.btn.ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Hero — more spacing, cleaner */
+.hero {
+  padding: 80px 0 60px;
+}
+.hero-text {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0;
+}
+.hero-text h1 {
+  font-size: clamp(36px, 5.5vw, 60px);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.hero-text .accent {
+  color: var(--accent);
+  text-shadow: 0 0 30px rgba(0, 229, 255, 0.4);
+}
+.hero-text .lead {
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+/* Cards — cleaner, less decorative */
+.card {
+  border-radius: 10px;
+  clip-path: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 24px;
+  box-shadow: none;
+}
+.card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transform: translateY(-4px);
+}
+
+/* Feature rows — cleaner */
+.spec-row {
+  border-bottom: 1px solid var(--border);
+  padding: 20px 12px;
+}
+.spec-row:hover,
+.spec-row.open {
+  background: linear-gradient(90deg, var(--accent-weak), transparent 70%);
+}
+.spec-row::before {
+  width: 3px;
+  border-radius: 2px;
+}
+
+/* Why section — new cards grid */
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 32px;
+}
+.why-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  transition: all 0.25s ease;
+}
+.why-card:hover {
+  border-color: var(--accent);
+  background: var(--panel2);
+  transform: translateY(-4px);
+}
+.why-card svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.why-card b {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.why-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* Comparison table — cleaner */
+.tbl-wrap {
+  border-radius: 10px;
+  clip-path: none;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.tbl th,
+.tbl td {
+  padding: 14px 16px;
+  font-size: 14px;
+}
+.tbl thead th {
+  background: var(--bg2);
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* FAQ — cleaner accordion */
+.faq details {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 10px;
+}
+.faq details[open] {
+  border-color: var(--accent);
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 0;
+}
+footer .wrap {
+  color: var(--dim);
+}
+
+/* Download cards */
+.grid.dl {
+  gap: 20px;
+}
+.card.dl {
+  border-radius: 12px;
+  text-align: center;
+  padding: 30px 24px;
+}
+.card.dl img {
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+/* Images — consistent rounded, subtle shadow */
+.hero-screenshot img,
+.feature-screenshots img {
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Marquee — cleaner */
+.marquee {
+  border-block: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+/* Demo frame — cleaner */
+.demo-frame {
+  border-radius: 12px;
+  clip-path: none;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.demo-body {
+  border-radius: 0 0 12px 12px;
+}
+
+/* Source code box */
+.src {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--field);
+}
+
+/* Tech grid */
+.eps {
+  border-radius: 10px;
+  clip-path: none;
+  border: 1px solid var(--border);
+}
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .hero-text {
+    padding: 0 20px;
+  }
+}
