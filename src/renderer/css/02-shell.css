@@ -1,0 +1,80 @@
+/* css/02-shell.css — split from style.css (lines 25-102); link in numeric order to keep the cascade. */
+/* app shell, rail nav, status dot, buttons, panels. */
+/* SHELL — left rail + workspace */
+.app-shell{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden;background:var(--bg)}
+.rail{background:var(--panel);border-right:1.5px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.rail-head{padding:16px 14px;border-bottom:1.5px solid var(--border);display:flex;gap:10px;align-items:center;background:linear-gradient(180deg, var(--panel-raised), var(--panel))}
+.brand{display:flex;gap:12px;align-items:center} .brand-mark{width:32px;height:32px;background:var(--panel-raised);border:1px solid var(--border);display:grid;place-items:center;overflow:hidden;border-radius:var(--r-sm);flex-shrink:0}
+.brand-mark img{width:100%;height:100%;object-fit:cover;display:block} .brand b{font-size:16px;letter-spacing:.02em;line-height:1} .brand small{display:block;font:600 9px var(--font-mono);letter-spacing:.14em;color:var(--text-dim);margin-top:3px}
+.rail-nav{padding:10px 8px;display:grid;gap:4px;flex:1;overflow:auto}
+.rail-nav .nav-item{width:100%;display:flex;align-items:center;gap:12px;padding:12px 12px;border:1px solid transparent;background:transparent;color:var(--text-muted);font:600 14px var(--font-ui);cursor:pointer;border-radius:var(--r-sm);text-align:left;transition:all .12s var(--ease)}
+.rail-nav .nav-item:hover{background:var(--panel-raised);color:var(--text);border-color:var(--border)}
+.rail-nav .nav-item.active{background:var(--panel-raised);border-color:var(--border-strong);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+.rail-nav .nav-item .nav-icon{width:22px;height:22px;opacity:.5;flex-shrink:0;transition:opacity .12s}
+.rail-nav .nav-item:hover .nav-icon{opacity:.8}
+.rail-nav .nav-item.active .nav-icon{opacity:1;filter:drop-shadow(0 0 6px rgba(255,255,255,.45))}
+.rail-nav .nav-item.active .nav-icon{opacity:1}
+.rail-foot{padding:10px 12px;border-top:1.5px solid var(--border);font:500 10px var(--font-mono);color:var(--text-dim);display:flex;justify-content:space-between}
+/* BUGFIX: with titleBarStyle:'hidden' (Windows) there was no -webkit-app-region drag strip anywhere,
+so the window could not be moved by dragging at all. The top command bar is now the drag handle. */
+.command-bar{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1.5px solid var(--border);background:rgba(15,20,26,.9);backdrop-filter:blur(8px);position:sticky;top:0;z-index:2;-webkit-app-region:drag;user-select:none}
+.command-bar button,.command-bar input{-webkit-app-region:no-drag}
+/* BUGFIX: the native minimize/maximize/close overlay sits ON TOP of web content in the top-right
+corner — the server-path text used to run underneath it and got covered. When Window Controls Overlay
+is active (renderer adds .wco-app to <html>), reserve its width on the right side of the bar. */
+.wco-app .command-bar{padding-right:max(152px,calc(100vw - env(titlebar-area-width,100%) - env(titlebar-area-x,0px) + 14px))}
+.command-bar-path{flex:1;font:500 11px var(--font-mono);color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.settings-trigger{padding:7px 12px!important;border-radius:999px!important;border:1px solid var(--border)!important;background:transparent!important;color:var(--text-muted);font:600 12px var(--font-ui);display:flex;gap:7px;align-items:center;cursor:pointer}
+.settings-trigger.active{border-color:var(--accent)!important;color:var(--accent);background:var(--accent-weak)!important;box-shadow:0 0 10px var(--accent-weak)}
+.channel-strip{display:none} /* hidden in mix, rail replaces it */
+/* keep channelIndicator hidden but exists for JS */
+.channel-indicator{display:none}
+.workspace{display:flex;flex-direction:column;overflow:hidden;padding:0;background:radial-gradient(800px 400px at 20% 0%, rgba(0,229,255,.06), transparent 60%), var(--bg)}
+.workspace main{flex:1;overflow:auto;padding:18px 18px 40px;min-height:0}
+.topbar{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border)}
+.top-actions{display:flex;gap:8px;align-items:center}
+.status-pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--text-muted);display:flex;gap:7px;align-items:center;background:var(--panel)}
+/* Status indicator — 4 states with distinct animations:
+   st-offline  = hollow gray ring (static)
+   st-running  = solid green core + two expanding pulse rings
+   st-starting = cyan spinner (fast)
+   st-stopping = amber spinner (slower, reverse) */
+.status-dot{position:relative;width:16px;height:16px;flex-shrink:0;display:inline-grid;place-items:center}
+.status-dot .sd-core{width:8px;height:8px;border-radius:50%;background:var(--text-dim);transition:background .2s,box-shadow .2s}
+.status-dot .sd-ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--success);opacity:0;pointer-events:none}
+.status-dot .sd-spin{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;display:none;animation:sdSpin .8s linear infinite}
+@keyframes sdSpin{to{transform:rotate(360deg)}}
+@keyframes sdPulse{0%{transform:scale(.6);opacity:.75}100%{transform:scale(2.2);opacity:0}}
+.status-dot.st-offline .sd-core{background:transparent;border:2px solid var(--text-dim);width:10px;height:10px}
+.status-dot.st-running .sd-core{background:var(--success);box-shadow:0 0 8px var(--success)}
+.status-dot.st-running .sd-ring.r1{animation:sdPulse 1.8s ease-out infinite}
+.status-dot.st-running .sd-ring.r2{animation:sdPulse 1.8s ease-out .9s infinite}
+.status-dot.st-starting .sd-core,.status-dot.st-starting .sd-ring{display:none}
+.status-dot.st-starting .sd-spin{display:block}
+.status-dot.st-stopping .sd-core,.status-dot.st-stopping .sd-ring{display:none}
+.status-dot.st-stopping .sd-spin{display:block;border-color:var(--warning);border-top-color:transparent;animation-direction:reverse;animation-duration:1.3s}
+.status-dot.lg{width:22px;height:22px}
+.status-dot.lg .sd-core{width:11px;height:11px}
+.status-dot.lg.st-offline .sd-core{width:13px;height:13px}
+.status-dot.lg .sd-spin{width:18px;height:18px}
+@media (prefers-reduced-motion: reduce){
+  .status-dot .sd-spin{animation-duration:2.4s}
+  .status-dot .sd-ring{animation:none!important;opacity:0}
+}
+/* (iconSpin/iconGlow removed — replaced by the status-dot component animations) */
+/* BUTTONS */
+.btn{border:1px solid var(--border);border-radius:var(--r);padding:9px 14px;font:600 12.5px var(--font-ui);cursor:pointer;background:var(--panel-raised);color:var(--text);transition:all .13s var(--ease)}
+.btn:hover{border-color:var(--border-hover);background:var(--panel-hover);transform:translateY(-1px)}
+.btn:active{transform:translateY(0) scale(.98)} .btn:disabled{opacity:.4;pointer-events:none}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 0 12px var(--accent-weak)}
+.btn.primary:hover{background:var(--accent-dim);border-color:var(--accent-dim);box-shadow:0 0 16px var(--accent-glow)}
+.btn.secondary{background:transparent}
+.btn.danger{background:var(--danger-weak);color:var(--danger);border-color:rgba(255,59,92,.25)}
+.text-btn{background:none;border:0;color:var(--accent);font:600 11px var(--font-ui);cursor:pointer} .text-btn:hover{color:var(--text)}
+.text-btn.danger{color:var(--danger)}
+/* PANELS */
+.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);position:relative;overflow:hidden}
+.glass::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(to bottom, rgba(0,229,255,.03) 0 1px, transparent 1px 3px);pointer-events:none;opacity:.6}
+.glass:hover{border-color:var(--border-hover)}
+.panel{padding:16px} .panel-head{display:flex;justify-content:space-between;gap:10px;align-items:start;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)}
+.panel-head p{margin:0;color:var(--text-muted);font-size:11px}

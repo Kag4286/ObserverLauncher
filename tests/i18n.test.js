@@ -1,5 +1,9 @@
 global.window = {};
-require('../src/renderer/locales.js');
+// locales/ split: meta first (init + LOCALES_META), then every language file.
+require('../src/renderer/locales/meta.js');
+for (const lang of ['en', 'vi', 'es', 'pt-BR', 'de', 'ru', 'zh-CN']) {
+  require(`../src/renderer/locales/${lang}.js`);
+}
 const en = Object.keys(window.LOCALES.en);
 let ok = true;
 for (const c of Object.keys(window.LOCALES)) {

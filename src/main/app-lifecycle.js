@@ -1,0 +1,77 @@
+// App window lifecycle + auto-update + graceful quit (extracted from main.js).
+const path = require('path');
+const { app, BrowserWindow, protocol } = require('electron');
+const { killTree } = require('./kill.js');
+const { loadSettings } = require('./settings.js');
+const { detectJava } = require('./java.js');
+const { serverFiles } = require('./server-files.js');
+const { startMetrics } = require('./server-lifecycle.js');
+const { startAutoBackupWatcher } = require('./backups.js');
+const textures = require('./textures');
+
+async function createWindow(ctx) {
+  if (process.platform === 'win32') app.setAppUserModelId('dev.observerlauncher.minecraftservercontrol');
+  const winOpts = {
+    width: 1480, height: 930, minWidth: 1080, minHeight: 720,
+    backgroundColor: '#08090a',
+    icon: path.join(__dirname, '..', 'renderer', 'assets', 'icons', 'observer.png'),
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false }
+  };
+  if (process.platform === 'win32') Object.assign(winOpts, { titleBarStyle: 'hidden', titleBarOverlay: { color: '#08090a', symbolColor: '#e9edf0', height: 42 } });
+  ctx.win = new BrowserWindow(winOpts);
+  await ctx.win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+}
+
+function setupAutoUpdater(ctx, ipcMain) {
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.autoDownload = false;
+  autoUpdater.on('update-available', v => ctx.send('app:update-available', v));
+  autoUpdater.on('update-not-available', () => ctx.send('app:update-none', {}));
+  autoUpdater.on('download-progress', p => ctx.send('app:update-progress', p));
+  autoUpdater.on('update-downloaded', () => ctx.send('app:update-downloaded', {}));
+  if (app.isPackaged) autoUpdater.checkForUpdates();
+
+  ipcMain.handle('app:check-update', () => autoUpdater.checkForUpdates());
+  ipcMain.handle('app:download-update', () => autoUpdater.downloadUpdate());
+  ipcMain.handle('app:quit-install', () => autoUpdater.quitAndInstall());
+}
+
+function setupQuitHandler(ctx) {
+  let quitHandled = false;
+  app.on('before-quit', event => {
+    clearTimeout(ctx.restartTimer);
+    clearInterval(ctx.sampleTimer);
+    clearInterval(ctx.autoPollTimer);
+    clearInterval(ctx.autoBackupTimer);
+    if (quitHandled || (!ctx.serverProcess && !ctx.buildProcess)) return;
+    event.preventDefault();
+    quitHandled = true;
+    ctx.manualStop = true;
+    try { if (ctx.serverProcess?.stdin?.writable) ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
+    if (ctx.buildProcess) killTree(ctx.buildProcess.pid);
+    const deadline = Date.now() + 10000;
+    const waitStop = setInterval(() => {
+      if (ctx.serverProcess && Date.now() < deadline) return;
+      clearInterval(waitStop);
+      if (ctx.serverProcess) killTree(ctx.serverProcess.pid);
+      setTimeout(() => app.quit(), 200);
+    }, 250);
+  });
+}
+
+async function initApp(ctx, ipcMain) {
+  textures.init({
+    serverNames: () => {
+      try { const i = serverFiles(ctx.currentServerPath); return [i.jar, i.launchScript].filter(Boolean); }
+      catch { return []; }
+    }
+  });
+  protocol.handle('tex', textures.handle);
+  ctx.currentServerPath = loadSettings().serverPath;
+  ctx.watchServerFolder();
+  ctx.javaInfo = await detectJava(loadSettings().javaPath || 'java');
+  startMetrics(ctx);
+  startAutoBackupWatcher(ctx);
+}
+
+module.exports = { killTree, createWindow, setupAutoUpdater, setupQuitHandler, initApp };

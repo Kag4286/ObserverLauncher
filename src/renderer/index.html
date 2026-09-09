@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="style.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"></head>
 <body>
 <div class="app-shell">
   <aside class="rail">
@@ -24,25 +24,31 @@
     <div class="command-bar-path" id="serverPath">No server selected</div>
   </header>
   <div class="channel-strip" hidden></div>
-  <main><header class="topbar"><div><p class="eyebrow" data-i18n="top.eyebrow">LOCAL SERVER</p><h1 id="pageTitle">Overview</h1></div><div class="top-actions"><div class="status-pill"><i id="statusDot" class="status-dot st-offline" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i><span id="statusText" data-i18n="top.offline">Offline</span></div><button id="stopBtn" class="btn secondary" disabled data-i18n="top.stop">Stop server</button><button id="startBtn" class="btn primary" data-i18n="top.start">Start server <span>↗</span></button></div></header>
+  <main><header class="topbar"><div><p class="eyebrow" data-i18n="top.eyebrow">LOCAL SERVER</p><h1 id="pageTitle">Overview</h1></div><div class="top-actions"><div class="status-pill"><i id="statusDot" class="status-dot st-offline" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i><span id="statusText" data-i18n="top.offline">Offline</span></div><button id="stopBtn" class="btn secondary" disabled data-i18n="top.stop">Stop server</button><button id="forceStopBtn" class="btn danger" disabled data-i18n="top.forceStop" data-i18n-title="top.forceStopHint" title="Kill the server process immediately">Force stop</button><button id="startBtn" class="btn primary" data-i18n="top.start">Start server <span>↗</span></button></div></header>
     <section id="overview" class="tab active">
-      <div class="welcome glass" id="welcomeCard"><div><p class="eyebrow" data-i18n="ov.controlCenter">CONTROL CENTER</p><h2 id="serverName">Your Minecraft server</h2><p id="serverHint">Select your server folder to get started — or create a new one from scratch.</p></div><div class="welcome-actions"><button class="btn secondary" id="chooseFolder" data-i18n="ov.choose">Choose folder</button><button class="btn primary" id="welcomeCreateBtn" data-i18n="ov.create">Create new server</button></div></div>
+      <div class="hero glass" id="welcomeCard">
+        <div class="hero-top">
+          <div class="hero-id">
+            <b id="serverName">Your Minecraft server</b>
+            <p class="hero-sub"><span class="status-pill"><i class="metric-hero-dot status-dot st-offline" id="heroDot" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i><strong id="metricStatus">Offline</strong></span><span id="serverHint">Select your server folder to get started — or create a new one from scratch.</span></p>
+            <p class="hero-meta"><small id="eulaStatus">EULA status unknown</small><span class="srv-sep" aria-hidden="true">·</span><span class="srv-uptime"><span data-i18n="ov.uptime">SESSION UPTIME</span> <b id="heroUptime">—</b></span></p>
+          </div>
+          <div class="welcome-actions"><button class="btn secondary" id="chooseFolder" data-i18n="ov.choose">Choose folder</button><button class="btn primary" id="welcomeCreateBtn" data-i18n="ov.create">Create new server</button></div>
+        </div>
+        <ul class="hero-steps" id="setupSteps" aria-label="Setup checklist" hidden></ul>
+        <div class="hero-bottom">
+        <dl class="srv-stats">
+          <div title="Live player list when running"><dt data-i18n="ov.players">PLAYERS ONLINE</dt><dd id="playerCount">—</dd></div>
+          <div><dt>TPS</dt><dd id="tps">—</dd></div>
+          <div title="Java process usage"><dt data-i18n="ov.cpu">SERVER CPU</dt><dd id="overviewCpu">—</dd></div>
+          <div title="Actually used right now"><dt data-i18n="ov.ram">SERVER RAM</dt><dd id="serverRam">—</dd></div>
+          <div class="stat-ram" title="Restart the server to apply a new allocation"><dt data-i18n="ov.limit">ALLOCATE RAM (GB)</dt><dd><input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn secondary" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button></dd></div>
+        </dl>
+        </div>
+      </div>
       <div class="proxy-notice ed-conflict" id="javaWarnBanner" hidden style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <span id="javaWarnText" style="flex:1;min-width:200px"></span>
         <button class="btn sm primary" id="javaFixBtn" data-i18n="ov.fixJava">Install Java now</button>
-      </div>
-      <div class="metrics-bento">
-        <article class="metric glass metric-hero">
-          <div class="metric-hero-top"><span data-i18n="ov.status">SERVER STATUS</span><i class="metric-hero-dot status-dot lg st-offline" id="heroDot" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i></div>
-          <strong id="metricStatus">Offline</strong>
-          <small id="eulaStatus">EULA status unknown</small>
-          <div class="metric-hero-uptime"><span class="metric-hero-uptime-label" data-i18n="ov.uptime">SESSION UPTIME</span><b id="heroUptime">—</b></div>
-        </article>
-        <article class="metric glass bento-players"><span data-i18n="ov.players">PLAYERS ONLINE</span><strong id="playerCount">—</strong><small data-i18n="ov.playersHint">Live player list when running</small></article>
-        <article class="metric glass bento-tps"><span>TPS</span><strong id="tps">—</strong></article>
-        <article class="metric glass bento-cpu"><span data-i18n="ov.cpu">SERVER CPU</span><strong id="overviewCpu">—</strong><small data-i18n="ov.cpuHint">Java process usage</small></article>
-        <article class="metric glass bento-ram"><span data-i18n="ov.ram">SERVER RAM</span><strong id="serverRam">—</strong><small data-i18n="ov.ramHint">Actually used right now</small></article>
-        <article class="metric glass bento-limit ram-allocate"><span data-i18n="ov.limit">ALLOCATE RAM (GB)</span><div class="ram-allocate-inputs"><input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn secondary" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button></div><small data-i18n="ov.limitHint">Restart the server to apply a new allocation</small></article>
       </div>
       <div class="overview-grid"><article class="panel glass chart-panel"><div class="panel-head"><div><h3 data-i18n="ov.perfTitle">Server performance</h3><p data-i18n="ov.perfSub">TPS, MSPT, CPU and RAM telemetry</p></div><button class="text-btn" data-tab-jump="performance" data-i18n="ov.perfOpen">Open performance →</button></div><canvas id="miniChart" width="800" height="250"></canvas><div class="chart-legend"><span><i class="legend-tps"></i> TPS</span><span><i class="legend-cpu"></i> CPU</span><span><i class="legend-ram"></i> RAM</span></div></article>
       <article class="panel glass activity"><div class="panel-head"><div><h3 data-i18n="ov.quickTitle">Quick actions</h3><p data-i18n="ov.quickSub">Common server tasks</p></div></div><div class="quick-strip"><button class="quick" data-command="say Server maintenance tools are ready."><span data-i18n="ov.broadcast">Broadcast message</span></button><button class="quick" data-open="plugins"><span data-i18n="ov.managePlugins">Manage plugins / mods</span></button><button class="quick" data-open="world"><span data-i18n="ov.openWorld">Open world folder</span></button><button class="quick" data-tab-jump="properties"><span data-i18n="ov.editProps">Edit server properties</span></button></div></article></div>
@@ -505,4 +511,4 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales.js"></script><script src="app.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/01-content.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script></body></html>

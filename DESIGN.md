@@ -1,7 +1,7 @@
 # ObserverLauncher — Design System
 
 > **Theme:** MIX A+B — FIELD STATION + SIGNAL LAB — black / cyan
-> Source of truth: `src/renderer/style.css:1`
+> Source of truth: `src/renderer/css/01-tokens.css:1` (split from `style.css`; link `css/*.css` in numeric order)
 
 ## Concept
 
@@ -45,25 +45,26 @@ Together: a launcher that feels like a local server appliance, not a marketing s
 
 - ` --r-sm:2px --r:3px --r-lg:4px`
 - ` --ease:cubic-bezier(.16,.84,.44,1) --ease-spring:cubic-bezier(.34,1.56,.64,1)`
-- Shell grid: `260px rail + 1fr workspace` `src/renderer/style.css:26`, content gaps `10-16px`, panel padding `16px`
+- Shell grid: `260px rail + 1fr workspace` `src/renderer/css/02-shell.css:4`, content gaps `10-16px`, panel padding `16px`
 
 ## Shell
 
-- Left `rail` `260px` with `rail-head` + `rail-nav` + `rail-foot` `src/renderer/style.css:27`
-- Top `command-bar` is the ` -webkit-app-region:drag` handle on Windows `src/renderer/style.css:42` (fixes `titleBarStyle:'hidden'` drag)
-- `Window Controls Overlay` reserved via `.wco-app .command-bar` `src/renderer/style.css:47`
+- Left `rail` `260px` with `rail-head` + `rail-nav` + `rail-foot` `src/renderer/css/02-shell.css:5`
+- Top `command-bar` is the ` -webkit-app-region:drag` handle on Windows `src/renderer/css/02-shell.css:20` (fixes `titleBarStyle:'hidden'` drag)
+- `Window Controls Overlay` reserved via `.wco-app .command-bar` `src/renderer/css/02-shell.css:25`
 
 ## Components
 
-- **Metrics bento** `src/renderer/style.css:111` — `grid: hero | players tps / hero cpu ram limit`, hero 32px mono, status-dot 4 states (`st-offline/running/starting/stopping` `src/renderer/style.css:64`)
-- **Perf KPIs** `src/renderer/style.css:199` — 4 columns, top border accent per KPI, `kpi-bar` 4px, badges `ok/warn/bad`
-- **Charts** `src/renderer/style.css:213` — `canvas 100%×200px` on `var(--field)` + `tickChartEmpty/resourceChartEmpty` overlay `hidden` when `samples` has data
-- **Player inspector** `src/renderer/style.css:1058` — `player-modal 780px/88vh`, `inspect-header/avatar/badge`, `text-list` with `inv-row` + search/sort toolbar, staggered animations `modalIn/sectionIn/rowIn`
-- **Marketplace** `src/renderer/style.css:418` — `market-item 48px icon + 1fr + auto`, `skeletonPulse`, `marketIn` stagger
+- **Hero** `src/renderer/css/03-overview.css:3` — identity (name + pill with dot inside + plain sentence) over a problems-only checklist (`#setupSteps`, hidden when all green) over a 5-cell stats row (4 live numbers + RAM); meta line (EULA/uptime) visible only while running (`.is-running`)
+- **Quick actions** — vertical `var(--row-h)` rows with `→` cue, hover shifts border/text only (no lift)
+- **Perf KPIs** `src/renderer/css/03-overview.css:99` — 4 columns, top border accent per KPI, `kpi-bar` 4px, badges `ok/warn/bad`
+- **Charts** `src/renderer/css/03-overview.css` — slim `canvas 100%×140px` on `var(--field)` + `tickChartEmpty/resourceChartEmpty` overlay `hidden` when `samples` has data
+- **Player inspector** `src/renderer/css/07-polish.css:121` — `player-modal 780px/88vh`, `inspect-header/avatar/badge`, `text-list` with `inv-row` + search/sort toolbar, staggered animations `modalIn/sectionIn/rowIn`
+- **Marketplace** `src/renderer/css/05-market.css:105` — `market-item 48px icon + 1fr + auto`, `skeletonPulse`, `marketIn` stagger
 
 ## Motion
 
-- `fadeIn .16s var(--ease)` for tabs `src/renderer/style.css:148`
+- Direction-aware tab slide `tabFwd/tabBack var(--dur-tab) var(--ease-out)` (`css/08-motion.css`), 10px travel, retriggered per switch in `js/08-shell.js:switchTab`
 - `sdPulse 1.8s` for `st-running` dot, `sdSpin .8s` for `st-starting/stopping`
-- `itemIn .18s` + `itemFloat .9s` for inventory cells `src/renderer/style.css:311`
-- Respects `prefers-reduced-motion` `src/renderer/style.css:82`
+- `itemIn .18s` + `itemFloat .9s` for inventory cells `src/renderer/css/04-players.css:73`
+- Global `prefers-reduced-motion` kill-switch `src/renderer/css/08-motion.css` (all durations → 0)

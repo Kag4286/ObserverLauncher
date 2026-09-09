@@ -59,8 +59,16 @@ async function restoreBackup({ destPath, zipPath }) {
 }
 
 async function allowFirewall(port) {
-  const ruleName = `ObserverLauncher-${port}`;
-  const innerScript = `if (-not (Get-NetFirewallRule -DisplayName '${ruleName.replace(/'/g, "''")}' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '${ruleName.replace(/'/g, "''")}' -Direction Inbound -Protocol TCP -LocalPort ${port} -Action Allow -ErrorAction Stop }`;
+  // BUGFIX (command injection): `port` arrives from the renderer and used to be
+  // interpolated raw into `-LocalPort ${port}` inside an ELEVATED PowerShell
+  // (UAC). A value like `80; Remove-Item C:\...` would run as admin. Validate
+  // here too (defense in depth — the IPC layer already checks) and only ever
+  // interpolate the coerced integer.
+  const { isValidPort } = require('../validate.js');
+  const p = isValidPort(port);
+  if (p === null) return { ok: false, error: 'Invalid port.' };
+  const ruleName = `ObserverLauncher-${p}`;
+  const innerScript = `if (-not (Get-NetFirewallRule -DisplayName '${ruleName.replace(/'/g, "''")}' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '${ruleName.replace(/'/g, "''")}' -Direction Inbound -Protocol TCP -LocalPort ${p} -Action Allow -ErrorAction Stop }`;
   const encoded = Buffer.from(innerScript, 'utf16le').toString('base64');
   const outer = `$p = Start-Process powershell -ArgumentList '-NoProfile -EncodedCommand ${encoded}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode`;
   const r = await runPowerShell(outer, 120000);

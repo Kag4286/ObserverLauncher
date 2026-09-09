@@ -134,21 +134,42 @@ async function createBackup({ serverPath, worlds, destZip }) {
   // names are relative — so it failed EVERY time ("cannot stat world") and every backup silently
   // paid for a doomed process before falling back to a retry that did set cwd. Run whichever tool
   // is available directly with the right working directory; no doomed first attempt.
+  // SECURITY: world names come from disk scanning but are still validated — a name starting
+  // with `-` would be parsed as a CLI flag, and `/` or `..` would archive outside serverPath.
+  const { isSafeWorldName } = require('../validate.js');
+  const safeWorlds = Array.isArray(worlds) ? worlds.filter(isSafeWorldName) : [];
+  if (!safeWorlds.length) return { ok: false, error: 'No valid world folders to back up.' };
   const hasZip = await exec('which', ['zip']).then(r => r.ok);
   const cmd = hasZip ? 'zip' : 'tar';
-  const args = hasZip ? ['-r', destZip, ...worlds] : ['-czf', destZip, ...worlds];
+  const args = hasZip ? ['-r', destZip, '--', ...safeWorlds] : ['-czf', destZip, '--', ...safeWorlds];
   return new Promise(resolve => {
     const { spawn } = require('child_process');
     const proc = spawn(cmd, args, { cwd: serverPath });
     let stderr = '';
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} done({ ok: false, error: `${cmd} timed out` }); }, 300000);
     proc.stderr.on('data', d => { stderr += d.toString(); });
-    proc.on('error', err => resolve({ ok: false, error: err.message }));
-    proc.on('close', code => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr || `${cmd} exited with ${code}` }));
-    setTimeout(() => { try { proc.kill(); } catch {} resolve({ ok: false, error: `${cmd} timed out` }); }, 300000);
+    proc.on('error', err => done({ ok: false, error: err.message }));
+    proc.on('close', code => done(code === 0 ? { ok: true } : { ok: false, error: stderr || `${cmd} exited with ${code}` }));
   });
 }
 
 async function restoreBackup({ destPath, zipPath }) {
+  // SECURITY (zip-slip): `unzip -o` / `tar -xzf` extract absolute paths and
+  // `../` entries OUTSIDE destPath. A crafted .zip dropped into the backups
+  // folder could overwrite files anywhere the user can write. List entries
+  // first and refuse the whole archive on the first unsafe path.
+  const { isSafeArchiveEntry } = require('../validate.js');
+  try {
+    const entries = await listArchiveEntries(zipPath);
+    if (entries) {
+      const bad = entries.find(e => !isSafeArchiveEntry(e));
+      if (bad) return { ok: false, error: `Backup contains an unsafe path ("${bad}") — restore stopped for safety.` };
+    }
+  } catch {
+    // listing failed (unknown format?) — fall through to extraction errors below
+  }
   // try unzip first (handles both zip and tar.gz if bsdtar)
   const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);
   if (hasUnzip) {
@@ -160,11 +181,25 @@ async function restoreBackup({ destPath, zipPath }) {
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract backup (needs unzip or tar)' };
 }
 
+// Best-effort archive listing for the zip-slip pre-check above.
+// Returns an array of entry names, or null when the format can't be listed
+// (caller then falls through to normal extraction).
+async function listArchiveEntries(zipPath) {
+  const zipList = await exec('unzip', ['-Z1', zipPath], 30000);
+  if (zipList.ok && zipList.stdout.trim()) return zipList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const tarList = await exec('tar', ['-tzf', zipPath], 30000);
+  if (tarList.ok && tarList.stdout.trim()) return tarList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  return null;
+}
+
 async function allowFirewall(port) {
+  const { isValidPort } = require('../validate.js');
+  const p = isValidPort(port);
+  if (p === null) return { ok: false, error: 'Invalid port.' };
   return {
     ok: false,
-    error: `On Linux, please allow port ${port}/tcp manually: sudo ufw allow ${port}/tcp  — or configure your firewall/iptables. The launcher does not request sudo automatically.`
+    error: `On Linux, please allow port ${p}/tcp manually: sudo ufw allow ${p}/tcp  — or configure your firewall/iptables. The launcher does not request sudo automatically.`
   };
 }
 
-module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall };
+module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries };

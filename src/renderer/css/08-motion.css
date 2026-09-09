@@ -1,0 +1,23 @@
+/* css/08-motion.css — redesign P0: motion primitives. Load LAST so the
+   reduced-motion guard wins over every component animation. */
+/* Tab switch: direction-aware slide (JS adds .tab-enter-fwd/.tab-enter-back
+   to the incoming panel; classes are removed on animationend). */
+.tab.active{animation:none}
+.tab-enter-fwd{animation:tabFwd var(--dur-tab) var(--ease-out)}
+.tab-enter-back{animation:tabBack var(--dur-tab) var(--ease-out)}
+@keyframes tabFwd{from{opacity:0;transform:translateX(var(--slide-x))}to{opacity:1;transform:none}}
+@keyframes tabBack{from{opacity:0;transform:translateX(calc(var(--slide-x) * -1))}to{opacity:1;transform:none}}
+/* Modal sheet rise (pairs with .closing shrink in component CSS). */
+.modal-rise{animation:modalRise var(--dur-modal) var(--ease-out)}
+@keyframes modalRise{from{opacity:0;transform:translateY(10px) scale(.995)}to{opacity:1;transform:none}}
+/* List refresh: opacity only — no translate cascade, no stagger. */
+.fade-swap{animation:fadeSwap var(--dur-fast) var(--ease-out)}
+@keyframes fadeSwap{from{opacity:.25}to{opacity:1}}
+/* Legacy simple fade (wizard steps). New code: use tab/modal/fade-swap. */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+/* Hover lifts are banned: interactive rows may only shift border/text color.
+   (Enforced by review, not by CSS — this file documents the rule.) */
+/* Reduced motion: everything instant, including status-dot pulses. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:var(--dur-instant)!important;animation-iteration-count:1!important;transition-duration:var(--dur-instant)!important;scroll-behavior:auto!important}
+}

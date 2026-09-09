@@ -1,0 +1,33 @@
+/* css/01-tokens.css — split from style.css (lines 1-24); link in numeric order to keep the cascade. */
+/* design tokens (:root), base, focus. */
+/* ObserverLauncher — MIX A+B : FIELD STATION + SIGNAL LAB — black/cyan */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@500;600;700&display=swap');
+:root{
+  --bg:#05070A; --bg-2:#0A0E13;
+  --panel:#0F141A; --panel-raised:#141B22; --panel-hover:#18202B;
+  --field:#080A0D; --field-border:#1E2A36;
+  --border:#1A2735; --border-strong:#223449; --border-hover:#2A4158;
+  --text:#FFFFFF; --text-muted:#E6EDF3; --text-dim:#B8C2CC;
+  --accent:#00E5FF; --accent-dim:#00B8CC; --accent-weak:rgba(0,229,255,.12); --accent-glow:rgba(0,229,255,.45); --accent-ink:#00141A;
+  --danger:#FF3B5C; --danger-weak:rgba(255,59,92,.12);
+  --success:#00E5A0; --success-weak:rgba(0,229,160,.12);
+  --warning:#FFD23F; --warning-weak:rgba(255,210,63,.12);
+  --chart-tps:var(--accent); --chart-cpu:var(--warning); --chart-ram:var(--success);
+  --font-ui:Inter, system-ui, -apple-system, sans-serif;
+  --font-mono:JetBrains Mono, ui-monospace, monospace;
+  --r-sm:2px; --r:3px; --r-lg:4px;
+  --ease:cubic-bezier(.16,.84,.44,1); --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  /* MOTION (redesign P0): one ease, three durations. Slide distance stays
+     small (10px) — direction cue, not decoration. */
+  --ease-out:cubic-bezier(.2,.7,.3,1);
+  --dur-instant:0ms; --dur-fast:120ms; --dur-tab:170ms; --dur-modal:210ms;
+  --slide-x:10px;
+  /* DENSITY: instrument rows, not cards. */
+  --row-h:34px; --gap:10px; --pad-panel:14px;
+}
+*{box-sizing:border-box} [hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;overflow:hidden}
+h1,h2,h3{margin:0} h1{font-size:22px;font-weight:700;letter-spacing:-.02em} h2{font-size:18px;font-weight:700}
+.eyebrow{font:700 10px var(--font-mono);letter-spacing:.14em;color:var(--text-dim);text-transform:uppercase}
+.text-muted{color:var(--text-muted)} code{color:var(--accent);font-family:var(--font-mono)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

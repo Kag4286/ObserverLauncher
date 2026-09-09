@@ -33,8 +33,11 @@ function findPlayerDataFile(root, properties, uuid, name) {
   findPlayerDataFile.lastSearch = { worlds: uniqueWorlds, ids, subpaths: subpaths.map(s => s.join('/')) };
   return null;
 }
+function emptyServerFiles() {
+  return { jar: null, launchScript: null, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {} };
+}
 function serverFiles(root) {
-  if (!root || !fs.existsSync(root)) return { jar: null, plugins: [], mods: [], datapacks: [], worlds: [], backups: [], properties: {} };
+  if (!root || !fs.existsSync(root)) return emptyServerFiles();
   const list = p => fs.existsSync(p) ? fs.readdirSync(p, { withFileTypes: true }) : [];
   const names = list(root).filter(x => x.isFile() && /\.jar$/i.test(x.name)).map(x => x.name);
   const runnable = names.filter(x => !/(installer|universal|shim|buildtools)/i.test(x)); const launchScript = list(root).find(x => x.isFile() && /^run\.(bat|sh)$/i.test(x.name))?.name || null;
@@ -192,4 +195,4 @@ function parseServerLine(text, live, send) {
   }
   if (changed && typeof send === 'function') send('server:live', live);
 }
-module.exports = { serverFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine };
+module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine };
