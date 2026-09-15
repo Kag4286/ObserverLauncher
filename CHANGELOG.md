@@ -3,6 +3,27 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.1] — 2026-09-15
+
+### Changed
+- **README rewritten end to end.** Moved the focus from marketing to practical
+  use: a step-by-step quick start, an expanded Troubleshooting section built
+  from real bug reports, a FAQ, a Data & privacy section, Known limitations, a
+  Roadmap, and an Architecture overview for contributors. Added three UI
+  screenshots.
+- **CONTRIBUTING.md updated** to match the v0.2.0+ split structure (it still
+  referenced the old `app.js` / `locales.js` / `style.css` files). Documents the
+  three-layer main/preload/renderer design, the load-order rules for the
+  renderer, the stable-IPC-channel rule, and the shared validators.
+
+### Added
+- `docs/` folder with three screenshots (Overview, World Map, Marketplace).
+
+### Removed
+- `check-i18n.js` and `.github/workflows/pages.yml` — leftovers from the
+  marketing website, which is no longer part of this repository. Only the
+  release workflow remains.
+
 ## [0.3.0] — 2026-09-09
 
 ### Added

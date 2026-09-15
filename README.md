@@ -103,13 +103,13 @@ Running from source additionally requires **Node.js 18 or newer**.
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-0.3.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-0.3.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-0.3.1-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-0.3.1.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe`. It is a normal NSIS installer — you can choose the install location, and it sets up auto-update.
-- **Linux:** `chmod +x ObserverLauncher-0.3.0.AppImage` then run it. No installation, no root required.
+- **Linux:** `chmod +x ObserverLauncher-0.3.1.AppImage` then run it. No installation, no root required.
 
 ### Option B — Run from source
 
