@@ -38,7 +38,7 @@ function renderItemGrid(id,items){
   n.innerHTML=list.map((x,i)=>{
     if(x.empty) return `<div class="inv-row empty" style="animation-delay:${i*18}ms"><span class="slot">#${x.slot}</span><span class="item-name muted">— Empty —</span><span class="count"></span></div>`;
     const label=itemLabel(x.id);
-    return `<div class="inv-row" style="animation-delay:${i*18}ms" title="${esc(label)}"><span class="slot">#${x.slot}</span><span class="item-name">${esc(label)}</span><span class="count">×${x.count}</span><span class="item-id">${esc(x.id)}</span></div>`;
+    return `<div class="inv-row" style="animation-delay:${i*18}ms" title="${esc(label)} — ${esc(x.id)}"><span class="slot">#${x.slot}</span><span class="item-name">${esc(label)}</span><span class="count">×${x.count}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
@@ -48,7 +48,7 @@ function renderEquipment(armor,offhand){
   n.innerHTML=order.map((label,i)=>{
     const it=slots.find(x=>x.slot===label);
     const has=!!it;
-    return `<div class="inv-row equip ${has?'':'empty'}" style="animation-delay:${i*22}ms"><span class="slot">${esc(label)}</span><span class="item-name ${has?'':'muted'}">${has?esc(itemLabel(it.id)):'— Empty —'}</span><span class="count">${has&&it.count>1?`×${it.count}`:''}</span><span class="item-id">${has?esc(it.id):''}</span></div>`;
+    return `<div class="inv-row equip ${has?'':'empty'}" style="animation-delay:${i*22}ms"${has?` title="${esc(it.id)}"`:''}><span class="slot">${esc(label)}</span><span class="item-name ${has?'':'muted'}">${has?esc(itemLabel(it.id)):'— Empty —'}</span></div>`;
   }).join('');
 }
 let playerFilter='online';
@@ -152,7 +152,11 @@ $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
 });
 $('#playersPrevPage').onclick=()=>{if(playerPage>0){playerPage--;renderPlayers()}};
 $('#playersNextPage').onclick=()=>{playerPage++;renderPlayers()};
-$('#playerSearch')?.addEventListener('input', debounce(e=>{playerSearchQuery=e.target.value; playerPage=0; renderPlayers();}, 200));
+// BUGFIX: this file loads BEFORE 08-shell.js (where debounce() is defined), so calling
+// debounce() here at load time threw ReferenceError and the search box never got a
+// listener. Use an inline debounce so this file is self-contained.
+let playerSearchTimer=null;
+$('#playerSearch')?.addEventListener('input', e=>{ clearTimeout(playerSearchTimer); playerSearchTimer=setTimeout(()=>{ playerSearchQuery=e.target.value; playerPage=0; renderPlayers(); }, 200); });
 // BUGFIX: "Refresh list" used to be a generic [data-command="list"] button, which only sends the
 // console command "list" to a RUNNING server — it never re-read usercache.json/playerdata from disk,
 // so a player who joined (recorded on disk) then left could click this forever and never see a working

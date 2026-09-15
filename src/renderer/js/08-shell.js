@@ -592,11 +592,23 @@ const v=await window.observer.marketVersions();if(v.ok)$('#marketVersion').inner
 
 // ===== AUTO-UPDATE UI =====
 const updateBtn=$('#checkUpdateBtn');
-if(updateBtn)updateBtn.onclick=async()=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.checking');await window.observer.checkUpdate();};
-window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.available',{v:v.version})+' <button class="btn primary sm" id="dlBtn">'+t('upd.download')+'</button>';const b=$('#dlBtn');if(b)b.onclick=()=>window.observer.downloadUpdate();});
+// BUGFIX: every update call is now awaited and its {ok:false} / thrown error is shown, and the
+// status text resets to a retryable state instead of sticking on "Checking…" after a failure.
+if(updateBtn)updateBtn.onclick=async()=>{
+  const st=$('#updateStatus');
+  if(st)st.textContent=t('upd.checking');
+  try{const r=await window.observer.checkUpdate();if(r&&!r.ok&&st)st.textContent=r.error||t('upd.none');}catch(e){if(st)st.textContent=e?.message||String(e);}
+};
+window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.available',{v:v.version})+' <button class="btn primary sm" id="dlBtn">'+t('upd.download')+'</button>';const b=$('#dlBtn');if(b)b.onclick=async()=>{const s=$('#updateStatus');try{const r=await window.observer.downloadUpdate();if(r&&!r.ok&&s)s.textContent=r.error||'Download failed.';}catch(e){if(s)s.textContent=e?.message||String(e);}};});
 window.observer.onUpdateProgress(p=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.downloading',{p:Math.round(p.percent)});});
-window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.ready')+' <button class="btn primary sm" id="installBtn">'+t('upd.install')+'</button>';const b=$('#installBtn');if(b)b.onclick=()=>window.observer.quitInstall();});
+window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.ready')+' <button class="btn primary sm" id="installBtn">'+t('upd.install')+'</button>';const b=$('#installBtn');if(b)b.onclick=async()=>{
+  // Installing restarts the app, which stops any running server. Warn first so nobody loses an
+  // unsaved world without knowing why the launcher is about to close.
+  if(state.running&&!confirm(t('upd.confirmRunning')))return;
+  try{await window.observer.quitInstall();}catch(e){const s=$('#updateStatus');if(s)s.textContent=e?.message||String(e);}
+};});
 window.observer.onUpdateNone&&window.observer.onUpdateNone(()=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.none');});
+window.observer.onUpdateError&&window.observer.onUpdateError(d=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.error',{m:d&&d.message?d.message:'unknown error'});});
 
 // ===== PULSE — the launcher's heartbeat. 8 ticks fill every ~5s poll cycle.
 const pulseWave=$('#pulseWave');let pulseTicks=[];

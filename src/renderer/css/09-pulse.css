@@ -17,7 +17,13 @@
 .pulse-wave i{width:3px;height:5px;background:var(--border);display:block}
 /* live beat fill: JS toggles .done on each tick as the poll lands */
 .pulse-wave i.done{background:var(--accent)}
-@keyframes pulseScan{0%{opacity:0;filter:blur(6px) saturate(.6)}60%{opacity:1}100%{filter:blur(0) saturate(1)}}
+@keyframes pulseScan{0%{opacity:0;filter:blur(6px) saturate(.6)}60%{opacity:1}100%{filter:none}}
+/* BUGFIX (blurry text on scroll): fill-mode:both keeps the final keyframe forever.
+   The old final state was `filter:blur(0) saturate(1)` — technically a no-op filter, but
+   Chromium treats any non-`none` filter as a real one, which promotes .app-shell (the
+   ancestor of the whole app) to its own GPU compositing layer. On a composited layer
+   subpixel antialiasing is disabled, so all text looked thin/dim and got worse while
+   scrolling. Ending on `filter:none` drops the layer. */
 .app-shell{animation:pulseScan .42s cubic-bezier(.2,.7,.3,1) both}
 
 /* ============ RAIL (nav feels like a console, not a list) ============ */
@@ -34,8 +40,6 @@
 .rail-nav .nav-item .nav-icon{width:20px;height:20px;opacity:.55}
 .rail-nav .nav-item.active .nav-icon{opacity:1;filter:drop-shadow(0 0 4px rgba(0,229,255,.5))}
 /* settings separated by a soft break, not a heavy dashed box */
-.rail-nav .settings-trigger{border:1px dashed var(--border-strong)!important;margin-top:10px;color:var(--text-dim)}
-.rail-nav .settings-trigger.active{color:var(--accent);border-color:var(--accent)!important;background:var(--accent-weak)}
 .rail-foot{border-top:var(--hairline) solid var(--border)}
 
 /* ============ COMMAND BAR (thinner, mono, pulse dry) ============ */

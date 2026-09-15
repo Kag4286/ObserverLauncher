@@ -11,44 +11,87 @@ async function json(url) {
   } catch (error) { throw error.name === 'AbortError' ? new Error('Request timed out after 15s — check your internet connection.') : error; }
   finally { cancel(); }
 }
-async function download(url, destination, onProgress) {
-  const { signal, cancel } = withTimeout(300000);
-  const tmp = `${destination}.download-${process.pid}-${Date.now()}.tmp`;
+// BUGFIX (downloads died on a brief network hiccup): the old download used ONE fetch with a
+// hard 5-minute total timeout. On a slow link a perfectly healthy 80MB jar could be aborted
+// mid-download because the wall clock ran out, and a single dropped packet killed the whole
+// transfer with no retry. Now: (1) the timeout is STALL-based — the clock only fires after
+// `stallMs` with NO bytes received, so a slow-but-alive download is never killed; (2) a failed
+// attempt is retried up to `attempts` times with a short backoff before giving up.
+// One resumable download attempt. `partPath` is a STABLE path (not per-attempt) so bytes that
+// already arrived survive a retry: we send `Range: bytes=<have>-` and append from there. Servers
+// that don't support ranges reply 200 (full body) instead of 206 — then we restart that file.
+async function downloadAttempt(url, partPath, onProgress, stallMs) {
+  let have = 0;
+  try { have = fs.statSync(partPath).size; } catch { have = 0; }
+  const controller = new AbortController();
+  let stallTimer = null;
+  const bump = () => { if (stallTimer) clearTimeout(stallTimer); stallTimer = setTimeout(() => controller.abort(), stallMs); };
   try {
-    const r = await fetch(url, { redirect: 'follow', signal, headers: { 'User-Agent': 'ObserverLauncher/0.2' } });
-    if (!r.ok) throw new Error(`Download failed: ${r.status} ${r.statusText}`);
-    const total = Number(r.headers.get('content-length')) || 0;
-    // FEATURE: stream to a temp file and report bytes as they arrive, instead of buffering the whole
-    // response in memory with r.arrayBuffer() and only finding out it's done when it's already done.
-    // Server jars/installers can be 40-80MB+, so on a slow connection the wizard used to just say
-    // "Downloading…" with zero feedback for a minute or more — no way to tell a slow download from a
-    // hung one. Falls back to the old buffered path if the runtime's fetch doesn't expose a readable
-    // stream body (defensive; Electron's fetch always does).
-    let received = 0;
-    if (r.body && typeof r.body.getReader === 'function') {
-      const reader = r.body.getReader();
-      const fileHandle = fs.openSync(tmp, 'w');
-      try {
+    const headers = { 'User-Agent': 'ObserverLauncher/0.2' };
+    if (have > 0) headers['Range'] = `bytes=${have}-`;
+    bump();
+    const r = await fetch(url, { redirect: 'follow', signal: controller.signal, headers });
+    if (!r.ok && r.status !== 206) {
+      // 416 = our partial is already the whole file (or stale) — caller validates the final size.
+      if (r.status === 416) return { done: true };
+      throw new Error(`Download failed: ${r.status} ${r.statusText}`);
+    }
+    // If we asked for a range but the server ignored it (200), the body is the FULL file:
+    // truncate our partial and start from zero so we don't append the whole thing twice.
+    const resumed = have > 0 && r.status === 206;
+    if (have > 0 && !resumed) have = 0;
+    const total = (Number(r.headers.get('content-length')) || 0) + have;
+    let received = have;
+    const fileHandle = fs.openSync(partPath, resumed ? 'a' : 'w');
+    try {
+      if (r.body && typeof r.body.getReader === 'function') {
+        const reader = r.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          bump(); // progress → reset the stall watchdog
           fs.writeSync(fileHandle, value);
           received += value.length;
           if (onProgress) onProgress(received, total);
         }
-      } finally { fs.closeSync(fileHandle); }
-    } else {
-      const buffer = Buffer.from(await r.arrayBuffer());
-      fs.writeFileSync(tmp, buffer);
-      received = buffer.length;
-      if (onProgress) onProgress(received, total || received);
-    }
-    fs.renameSync(tmp, destination);
-    return received;
+      } else {
+        const buffer = Buffer.from(await r.arrayBuffer());
+        fs.writeSync(fileHandle, buffer);
+        received += buffer.length;
+        if (onProgress) onProgress(received, total || received);
+      }
+    } finally { fs.closeSync(fileHandle); }
+    return { done: true, received, total };
   } catch (error) {
-    try { fs.rmSync(tmp, { force: true }); } catch {}
-    throw error.name === 'AbortError' ? new Error('Download timed out after 5 minutes — check your internet connection.') : error;
-  } finally { cancel(); }
+    // NOTE: the .part file is intentionally KEPT so the next attempt can resume.
+    if (error.name === 'AbortError') throw new Error(`Download stalled — no data received for ${Math.round(stallMs / 1000)}s. Check your internet connection.`);
+    throw error;
+  } finally { clearTimeout(stallTimer); }
+}
+
+async function download(url, destination, onProgress) {
+  const attempts = 4;
+  const stallMs = 30000;
+  const backoff = [1000, 3000, 6000];
+  const partPath = `${destination}.part`;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await downloadAttempt(url, partPath, onProgress, stallMs);
+      // Success — move the finished part into place.
+      try { fs.rmSync(destination, { force: true }); } catch {}
+      fs.renameSync(partPath, destination);
+      return fs.statSync(destination).size;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        // Keep the partial and let the next attempt resume — do NOT reset progress to 0.
+        await new Promise(r => setTimeout(r, backoff[attempt - 1] || 6000));
+      }
+    }
+  }
+  // All attempts failed — leave the .part file so a future retry can still resume it.
+  throw lastError;
 }
 function marketplaceError(error) { return { ok: false, error: error?.message || 'Marketplace request failed. Check your connection.' }; }
 function psQuote(value) { return `'${String(value).replace(/'/g, "''")}'`; }

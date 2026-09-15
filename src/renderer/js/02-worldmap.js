@@ -50,7 +50,98 @@ function getTerrainColor(wx, wz, seedBig, dim) {
   return 'rgba(208,208,208,.97)';
 }
 
-let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null};
+let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null,biomes:new Map(),biomeReqSeq:0,biomeTimer:null,lastBiomeRect:'',biomeLoading:false,biomeTooWide:false,biomeTruncated:false};
+// REAL biome colours (terrain-map style). Keyed by exact biome id with family fallbacks, so a
+// brand-new biome still gets a sensible colour instead of grey. Slightly desaturated to sit on
+// the dark canvas without glowing.
+const BIOME_COLORS={
+  ocean:'#2E5A8A',deep_ocean:'#1E3F63',warm_ocean:'#3A7CA5',lukewarm_ocean:'#3E7EA0',cold_ocean:'#274E77',frozen_ocean:'#2B4C6B',deep_cold_ocean:'#1C3A57',deep_frozen_ocean:'#1E3D55',deep_lukewarm_ocean:'#2A5878',
+  river:'#3E7FB0',frozen_river:'#4E7C9E',beach:'#C9BE8A',snowy_beach:'#D5D8DA',stony_shore:'#8A8477',
+  plains:'#6FA84E',sunflower_plains:'#7FB255',snowy_plains:'#D7DCE0',ice_spikes:'#C6D2DE',meadow:'#86B562',
+  forest:'#3F7A3A',flower_forest:'#568F45',birch_forest:'#6E9A55',old_growth_birch_forest:'#7BA25E',dark_forest:'#2E5A2E',taiga:'#4E7A5A',snowy_taiga:'#5C7C72',old_growth_pine_taiga:'#3F6B4A',old_growth_spruce_taiga:'#3D6448',
+  jungle:'#2E7D32',sparse_jungle:'#4E8B3E',bamboo_jungle:'#5C9A3E',
+  desert:'#D8C77A',badlands:'#B5713E',eroded_badlands:'#A85E33',wooded_badlands:'#9C6B3F',savanna:'#B0A24E',savanna_plateau:'#A99A44',windswept_savanna:'#9E9143',
+  swamp:'#5A6B45',mangrove_swamp:'#4E6B4A',
+  snowy_slopes:'#D7DCE0',snowy_plains_peaks:'#D7DCE0',grove:'#5E7C6A',snowy_taiga_peaks:'#6A8277',
+  windswept_hills:'#8A8A7E',windswept_gravelly_hills:'#97968B',windswept_forest:'#5E7A55',jagged_peaks:'#C9CDD2',frozen_peaks:'#DCE2E6',stony_peaks:'#9A9C92',
+  mushroom_fields:'#8A7C8E',
+  nether_wastes:'#7A3B33',crimson_forest:'#8E2E3E',warped_forest:'#2E7A72',soul_sand_valley:'#5A4A3E',basalt_deltas:'#54545C',
+  the_end:'#C9C29A',end_highlands:'#C2BB92',end_midlands:'#B8B189',small_end_islands:'#A8A17C',end_barrens:'#9C9577',
+  the_void:'#0A0F14',dripstone_caves:'#8A7355',lush_caves:'#4E8A5A',deep_dark:'#1E3A4A',
+};
+function biomeColor(id){
+  if(!id)return '#3A4250';
+  const k=String(id).replace(/^minecraft:/,'');
+  if(BIOME_COLORS[k])return BIOME_COLORS[k];
+  if(/ocean|sea/.test(k))return '#2E5A8A';
+  if(/river/.test(k))return '#3E7FB0';
+  if(/forest|wood|taiga|grove/.test(k))return '#3F7A3A';
+  if(/jungle/.test(k))return '#2E7D32';
+  if(/desert|sand|badland/.test(k))return '#D8C77A';
+  if(/snow|frozen|ice/.test(k))return '#D7DCE0';
+  if(/mountain|peak|hill|slope/.test(k))return '#8A8A7E';
+  if(/swamp|mangrove/.test(k))return '#5A6B45';
+  if(/savanna/.test(k))return '#B0A24E';
+  if(/beach|shore/.test(k))return '#C9BE8A';
+  if(/cave|dripstone|deep_dark/.test(k))return '#5A5548';
+  if(/nether|crimson|warped|basalt|soul/.test(k))return '#7A3B33';
+  if(/end/.test(k))return '#C2BB92';
+  return '#4A5442';
+}
+// Max chunks we ask the backend to parse in one go. Beyond this we skip the fetch and keep
+// the seed wash, so panning at a far zoom-out can't tie up the main process (~3s of parsing).
+const WM_BIOME_MAX_CHUNKS=1600;
+// Below this zoom the viewport spans too many chunks to be worth fetching.
+const WM_BIOME_MIN_ZOOM=0.06;
+// Hide marker text labels below this zoom so they don't overlap into a smear.
+const WM_LABEL_MIN_ZOOM=0.15;
+// Debounced biome fetch for the visible chunk range. Drops stale responses via a sequence token.
+function wmScheduleBiomes(){
+  if(!wm.level||!wm.layers.terrain)return;
+  const cv=$('#wmCanvas');if(!cv)return;
+  const W=cv.clientWidth||800,H=cv.clientHeight||520;
+  const cx0=Math.floor((wm.cam.x-W/2/wm.zoom)/16),cx1=Math.floor((wm.cam.x+W/2/wm.zoom)/16);
+  const cz0=Math.floor((wm.cam.z-H/2/wm.zoom)/16),cz1=Math.floor((wm.cam.z+H/2/wm.zoom)/16);
+  // Too wide (far zoom-out or huge viewport): don't fetch — keep the seed wash and show a hint.
+  const chunkCount=(cx1-cx0+1)*(cz1-cz0+1);
+  if(wm.zoom<WM_BIOME_MIN_ZOOM||chunkCount>WM_BIOME_MAX_CHUNKS){
+    wm.lastBiomeRect='';
+    wm.biomeTooWide=true;
+    return;
+  }
+  if(wm.biomeTooWide)wm.biomeTooWide=false;
+  const rect=[cx0,cz0,cx1,cz1].join(',');
+  if(rect===wm.lastBiomeRect)return;
+  clearTimeout(wm.biomeTimer);
+  wm.biomeTimer=setTimeout(async()=>{
+    wm.lastBiomeRect=rect;
+    const seq=++wm.biomeReqSeq;
+    wm.biomeLoading=true;wmDraw();
+    let r;
+    try{r=await window.observer.worldmapBiomes({dim:wm.dim,cx0,cz0,cx1,cz1})}catch{wm.biomeLoading=false;return}
+    if(seq!==wm.biomeReqSeq)return;
+    wm.biomeLoading=false;
+    if(!r||!r.ok)return;
+    wm.biomeTruncated=!!r.truncated;
+    let added=0;
+    for(const[cx,cz,b]of r.biomes){wm.biomes.set(cx+','+cz,b);added++}
+    if(added||wm.biomeTruncated)wmDraw();
+  },220);
+}
+// Fetch a bounded square of chunks around a centre, ignoring the zoom/viewport limit. Used on
+// load so the spawn area shows real biomes even when the whole viewport is too wide to fetch.
+async function wmPrefetchBiomes(ccx,ccz,half){
+  if(!wm.level)return;
+  const seq=++wm.biomeReqSeq;
+  wm.biomeLoading=true;wmDraw();
+  let r;
+  try{r=await window.observer.worldmapBiomes({dim:wm.dim,cx0:ccx-half,cz0:ccz-half,cx1:ccx+half,cz1:ccz+half})}catch{wm.biomeLoading=false;return}
+  if(seq!==wm.biomeReqSeq)return;
+  wm.biomeLoading=false;
+  if(!r||!r.ok)return;
+  for(const[cx,cz,b]of r.biomes)wm.biomes.set(cx+','+cz,b);
+  wmDraw();
+}
 const WM_COLORS=['#FF3B5C','#00E5FF','#FFD23F','#00E5A0','#C792EA','#FF8C42'];
 function wmShow(view){$('#wmNoWorld').hidden=view!=='none';$('#wmApp').hidden=view!=='app'}
 async function wmLoad(){
@@ -78,16 +169,26 @@ async function wmLoad(){
   // center on spawn or first player
   const f=wm.players[0]?wm.players[0].pos:wm.level.spawn;
   wm.cam={x:f.x,z:f.z};if(wm.zoom<0.1)wm.zoom=0.25;
+  // A1: a reload must not keep stale biome colours from a previous world/session.
+  wm.biomes.clear();wm.lastBiomeRect='';wm.biomeTooWide=false;wm.biomeTruncated=false;
   wmLoadChunks(wm.dim);
   wmRenderList();wmDraw();
+  // C: at the default zoom the viewport spans tens of thousands of chunks, so the normal
+  // biome fetch is skipped and spawn stays on the seed wash. Fetch a bounded block around
+  // spawn so real biomes appear immediately.
+  wmPrefetchBiomes(Math.floor(f.x/16),Math.floor(f.z/16),12);
 }
 function wmVisible(){
+  // BUGFIX: the ResizeObserver can fire wmDraw() before wmLoad() has set wm.level,
+  // so this ran with wm.level=null and threw on `...wm.level.spawn`.
+  if(!wm.level)return[];
   const list=(wm.dim==='overworld'?[{type:'spawn',...wm.level.spawn,name:t('wm.spawn'),color:'#00E5A0'}]:[]);
   for(const p of wm.players)if(p.dim===wm.dim)list.push({type:'player',...p.pos,name:p.name||p.uuid.slice(0,8),color:'#00E5FF'});
   for(const w of wm.waypoints)if(w.dim===wm.dim)list.push({type:'wp',...w});
   return list;
 }
 function wmDraw(){
+  if(!wm.level)return; // no world loaded yet — nothing to draw (see wmVisible guard)
   const cv=$('#wmCanvas'),ctx=cv.getContext('2d');
   const dpr=devicePixelRatio||1;
   const W=cv.clientWidth||800,H=cv.clientHeight||520;
@@ -112,37 +213,75 @@ function wmDraw(){
   const[,ay]=toS(0,0);ctx.beginPath();ctx.moveTo(0,ay);ctx.lineTo(W,ay);ctx.stroke();
   // markers
   ctx.textBaseline='top';
+  // BUGFIX (markers hard to see): spawn and player used to be the SAME 5px dot
+  // (only the colour differed) with a faint 1.5px black outline, so on the dark
+  // canvas + terrain wash they were nearly invisible. Give each type a distinct
+  // shape, a dark halo behind it, and a stroked label so it reads on any background.
   for(const m of wmVisible()){
     const[sx,sy]=toS(m.x,m.z);
     if(sx<-40||sx>W+40||sy<-30||sy>H+30)continue;
-    ctx.fillStyle=m.color;
-    if(m.type==='wp'){ctx.save();ctx.translate(sx,sy);ctx.rotate(Math.PI/4);ctx.fillRect(-5,-5,10,10);ctx.restore()}
-    else{ctx.beginPath();ctx.arc(sx,sy,5,0,7);ctx.fill()}
-    ctx.strokeStyle='rgba(0,0,0,.6)';ctx.lineWidth=1.5;ctx.stroke();
-    ctx.font='600 10.5px "JetBrains Mono",monospace';
-    ctx.fillStyle=m.color;
-    ctx.fillText(m.name,sx+9,sy-14);
-    ctx.fillStyle='rgba(232,244,248,.75)';
-    ctx.fillText(Math.round(m.x)+' '+Math.round(m.z),sx+9,sy-2);
+    ctx.beginPath();ctx.arc(sx,sy,9,0,7);ctx.fillStyle='rgba(0,0,0,.55)';ctx.fill(); // contrast halo
+    ctx.fillStyle=m.color;ctx.strokeStyle='#05070A';ctx.lineWidth=2;
+    if(m.type==='wp'){
+      ctx.save();ctx.translate(sx,sy);ctx.rotate(Math.PI/4);ctx.fillRect(-5.5,-5.5,11,11);ctx.strokeRect(-5.5,-5.5,11,11);ctx.restore();
+    } else if(m.type==='spawn'){
+      // 5-point star — unmistakably "spawn" (was a plain dot identical to players)
+      ctx.beginPath();
+      for(let i=0;i<10;i++){const r=i%2?3:7,a=-Math.PI/2+i*Math.PI/5;ctx.lineTo(sx+Math.cos(a)*r,sy+Math.sin(a)*r)}
+      ctx.closePath();ctx.fill();ctx.stroke();
+    } else {
+      // player — filled ring with a dark core (reads at a glance)
+      ctx.beginPath();ctx.arc(sx,sy,6,0,7);ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.arc(sx,sy,2,0,7);ctx.fillStyle='#05070A';ctx.fill();
+    }
+    // Labels only when zoomed in enough — at far zoom-out every name would overlap into a smear.
+    // Draw to the RIGHT of the marker, but flip to the LEFT when the text would run off the
+    // canvas edge, and clamp vertically so a marker near the top/bottom keeps its label visible.
+    if(wm.zoom>=WM_LABEL_MIN_ZOOM){
+      ctx.font='700 10.5px "JetBrains Mono",monospace';
+      const coordText=Math.round(m.x)+' '+Math.round(m.z);
+      const tw=Math.max(ctx.measureText(m.name).width,ctx.measureText(coordText).width);
+      const right=sx+11+tw<W-4;
+      const lx=right?sx+11:Math.max(4,sx-11-tw);
+      const ly=Math.max(2,Math.min(sy-14,H-22));
+      ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.75)';
+      ctx.strokeText(m.name,lx,ly);ctx.strokeText(coordText,lx,ly+12);
+      ctx.fillStyle=m.color;ctx.fillText(m.name,lx,ly);
+      ctx.fillStyle='rgba(232,244,248,.9)';ctx.fillText(coordText,lx,ly+12);
+    }
   }
-  // terrain preview wash (behind grid/markers) — MCA-Selector style: only where chunks exist
+  // terrain / biome layer (behind grid/markers). When real biome data for the viewport has
+  // been loaded (wm.biomes), each cell is coloured by its chunk's actual surface biome; cells
+  // without data fall back to the seed-coloured approximation. Only explored chunks render
+  // when a chunk mask is present.
   if(wm.layers.terrain){
-    const cellPx=8;
+    const cellPx=Math.max(8,Math.round(16*wm.zoom));
     const stepW=cellPx/wm.zoom;
     const x0=Math.floor((wm.cam.x-W/2/wm.zoom)/stepW)*stepW;
     const x1=wm.cam.x+W/2/wm.zoom;
     const z0=Math.floor((wm.cam.z-H/2/wm.zoom)/stepW)*stepW;
     const z1=wm.cam.z+H/2/wm.zoom;
     for(let wz=z0;wz<z1;wz+=stepW)for(let wx=x0;wx<x1;wx+=stepW){
-      if(wm.explored.size){
-        const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
-        if(!wm.explored.has(cx+','+cz))continue;
-      }
+      const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
+      if(wm.explored.size && !wm.explored.has(cx+','+cz))continue;
       const[sx,sy]=toS(wx,wz);
-      ctx.fillStyle=getTerrainColor(wx,wz,wm.seedBig,wm.dim);
+      const ck=cx+','+cz;
+      if(wm.biomes.has(ck)){
+        const bio=wm.biomes.get(ck);
+        // Known chunk: real biome colour, or a neutral slate when the chunk had no biome data
+        // (proto-chunk / no section) — so "checked, none" is visibly different from "not loaded".
+        ctx.fillStyle=bio?biomeColor(bio):'#20262E';
+      } else {
+        ctx.fillStyle=getTerrainColor(wx,wz,wm.seedBig,wm.dim);
+      }
       ctx.fillRect(sx,sy,cellPx,cellPx);
     }
   }
+  wmScheduleBiomes();
+  // biome status hint (top-left): a loading indicator while a fetch is in flight, or a
+  // "zoom in" note when the viewport is too wide / the backend hit its chunk cap.
+  { const hint=wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null);
+    if(hint){ ctx.fillStyle='rgba(232,244,248,.75)';ctx.font='600 10.5px "JetBrains Mono",monospace';ctx.fillText(hint,14,20); } }
   // scale bar
   const px=step*wm.zoom;
   ctx.fillStyle='rgba(232,244,248,.7)';ctx.font='600 9.5px "JetBrains Mono",monospace';
@@ -229,7 +368,7 @@ async function wmAddWaypoint(x,z){
 $('#wmReload').onclick=wmLoad;
 $('#wmReload2').onclick=wmLoad;
 $('#wmCopySeed').onclick=async()=>{if(!wm.level)return;try{await navigator.clipboard.writeText(wm.level.seed);toast(t('toast.copied'),'success')}catch{toast(wm.level.seed)}};
-$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{wm.dim=c.dataset.dim;wmSyncDimTabs();wmLoadChunks(wm.dim);wmDraw()});
+$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{wm.dim=c.dataset.dim;wm.biomes.clear();wm.lastBiomeRect='';wm.biomeTooWide=false;wm.biomeTruncated=false;wm.explored=new Set();wm.exploredDim=null;wmSyncDimTabs();wmLoadChunks(wm.dim);wmDraw()});
 $('#wmAdd').onclick=()=>{wm.addMode=!wm.addMode;$('#wmAdd').classList.toggle('active',wm.addMode)};
 async function wmLoadChunks(dim){
   try{

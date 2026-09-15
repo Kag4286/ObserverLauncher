@@ -107,6 +107,9 @@ function buildPropertiesContent(root, props) {
   for (const [key, value] of remaining) outLines.push(`${key}=${value}`);
   return outLines.join(eol) + eol;
 }
+// BUGFIX (item count showing as undefined): 1.21.5+ / 26.x item stacks use
+// lowercase `count`; pre-1.20.5 files used `Count`. Normalize both here.
+function stackOf(item) { return { id: item.id, count: item.count ?? item.Count ?? 1 }; }
 async function readPlayerData(root, uuid) {
   if (!root) throw new Error('No server folder is selected.');
   const files = serverFiles(root);
@@ -129,14 +132,32 @@ async function readPlayerData(root, uuid) {
   const parsed = await nbt.parse(fs.readFileSync(file)); const simple = nbt.simplify(parsed.parsed);
   // FEATURE: previously only read the combined "Inventory" tag (36 main slots + armor + offhand all
   // mixed together) — there was no way to separate worn armor, the offhand slot, or the Ender Chest
-  // (which lives in its own NBT tag, "EnderItems"). Now split cleanly: main inventory (slot 0-35),
-  // armor (slot 100-103), offhand (slot -106), ender chest.
+  // (which lives in its own NBT tag, "EnderItems").
+  //
+  // BUGFIX (armor + offhand always showed empty on 1.21.5+/26.x servers): Minecraft 1.21.5 moved
+  // players' worn armor and off-hand item OUT of Inventory and into a top-level `equipment`
+  // compound keyed by slot name (head/chest/legs/feet/offhand). The old code only looked at the
+  // legacy Inventory slots (100-103 armor, -106 offhand), which those versions no longer write, so
+  // armor came back empty and offhand null. Read the modern `equipment` tag first, and keep the
+  // legacy slot scan as a fallback for older servers. Item stacks also moved from `Count` to
+  // lowercase `count` — stackOf() normalizes both.
   const raw = simple.Inventory || [];
   const armorNames = { 100: 'Boots', 101: 'Leggings', 102: 'Chestplate', 103: 'Helmet' };
-  const mainInventory = raw.filter(x => x.Slot >= 0 && x.Slot <= 35).map(x => ({ slot: x.Slot, id: x.id, count: x.Count }));
-  const armor = raw.filter(x => x.Slot in armorNames).map(x => ({ slot: armorNames[x.Slot], id: x.id, count: x.Count })).sort((a, b) => Object.values(armorNames).indexOf(a.slot) - Object.values(armorNames).indexOf(b.slot));
-  const offhandItem = raw.find(x => x.Slot === -106); const offhand = offhandItem ? { id: offhandItem.id, count: offhandItem.Count } : null;
-  const enderChest = (simple.EnderItems || []).map(x => ({ slot: x.Slot, id: x.id, count: x.Count }));
+  const mainInventory = raw.filter(x => x.Slot >= 0 && x.Slot <= 35).map(x => ({ slot: x.Slot, ...stackOf(x) }));
+  let armor, offhand;
+  if (simple.equipment) {
+    const eq = simple.equipment;
+    const equipNames = { feet: 'Boots', legs: 'Leggings', chest: 'Chestplate', head: 'Helmet' };
+    armor = Object.entries(equipNames)
+      .filter(([k]) => eq[k])
+      .map(([k, label]) => ({ slot: label, ...stackOf(eq[k]) }))
+      .sort((a, b) => Object.values(armorNames).indexOf(a.slot) - Object.values(armorNames).indexOf(b.slot));
+    offhand = eq.offhand ? stackOf(eq.offhand) : null;
+  } else {
+    armor = raw.filter(x => x.Slot in armorNames).map(x => ({ slot: armorNames[x.Slot], ...stackOf(x) })).sort((a, b) => Object.values(armorNames).indexOf(a.slot) - Object.values(armorNames).indexOf(b.slot));
+    const offhandItem = raw.find(x => x.Slot === -106); offhand = offhandItem ? stackOf(offhandItem) : null;
+  }
+  const enderChest = (simple.EnderItems || simple.ender_items || []).map(x => ({ slot: x.Slot, ...stackOf(x) }));
   return { file, parsed, type: parsed.type, data: { health: simple.Health ?? null, food: simple.foodLevel ?? null, saturation: simple.foodSaturationLevel ?? null, xpLevel: simple.XpLevel ?? 0, xpTotal: simple.XpTotal ?? 0, gameType: simple.playerGameType ?? 0, dimension: simple.Dimension ?? 'unknown', pos: simple.Pos || [], inventory: mainInventory, armor, offhand, enderChest } };
 }
 function parseServerLine(text, live, send) {

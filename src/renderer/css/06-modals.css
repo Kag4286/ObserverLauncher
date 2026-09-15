@@ -45,6 +45,18 @@
 
 /* One surface: header strip + hairline-divided areas */
 .flat-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+/* Settings tab: single vertical column (no more staggered 2-col grid), each section numbered
+   for a clear reading order. Scoped to #settings so the Content tab's grid is untouched. */
+#settings .flat-grid2{grid-template-columns:1fr;counter-reset:setgrp}
+#settings .flat-grid2 > .flat-cell{counter-increment:setgrp}
+#settings .flat-cell .sec-head h3::before{content:counter(setgrp,decimal-leading-zero);font:700 10px var(--font-mono);letter-spacing:.12em;color:var(--accent-dim);margin-right:9px}
+/* Settings: de-emphasise the section subtitle so the numbered h3 leads the eye. */
+#settings .flat-cell .sec-head small{color:var(--text-dim);font-weight:500;opacity:.85}
+/* Settings tab: keep the header (and its Apply button) pinned while scrolling. A sticky child
+   is neutralised by an overflow:hidden ancestor, so the wrapper switches to visible here and
+   the header supplies its own top rounding to keep the card corners clean. */
+#settings .flat-wrap{overflow:visible}
+#settings .flat-head{position:sticky;top:0;z-index:6;border-radius:var(--r) var(--r) 0 0;box-shadow:0 6px 16px rgba(0,0,0,.28)}
 .flat-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;background:var(--panel-raised);border-bottom:1px solid var(--border)}
 .flat-head-id{display:flex;gap:13px;align-items:center;min-width:0}
 .flat-head h2{font-size:17px;margin:2px 0 0}
@@ -277,6 +289,12 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 #fbList .fb-row:hover{background:var(--panel-hover);box-shadow:inset 2px 0 0 var(--accent)}
 #fbList .fb-row .file-name{flex:1;min-width:0}
 #fbList .fb-row .fb-size{font:600 10px var(--font-mono);color:var(--text-dim);flex-shrink:0}
+#fbList .fb-row .file-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Folder rows: a caret + folder name; the size column shows the file count. */
+#fbList .fb-dir{font-weight:600}
+#fbList .fb-dir .fb-caret{width:14px;flex-shrink:0;color:var(--accent-dim);font-size:11px;text-align:center}
+#fbList .fb-dir.open .fb-caret{color:var(--accent)}
+#fbList .fb-dir .file-name{color:var(--text)}
 #imBar{transition:width .2s var(--ease)}
 #imBar.indeterminate{width:40%!important;animation:setIndeterminate 1.1s ease-in-out infinite}
 #imBar.ok{background:var(--success)}

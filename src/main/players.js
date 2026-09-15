@@ -100,7 +100,14 @@ function registerPlayers(ipcMain, ctx) {
       set('XpLevel', 'int', v.xpLevel);
       set('XpTotal', 'int', v.xpTotal);
       set('playerGameType', 'int', v.gameType);
-      if (clearInventory) root.Inventory = { type: 'list', value: { type: 'compound', value: [] } };
+      // BUGFIX: on 1.21.5+/26.x servers the worn armor and off-hand item live in the
+      // top-level `equipment` compound, NOT in Inventory — so clearing only Inventory
+      // left armor + offhand untouched (the button's label promised otherwise).
+      // Clear `equipment` too when it exists; legacy files simply don't have the tag.
+      if (clearInventory) {
+        root.Inventory = { type: 'list', value: { type: 'compound', value: [] } };
+        if (root.equipment) root.equipment = { type: 'compound', value: {} };
+      }
       const backupDir = safeTarget(ctx.currentServerPath, 'observerlauncher-backups');
       fs.mkdirSync(backupDir, { recursive: true });
       const backup = path.join(backupDir, `playerdata-${uuid}-${new Date().toISOString().replace(/[:.]/g, '-')}.dat`);

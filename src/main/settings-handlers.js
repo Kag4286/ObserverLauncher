@@ -114,11 +114,25 @@ function registerSettings(ipcMain, ctx) {
       zipPath = path.join(app.getPath('temp'), `observerlauncher-jre-${Date.now()}.zip`);
       await download(url, zipPath, (received, total) => ctx.send('java:progress', { received, total }));
       const targetDir = path.join(app.getPath('userData'), `jre${major}`);
-      fs.rmSync(targetDir, { recursive: true, force: true });
-      fs.mkdirSync(targetDir, { recursive: true });
+      // BUGFIX (a bad install could wipe a working Java): the old code deleted the existing
+      // jre<major> folder BEFORE extracting. If the extract then failed, the user lost the
+      // Java they already had. Extract into a staging folder first; only swap it into place
+      // after java.exe is confirmed present, so a failure leaves the previous install intact.
+      const stagingDir = `${targetDir}.staging-${Date.now()}`;
       ctx.appendLog('Extracting Java runtime…', 'system');
-      const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(zipPath)} -DestinationPath ${psQuote(targetDir)} -Force`, 300000);
-      if (!r.ok) throw new Error(r.error || 'Could not extract the Java runtime.');
+      try {
+        fs.mkdirSync(stagingDir, { recursive: true });
+        const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(zipPath)} -DestinationPath ${psQuote(stagingDir)} -Force`, 300000);
+        if (!r.ok) throw new Error(r.error || 'Could not extract the Java runtime.');
+        const stagedJava = findFileRecursive(stagingDir, 'java.exe');
+        if (!stagedJava) throw new Error('Java runtime was downloaded but java.exe was not found after extracting.');
+        // Success — replace the old install with the freshly verified one.
+        try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch {}
+        fs.renameSync(stagingDir, targetDir);
+      } catch (e) {
+        try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
+        throw e;
+      }
       const javaExe = findFileRecursive(targetDir, 'java.exe');
       if (!javaExe) throw new Error('Java runtime was downloaded but java.exe was not found after extracting.');
       const settings = loadSettings();

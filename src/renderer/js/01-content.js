@@ -26,7 +26,7 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
   node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!confirm(t('toast.confirmDelete',{n:file})))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('toast.deleted',{n:file}),'success')})
 }
 // ============ FILE EDITOR (Content tab, in-place: bays ↔ browser ↔ editor) ============
-let edState={rel:null,content:'',mtime:0,readOnly:false,dirty:false,wrap:false,from:'bays',conflict:false,files:[]};
+let edState={rel:null,content:'',mtime:0,readOnly:false,dirty:false,wrap:false,from:'bays',conflict:false,files:[],fbOpen:new Set()};
 function edShow(view){$('#contentBays').hidden=view!=='bays';$('#fileBrowser').hidden=view!=='browser';$('#fileEditor').hidden=view!=='editor'}
 function edFmtBytes(n){if(!n&&n!==0)return'—';if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(2)+' MB'}
 function edUpdateStats(){
@@ -49,7 +49,7 @@ async function openEd(rel,from){
     else toast(t('ed.notFound'),'error');
     return;
   }
-  edState={rel:r.rel,content:r.content,mtime:r.mtime,readOnly:!!r.readOnly,dirty:false,wrap:edState.wrap,from,conflict:false,files:edState.files};
+  edState={rel:r.rel,content:r.content,mtime:r.mtime,readOnly:!!r.readOnly,dirty:false,wrap:edState.wrap,from,conflict:false,files:edState.files,fbOpen:edState.fbOpen};
   const ta=$('#edText');ta.value=r.content;ta.readOnly=edState.readOnly;
   ta.classList.toggle('wrap-on',edState.wrap);ta.setAttribute('wrap',edState.wrap?'soft':'off');
   $('#edPath').textContent=r.rel;
@@ -100,13 +100,71 @@ async function openFileBrowser(){
   edState.files=(r&&r.files)||[];
   renderFbList();
 }
+// Build a nested tree from the flat {path,size} list so the browser shows collapsible folders
+// instead of one enormous flat list (a real server folder can have 500+ editable files).
+function buildFileTree(files){
+  const root={name:'',dirs:new Map(),files:[]};
+  for(const f of files){
+    const parts=f.path.split('/');
+    let node=root;
+    for(let i=0;i<parts.length-1;i++){
+      const seg=parts[i];
+      if(!node.dirs.has(seg))node.dirs.set(seg,{name:seg,dirs:new Map(),files:[]});
+      node=node.dirs.get(seg);
+    }
+    node.files.push({name:parts[parts.length-1],rel:f.path,size:f.size});
+  }
+  return root;
+}
+function fbDirRow(node,prefix,depth){
+  const open=edState.fbOpen.has(prefix);
+  const count=countTreeFiles(node);
+  return `<div class="fb-row fb-dir${open?' open':''}" data-dir="${esc(prefix)}" style="padding-left:${8+depth*16}px"><span class="fb-caret">${open?'▾':'▸'}</span><span class="file-name">${esc(node.name)}</span><span class="fb-size">${count}</span></div>`;
+}
+function countTreeFiles(node){
+  let n=node.files.length;
+  for(const c of node.dirs.values())n+=countTreeFiles(c);
+  return n;
+}
+function renderTree(node,depth,prefix,out){
+  // folders first (alphabetical), then files
+  const dirs=[...node.dirs.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  const files=node.files.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  for(const d of dirs){
+    const p=prefix?prefix+'/'+d.name:d.name;
+    out.push(fbDirRow(d,p,depth));
+    if(edState.fbOpen.has(p))renderTree(d,depth+1,p,out);
+  }
+  for(const f of files){
+    out.push(`<div class="fb-row" data-rel="${esc(f.rel)}" title="${esc(f.rel)}" style="padding-left:${8+(depth+1)*16}px"><span class="file-name">${esc(f.name)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`);
+  }
+}
 function renderFbList(){
   const q=$('#fbSearch').value.trim().toLowerCase();
-  const list=q?edState.files.filter(f=>f.path.toLowerCase().includes(q)):edState.files;
-  $('#fbCount').textContent=t('ed.filesCount',{a:list.length});
   const box=$('#fbList');
-  box.innerHTML=list.length?list.map(f=>`<div class="fb-row" data-rel="${esc(f.path)}" title="${esc(f.path)}"><span class="file-name">${esc(f.path)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`).join(''):`<li class="empty"><span>${t('ed.noFiles')}</span></li>`;
-  box.querySelectorAll('.fb-row').forEach(row=>row.onclick=()=>openEd(row.dataset.rel,'browser'));
+  if(q){
+    // Search stays flat: show every matching path in full so a known filename is one glance away.
+    const list=edState.files.filter(f=>f.path.toLowerCase().includes(q));
+    $('#fbCount').textContent=t('ed.filesCount',{a:list.length});
+    box.innerHTML=list.length?list.map(f=>`<div class="fb-row" data-rel="${esc(f.path)}" title="${esc(f.path)}"><span class="file-name">${esc(f.path)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`).join(''):`<li class="empty"><span>${t('ed.noFiles')}</span></li>`;
+  } else {
+    $('#fbCount').textContent=t('ed.filesCount',{a:edState.files.length});
+    // Defensive: if fbOpen was ever lost (edState rebuilt) or a file has an odd path, fall back
+    // to the flat list instead of leaving the browser stuck on the loading placeholder.
+    if(!(edState.fbOpen instanceof Set))edState.fbOpen=new Set();
+    let out=[];
+    try { renderTree(buildFileTree(edState.files),0,'',out); }
+    catch(e){ console.error('file tree render failed, falling back to flat list:',e); out=[]; }
+    box.innerHTML=out.length?out.join(''):(edState.files.length
+      ? edState.files.map(f=>`<div class="fb-row" data-rel="${esc(f.path)}" title="${esc(f.path)}"><span class="file-name">${esc(f.path)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`).join('')
+      : `<li class="empty"><span>${t('ed.noFiles')}</span></li>`);
+  }
+  box.querySelectorAll('.fb-row[data-rel]').forEach(row=>row.onclick=()=>openEd(row.dataset.rel,'browser'));
+  box.querySelectorAll('.fb-row[data-dir]').forEach(row=>row.onclick=()=>{
+    const d=row.dataset.dir;
+    if(edState.fbOpen.has(d))edState.fbOpen.delete(d);else edState.fbOpen.add(d);
+    renderFbList();
+  });
 }
 $('#edBrowse').onclick=openFileBrowser;
 $('#edBrowse').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openFileBrowser()}});

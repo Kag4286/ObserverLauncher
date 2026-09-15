@@ -48,6 +48,33 @@ The app is plain Electron — **no bundler, no build step for development**. The
     module system and no bundler, so **load order matters** — a file that uses something defined in a
     later file will throw at load time.
 
+## Minecraft data formats change between versions
+
+A recurring source of bugs in this project: Mojang moves things around between
+Minecraft versions, and the launcher reads those files directly. When you touch
+player data or world files, **assume nothing about the layout** — support both the
+old and the new shape, and test against a real file when you can.
+
+Known changes the code already handles (keep them working):
+
+- **Player armor + off-hand (1.21.5+ / 26.x):** worn armor and the off-hand item
+  moved out of `Inventory` into a top-level `equipment` compound keyed
+  `head`/`chest`/`legs`/`feet`/`offhand`. Item stacks also switched from `Count`
+  to lowercase `count`. `readPlayerData()` reads both; `stackOf()` normalizes the
+  count key.
+- **Player data folder (26.1+):** `<world>/players/data/<uuid>.dat` replaced
+  `<world>/playerdata/<uuid>.dat`. `findPlayerDataFile()` tries both.
+- **Region folders:** overworld regions live under
+  `<world>/dimensions/minecraft/overworld/region` on new versions and
+  `<world>/region` on old ones. `getRegionDirs()` lists both.
+- **Biomes (1.18+):** stored per chunk section as a paletted container
+  (`{ palette, data? }`, 64 cells per section, bit-packed longs). See
+  `readBiomes()` in `src/main/worldmap.js`.
+
+When you add a reader, prefer the new format first with a legacy fallback, and
+add a regression test with a synthesized NBT fixture (see
+`tests/player-equipment.test.js` for the pattern).
+
 ## Guidelines
 
 - **English only** in code comments, commit messages, and UI strings added to the `en` locale

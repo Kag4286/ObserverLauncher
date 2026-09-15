@@ -29,11 +29,25 @@ function setupAutoUpdater(ctx, ipcMain) {
   autoUpdater.on('update-not-available', () => ctx.send('app:update-none', {}));
   autoUpdater.on('download-progress', p => ctx.send('app:update-progress', p));
   autoUpdater.on('update-downloaded', () => ctx.send('app:update-downloaded', {}));
-  if (app.isPackaged) autoUpdater.checkForUpdates();
+  // BUGFIX: no error handler meant a failed check/download (offline, 404 asset, bad signature)
+  // silently did nothing — the button stayed on "Checking…" forever. Surface it to the renderer.
+  autoUpdater.on('error', err => ctx.send('app:update-error', { message: err?.message || String(err) }));
+  // Only check automatically when actually packaged — electron-updater has no app-update.yml in dev.
+  if (app.isPackaged) autoUpdater.checkForUpdates().catch(err => ctx.send('app:update-error', { message: err?.message || String(err) }));
 
-  ipcMain.handle('app:check-update', () => autoUpdater.checkForUpdates());
-  ipcMain.handle('app:download-update', () => autoUpdater.downloadUpdate());
-  ipcMain.handle('app:quit-install', () => autoUpdater.quitAndInstall());
+  // Every handler resolves {ok:false} instead of rejecting, so the renderer's await never throws
+  // an unhandled rejection and the UI can always show a reason.
+  const guard = fn => async (...args) => {
+    if (!app.isPackaged) return { ok: false, error: 'Updates are only available in the installed build.' };
+    try { return { ok: true, result: await fn(...args) }; }
+    catch (err) { const message = err?.message || String(err); ctx.send('app:update-error', { message }); return { ok: false, error: message }; }
+  };
+  ipcMain.handle('app:check-update', guard(() => autoUpdater.checkForUpdates()));
+  ipcMain.handle('app:download-update', guard(() => autoUpdater.downloadUpdate()));
+  ipcMain.handle('app:quit-install', async () => {
+    try { autoUpdater.quitAndInstall(); return { ok: true }; }
+    catch (err) { return { ok: false, error: err?.message || String(err) }; }
+  });
 }
 
 function setupQuitHandler(ctx) {

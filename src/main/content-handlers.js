@@ -114,6 +114,24 @@ function registerContent(ipcMain, ctx) {
     }
   });
   ipcMain.handle('worldmap:waypoints:set', async (_, list) => worldmap.writeWaypoints(ctx.currentServerPath, Array.isArray(list) ? list : []));
+
+  // Real biome preview: reads the actual paletted biome containers from region files.
+  // The rect is the chunk range visible in the viewport, so only intersecting regions
+  // (and only in-view chunks) are parsed. Never rejects — the map falls back to the
+  // seed-coloured approximation on {ok:false}.
+  ipcMain.handle('worldmap:biomes', async (_, rect) => {
+    try {
+      const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+      const dim = rect?.dim || 'overworld';
+      const out = await worldmap.readBiomes(ctx.currentServerPath, lvlName, dim, {
+        cx0: Number(rect?.cx0) || 0, cz0: Number(rect?.cz0) || 0,
+        cx1: Number(rect?.cx1) || 0, cz1: Number(rect?.cz1) || 0,
+      });
+      return { ok: true, ...out };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not read biome data.', biomes: [] };
+    }
+  });
 }
 
 module.exports = { registerContent };

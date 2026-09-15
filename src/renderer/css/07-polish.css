@@ -127,25 +127,37 @@
 .wm-wpmain small{font:500 9.5px var(--font-mono);color:var(--text-dim)}
 @media(max-width:900px){.wm-main{grid-template-columns:1fr}.wm-panel{border-left:0;border-top:1px solid var(--border)}}
 /* ===== PLAYER INSPECTOR — TEXT-ONLY REDESIGN ===== */
-.player-modal{max-width:780px;width:92vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;animation:modalIn .22s var(--ease)}
+.player-modal{max-width:1120px;width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:modalIn .22s var(--ease)}
 @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 #playerInspector{flex:1;overflow:auto;padding:0;display:flex;flex-direction:column;gap:16px}
 #playerDataForm{padding:18px 20px 20px;display:flex;flex-direction:column;gap:16px}
-.inspect-header{display:flex;gap:14px;align-items:center;padding:14px 16px;background:var(--panel-raised);border:1px solid var(--border);border-radius:var(--r);animation:sectionIn .3s var(--ease) .05s both}
-.inspect-head-left{display:flex;gap:12px;align-items:center;flex:1;min-width:0}
+/* Header: avatar + (name-row / dimension / uuid) + Apply button. Every flex child can shrink
+   (min-width:0) so a long player name or a narrow window never pushes the badge or button into
+   the text. The name row wraps instead of overlapping. */
+.inspect-header{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:var(--panel-raised);border:1px solid var(--border);border-radius:var(--r);animation:sectionIn .3s var(--ease) .05s both}
 .inspect-avatar{width:48px;height:48px;border-radius:var(--r);border:1px solid var(--border);background:var(--field);image-rendering:pixelated;flex-shrink:0}
-.inspect-title{display:flex;flex-direction:column;gap:2px;min-width:0}
-.inspect-title b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.inspect-title span{font:500 11px var(--font-mono);color:var(--text-muted)}
-.inspect-uuid{font:500 10px var(--font-mono);color:var(--accent-dim);cursor:pointer;word-break:break-all}
+.inspect-title{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.inspect-name-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
+.inspect-title b{font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.inspect-title>span{font:500 11px var(--font-mono);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inspect-uuid{font:500 10px var(--font-mono);color:var(--accent-dim);cursor:pointer;word-break:break-word;overflow-wrap:anywhere;line-height:1.35}
 .inspect-uuid.copied{color:var(--success)}
-.inspect-badge{font:600 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--warning);background:var(--warning-weak);border:1px solid rgba(255,210,63,.25);padding:4px 8px;border-radius:999px;white-space:nowrap}
+.inspect-badge{font:600 9.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--warning);background:var(--warning-weak);border:1px solid rgba(255,210,63,.25);padding:3px 7px;border-radius:999px;white-space:nowrap;flex-shrink:0}
+.inspect-header .btn{flex-shrink:0;align-self:center}
 .inspect-note{font:500 11px var(--font-ui);color:var(--text-dim);background:var(--warning-weak);border:1px solid rgba(255,210,63,.2);padding:8px 12px;border-radius:var(--r);animation:sectionIn .3s var(--ease) .08s both}
-.inspect-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;animation:sectionIn .3s var(--ease) .1s both}
-.inspect-stats label{display:flex;flex-direction:column;gap:6px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;transition:border-color .12s}
+/* Two-column layout: left = stats + clear + equipment, right = inventory + ender chest.
+   Collapses to a single column on narrow windows. minmax(0,...) + min-width:0 let the inner
+   lists shrink instead of forcing the grid wider than the modal. */
+.inspect-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:16px;align-items:start}
+.inspect-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media(max-width:820px){.inspect-cols{grid-template-columns:1fr}}
+/* Stats: auto-fit so the 6 fields reflow to as many columns as fit instead of being squeezed
+   into a fixed 3-column grid (which clipped long labels / "Total XP" values). */
+.inspect-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;animation:sectionIn .3s var(--ease) .1s both}
+.inspect-stats label{display:flex;flex-direction:column;gap:6px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;transition:border-color .12s;min-width:0}
 .inspect-stats label:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
-.inspect-stats label span{font:600 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
-.inspect-stats input,.inspect-stats select{width:100%;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 10px;color:var(--text);font:500 13px var(--font-ui)}
+.inspect-stats label span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inspect-stats input,.inspect-stats select{width:100%;min-width:0;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 10px;color:var(--text);font:500 13px var(--font-ui)}
 .inspect-stats input:focus,.inspect-stats select:focus{outline:none;border-color:var(--accent)}
 .inspect-check{display:flex;gap:8px;align-items:center;font:500 12px var(--font-ui);color:var(--text-muted);cursor:pointer;animation:sectionIn .3s var(--ease) .12s both}
 .inspect-check input{width:16px;height:16px;accent-color:var(--accent)}
@@ -154,11 +166,13 @@
 .inspect-section:nth-of-type(4){animation-delay:.18s}
 .inspect-section:nth-of-type(5){animation-delay:.22s}
 @keyframes sectionIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.inspect-section-head{display:flex;align-items:baseline;gap:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.inspect-section-head h3{font-size:13px}
-.inspect-section-head span{font:500 11px var(--font-mono);color:var(--text-dim)}
-.inv-count{margin-left:auto;font:600 10px var(--font-mono);color:var(--text-dim);background:var(--field);border:1px solid var(--border);padding:3px 8px;border-radius:999px}
-.inv-bar{height:3px;background:var(--field);border:1px solid var(--border);border-radius:999px;overflow:hidden;flex:1;max-width:120px;margin-left:8px}
+/* Section head: title + optional subtitle + count + bar on one row that wraps instead of
+   overlapping. h3 and the count never shrink; the bar takes the leftover space. */
+.inspect-section-head{display:flex;align-items:center;gap:10px;padding-bottom:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.inspect-section-head h3{font-size:13px;flex-shrink:0}
+.inspect-section-head span{font:500 11px var(--font-mono);color:var(--text-dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inv-count{margin-left:auto;flex-shrink:0;font:600 10px var(--font-mono);color:var(--text-dim);background:var(--field);border:1px solid var(--border);padding:3px 8px;border-radius:999px;white-space:nowrap}
+.inv-bar{height:3px;background:var(--field);border:1px solid var(--border);border-radius:999px;overflow:hidden;flex:1 1 60px;min-width:40px;max-width:140px;margin-left:8px}
 .inv-bar i{display:block;height:100%;background:var(--accent);transition:width .3s var(--ease)}
 .inv-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .inv-toolbar input[type="search"]{flex:1;min-width:160px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 10px;color:var(--text);font:500 12px var(--font-ui)}
@@ -166,20 +180,25 @@
 .inv-toolbar .chk{font:500 11px var(--font-ui);color:var(--text-muted);display:flex;gap:6px;align-items:center;cursor:pointer}
 .inv-toolbar .chk input{width:14px;height:14px;accent-color:var(--accent)}
 .inv-toolbar select{background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 8px;color:var(--text);font:500 11px var(--font-ui)}
-.text-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto;padding-right:4px}
+.text-list{display:flex;flex-direction:column;gap:6px;max-height:min(46vh,440px);overflow:auto;padding-right:4px}
 .text-list::-webkit-scrollbar{width:6px}
 .text-list::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px}
-.inv-row{display:flex;gap:10px;align-items:center;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:500 12px var(--font-ui);animation:rowIn .25s var(--ease) both}
+/* Inventory/equipment row: fixed-width slot + count, flexible item name that shrinks (min-width:0)
+   so a long item name can never push the count or id into/over each other. */
+.inv-row{display:flex;gap:10px;align-items:center;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:500 12px var(--font-ui);animation:rowIn .25s var(--ease) both;min-width:0}
 .inv-row.empty{opacity:.55;border-style:dashed}
 .inv-row:hover{border-color:var(--border-hover);background:var(--panel-hover)}
 @keyframes rowIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
-.inv-row .slot{font:600 10px var(--font-mono);color:var(--text-dim);min-width:32px;text-align:center;background:var(--panel);border:1px solid var(--border);padding:2px 6px;border-radius:999px}
-.inv-row .item-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inv-row .slot{font:600 10px var(--font-mono);color:var(--text-dim);min-width:32px;flex-shrink:0;text-align:center;background:var(--panel);border:1px solid var(--border);padding:2px 6px;border-radius:999px}
+.inv-row .item-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inv-row .item-name.muted{color:var(--text-dim);font-style:italic}
-.inv-row .count{font:700 11px var(--font-mono);color:var(--accent);background:var(--accent-weak);padding:2px 7px;border-radius:999px;min-width:28px;text-align:center}
-.inv-row .item-id{font:500 10px var(--font-mono);color:var(--text-dim);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
+.inv-row .count{font:700 11px var(--font-mono);color:var(--accent);background:var(--accent-weak);padding:2px 7px;border-radius:999px;min-width:28px;flex-shrink:0;text-align:center}
+.inv-row .item-id{font:500 10px var(--font-mono);color:var(--text-dim);flex:0 1 auto;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
 @media(min-width:640px){.inv-row .item-id{display:block}}
-.inv-row.equip .slot{min-width:84px}
+.inv-row.equip .slot{min-width:78px;flex-shrink:0}
+/* Equipment rows don't need the raw id — the slot label + item name already say it,
+   and the long "minecraft:..." string was eating the room the name needed. */
+.inv-row.equip .item-id{display:none}
 .inv-empty{padding:24px 16px;text-align:center;border:1px dashed var(--border);border-radius:var(--r);background:var(--field)}
 .inv-empty b{font-size:13px}
 .inv-empty span{font:500 11px var(--font-ui);color:var(--text-muted)}

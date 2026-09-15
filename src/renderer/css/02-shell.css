@@ -24,8 +24,6 @@ corner — the server-path text used to run underneath it and got covered. When 
 is active (renderer adds .wco-app to <html>), reserve its width on the right side of the bar. */
 .wco-app .command-bar{padding-right:max(152px,calc(100vw - env(titlebar-area-width,100%) - env(titlebar-area-x,0px) + 14px))}
 .command-bar-path{flex:1;font:500 11px var(--font-mono);color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
-.settings-trigger{padding:7px 12px!important;border-radius:999px!important;border:1px solid var(--border)!important;background:transparent!important;color:var(--text-muted);font:600 12px var(--font-ui);display:flex;gap:7px;align-items:center;cursor:pointer}
-.settings-trigger.active{border-color:var(--accent)!important;color:var(--accent);background:var(--accent-weak)!important;box-shadow:0 0 10px var(--accent-weak)}
 .channel-strip{display:none} /* hidden in mix, rail replaces it */
 /* keep channelIndicator hidden but exists for JS */
 .channel-indicator{display:none}
