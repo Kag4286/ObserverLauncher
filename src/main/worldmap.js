@@ -76,12 +76,18 @@ async function readPlayers(root, levelName) {
       const parsed = await nbt.parse(fs.readFileSync(f));
       const S = nbt.simplify(parsed.parsed);
       const pos = S.Pos || [0, 64, 0];
+      // FEATURE: file mtime = last time the server flushed this player to
+      // disk (logout + periodic autosave). The map shows it as "saved HH:MM"
+      // so users can tell live-ish positions from stale ones.
+      let seenAt = 0;
+      try { seenAt = fs.statSync(f).mtimeMs; } catch {}
       players.push({
         uuid,
         name: names[uuid.toLowerCase()] || null,
         pos: { x: +pos[0], y: +pos[1], z: +pos[2] },
         dim: dimName(S.Dimension),
         gamemode: S.playerGameType | 0,
+        seenAt,
       });
     } catch {}
   }

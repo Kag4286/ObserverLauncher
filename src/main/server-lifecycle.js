@@ -14,6 +14,17 @@ const { serverFiles, detectSoftware, readEula, writeEula, parseServerLine } = re
 const platform = require('./platform');
 const { killTree } = require('./kill.js');
 
+// BUGFIX: PS output can carry a culture comma ("45,6712") even after we ask
+// for InvariantCulture (old PS, localized shims). Normalize before Number() so
+// a comma never produces NaN and silently zeroes RAM/CPU.
+function parseMetricValue(raw) {
+  if (raw === null || raw === undefined) return NaN;
+  const s = String(raw).trim();
+  if (!s) return NaN; // empty read → not a number, not a fake 0
+  const n = Number(s.replace(',', '.'));
+  return Number.isFinite(n) ? n : NaN;
+}
+
 let waitingForDone = false;
 
 function startAutoPoll(ctx, software) {
@@ -78,7 +89,7 @@ function startMetrics(ctx) {
       }
       consecutiveMisses = 0;
       const [memoryRaw, cpuTotalRaw] = String(r.stdout).trim().split('|');
-      const memory = Number(memoryRaw), cpuTotal = Number(cpuTotalRaw);
+      const memory = parseMetricValue(memoryRaw), cpuTotal = parseMetricValue(cpuTotalRaw);
       const now = Date.now();
       let cpu = 0;
       if (Number.isFinite(cpuTotal) && ctx.previousCpu && Number.isFinite(ctx.previousCpu.total)) {
@@ -304,4 +315,4 @@ async function forceStopServer(ctx) {
   return { ok: true };
 }
 
-module.exports = { startServerInternal, forceStopServer, startAutoPoll, startMetrics, registerServer };
+module.exports = { startServerInternal, forceStopServer, startAutoPoll, startMetrics, registerServer, parseMetricValue };

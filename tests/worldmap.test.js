@@ -38,6 +38,7 @@ fs.writeFileSync(path.join(root, 'usercache.json'), JSON.stringify([{ uuid: uuid
   ck('spawn exact', L.spawn.x === 128);
   const P = await wm.readPlayers(root, 'My World');
   ck('player found in level-name playerdata', P.players.length === 1 && P.players[0].name === 'Notch');
+  ck('player carries seenAt mtime', typeof P.players[0].seenAt === 'number' && P.players[0].seenAt > 0);
   // root fallback (legacy)
   fs.rmSync(worldDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(root, 'playerdata'), { recursive: true });

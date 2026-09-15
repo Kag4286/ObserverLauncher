@@ -59,7 +59,9 @@ function playerNameError(name){
   if(!isSafePlayerName(name)) return 'Invalid player name — use 3-16 letters, numbers or underscores.';
   return null;
 }
-function toast(message,kind){const t=$('#toast');t.textContent=message;t.className=kind?`show ${kind}`:'show';clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2800)}
+let toastQueue=[],toastTimer=null;
+function toast(message,kind){toastQueue.push({message,kind});if(toastQueue.length>3)toastQueue.shift();flushToast()}
+function flushToast(){if(toastTimer)return;const item=toastQueue.shift();if(!item)return;const el=$('#toast');el.textContent=item.message;el.className='show '+(item.kind||'');toastTimer=setTimeout(()=>{el.classList.remove('show');toastTimer=null;setTimeout(flushToast,80)},2800)}
 function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;const ctx=canvas.getContext('2d');const r=canvas.getBoundingClientRect();if(!r.width||!r.height) return;const d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);const w=r.width,h=r.height,p=expanded?30:13;const cs=getComputedStyle(document.documentElement);const cAccent=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';const cWarn=cs.getPropertyValue('--chart-cpu').trim()||'#d6a24a';const cSuccess=cs.getPropertyValue('--chart-ram').trim()||'#2fd0a0';const cDanger=cs.getPropertyValue('--danger').trim()||'#e5566a';const cMuted=cs.getPropertyValue('--text-dim').trim()||'#5c6470';const cFont=cs.getPropertyValue('--font-ui').trim()||'Space Grotesk, sans-serif';ctx.clearRect(0,0,w,h);
   if(mode==='tick'){
     // Danger band: bottom 25% of the chart (roughly under ~15 TPS / over ~25ms MSPT) tinted red,

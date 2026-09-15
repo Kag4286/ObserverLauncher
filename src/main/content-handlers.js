@@ -89,19 +89,29 @@ function registerContent(ipcMain, ctx) {
   });
   ipcMain.handle('editor:list', async () => editor.listFiles(ctx.currentServerPath));
 
+  // Never rejects: the Map tab renders the 'none' view on {level:null} and
+  // toasts r.error — a throw here used to leave the tab blank with no message.
   ipcMain.handle('worldmap:load', async () => {
-    const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
-    return {
-      level: await worldmap.readLevel(ctx.currentServerPath, lvlName),
-      players: await worldmap.readPlayers(ctx.currentServerPath, lvlName),
-      waypoints: worldmap.readWaypoints(ctx.currentServerPath),
-      levelName: lvlName
-    };
+    try {
+      const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+      return {
+        level: await worldmap.readLevel(ctx.currentServerPath, lvlName),
+        players: await worldmap.readPlayers(ctx.currentServerPath, lvlName),
+        waypoints: worldmap.readWaypoints(ctx.currentServerPath),
+        levelName: lvlName
+      };
+    } catch (error) {
+      return { level: null, players: { players: [] }, waypoints: [], levelName: 'world', error: error?.message || 'Could not read world data.' };
+    }
   });
   ipcMain.handle('worldmap:chunks', async (_, dim) => {
-    const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
-    const set = worldmap.scanExploredChunks(ctx.currentServerPath, lvlName, dim || 'overworld');
-    return { ok: true, dim: dim || 'overworld', chunks: [...set], truncated: set.size >= 200000 };
+    try {
+      const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+      const set = worldmap.scanExploredChunks(ctx.currentServerPath, lvlName, dim || 'overworld');
+      return { ok: true, dim: dim || 'overworld', chunks: [...set], truncated: set.size >= 200000 };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not scan chunks.' };
+    }
   });
   ipcMain.handle('worldmap:waypoints:set', async (_, list) => worldmap.writeWaypoints(ctx.currentServerPath, Array.isArray(list) ? list : []));
 }

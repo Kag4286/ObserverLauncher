@@ -30,7 +30,13 @@ if($candidates.Count -gt 0){
 }
 
 async function getProcessMetrics(pid) {
-  const script = `$p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue;if(-not $p){ exit 1 };$c=0;try{$c=$p.TotalProcessorTime.TotalSeconds}catch{try{$c=$p.CPU}catch{}};try{ $ws=$p.WorkingSet64 }catch{ $ws=0 }; if($ws -eq 0){ try{ $ws=(Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}" -ErrorAction SilentlyContinue).WorkingSetSize }catch{} }; "$([math]::Round($ws/1MB))|$c"`;
+  // BUGFIX: PowerShell string output uses the CURRENT CULTURE — on a
+  // vi-VN / de-DE / pt-BR system, TotalSeconds prints "45,6712" (comma).
+  // Number("45,6712")===NaN, which poisoned the CPU calc into a permanent
+  // 0% (previousCpu never updates). Force InvariantCulture so decimals are
+  // always "." regardless of the user's Windows language.
+  const script = `[System.Threading.Thread]::CurrentThread.CurrentCulture=[cultureinfo]::InvariantCulture;
+$p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue;if(-not $p){ exit 1 };$c=0;try{$c=$p.TotalProcessorTime.TotalSeconds}catch{try{$c=$p.CPU}catch{}};try{ $ws=$p.WorkingSet64 }catch{ $ws=0 }; if($ws -eq 0){ try{ $ws=(Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}" -ErrorAction SilentlyContinue).WorkingSetSize }catch{} }; "$([math]::Round($ws/1MB,2))|$([math]::Round($c,3))"`;
   const r = await runPowerShell(script);
   if (!r.stdout || !r.stdout.trim()) {
     // Fallback via wmic/tasklist if PowerShell Get-Process failed (e.g., 32/64-bit mismatch or policy)

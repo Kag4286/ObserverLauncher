@@ -72,8 +72,8 @@ ObserverLauncher does all of that in one window. What used to take an afternoon 
 
 | Platform | File | Link |
 |----------|------|------|
-| Windows 10/11 (64-bit) | `ObserverLauncher-0.2.0-setup.exe` | [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) |
-| Linux (AppImage) | `ObserverLauncher-0.2.0.AppImage` | [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) |
+| Windows 10/11 (64-bit) | `ObserverLauncher-0.3.0-setup.exe` | [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) |
+| Linux (AppImage) | `ObserverLauncher-0.3.0.AppImage` | [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) |
 
 Requirements: Windows 10+ or a modern Linux distro. No admin rights needed. Java is auto-detected or installed by the launcher.
 

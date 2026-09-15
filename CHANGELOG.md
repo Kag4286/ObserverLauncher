@@ -3,6 +3,54 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.0] — 2026-09-09
+
+### Added
+- **Force stop** button in the top bar: terminates the server process tree
+  immediately, even while starting or stuck stopping. Confirms first
+  (unsaved progress may be lost), suppresses auto-restart. New
+  `server:force-stop` IPC (`src/main/kill.js` shared kill-tree).
+- **World Map upgrades**
+  - Click a marker (player / spawn / waypoint) for a popup with exact XYZ,
+    dimension and a Copy button; clicking empty map shows that point's coords.
+  - Live layer: while the server runs and the tab is open, player positions
+    re-read every 15s (camera untouched) and explored chunks re-scan every
+    45s. Player dots carry the save-file mtime shown as "saved HH:MM:SS".
+
+### UI — PULSE SYSTEM redesign
+- New motion system (`css/08-motion.css` + `css/09-pulse.css`): direction-aware
+  tab slide, modal rise, opacity-only list refresh, global `prefers-reduced-motion`
+  kill-switch, one-time boot scanline.
+- **Pulse Wave**: 8 ticks in the command bar beating on each ~5s server poll
+  while running — the launcher's live heartbeat.
+- Rail nav: hairline left-tick signature, active halo, softer settings break.
+- Console rebuilt as a fixed-viewport terminal: dense rows, timestamps,
+  per-level left-border tint, segmented filters, log-line enter animation.
+  Long lines now wrap/scroll in place instead of stretching the tab.
+- Players roster densified (38px rows, smaller avatar/buttons), hover lifts
+  removed app-wide in favour of border/ink feedback.
+- Toasts are queued (max 3), bottom-left, styled per success/error.
+- Overview hero: name + status pill + plain sentence, problems-only setup
+  checklist, single 5-cell stats row.
+
+### Refactor
+- Split `marketplace.js` into `marketplace.js` (remote catalog) +
+  `modpacks.js` (`.mrpack` import/export).
+
+### Bug fixes
+- **Start button dead on launch**: backend initializes before the window opens
+  and boot re-syncs if Java/files were missing.
+- **RAM/CPU showing 0 / "—"**: PowerShell culture decimal — `Number("45,6712")`
+  was NaN. Metrics now run under `InvariantCulture` and a `parseMetricValue`
+  normalizes comma decimals (fixes vi-VN / de-DE / pt-BR systems).
+- **World Map blank tab**: the load-time `switchTab` capture threw after the
+  GUI split; lazy-load moved into `switchTab`, readers never reject.
+- `settings:get` / `files:get` never reject; `server:start` always resolves
+  `{ok:false}` with a reason instead of rejecting silently.
+- Console no longer grows unbounded with long log lines (fixed viewport).
+- Force-stop added `server:force-stop` + `tests/force-stop.test.js`,
+  `tests/metrics-parse.test.js`, `tests/worldmap-wiring.test.js`.
+
 ## [0.2.0] — 2026-09-09
 
 ### Refactor

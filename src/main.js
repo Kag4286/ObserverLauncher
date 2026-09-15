@@ -8,7 +8,8 @@
 //   server-lifecycle.js start/stop/command, auto-poll, metrics, auto-restart
 //   backups.js          manual + auto world backups, restore, delete
 //   players.js          read/save player data, whitelist/ban/op
-//   marketplace.js      market search/detail/install, .mrpack import/export
+//   marketplace.js      market search/detail/install (Modrinth/Hangar/Spiget)
+//   modpacks.js         .mrpack import/export (local archive handling)
 //   wizard.js           create-server wizard (adapters + BuildTools)
 //   settings-handlers.js settings/dialog/network/Java auto-install
 //   content-handlers.js files/properties/content import/editor/worldmap
@@ -22,6 +23,7 @@ const { registerServer } = require('./main/server-lifecycle.js');
 const { registerBackups } = require('./main/backups.js');
 const { registerPlayers } = require('./main/players.js');
 const { registerMarketplace } = require('./main/marketplace.js');
+const { registerModpacks } = require('./main/modpacks.js');
 const { registerWizard } = require('./main/wizard.js');
 const { registerSettings } = require('./main/settings-handlers.js');
 const { registerContent } = require('./main/content-handlers.js');
@@ -37,6 +39,7 @@ registerServer(ipcMain, ctx);
 registerBackups(ipcMain, ctx);
 registerPlayers(ipcMain, ctx);
 registerMarketplace(ipcMain, ctx);
+registerModpacks(ipcMain, ctx);
 registerWizard(ipcMain, ctx);
 registerSettings(ipcMain, ctx);
 registerContent(ipcMain, ctx);

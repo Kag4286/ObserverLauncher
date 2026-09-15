@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"><link rel="stylesheet" href="css/09-pulse.css"></head>
 <body>
 <div class="app-shell">
   <aside class="rail">
@@ -21,6 +21,7 @@
   </aside>
   <div class="workspace">
   <header class="command-bar">
+    <div class="command-bar-pulse"><div class="pulse-wave" id="pulseWave" aria-hidden="true"></div></div>
     <div class="command-bar-path" id="serverPath">No server selected</div>
   </header>
   <div class="channel-strip" hidden></div>

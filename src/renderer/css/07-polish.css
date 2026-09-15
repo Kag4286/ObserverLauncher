@@ -107,8 +107,16 @@
 .wm-seed{font:600 11px var(--font-mono);color:var(--accent);background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);border-radius:var(--r-sm);padding:5px 10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wm-coord{font:700 11.5px var(--font-mono);color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:5px 10px;min-width:130px;text-align:center}
 .spacer{flex:1}
-.wm-main{display:grid;grid-template-columns:1fr 250px;min-height:0}
+.wm-main{display:grid;grid-template-columns:1fr 250px;min-height:0;position:relative}
 #wmCanvas{display:block;width:100%;height:min(58vh,560px);background:#0A0F14;cursor:crosshair}
+/* Click inspector popup — anchored near the cursor, clamped into the map. */
+#wmPopup{position:absolute;z-index:5;min-width:170px;max-width:240px;background:var(--panel-raised);border:1px solid var(--border-strong);border-radius:var(--r);padding:10px 12px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.wm-pop-x{position:absolute;top:4px;right:8px;background:none;border:0;color:var(--text-dim);font-size:15px;cursor:pointer;padding:2px 4px}
+.wm-pop-x:hover{color:var(--text)}
+.wm-pop-title{display:flex;align-items:center;gap:8px;margin-bottom:6px;padding-right:18px}
+.wm-pop-title b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wm-pop-line{font-size:11.5px;color:var(--text-muted);margin:2px 0}
+.wm-pop-copy{margin-top:8px;width:100%}
 .wm-panel{border-left:1px solid var(--border);padding:12px 14px;background:var(--panel);overflow:auto;max-height:min(58vh,560px)}
 .wm-wplist{display:flex;flex-direction:column;gap:6px}
 .wm-wprow{display:flex;gap:8px;align-items:center;padding:7px 8px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm)}

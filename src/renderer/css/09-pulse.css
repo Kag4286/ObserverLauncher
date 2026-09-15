@@ -1,0 +1,105 @@
+/* css/09-pulse.css — PULSE SYSTEM: the launcher reads like a live instrument.
+   One accent (cyan), 1px hairlines substituting shadows, motion restrained
+   to a single 170ms ease tab pan + a 5s poll wave + one-time boot scanline.
+   Load LAST so it owns the final cascade (after per-tab styles). */
+
+/* ============ TOKENS (override only where Pulse deviates) ============ */
+:root{
+  --hairline:1px; /* every border collapses to 1px — no 1.5px/2px inconsistency */
+  --live-dot-size:6px;
+}
+
+/* ============ PULSE WAVE (signal spine, top of command bar) ============
+   A row of 8 ticks filling across each 5s poll cycle. This is the ONE
+   element allowed to run at ~1Hz — everything else is quieter. */
+.command-bar-pulse{display:flex;align-items:center;flex-shrink:0;-webkit-app-region:no-drag}
+.pulse-wave{display:flex;gap:2px;align-items:center}
+.pulse-wave i{width:3px;height:5px;background:var(--border);display:block}
+/* live beat fill: JS toggles .done on each tick as the poll lands */
+.pulse-wave i.done{background:var(--accent)}
+@keyframes pulseScan{0%{opacity:0;filter:blur(6px) saturate(.6)}60%{opacity:1}100%{filter:blur(0) saturate(1)}}
+.app-shell{animation:pulseScan .42s cubic-bezier(.2,.7,.3,1) both}
+
+/* ============ RAIL (nav feels like a console, not a list) ============ */
+.rail{border-right:var(--hairline) solid var(--border);background:var(--panel)}
+.rail-head{border-bottom:var(--hairline) solid var(--border);background:linear-gradient(180deg, var(--panel-raised), var(--panel))}
+.rail-nav{padding:8px}
+.rail-nav .nav-item{position:relative;padding:9px 10px;margin:1px 0;border-radius:var(--r);border:1px solid transparent;color:var(--text-muted);font-weight:600;font-size:13.5px;background:transparent;transition:background .12s,color .12s}
+/* hairline tick on the left — Pulse signature */
+.rail-nav .nav-item::before{content:'';position:absolute;left:0;top:9px;height:calc(100% - 18px);width:2px;background:var(--border-strong);border-radius:0;transform:scaleY(0);transform-origin:center;transition:transform .16s var(--ease-out)}
+.rail-nav .nav-item:hover{background:var(--panel-raised);color:var(--text)}
+.rail-nav .nav-item:hover::before{transform:scaleY(1);background:var(--text-dim)}
+.rail-nav .nav-item.active{background:var(--panel-raised);color:var(--text);border-color:var(--border)}
+.rail-nav .nav-item.active::before{transform:scaleY(1);background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
+.rail-nav .nav-item .nav-icon{width:20px;height:20px;opacity:.55}
+.rail-nav .nav-item.active .nav-icon{opacity:1;filter:drop-shadow(0 0 4px rgba(0,229,255,.5))}
+/* settings separated by a soft break, not a heavy dashed box */
+.rail-nav .settings-trigger{border:1px dashed var(--border-strong)!important;margin-top:10px;color:var(--text-dim)}
+.rail-nav .settings-trigger.active{color:var(--accent);border-color:var(--accent)!important;background:var(--accent-weak)}
+.rail-foot{border-top:var(--hairline) solid var(--border)}
+
+/* ============ COMMAND BAR (thinner, mono, pulse dry) ============ */
+.command-bar{border-bottom:var(--hairline) solid var(--border);backdrop-filter:none;background:var(--panel)}
+.command-bar-path{font-family:var(--font-mono);font-size:11px;letter-spacing:.01em}
+
+/* ============ BUTTONS (no lift on hover — only border/ink) ============ */
+.btn{padding:8px 13px;border-width:var(--hairline);border-radius:var(--r);font-size:12.5px;transition:background .12s,border-color .12s,color .12s,box-shadow .12s}
+.btn:hover{transform:none;border-color:var(--border-strong);background:var(--panel-hover)}
+.btn:active{transform:scale(.985)}
+.btn.primary{box-shadow:0 0 0 1px var(--accent-ink) inset}
+.btn.primary:hover{box-shadow:0 0 0 1px var(--accent-ink) inset, 0 0 14px var(--accent-weak)}
+.text-btn{font-weight:600}
+/* focus ring — visible everywhere, same thickness as Pulse's hairline */
+:focus-visible{outline:1.5px solid var(--accent);outline-offset:1.5px}
+
+/* ============ PANELS (kill scanline overlay + soften) ============ */
+.glass{border-width:var(--hairline);border-color:var(--border)}
+.glass::before{display:none} /* drop the fake CRT texture — field station, not synthwave */
+.glass:hover{border-color:var(--border-strong)}
+.panel{padding:var(--pad-panel)}
+.panel-head{margin-bottom:var(--pad-panel);padding-bottom:8px;border-bottom:var(--hairline) solid var(--border)}
+
+/* ============ TOAST — elevated, once, then gone ============ */
+#toast{position:fixed;left:18px;bottom:18px;z-index:80;background:var(--panel-raised);border:1px solid var(--border-strong);color:var(--text);padding:10px 14px;border-radius:var(--r);font:600 12.5px var(--font-ui);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .16s var(--ease-out),transform .16s var(--ease-out)}
+#toast.show{opacity:1;transform:none;pointer-events:auto}
+#toast.show.success{border-color:var(--success);box-shadow:0 0 0 1px rgba(0,229,160,.25)}
+#toast.show.error{border-color:var(--danger);box-shadow:0 0 0 1px rgba(255,59,92,.25)}
+
+/* ============ LIVE dot flash on metric value change (used by JS) ============ */
+@keyframes valPop{0%{box-shadow:0 0 0 0 var(--accent-glow)}100%{box-shadow:0 0 0 6px transparent}}
+.srv-stats dd.pop{animation:valPop .3s var(--ease-out)}
+
+/* ============ TAB content entry — slide only (motion v2) ============
+   Keep the directional slide from js/08-shell.js; add a subtle fade-up for
+   the active pane under it. No stacking keyframes. */
+.tab.active{animation:contentIn .18s var(--ease-out)}
+@keyframes contentIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ============ GLOBAL density / anti-slop pass ============
+   The whole app shares ONE language: hairline rows, 3px radii, no lift-on-hover,
+   no pill-drift. These overrides flatten the "dashboard card" leftovers. */
+/* pills → square-in-pill only for live data, 3px everywhere else */
+.roster-count,.live-label,.channel-tag,.player-badge,.kpi-badge,.diag-badge,.inspect-badge{border-radius:3px}
+/* no hover lifts anywhere — border/ink only */
+.player-row:hover,.help-cards button:hover,.diag-card:hover,.item-cell:hover{transform:none}
+.player-row:hover{box-shadow:none;border-color:var(--border-strong)}
+.help-cards button:hover::after{content:none}
+/* players: dense 38px rows */
+.player-row{padding:6px 10px;min-height:38px;gap:10px}
+.player-avatar{width:28px;height:28px;border-radius:3px}
+.player-name b{font-size:13.5px}
+.row-action{padding:4px 9px;font-size:10.5px;border-radius:3px}
+/* marketplace / content rows: tighter */
+.market-item{min-height:44px}
+/* focus ring matches hairline */
+#edText,#edHl,#edGutter{font-family:var(--font-mono)}
+
+/* ============ MODAL motion — rise, not center-scale ============ */
+.modal-overlay .modal{animation:modalRise var(--dur-modal) var(--ease-out)}
+.modal-overlay{background:rgba(3,6,10,.72);backdrop-filter:blur(4px)}
+
+/* ============ REDUCED MOTION — total kill (owns final cascade) ============ */
+@media (prefers-reduced-motion:reduce){
+  .pulse-wave i,.status-dot .sd-ring,.status-dot .sd-spin{animation:none!important}
+  .app-shell,.tab.active,.modal-overlay .modal,.log-line{animation:none!important}
+}

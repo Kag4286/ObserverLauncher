@@ -50,6 +50,10 @@ function switchTab(tab){
   if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); metricChart($('#miniChart'));}catch{}})}); }
   if(tab==='players')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
   if(tab==='content')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});
+  // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
+  // hook switchTab itself: it evaluates before this file, so capturing
+  // switchTab there throws and leaves the tab blank with dead Reload buttons.
+  if(tab==='worldmap'&&typeof wmLoad==='function')wmLoad().catch(e=>toast(`World Map failed to load: ${e?.message||e}`,'error'));
 }
 async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast('Invalid command — single line only.');const r=await window.observer.command(c);if(!r.ok)toast(r.error)}
 let cmdHistory=[],cmdHistoryIdx=-1;
@@ -593,3 +597,13 @@ window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st)st.inner
 window.observer.onUpdateProgress(p=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.downloading',{p:Math.round(p.percent)});});
 window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.ready')+' <button class="btn primary sm" id="installBtn">'+t('upd.install')+'</button>';const b=$('#installBtn');if(b)b.onclick=()=>window.observer.quitInstall();});
 window.observer.onUpdateNone&&window.observer.onUpdateNone(()=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.none');});
+
+// ===== PULSE — the launcher's heartbeat. 8 ticks fill every ~5s poll cycle.
+const pulseWave=$('#pulseWave');let pulseTicks=[];
+if(pulseWave){for(let i=0;i<8;i++){const tEl=document.createElement('i');pulseWave.appendChild(tEl);pulseTicks.push(tEl)}}
+let pulseTimer=null,pulsePos=0;
+function pulseTick(){if(!pulseTicks.length)return;pulseTicks.forEach(t=>t.classList.remove('done'));
+  pulseTicks[pulsePos%8].classList.add('done');pulsePos++}
+function pulseStart(){pulseStop();pulsePos=0;pulseTimer=setInterval(pulseTick,625)} // 8 ticks × 625ms ≈ 5s poll
+function pulseStop(){clearInterval(pulseTimer);pulseTimer=null;pulsePos=0;pulseTicks.forEach(t=>t.classList.remove('done'))}
+window.observer.onState(v=>{if(v.status==='running')pulseStart();else pulseStop()});

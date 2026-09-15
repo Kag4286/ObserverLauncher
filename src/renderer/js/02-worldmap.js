@@ -54,13 +54,25 @@ let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.
 const WM_COLORS=['#FF3B5C','#00E5FF','#FFD23F','#00E5A0','#C792EA','#FF8C42'];
 function wmShow(view){$('#wmNoWorld').hidden=view!=='none';$('#wmApp').hidden=view!=='app'}
 async function wmLoad(){
-  const r=await window.observer.worldmapLoad();
+  // NOTE: tab activation lives in switchTab (js/08-shell.js) — do NOT capture
+  // switchTab here at load time. This file evaluates BEFORE 08-shell.js, so
+  // `const orig=switchTab` used to throw ReferenceError, aborting this script
+  // (Reload buttons included) and leaving the Map tab permanently blank.
+  let r;
+  try {
+    r = await window.observer.worldmapLoad();
+  } catch (e) {
+    wmShow('none');
+    toast(`Could not load world data: ${e?.message || e}`, 'error');
+    return;
+  }
+  if (!r) { wmShow('none'); return }
   wm.level=(r&&r.level&&r.level.ok)?r.level:null;
   wm.players=(r&&r.players&&r.players.players)||[];
   wm.waypoints=(r&&r.waypoints)||[];
-  if(!wm.level){wmShow('none');return}
+  if(!wm.level){wmShow('none');if(r.error)toast(`World Map: ${r.error}`,'error');return}
   wmShow('app');
-  wm.seedBig=BigInt(wm.level.seed);
+  try { wm.seedBig=BigInt(wm.level.seed); } catch { wm.seedBig=0n }
   $('#wmSeed').textContent=wm.level.seed;
   $('#wmSeed').title=wm.level.levelName+' · '+wm.level.version.name;
   // center on spawn or first player
@@ -147,6 +159,59 @@ function wmRenderList(){
   box.querySelectorAll('[data-wm-del]').forEach(b=>b.onclick=async()=>{wm.waypoints=wm.waypoints.filter(x=>x.id!==b.dataset.wmDel);await window.observer.worldmapSetWaypoints(wm.waypoints);wmRenderList();wmDraw()});
 }
 function wmSyncDimTabs(){$$('#wmDims .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.dim===wm.dim))}
+// FEATURE: click-to-inspect — click a marker for a popup with exact coords +
+// Copy; click empty map for that point's coords. (Hover already shows coords
+// in #wmCoord; the popup persists so you can copy/keep it while panning.)
+function wmToScreen(wx,wz){const W=$('#wmCanvas').clientWidth||800,H=$('#wmCanvas').clientHeight||520;return [(wx-wm.cam.x)*wm.zoom+W/2,(wz-wm.cam.z)*wm.zoom+H/2]}
+function wmHidePopup(){const p=$('#wmPopup');if(p)p.hidden=true}
+function wmShowPopup(px,py,{color,title,lines,copy}){
+  let p=$('#wmPopup');
+  if(!p){const host=document.querySelector('#wmApp .wm-main');if(!host)return;p=document.createElement('div');p.id='wmPopup';p.hidden=true;host.appendChild(p)}
+  p.innerHTML=`<button class="wm-pop-x" aria-label="Close">×</button><div class="wm-pop-title"><span class="wm-dot" style="background:${esc(color||'#B8C2CC')}"></span><b>${esc(title)}</b></div>${lines.map(l=>`<div class="wm-pop-line mono">${esc(l)}</div>`).join('')}<button class="btn sm secondary wm-pop-copy">${esc(t('conn.copy'))}</button>`;
+  p.hidden=false;
+  p.querySelector('.wm-pop-x').onclick=e=>{e.stopPropagation();wmHidePopup()};
+  p.querySelector('.wm-pop-copy').onclick=async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(copy);toast(t('toast.copied'),'success')}catch{toast(copy)}};
+  const wrap=p.parentElement.getBoundingClientRect();
+  const pw=p.offsetWidth||180,ph=p.offsetHeight||120;
+  p.style.left=Math.max(8,Math.min(px+14,wrap.width-pw-8))+'px';
+  p.style.top=Math.max(8,Math.min(py-10,wrap.height-ph-8))+'px';
+}
+function wmMapClick(px,py,wx,wz){
+  const marks=wmVisible();
+  for(let i=marks.length-1;i>=0;i--){
+    const m=marks[i];const[sx,sy]=wmToScreen(m.x,m.z);
+    if(Math.hypot(px-sx,py-sy)<=14){
+      const y=Math.round(m.y??64);
+      const lines=[`${Math.round(m.x)} ${y} ${Math.round(m.z)}`,m.dim];
+      if(m.type==='player'&&m.seenAt)lines.push(new Date(m.seenAt).toLocaleTimeString());
+      wmShowPopup(px,py,{color:m.color,title:m.name,lines,copy:`${Math.round(m.x)} ${y} ${Math.round(m.z)}`});
+      return;
+    }
+  }
+  wmShowPopup(px,py,{title:`${wx} ${wz}`,lines:[wm.dim],copy:`${wx} ${wz}`});
+}
+// FEATURE: live layer — while the server runs and this tab is open, re-read
+// player positions every 15s (the server flushes playerdata on logout +
+// periodic autosave; seenAt tells how fresh each dot is) and re-scan explored
+// chunks every 3rd tick. Camera/zoom are never touched. Singleton ticker,
+// no-ops when idle — same pattern as the uptime interval.
+let wmLiveTick=0,wmRefreshing=false;
+setInterval(()=>{if(wmRefreshing||!state.running||!wm.level)return;const tab=document.getElementById('worldmap');if(!tab||!tab.classList.contains('active'))return;wmLiveRefresh()},15000);
+async function wmLiveRefresh(){
+  if(wmRefreshing||!state.running||!wm.level)return;
+  wmRefreshing=true;
+  try{
+    const r=await window.observer.worldmapLoad();
+    if(r&&r.level&&r.level.ok){
+      wm.players=(r.players&&r.players.players)||[];
+      wm.level=r.level;
+      try{$('#wmSeed').textContent=wm.level.seed}catch{}
+      wmRenderList();wmDraw();
+      if(++wmLiveTick%3===0)wmLoadChunks(wm.dim);
+    }
+  }catch{}
+  wmRefreshing=false;
+}
 async function wmAddWaypoint(x,z){
   let name=null;
   try{ name=prompt(t('wm.namePrompt'),t('wm.waypoints')+' '+(wm.waypoints.length+1)); }catch{ name=''; }
@@ -160,14 +225,7 @@ async function wmAddWaypoint(x,z){
   wmRenderList();wmDraw();
   wmJump(x,z);
 }
-// tab activation: load data lazily
-(function(){
-  const orig=switchTab;
-  window.switchTab=function(tab){
-    orig(tab);
-    if(tab==='worldmap')wmLoad().catch(()=>{});
-  };
-})();
+// (Tab activation hook lives in switchTab — see js/08-shell.js.)
 $('#wmReload').onclick=wmLoad;
 $('#wmReload2').onclick=wmLoad;
 $('#wmCopySeed').onclick=async()=>{if(!wm.level)return;try{await navigator.clipboard.writeText(wm.level.seed);toast(t('toast.copied'),'success')}catch{toast(wm.level.seed)}};
@@ -193,8 +251,8 @@ $('#wmExport').onclick=()=>{
 };
 (function(){
   const cv=$('#wmCanvas');
-  let dragging=false,lx=0,ly=0;
-  cv.addEventListener('mousedown',e=>{dragging=true;lx=e.clientX;ly=e.clientY});
+  let dragging=false,lx=0,ly=0,downPos=null;
+  cv.addEventListener('mousedown',e=>{dragging=true;lx=e.clientX;ly=e.clientY;downPos={x:e.clientX,y:e.clientY};wmHidePopup()});
   window.addEventListener('mouseup',()=>dragging=false);
   cv.addEventListener('mousemove',e=>{
     const r=cv.getBoundingClientRect();
@@ -215,12 +273,20 @@ $('#wmExport').onclick=()=>{
     wmDraw();
   },{passive:false});
   cv.addEventListener('click',e=>{
-    if(!wm.addMode||!wm.level)return;
+    if(!wm.level)return;
     const r=cv.getBoundingClientRect();
+    // A drag-pan also fires click on release — only treat near-stationary
+    // presses as clicks so panning never pops the inspector open.
+    if(downPos&&Math.hypot(e.clientX-downPos.x,e.clientY-downPos.y)>5){downPos=null;return}
+    downPos=null;
     const x=Math.round((e.clientX-r.left-WM_CX())/wm.zoom+wm.cam.x);
     const z=Math.round((e.clientY-r.top-WM_CY())/wm.zoom+wm.cam.z);
-    wmAddWaypoint(x,z);
-    wm.addMode=false;$('#wmAdd').classList.remove('active');
+    if(wm.addMode){
+      wmAddWaypoint(x,z);
+      wm.addMode=false;$('#wmAdd').classList.remove('active');
+      return;
+    }
+    wmMapClick(e.clientX-r.left,e.clientY-r.top,x,z);
   });
   new ResizeObserver(()=>wmDraw()).observe(cv);
 })();
