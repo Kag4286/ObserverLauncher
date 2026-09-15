@@ -1,203 +1,516 @@
 # ObserverLauncher
 
-Run a Minecraft server on your own computer, without the terminal.
+**Run a Minecraft server on your own computer — without touching a terminal.**
 
-ObserverLauncher is a desktop app for Windows and Linux. It handles the boring parts of hosting: downloading the server, installing Java, editing configs, opening the firewall, backing up your world. You pick a folder, choose a server type, press Start.
+ObserverLauncher is a desktop app for Windows and Linux that handles the boring parts of hosting a Minecraft server for you: downloading the server software, installing Java, editing config files, opening the firewall, and backing up your world. You pick a folder, choose a server type, and press **Start**.
 
-> **Status: Experimental.** This project is under active development and is **not yet stable**. Things may change, break, or not work as expected. Use at your own risk. Bug reports and suggestions are welcome.
+[![Release](https://img.shields.io/github/v/release/Kag4286/ObserverLauncher?label=release)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
-## Why not just do it manually?
+> ⚠️ **Status: Experimental.** This project is under active development and is **not yet stable**. Things may change, break, or behave unexpectedly. Use it at your own risk. Bug reports and suggestions are very welcome.
 
-Hosting a Minecraft server usually means following a long tutorial:
+---
 
-1. Download a server jar from a website
-2. Create a `run.bat` file
-3. Edit JVM arguments by hand
-4. Open `server.properties` in Notepad and guess what each option means
-5. Download plugins one by one, check versions, copy files into folders
-6. Open ports on your router and firewall
-7. Watch a console scroll for 10 minutes to see if it worked
+## Table of contents
 
-ObserverLauncher does all of that in one window. What used to take an afternoon now takes about three minutes.
+- [What is this?](#what-is-this)
+- [Who is it for?](#who-is-it-for)
+- [Screenshots](#screenshots)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Quick start (5 minutes)](#quick-start-5-minutes)
+- [Feature tour](#feature-tour)
+- [Supported server software](#supported-server-software)
+- [Supported languages](#supported-languages)
+- [Where things live on your disk](#where-things-live-on-your-disk)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Data & privacy](#data--privacy)
+- [Known limitations](#known-limitations)
+- [Roadmap](#roadmap)
+- [Architecture (for contributors)](#architecture-for-contributors)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+- [Disclaimer](#disclaimer)
 
-## What it does
+---
 
-### Server setup
+## What is this?
 
-- Downloads Vanilla, Paper, Purpur, Leaf, Fabric, Forge, NeoForge, Folia, or Spigot from official sources
-- Loads version lists live from each project's API
-- Checks that your Java version matches the server's requirement before starting
-- Can install Java for you (no admin rights needed)
-- Compiles Spigot from source via BuildTools if you pick that option
+Hosting a Minecraft server usually means following a long, error-prone tutorial:
 
-### Live monitoring
+1. Find and download a server `.jar` from some website.
+2. Create a `run.bat` file by hand.
+3. Edit JVM arguments and hope you got them right.
+4. Open `server.properties` in Notepad and guess what `view-distance` does.
+5. Download plugins one by one, matching versions to your server type.
+6. Forward ports on your router and poke holes in your firewall.
+7. Watch a black console scroll for 10 minutes to find out whether it worked.
 
-- Real-time TPS, MSPT, CPU, and RAM graphs
-- Plain-language explanations for each metric (hover the ?)
-- Works for Paper/Purpur/Forge; shows player count on Vanilla/Fabric
+ObserverLauncher turns all of that into a single window. What used to take an afternoon now takes about three minutes — and if something goes wrong, the app tells you *why* instead of showing a cryptic Java stack trace.
 
-### Player management
+It is a **local** tool. It runs the server on your machine; it does not host anything for you, and it has no account system or cloud component.
 
-- See who is online, whitelisted, banned, or OP
-- Whitelist / ban / OP players even while the server is stopped
-- Open a player's inventory, armor, and ender chest with real item icons
+---
 
-### Plugin & mod marketplace
+## Who is it for?
 
-- Search Modrinth, Hangar, and SpigotMC in one box
-- Shows compatibility before you install (game version, loader, server-side support)
-- Explicit version picker with per-file download progress
-- Imports and exports standard Modrinth `.mrpack` files
+- **First-time server owners** who want to play with friends and don't want to learn the command line.
+- **People who already host manually** but want a GUI for the tedious parts (metrics, backups, config editing, player management).
+- **Tinkerers** who want to run several server types (Paper, Fabric, Forge…) from one place.
 
-### Config editor
+If you are comfortable with a terminal and want maximum control, you may not need this — but the monitoring and backup features are still convenient.
 
-- Edit `server.properties`, `spigot.yml`, `whitelist.json`, plugin configs
-- Syntax highlighting for YAML, JSON, TOML, properties, JS
-- JSON validation + auto-format
-- Detects conflicts when the file changes on disk
+---
 
-### Backups
+## Screenshots
 
-- Manual or scheduled ZIP snapshots of world folders
-- Uses `save-off` / `save-all` / `save-on` so worlds never get archived mid-write
-- Restore from the launcher
+**Overview** — the control panel: server status, live metrics, quick actions, and how friends can connect.
 
-### Auto-update
+![ObserverLauncher Overview tab](docs/screenshot-overview.png)
 
-- Checks GitHub Releases on launch
-- Shows a notification when a new version exists
-- One-click install (Windows via NSIS installer, Linux via AppImage)
+**World Map** — reads your real world save: seed, spawn, player positions, waypoints, and explored chunks.
 
-## Download
+![ObserverLauncher World Map tab](docs/screenshot-worldmap.png)
 
-| Platform | File | Link |
-|----------|------|------|
-| Windows 10/11 (64-bit) | `ObserverLauncher-0.3.0-setup.exe` | [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) |
-| Linux (AppImage) | `ObserverLauncher-0.3.0.AppImage` | [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) |
+**Marketplace** — search Modrinth, Hangar and SpigotMC in one box and install straight into your server folder.
 
-Requirements: Windows 10+ or a modern Linux distro. No admin rights needed. Java is auto-detected or installed by the launcher.
+![ObserverLauncher Marketplace tab](docs/screenshot-marketplace.png)
 
-## Quick Start
+---
 
-1. Download the installer for your platform.
-2. Run it.
-3. Pick a folder where the server files will live.
-4. Choose your server type and version.
-5. Press **Start**.
+## Requirements
 
-The launcher downloads the server, configures it, opens the firewall (if needed), and shows you the address to share with friends.
+| | Minimum | Recommended |
+|---|---|---|
+| **OS** | Windows 10 (64-bit) or a modern 64-bit Linux distro | Windows 11 / recent Ubuntu, Fedora, etc. |
+| **RAM** | 4 GB (2 GB for the OS, 2 GB for the server) | 8 GB or more |
+| **Disk** | ~1 GB free for the app + the server | 5 GB+ (worlds and modpacks grow) |
+| **Java** | Any Java — the launcher **detects and can install it for you** | 64-bit Java 17 / 21 / 25, depending on your server version |
+| **Git** | Only needed to compile Spigot from source | Install it if you plan to use Spigot |
 
-## Run from Source
+**You do not need admin rights.** The launcher installs Java into your user folder and only asks for elevation if you choose to open the Windows Firewall for a port.
 
-If you prefer to run from source:
+Running from source additionally requires **Node.js 18 or newer**.
+
+---
+
+## Install
+
+### Option A — Download the installer (recommended)
+
+| Platform | File |
+|---|---|
+| Windows 10/11 (64-bit) | `ObserverLauncher-0.3.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-0.3.0.AppImage` |
+
+Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
+
+- **Windows:** run the `.exe`. It is a normal NSIS installer — you can choose the install location, and it sets up auto-update.
+- **Linux:** `chmod +x ObserverLauncher-0.3.0.AppImage` then run it. No installation, no root required.
+
+### Option B — Run from source
 
 ```bash
 npm install
 npm start
 ```
 
-Requires Node.js 18+.
+This starts the app in development mode (no packaging step). See [Development](#development) for tests and builds.
+
+### Auto-update
+
+The launcher checks GitHub Releases on startup and shows a notification when a newer version exists. One-click install:
+
+- **Windows** — via the NSIS installer.
+- **Linux** — via the AppImage.
+
+> Auto-update does **not** work with a portable `.exe` or a `.deb`. Use the NSIS installer or AppImage. The release must also be *published*, not a draft.
+
+---
+
+## Quick start (5 minutes)
+
+1. **Launch the app.** On first run you'll see the Overview tab with a welcome card.
+2. **Choose a folder** — click **Choose folder** (or **Create new server**, which suggests a folder under `Documents/ObserverLauncher Servers`). Pick an **empty** folder; the launcher will not overwrite an existing server jar.
+3. **Create a server** — click **Create new server** to open the wizard. Choose the software (e.g. *Paper*) and the Minecraft version, then let it download. Spigot compiles from source and takes several minutes — the Console tab shows progress.
+4. **Check the setup checklist.** The Overview hero shows problems only: missing folder, missing jar, missing Java, or unaccepted EULA. When everything is green, the list disappears.
+5. **Accept the EULA.** Minecraft servers require accepting Mojang's EULA. The launcher can write `eula=true` for you (enable **Accept EULA automatically** in Settings), or you can edit `eula.txt` yourself.
+6. **Set memory.** In the stats row, set **Allocate RAM** (min / max in GB) and click **Apply**. A good rule of thumb is roughly half your system RAM, but leave room for the OS.
+7. **Press Start.** The status pill moves through *Starting → Running*. The first launch creates `server.properties` and world folders — an initial `Failed to load properties` error is expected and harmless.
+8. **Invite friends.** The *How friends can join* panel shows the address to share. On the same Wi-Fi, use the local address as-is. Over the internet, you also need to forward the port on your router — the **Allow this port through Windows Firewall** button only opens the OS firewall, it does not touch your router.
+
+That's it. Everything else — plugins, players, backups, the world map — is optional.
+
+---
+
+## Feature tour
+
+### Server setup
+
+- Downloads **Vanilla, Paper, Purpur, Leaf, Fabric, Forge, NeoForge, Folia, Velocity or Spigot** from official sources.
+- Loads version lists **live** from each project's API, so new Minecraft releases show up without an app update.
+- **Java check before start** — compares your installed Java against what the jar actually needs (e.g. a 26.x jar needs Java 25; an old 1.12.2 jar needs Java 8) and blocks the start with a clear message if it's too old.
+- **Automatic Java install** — no admin rights, no separate download page.
+- **Spigot from source** via BuildTools (requires Git; takes several minutes).
+
+### Live monitoring
+
+- Real-time **TPS, MSPT, CPU and RAM** graphs.
+- **Plain-language explanations** for each metric — hover the **?** next to a KPI.
+- Works natively for **Paper / Purpur / Leaf / Folia / Forge**; for Vanilla and Fabric it shows the player count but TPS/MSPT stay `—` (those servers don't expose the data without a plugin like Spark).
+
+### Player management
+
+- See who is **online, whitelisted, banned or OP** in one roster.
+- Whitelist / ban / OP players **even while the server is stopped** (the launcher edits the JSON files directly).
+- **Open a player's inventory, armor, offhand and ender chest** with real item names.
+- Editing a player's health, XP, food or game mode creates a backup of the `.dat` file first.
+
+### Plugin & mod marketplace
+
+- Search **Modrinth, Hangar and SpigotMC** in one box.
+- Shows **compatibility before you install** (game version, loader, server-side support) against the server the launcher detected.
+- **Explicit version picker** with per-file download progress.
+- **Import and export** standard Modrinth `.mrpack` files.
+
+### Config editor
+
+- Edit `server.properties`, `spigot.yml`, `whitelist.json`, plugin configs and more, in place.
+- **Syntax highlighting** for YAML, JSON, TOML, properties and JS.
+- **JSON validation + auto-format**.
+- **Conflict detection** — if the file changes on disk while you're editing, the launcher warns you instead of silently overwriting.
+- For Velocity proxies, a raw `velocity.toml` editor replaces the properties grid.
+
+### Backups
+
+- **Manual or scheduled** ZIP snapshots of your world folders.
+- Uses `save-off` / `save-all` / `save-on` so worlds are never archived mid-write.
+- **Restore** from the launcher, with a zip-slip safety check on extraction.
+
+### World Map
+
+- Reads **real data** from your world save — not a mock-up.
+- World **seed**, level name, version and spawn point from `level.dat`.
+- **Player positions** with their last-saved time.
+- **Explored-chunk overlay** scanned from region files (`.mca`).
+- **Waypoints** you can add, name, jump to and delete.
+- **Export the current view as PNG.**
+- A per-seed **terrain preview** (clearly labelled as an approximation — it does not reveal real structure positions).
+
+### Console
+
+- A real terminal view with timestamps, per-level colouring (info / warn / error / command) and **segmented filters**.
+- **Command history** (↑ / ↓) and a one-click **recent commands** row.
+- Auto-poll noise (`list`, `tps`, `tick query`) is filtered out so the log stays readable.
+
+### Auto-update
+
+- Checks GitHub Releases on launch and installs with one click (see [Install](#install)).
+
+---
 
 ## Supported server software
 
-| Software | How it's obtained |
-|---|---|
-| Vanilla | Official Mojang version manifest |
-| Paper / Folia / Velocity | Official PaperMC Fill API |
-| Purpur | Official Purpur API |
-| Leaf | Official Leaf API |
-| Fabric | Official Fabric meta API |
-| Forge / NeoForge | Official installer (runs automatically) |
-| Spigot / CraftBukkit | Compiled via BuildTools (requires Git) |
+| Software | How it's obtained | Native TPS/MSPT? |
+|---|---|---|
+| **Vanilla** | Official Mojang version manifest | Player count only |
+| **Paper / Folia / Velocity** | Official PaperMC Fill API | Yes (Velocity is a proxy — N/A) |
+| **Purpur** | Official Purpur API | Yes |
+| **Leaf** | Official Leaf API | Yes |
+| **Fabric** | Official Fabric meta API | Player count only |
+| **Forge / NeoForge** | Official installer (runs automatically) | Yes |
+| **Spigot / CraftBukkit** | Compiled via BuildTools (requires Git) | Via Spigot config |
+
+---
 
 ## Supported languages
 
-English, Tiếng Việt, Español, Português (BR), Deutsch, Русский, 简体中文
+English, **Tiếng Việt**, Español, Português (BR), Deutsch, Русский, 简体中文.
 
-The interface is fully translated for all 7 languages. Missing translations fall back to English.
+The interface is fully translated for all 7 languages. Any missing key falls back to English automatically, so a partial translation still works.
 
-## Project Structure
+---
+
+## Where things live on your disk
+
+### Your server folder
+
+This is the folder you chose in the launcher. A typical Paper/Fabric server looks like:
 
 ```
-ObserverLauncher/
-├── src/
-│   ├── main.js          # Electron main process (thin wiring; see main/)
-│   ├── preload.js       # Safe IPC bridge
-│   ├── main/            # Backend modules (context, server-lifecycle, backups, players, marketplace, wizard, …)
-│   │   ├── adapters/    # Server software download resolvers
-│   │   └── platform/    # Windows/Linux process management
-│   └── renderer/        # UI
-│       ├── index.html   # Shell (loads css/*, locales/*, js/* in order)
-│       ├── js/          # Frontend per tab (00-core … 08-shell, classic scripts)
-│       ├── css/         # Styles per area (01-tokens … 07-polish, link in order)
-│       └── locales/     # One file per language (meta.js first)
-├── tests/               # Unit tests
-├── site/                # Marketing website (GitHub Pages)
-└── package.json
+MyServer/
+├── paper-1.21.4.jar          # the server jar (or run.bat / run.sh for Forge/Fabric)
+├── eula.txt                  # Minecraft EULA acceptance
+├── server.properties         # main config
+├── spigot.yml / bukkit.yml   # Spigot/Paper config (if applicable)
+├── plugins/                  # plugins (.jar)
+├── mods/                     # mods (.jar) for Forge/Fabric
+├── world/                    # overworld + playerdata + datapacks
+├── world_nether/             # nether
+├── world_the_end/            # the end
+├── logs/                     # server logs
+├── usercache.json            # known players
+├── whitelist.json / banned-players.json / ops.json
+├── observerlauncher-backups/ # ZIP backups created by the launcher
+└── observerlauncher-manifest.json  # tracks marketplace installs (for export)
 ```
+
+> Newer Minecraft versions may store player data under `world/players/data/` instead of `world/playerdata/`. The launcher reads both.
+
+### Launcher data (per user, not in your server folder)
+
+| What | Where |
+|---|---|
+| Settings (`settings.json`) | Electron `userData` folder |
+| Downloaded item/block icons | `userData/textures/<version>/…` |
+| App preferences & update state | `userData` |
+
+On Windows, `userData` is typically `C:\Users\<you>\AppData\Roaming\ObserverLauncher`. On Linux it is `~/.config/ObserverLauncher`.
+
+---
+
+## Troubleshooting
+
+### Java not detected
+
+Install Java from the launcher (**Settings → Java runtime → Install Java automatically**), or set the path manually in Settings. If you already have Java, make sure `java -version` works in a terminal — if it doesn't, the launcher won't see it either.
+
+### "This jar needs Java X+, detected Java Y"
+
+The server jar requires a newer Java than you have. Use the **Fix Java** button in the banner, or install a newer Java manually. Note that Minecraft moved to calendar versioning: **26.x servers need Java 25**, 1.20.5+/1.21.x need Java 21, 1.18+ need Java 17, and very old versions need Java 8.
+
+### TPS / MSPT show "—"
+
+Only **Paper, Purpur, Leaf, Folia and Forge** have a built-in TPS/MSPT command. Vanilla and Fabric don't expose it. Install **Spark** from the Marketplace if you need deep profiling on those.
+
+### The server won't start and I see no clear error
+
+Check the **Console** tab and scroll up — the real Java error is usually a few lines above. The most common causes are a Java version mismatch, too little allocated RAM, or a corrupted/partial jar download (delete the jar and re-run the wizard).
+
+### "Failed to load properties" on first start
+
+This is **expected** on the very first launch. `server.properties` doesn't exist yet, so the server complains once, creates the file, and continues.
+
+### Start button is greyed out
+
+Hover it — the tooltip says why. Usually one of: no folder chosen, no runnable `.jar`/`run.bat` in the folder, or Java not detected. The Overview setup checklist lists the same problems.
+
+### CPU or RAM shows 0 / "—" on a non-English Windows
+
+This was a real bug (fixed in 0.3.0): PowerShell printed decimals with a comma (`45,6712`) on locales like vi-VN or de-DE, which broke the metric parser. Make sure you are on **0.3.0 or later**. If it still happens, please open an issue with your Windows display language.
+
+### Spigot build fails
+
+Spigot has no legal pre-built download — it is compiled locally with **BuildTools**, which needs **Git** installed and on your PATH. Install Git from [git-scm.com](https://git-scm.com) and try again. The build can take several minutes; watch the Console tab.
+
+### Auto-update not working
+
+Make sure you installed via the **NSIS installer** (Windows) or **AppImage** (Linux) — not a portable `.exe` or `.deb`. Also confirm the GitHub release is **published**, not a draft.
+
+### Backup is empty or fails
+
+Check that your world folders exist and are named as expected (the launcher follows `level-name` from `server.properties`). On Linux, backups need **`zip` or `tar`** available on the system. Restores refuse archives that contain unsafe paths (absolute paths or `..`) as a safety measure.
+
+### Friends can't connect over the internet
+
+Opening the Windows Firewall (the button in the launcher) is only **half** the job. You also need to **forward the port on your router** to your PC's local IP. If your ISP uses carrier-grade NAT, port forwarding may not work at all — consider a tunnel service or a rented host instead.
+
+### The app is stuck on "Stopping…"
+
+Use the **Force stop** button in the top bar. It kills the server process tree immediately. Unsaved progress may be lost, so it confirms first — but it is exactly the escape hatch for a frozen server.
+
+---
+
+## FAQ
+
+**Do I need to own Minecraft to run a server?**
+The server software is free. Players need a legitimate Minecraft: Java Edition account *if* the server runs in online mode (the default). You can turn online mode off in `server.properties`, but that allows cracked clients — think twice before doing so.
+
+**Does the launcher host the server for me?**
+No. The server runs on your own computer. The launcher is only the control panel.
+
+**Can I run more than one server?**
+Yes — just point the launcher at a different folder. Settings (folder, RAM, Java path) are per-folder in practice, so switch folders to switch servers.
+
+**Where are my backups?**
+Inside your server folder, in `observerlauncher-backups/`, as `.zip` files.
+
+**Can I use this on a Mac?**
+Not officially. It is built and tested for Windows and Linux. macOS is not a supported target.
+
+**Does it work with Bedrock?**
+No. This is for **Minecraft: Java Edition** servers only.
+
+**How much RAM should I allocate?**
+For a small server with a few friends, 2–4 GB is plenty. Leave at least 2 GB for the OS. The launcher defaults to roughly half your system RAM (capped at 8 GB).
+
+**Can I edit configs by hand instead of in the app?**
+Absolutely. Everything is a normal file in your server folder. The launcher even detects when a file changes on disk while it's open in its editor.
+
+---
+
+## Data & privacy
+
+ObserverLauncher is a local tool. It has **no account, no telemetry, and no analytics**.
+
+**What it downloads (only when you ask it to):**
+- Server jars from the official Mojang / PaperMC / Purpur / Leaf / Fabric / Forge Maven endpoints.
+- Plugins and mods from Modrinth, Hangar and SpigotMC when you install them.
+- Item/block icons from the public **PrismarineJS** mirror, cached on your machine (no Mojang assets are bundled or redistributed).
+- Java runtimes, when you use the automatic Java installer.
+- Update metadata from GitHub Releases.
+
+**What it never does:**
+- It does not upload your world, configs, or player data anywhere.
+- It does not collect usage statistics.
+- It does not run any background service once the app is closed.
+
+All requests are made directly from your machine to the official sources.
+
+---
+
+## Known limitations
+
+- **Windows and Linux only.** No macOS build.
+- **Not stable.** See the warning at the top — expect rough edges.
+- **TPS/MSPT need a supported server.** Vanilla and Fabric report player count only.
+- **Spigot needs Git** and compiles slowly.
+- **Velocity proxies don't tick a world**, so their TPS/MSPT panel shows N/A by design.
+- **No macOS auto-update path**, and auto-update requires the packaged installer/AppImage.
+- **Port forwarding is still on you** — the launcher cannot configure your router.
+
+---
+
+## Roadmap
+
+Planned / under consideration (not promises):
+
+- Broader i18n coverage for strings not yet wired to `data-i18n`.
+- More per-software adapters and version schemes.
+- Richer world-map layers and filters.
+- Better error surfacing for rare Java/OS edge cases.
+
+See the [CHANGELOG](CHANGELOG.md) for what has already shipped.
+
+---
+
+## Architecture (for contributors)
+
+The app follows a clean three-layer split. Understanding it makes contributing much easier.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  RENDERER  (src/renderer/)  — UI only, no Node access       │
+│  index.html loads css/* → locales/* → js/* in NUMERIC order  │
+│  js/00-core … js/08-shell (classic scripts, no bundler)      │
+└───────────────────────────┬─────────────────────────────────┘
+                            │  window.observer.*  (IPC)
+┌───────────────────────────┴─────────────────────────────────┐
+│  PRELOAD  (src/preload.js) — contextBridge, the only bridge  │
+│  contextIsolation ON · nodeIntegration OFF                    │
+└───────────────────────────┬─────────────────────────────────┘
+                            │  ipcMain.handle(...)
+┌───────────────────────────┴─────────────────────────────────┐
+│  MAIN  (src/main.js) — thin composition root                 │
+│  creates ctx, registers 9 feature modules:                    │
+│   context · server-lifecycle · backups · players ·            │
+│   marketplace · modpacks · wizard · settings-handlers ·       │
+│   content-handlers · app-lifecycle                            │
+│                                                               │
+│  Pure/stateless helpers (testable without Electron):          │
+│   java · server-files · settings · fs-utils · http ·          │
+│   editor · worldmap · textures · validate · migrations        │
+│  Per-software download resolvers:  adapters/                  │
+│  Per-OS process/metrics/firewall:  platform/ (win32, linux)   │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Key ideas:**
+
+- `src/main/context.js` holds the single shared mutable state object (`ctx`) plus helpers like `send`, `appendLog`, `setServerStatus`. Every status transition goes through `setServerStatus`, so the UI state machine stays consistent.
+- **IPC channel names are stable** and shared with `preload.js`. Don't rename them; the renderer depends on them.
+- Most `src/main/*` modules are plain, side-effect-free functions you can `require()` in a test with no Electron window.
+- The renderer has **no `require()`** — it mirrors input validation manually (see `validate.js` vs `js/00-core.js`), and the backend re-validates as defense in depth.
+
+---
 
 ## Development
 
-Run tests:
+### Run tests
 
 ```bash
 npm test
 ```
 
-Build for Windows:
+Runs every `tests/*.test.js` through `tests/run.js` (plain Node, no framework) and fails fast. The suite covers boot state, the editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace/poll suppression, textures, world-map wiring and more.
+
+### Build
 
 ```bash
-npm run build:win
+npm run build:win     # Windows NSIS installer
+npm run build:linux   # Linux AppImage
+npm run build:all     # both
 ```
 
-Build for Linux:
-
-```bash
-npm run build:linux
-```
-
-Build both:
-
-```bash
-npm run build:all
-```
+### Release
 
 Releases are automated via GitHub Actions when you push a `v*` tag.
 
-## Troubleshooting
+### Code conventions
 
-**Java not detected**
+- **English only** in code comments, commit messages, and the `en` locale block.
+- **One concern per pull request.**
+- Explain the *why*, not just the *what*, in PR descriptions — especially for bug fixes.
+- Test on **Windows** if you can; several paths (`powershell.exe`, `cmd.exe`, `run.bat`) are Windows-specific.
 
-Install Java from the launcher (Settings > Java runtime > Install Java automatically), or set the path manually.
+### Project structure
 
-**TPS/MSPT show "—"**
+```
+ObserverLauncher/
+├── src/
+│   ├── main.js          # Electron main process (thin wiring)
+│   ├── preload.js       # Safe IPC bridge
+│   ├── main/            # Backend modules (see Architecture above)
+│   │   ├── adapters/    # Server software download resolvers
+│   │   └── platform/    # Windows/Linux process + metrics + firewall
+│   └── renderer/        # UI
+│       ├── index.html   # Shell (loads css/*, locales/*, js/* in order)
+│       ├── js/          # Frontend per tab (00-core … 08-shell)
+│       ├── css/         # Styles per area (01-tokens … 09-pulse)
+│       └── locales/     # One file per language (meta.js first)
+├── tests/               # Unit tests (node tests/run.js)
+├── docs/                # Screenshots
+├── build/               # App icons
+└── package.json
+```
 
-Only Paper/Purpur/Forge servers have a built-in TPS/MSPT command. Vanilla and Fabric don't expose it. Install Spark if you need deep profiling.
-
-**Auto-update not working**
-
-Make sure you're using the NSIS installer (Windows) or AppImage (Linux), not a portable `.exe` or `.deb`. Also ensure the release is published, not a draft.
-
-**Spigot build fails**
-
-Spigot needs Git installed on the system. Install Git and try again.
+---
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first — it covers the development setup, the one-concern-per-PR rule, and how to add a language.
 
-## AI Contributions
+When reporting a bug, the most useful report includes **what you clicked, what you expected, and the actual Console output** (the launcher's Console tab, or `logs/latest.log` if the server itself failed).
 
-This project is developed with the assistance of AI tools (such as DeepSeek) for code generation, debugging, and documentation. AI contributions are used to accelerate development and improve code quality. All AI-generated code is reviewed and tested by humans before merging.
+---
 
-## Website
+## AI contributions
 
-Marketing site and live demo are at [kag4286.github.io/ObserverLauncher](https://kag4286.github.io/ObserverLauncher/).
+This project is developed with the assistance of AI tools (such as DeepSeek, Claude, ChatGPT, Qwen,...) for code generation, debugging and documentation. AI contributions accelerate development and improve code quality; all AI-generated code is reviewed and tested by humans before merging.
+
+---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © ObserverLauncher contributors.
+
+---
 
 ## Disclaimer
 
-ObserverLauncher is an unofficial tool, not affiliated with Mojang or Microsoft. Running a Minecraft server requires accepting the Minecraft EULA.
+ObserverLauncher is an **unofficial** tool and is **not affiliated with, endorsed by, or associated with Mojang, Microsoft, or any server-software project** (Paper, Purpur, Fabric, Forge, Spigot, etc.). Minecraft is a trademark of Mojang Synergies AB.
+
+Running a Minecraft server requires accepting the [Minecraft End User License Agreement](https://www.minecraft.net/en-us/eula). No Mojang game assets are bundled in this repository; item/block icons are fetched at runtime to your machine from a public mirror.
