@@ -1,0 +1,8 @@
+README: refresh for 0.4.0
+
+- Add Highlights + Quick links block at the top
+- Correct the World Map section to describe real biome preview
+- Document 0.4.0 features: resilient downloads, settings tab, file tree,
+  two-column player inspector, auto-update error handling
+- Add 3 screenshots (player inspector, file browser, editor)
+- Fix Roadmap and Development test list
