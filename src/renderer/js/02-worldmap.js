@@ -290,6 +290,15 @@ function wmDraw(){
   ctx.beginPath();ctx.moveTo(14,H-24);ctx.lineTo(14+px,H-24);ctx.stroke();
 }
 function wmJump(x,z){wm.cam={x,z};wmDraw()}
+// R1: jump to typed coordinates — accepts "X Z", "X, Z", or "X Z Y" (Y ignored, map is 2D).
+function wmGoTo(){
+  const el=$('#wmGotoInput');if(!el)return;
+  const nums=String(el.value).match(/-?\d+(?:\.\d+)?/g);
+  if(!nums||nums.length<2){toast('Enter coordinates like 120 -340');return}
+  wmJump(Number(nums[0]),Number(nums[1]));
+}
+$('#wmGotoBtn')?.addEventListener('click',wmGoTo);
+$('#wmGotoInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();wmGoTo()}});
 function wmRenderList(){
   const box=$('#wmWpList');const list=wm.waypoints;
   $('#wmWpCount').textContent=String(list.length);

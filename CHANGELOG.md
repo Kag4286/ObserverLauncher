@@ -3,6 +3,103 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.0] — 2026-09-16
+
+### Added
+- **Linux support for the Java auto-installer and .mrpack import/export.** These
+  were Windows-only and silently broken on Linux:
+  - Java runtime is now fetched for the correct OS (Adoptium `windows`/`linux`/`mac`)
+    in the right archive format (`.zip` on Windows, `.tar.gz` elsewhere), and the
+    `java` binary is located by the right name (`java.exe` vs `java`).
+  - Archive handling is now platform-abstracted (`platform.extractArchive` /
+    `createArchive`): PowerShell on Windows, `unzip`/`zip`/`tar` on Linux.
+  - Modpack import and export use the same abstraction, so both work on Linux.
+- New `tests/java-platform.test.js` covers the platform helpers.
+
+> **Not verified on real Linux hardware.** The Linux paths were fixed from code
+> analysis only — no Linux test machine was available. They are covered by unit
+> tests for the platform helpers, but the end-to-end Java install and modpack
+> import/export on Linux still need a manual check on a real Linux system.
+>
+> **Spigot's BuildTools needs a JDK, not a JRE.** The one-click "Install Java"
+> downloads a JRE (no `javac`), which is enough to *run* a server but not to
+> *compile* Spigot. Pick Spigot only if you have a full JDK on the system.
+
+### Security
+- **Single-instance lock.** A second copy of the launcher now refuses to start and
+  focuses the existing window, instead of racing the first on `settings.json`, the
+  server folder, and the running server process.
+- **`serverPath` is validated before it becomes the root for file operations.**
+  `settings:save` now rejects a path that is not an existing directory, instead of
+  trusting the renderer-supplied value verbatim (it drives backups, editor writes,
+  player data and content deletion).
+- **Player UUIDs are validated.** `player:read`, `player:save`, and the
+  whitelist/ban/op toggles now reject anything that is not a plain UUID before it
+  is joined into a `<world>/playerdata/<uuid>.dat` path.
+- **Unhandled main-process errors are logged** (`uncaughtException` /
+  `unhandledRejection`) instead of dying silently.
+- New `isSafeUuid` validator + tests (validate.test.js now 47 assertions).
+- **Symlink-safe path checks.** `safeTarget` now resolves the real path (not just the string)
+  and re-checks it stays inside the root, so a symlink inside the server folder can no longer
+  escape it. New `tests/safe-target.test.js`.
+- **Input size caps in the main process** (not just the renderer): `properties:save`,
+  `properties:raw-save` and `worldmap:waypoints:set` reject oversized payloads.
+- **Linux live content refresh fixed.** `fs.watch({recursive:true})` is unsupported on Linux
+  (it failed silently), so the content list never refreshed on file changes there. Linux now
+  watches the root plus each top-level subfolder manually.
+- **Backup uses a stable root snapshot** — changing the server folder mid-backup can no longer
+  split one backup across two folders.
+- **World Map: jump to coordinates.** A small X Z input next to the toolbar jumps the map to
+  typed coordinates (`120 -340`, `120, -340`, or `120 -340 64`). New i18n keys `wm.goto` /
+  `wm.gotoPh`.
+- **Create-server wizard: cancel a download in progress.** A Cancel button now sits next to the
+  download progress and aborts the transfer (AbortController threaded through `download()` in
+  http.js → `wizard:cancel` IPC → renderer). Cancelling stops immediately without retry and is
+  reported clearly. New i18n key `nsw.cancel`.
+- **Create-server wizard: clearer version + Spigot checks.** Picking "specific version" now
+  blocks Next when the field is empty or the typed version is definitively not in the live list
+  (with a "did you mean" hint) instead of silently falling back to latest. Spigot now checks for a
+  full JDK (`javac`) up front, not just a JRE, so the build fails fast with a clear message rather
+  than minutes into BuildTools.
+- **Removed the dead `wm.cheatNote` string** (the cheat-layer feature it described was dropped
+  long ago; the key was unused in the UI).
+- **Linux firewall button now copies the ufw command.** Linux cannot open the firewall without
+  sudo, so the button relabels to "Copy firewall command" and puts `sudo ufw allow <port>/tcp` on
+  the clipboard instead of pretending it can elevate.
+- **Linux backup fails clearly when no archiver is installed.** If neither `zip` nor `tar` is on
+  the system, the backup returns a clear message instead of a cryptic spawn error.
+
+### Security
+- **Modpack download URLs are now validated.** A `.mrpack` file is untrusted
+  input, and its `downloads` URLs were fetched verbatim — a crafted pack could
+  point at `file://` (local file read) or a private/loopback host (SSRF to the
+  user's router or cloud metadata endpoint). `isSafeDownloadUrl()` now allows
+  only http(s) to a public host and rejects `file:`, localhost, `::1`, `.local`,
+  and IPv4 private/loopback/link-local/CGNAT ranges. Unsafe entries are skipped.
+- **Renderer is now sandboxed** (`sandbox: true`), on top of the existing
+  `contextIsolation` + `nodeIntegration: false`.
+- **Navigation and popups are blocked.** The window refuses `window.open()` and
+  any navigation away from the local `file://` UI, so a stray link or injected
+  markup cannot replace the app with a remote page.
+- New `tests/download-url.test.js` covers the URL allowlist.
+
+### Changed
+- **Split the largest modules for maintainability** (no behaviour change):
+  - `renderer/js/08-shell.js` (622 lines) → kept as the app shell (nav, boot, live
+    status) plus three focused files loaded after it: `10-properties.js`
+    (server-properties tab), `11-market.js` (marketplace tab), `12-wizard.js`
+    (new-server wizard).
+  - `renderer/js/01-content.js` → kept the content list; the in-place file editor
+    moved to `01b-editor.js` (loads between 01 and 02, since 02 calls `openEd`).
+  - `main/server-lifecycle.js` → metrics sampling moved to `server-metrics.js` and
+    auto-poll to `server-poll.js`; both are re-exported so existing callers and
+    tests keep working.
+  - The console and onboarding blocks stay in `08-shell.js` on purpose — the boot
+    sequence calls them during script evaluation, so they cannot load later.
+- **Fixed a boot error from the split:** `javaMajorOf` was briefly moved into the
+  wizard file, but the Overview calls it during boot before that file loads. It now
+  lives in `00-core.js`, which loads first.
+
 ## [0.4.0] — 2026-09-15
 
 ### Added

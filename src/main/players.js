@@ -9,26 +9,32 @@ const nbt = require('prismarine-nbt');
 const { serverFiles, readPlayerData } = require('./server-files.js');
 const { readJsonList, writeJsonList, safeTarget } = require('./fs-utils.js');
 const { marketplaceError } = require('./http.js');
-const { isSafePlayerName, isSafeReason } = require('./validate.js');
+const { isSafePlayerName, isSafeReason, isSafeUuid } = require('./validate.js');
 
-function checkPlayerInput({ name, reason }) {
+function checkPlayerInput({ name, reason, uuid }) {
   // SECURITY (console injection): names are interpolated into stdin commands
   // (`whitelist add ${name}`, `ban ${name} ...`). A name like `Notch\nstop`
   // would execute a second command. Enforce Java-username shape up front.
   if (!isSafePlayerName(name)) return 'Invalid player name — use 3-16 letters, numbers or underscores.';
   if (reason !== undefined && !isSafeReason(reason)) return 'Invalid reason — must be under 200 characters with no line breaks.';
+  // SECURITY (path traversal): uuid is joined into <world>/playerdata/<uuid>.dat. Manual
+  // actions send null (no known uuid yet); any real uuid must be a plain UUID.
+  if (uuid !== null && uuid !== undefined && !isSafeUuid(uuid)) return 'Invalid player UUID.';
   return null;
 }
 
 function registerPlayers(ipcMain, ctx) {
   ipcMain.handle('player:read', async (_, uuid) => {
+    // SECURITY: uuid is joined into <world>/playerdata/<uuid>.dat — reject anything that is
+    // not a plain UUID before touching the filesystem.
+    if (!isSafeUuid(uuid)) return { ok: false, error: 'Invalid player UUID.' };
     try { return { ok: true, ...(await readPlayerData(ctx.currentServerPath, uuid)) }; }
     catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data for UUID ${uuid}.` }; }
   });
 
   ipcMain.handle('player:whitelist-toggle', async (_, { uuid, name, add }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const bad = checkPlayerInput({ name });
+    const bad = checkPlayerInput({ name, uuid });
     if (bad) return { ok: false, error: bad };
     if (ctx.serverProcess) {
       ctx.serverProcess.stdin.write(`whitelist ${add ? 'add' : 'remove'} ${name}\r\n`);
@@ -43,7 +49,7 @@ function registerPlayers(ipcMain, ctx) {
 
   ipcMain.handle('player:ban-toggle', async (_, { uuid, name, ban, reason }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const bad = checkPlayerInput({ name, reason });
+    const bad = checkPlayerInput({ name, reason, uuid });
     if (bad) return { ok: false, error: bad };
     if (ctx.serverProcess) {
       const cmd = ban ? `ban ${name} ${reason || ''}`.trim() : `pardon ${name}`;
@@ -59,7 +65,7 @@ function registerPlayers(ipcMain, ctx) {
 
   ipcMain.handle('player:op-toggle', async (_, { uuid, name, op }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const bad = checkPlayerInput({ name });
+    const bad = checkPlayerInput({ name, uuid });
     if (bad) return { ok: false, error: bad };
     if (ctx.serverProcess) {
       const cmd = op ? `op ${name}` : `deop ${name}`;
@@ -76,6 +82,8 @@ function registerPlayers(ipcMain, ctx) {
   ipcMain.handle('player:save', async (_, { uuid, changes, clearInventory }) => {
     try {
       if (ctx.serverProcess) return { ok: false, error: 'Stop the server before editing player data.' };
+      // SECURITY: uuid is joined into the player .dat path — reject non-UUID input up front.
+      if (!isSafeUuid(uuid)) return { ok: false, error: 'Invalid player UUID.' };
       const clampedFields = [['health', 0, 20], ['food', 0, 20], ['saturation', 0, 20], ['xpLevel', 0, 2000000000], ['xpTotal', 0, 2000000000]];
       const v = {};
       for (const [key, min, max] of clampedFields) {

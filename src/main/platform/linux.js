@@ -140,6 +140,8 @@ async function createBackup({ serverPath, worlds, destZip }) {
   const safeWorlds = Array.isArray(worlds) ? worlds.filter(isSafeWorldName) : [];
   if (!safeWorlds.length) return { ok: false, error: 'No valid world folders to back up.' };
   const hasZip = await exec('which', ['zip']).then(r => r.ok);
+  const hasTar = await exec('which', ['tar']).then(r => r.ok);
+  if (!hasZip && !hasTar) return { ok: false, error: 'Backup needs either "zip" or "tar" on this system — install one (e.g. sudo apt install zip) and try again.' };
   const cmd = hasZip ? 'zip' : 'tar';
   const args = hasZip ? ['-r', destZip, '--', ...safeWorlds] : ['-czf', destZip, '--', ...safeWorlds];
   return new Promise(resolve => {
@@ -202,4 +204,35 @@ async function allowFirewall(port) {
   };
 }
 
-module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries };
+module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries, extractArchive, createArchive };
+
+// Cross-platform archive helpers (Linux side). .zip -> unzip, .tar.gz/.tgz -> tar.
+async function extractArchive(archivePath, destDir) {
+  const isZip = /\.zip$/i.test(archivePath);
+  if (isZip) {
+    const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);
+    const r = hasUnzip
+      ? await exec('unzip', ['-o', archivePath, '-d', destDir], 300000)
+      : await exec('tar', ['-xf', archivePath, '-C', destDir], 300000);
+    return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive (needs unzip or tar).' };
+  }
+  const r = await exec('tar', ['-xzf', archivePath, '-C', destDir], 300000);
+  return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive (needs tar).' };
+}
+async function createArchive(srcPath, destArchive) {
+  // srcPath is the staging folder; archive its CONTENTS into destArchive.
+  const hasZip = await exec('which', ['zip']).then(r => r.ok);
+  const args = hasZip ? ['-r', destArchive, '.'] : ['-czf', destArchive, '.'];
+  const cmd = hasZip ? 'zip' : 'tar';
+  return new Promise(resolve => {
+    const { spawn } = require('child_process');
+    const proc = spawn(cmd, args, { cwd: srcPath });
+    let stderr = '';
+    let settled = false;
+    const done = v => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} done({ ok: false, error: `${cmd} timed out` }); }, 300000);
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('error', err => done({ ok: false, error: err.message }));
+    proc.on('close', code => done(code === 0 ? { ok: true } : { ok: false, error: stderr || `${cmd} exited with ${code}` }));
+  });
+}

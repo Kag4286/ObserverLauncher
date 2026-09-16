@@ -66,6 +66,37 @@ function isSafeWorldName(name) {
     && !name.startsWith('-') && path.basename(name) === name;
 }
 
+// SECURITY: download URLs inside a .mrpack come from an untrusted file the user
+// opens, and were fetched verbatim — a crafted pack could point at file:// (local
+// read) or a private/loopback host (SSRF to the user's router/cloud metadata).
+// Only allow http(s) to a public host; reject file:, localhost, and private ranges.
+function isSafeDownloadUrl(url) {
+  let u;
+  try { u = new URL(String(url)); } catch { return false; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false;
+  if (host === '::1') return false;
+  // IPv4 private / loopback / link-local / CGNAT
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10 || a === 127 || a === 0) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+  }
+  return true;
+}
+
+// SECURITY: player UUIDs from the renderer are joined into a file path
+// (<world>/playerdata/<uuid>.dat). A value with `/`, `\` or `..` could point outside the
+// world folder, so require a plain UUID (with or without dashes).
+function isSafeUuid(uuid) {
+  return typeof uuid === 'string' && /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/.test(uuid.trim());
+}
+
 module.exports = {
   isValidPort,
   isSafePlayerName,
@@ -74,4 +105,6 @@ module.exports = {
   isSafeBackupName,
   isSafeArchiveEntry,
   isSafeWorldName,
+  isSafeDownloadUrl,
+  isSafeUuid,
 };

@@ -6,7 +6,8 @@ const path = require('path');
 const { app, dialog } = require('electron');
 const { serverFiles } = require('./server-files.js');
 const { readJsonList, fileHashes, safeTarget } = require('./fs-utils.js');
-const { json, download, marketplaceError, psQuote, runPowerShell } = require('./http.js');
+const { json, download, marketplaceError } = require('./http.js');
+const platform = require('./platform');
 async function importMrpackFromPath(ctx, mrpackPath, onInfo) {
   let tempZip, extractDir;
   try {
@@ -16,7 +17,7 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo) {
     tempZip = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}.zip`);
     extractDir = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}`);
     fs.copyFileSync(mrpackPath, tempZip);
-    const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(tempZip)} -DestinationPath ${psQuote(extractDir)} -Force`, 300000);
+    const r = await platform.extractArchive(tempZip, extractDir);
     if (!r.ok) throw new Error(r.error || 'Could not extract the modpack archive.');
     const indexPath = path.join(extractDir, 'modrinth.index.json');
     if (!fs.existsSync(indexPath)) throw new Error('Not a valid .mrpack file (missing modrinth.index.json).');
@@ -27,6 +28,8 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo) {
       if (file.env?.server === 'unsupported') { skipped++; continue; }
       const url = file.downloads?.[0];
       if (!url) { skipped++; continue; }
+      const { isSafeDownloadUrl } = require('./validate.js');
+      if (!isSafeDownloadUrl(url)) { skipped++; continue; }
       const dest = safeTarget(ctx.currentServerPath, file.path);
       if (!dest) throw new Error(`This modpack's file list contains an unsafe path ("${file.path}") — import stopped for safety.`);
       installable.push({ url, dest, name: path.basename(dest), size: file.fileSize || 0 });
@@ -104,7 +107,7 @@ function registerModpacks(ipcMain, ctx) {
       fs.mkdirSync(path.join(stagingDir, 'overrides'), { recursive: true });
       fs.writeFileSync(path.join(stagingDir, 'modrinth.index.json'), JSON.stringify(index, null, 2));
       try { fs.copyFileSync(path.join(ctx.currentServerPath, 'server.properties'), path.join(stagingDir, 'overrides', 'server.properties')); } catch {}
-      const r = await runPowerShell(`Compress-Archive -Path ${psQuote(path.join(stagingDir, '*'))} -DestinationPath ${psQuote(saveDialog.filePath)} -Force`, 300000);
+      const r = await platform.createArchive(stagingDir, saveDialog.filePath);
       if (!r.ok) throw new Error(r.error || 'Could not create the .mrpack archive.');
       return { ok: true, count: files.length, path: saveDialog.filePath };
     } catch (error) { return marketplaceError(error); }

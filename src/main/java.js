@@ -27,6 +27,16 @@ function requiredJavaForJar(jar) {
   return null; // unknown scheme — validation skipped rather than guessed
 }
 function javaMajor(version) { const m = String(version || '').match(/(?:1\.)?(\d+)/); return m ? Number(m[1]) : null; }
+// Platform helpers for the Java auto-installer (Adoptium). Windows gets a .zip with java.exe;
+// Linux/mac get a .tar.gz with a plain `java` binary. Kept here (pure, testable) so the IPC
+// handler in settings-handlers.js stays platform-branch-free.
+function javaRuntimeOs(platform = process.platform) {
+  if (platform === 'win32') return 'windows';
+  if (platform === 'darwin') return 'mac';
+  return 'linux';
+}
+function javaRuntimeExt(osName = javaRuntimeOs()) { return osName === 'windows' ? 'zip' : 'tar.gz'; }
+function javaBinName(osName = javaRuntimeOs()) { return osName === 'windows' ? 'java.exe' : 'java'; }
 // NOTE: findJavaDescendant lives in ./platform/win32.js — a copy of it used to exist here too and
 // drifted out of sync. The platform module is the single source of truth for process-tree walking.
 
@@ -51,4 +61,4 @@ function validateStart(settings, javaInfo, serverFilesFn) {
   return null;
 }
 
-module.exports = { parseJavaVersion, detectJava, requiredJavaForJar, javaMajor, validateStart };
+module.exports = { parseJavaVersion, detectJava, requiredJavaForJar, javaMajor, validateStart, javaRuntimeOs, javaRuntimeExt, javaBinName };

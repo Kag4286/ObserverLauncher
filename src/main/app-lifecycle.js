@@ -15,10 +15,15 @@ async function createWindow(ctx) {
     width: 1480, height: 930, minWidth: 1080, minHeight: 720,
     backgroundColor: '#08090a',
     icon: path.join(__dirname, '..', 'renderer', 'assets', 'icons', 'observer.png'),
-    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   };
   if (process.platform === 'win32') Object.assign(winOpts, { titleBarStyle: 'hidden', titleBarOverlay: { color: '#08090a', symbolColor: '#e9edf0', height: 42 } });
   ctx.win = new BrowserWindow(winOpts);
+  // SECURITY: the renderer must never navigate away from the local UI, and no
+  // window.open() should ever create a real window. Without this, a stray link
+  // or injected markup could replace the app with a remote page.
+  ctx.win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  ctx.win.webContents.on('will-navigate', (e, url) => { if (!String(url).startsWith('file://')) e.preventDefault(); });
   await ctx.win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 

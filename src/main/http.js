@@ -20,10 +20,17 @@ async function json(url) {
 // One resumable download attempt. `partPath` is a STABLE path (not per-attempt) so bytes that
 // already arrived survive a retry: we send `Range: bytes=<have>-` and append from there. Servers
 // that don't support ranges reply 200 (full body) instead of 206 — then we restart that file.
-async function downloadAttempt(url, partPath, onProgress, stallMs) {
+async function downloadAttempt(url, partPath, onProgress, stallMs, externalSignal) {
   let have = 0;
   try { have = fs.statSync(partPath).size; } catch { have = 0; }
   const controller = new AbortController();
+  // Cancellation: if an external signal aborts (user pressed Cancel), abort our controller too.
+  let cancelled = false;
+  const onExternalAbort = () => { cancelled = true; controller.abort(); };
+  if (externalSignal) {
+    if (externalSignal.aborted) { cancelled = true; controller.abort(); }
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  }
   let stallTimer = null;
   const bump = () => { if (stallTimer) clearTimeout(stallTimer); stallTimer = setTimeout(() => controller.abort(), stallMs); };
   try {
@@ -64,12 +71,13 @@ async function downloadAttempt(url, partPath, onProgress, stallMs) {
     return { done: true, received, total };
   } catch (error) {
     // NOTE: the .part file is intentionally KEPT so the next attempt can resume.
+    if (cancelled) throw new Error('Download cancelled.');
     if (error.name === 'AbortError') throw new Error(`Download stalled — no data received for ${Math.round(stallMs / 1000)}s. Check your internet connection.`);
     throw error;
-  } finally { clearTimeout(stallTimer); }
+  } finally { clearTimeout(stallTimer); if (externalSignal) try { externalSignal.removeEventListener('abort', onExternalAbort); } catch {} }
 }
 
-async function download(url, destination, onProgress) {
+async function download(url, destination, onProgress, externalSignal) {
   const attempts = 4;
   const stallMs = 30000;
   const backoff = [1000, 3000, 6000];
@@ -77,13 +85,15 @@ async function download(url, destination, onProgress) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      await downloadAttempt(url, partPath, onProgress, stallMs);
+      await downloadAttempt(url, partPath, onProgress, stallMs, externalSignal);
       // Success — move the finished part into place.
       try { fs.rmSync(destination, { force: true }); } catch {}
       fs.renameSync(partPath, destination);
       return fs.statSync(destination).size;
     } catch (error) {
       lastError = error;
+      // Cancellation is not retryable — stop immediately.
+      if (externalSignal && externalSignal.aborted) throw error;
       if (attempt < attempts) {
         // Keep the partial and let the next attempt resume — do NOT reset progress to 0.
         await new Promise(r => setTimeout(r, backoff[attempt - 1] || 6000));

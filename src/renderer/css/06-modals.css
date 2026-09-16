@@ -354,3 +354,7 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
   .flat-head{flex-wrap:wrap}
 }
 
+
+/* Wizard cancel row: progress label + Cancel button on one line. */
+.nsw-progress-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.nsw-progress-row .set-progress-label{margin:0}

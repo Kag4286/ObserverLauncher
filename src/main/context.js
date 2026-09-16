@@ -11,6 +11,7 @@
 // All handlers read/write `ctx.*` and call `ctx.send / ctx.appendLog / ...`
 // so behaviour stays identical to the old monolithic main.js.
 const fs = require('fs');
+const path = require('path');
 const { serverFiles } = require('./server-files.js');
 
 function createContext() {
@@ -35,6 +36,7 @@ function createContext() {
     backupInProgress: false,
     lastAutoBackupAt: 0,
     buildProcess: null,
+    wizardAbort: null,
     serverStatus: 'stopped', // 'stopped' | 'starting' | 'running' | 'stopping'
     contentWatcher: null,
     contentWatchDebounce: null,
@@ -69,17 +71,35 @@ function createContext() {
   // Live content updates: rescan on disk changes while NOT running (running
   // servers write logs constantly — rescanning then would hammer the disk).
   function watchServerFolder() {
+    // Close any previous watchers (a single one on win/mac, several on linux).
     try { if (ctx.contentWatcher) ctx.contentWatcher.close(); } catch {}
+    if (ctx.contentWatchers) { for (const w of ctx.contentWatchers) { try { w.close(); } catch {} } }
     ctx.contentWatcher = null;
+    ctx.contentWatchers = null;
     if (!ctx.currentServerPath) return;
+    const onChange = () => {
+      clearTimeout(ctx.contentWatchDebounce);
+      ctx.contentWatchDebounce = setTimeout(() => {
+        if (ctx.serverStatus !== 'running') pushFiles();
+      }, 800);
+    };
+    // BUGFIX (Linux): fs.watch recursive:true is only supported on Windows/macOS; on Linux it
+    // throws (or silently does nothing), so live content refresh never worked there. Use the
+    // recursive watcher where available, and on Linux watch the root + each top-level subfolder
+    // manually (covers plugins/, mods/, config/, world/datapacks — the folders we list).
+    if (process.platform !== 'linux') {
+      try { ctx.contentWatcher = fs.watch(ctx.currentServerPath, { recursive: true }, onChange); } catch {}
+      return;
+    }
+    const watchers = [];
+    const watchDir = dir => { try { watchers.push(fs.watch(dir, onChange)); } catch {} };
+    watchDir(ctx.currentServerPath);
     try {
-      ctx.contentWatcher = fs.watch(ctx.currentServerPath, { recursive: true }, () => {
-        clearTimeout(ctx.contentWatchDebounce);
-        ctx.contentWatchDebounce = setTimeout(() => {
-          if (ctx.serverStatus !== 'running') pushFiles();
-        }, 800);
-      });
+      for (const e of fs.readdirSync(ctx.currentServerPath, { withFileTypes: true })) {
+        if (e.isDirectory()) watchDir(path.join(ctx.currentServerPath, e.name));
+      }
     } catch {}
+    ctx.contentWatchers = watchers;
   }
 
   // Watch the file currently open in the editor for external changes.

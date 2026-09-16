@@ -6,6 +6,9 @@ const $$ = s => [...document.querySelectorAll(s)];
 // on locale change; falls back to English for any key missing in the active locale.
 let currentLocale = 'en';
 const _missingI18nLogged=new Set();
+// Java major from a version string, e.g. '21.0.4' -> 21, '1.8.0' -> 8. Lives in core because
+// 07-overview.js calls it during boot, before the later-numbered files (12-wizard) have loaded.
+const javaMajorOf=s=>{const m=String(s||'').match(/(?:1\.)?(\d+)/);return m?Number(m[1]):null};
 function t(key,repl){
   const val=(window.LOCALES?.[currentLocale]?.[key]) ?? (window.LOCALES?.en?.[key]);
   if(val==null){ if(!_missingI18nLogged.has(key)){ _missingI18nLogged.add(key); console.warn(`[i18n] missing key: ${key} (locale: ${currentLocale})`);} return key; }

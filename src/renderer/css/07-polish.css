@@ -106,6 +106,9 @@
 .wm-tabs{display:flex;gap:6px}
 .wm-seed{font:600 11px var(--font-mono);color:var(--accent);background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);border-radius:var(--r-sm);padding:5px 10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wm-coord{font:700 11.5px var(--font-mono);color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:5px 10px;min-width:130px;text-align:center}
+.wm-goto{display:inline-flex;gap:6px;align-items:center}
+.wm-goto-input{width:110px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:5px 8px;color:var(--text);font:500 11px var(--font-mono);outline:0}
+.wm-goto-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .spacer{flex:1}
 .wm-main{display:grid;grid-template-columns:1fr 250px;min-height:0;position:relative}
 #wmCanvas{display:block;width:100%;height:min(58vh,560px);background:#0A0F14;cursor:crosshair}

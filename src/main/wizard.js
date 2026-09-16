@@ -99,6 +99,9 @@ function registerWizard(ipcMain, ctx) {
       if (contents.some(x => /\.jar$/i.test(x))) return { ok: false, error: 'This folder already contains a server jar. Choose an empty folder to avoid overwriting it.' };
       const targetVersion = version?.trim();
       const onProgress = (received, total) => ctx.send('wizard:progress', { received, total });
+      // Cancellation: a single AbortController per wizard run; wizard:cancel aborts it.
+      ctx.wizardAbort = new AbortController();
+      const signal = ctx.wizardAbort.signal;
 
       if (software === 'forge' || software === 'neoforge') {
         const r = await require('./adapters/forge.js').install({ software, version: targetVersion, javaInfo: ctx.javaInfo, serverPath: ctx.currentServerPath, onProgress });
@@ -108,7 +111,11 @@ function registerWizard(ipcMain, ctx) {
       if (software === 'spigot') {
         if (!ctx.javaInfo?.ok) throw new Error('Java is required to run BuildTools. Set a valid Java path first.');
         const gitOk = await new Promise(res => require('child_process').execFile('git', ['--version'], { windowsHide: true }, (e) => res(!e)));
-        if (!gitOk) throw new Error('Git is not installed or not on PATH — BuildTools needs Git to compile Spigot. Install Git for Windows (https://git-scm.com) and try again.');
+        if (!gitOk) throw new Error('Git is not installed or not on PATH — BuildTools needs Git to compile Spigot. Install Git from https://git-scm.com and try again.');
+        // BuildTools COMPILES Spigot, so it needs a full JDK (javac), not just the JRE that runs
+        // a server. Catch this here instead of failing minutes into the build.
+        const javacOk = await new Promise(res => require('child_process').execFile(ctx.javaInfo.path.replace(/java(\.exe)?$/i, 'javac$1'), ['-version'], { windowsHide: true }, (e) => res(!e)));
+        if (!javacOk) throw new Error('Spigot\'s BuildTools needs a full JDK (javac), but only a JRE was found. Install a JDK (e.g. Temurin or OpenJDK) and point Settings > Java at its bin folder, then try again.');
         const resolvedVersion = targetVersion || 'latest';
         await require('./adapters/spigot.js').fetchBuildTools(ctx.currentServerPath, onProgress);
         ctx.appendLog(`BuildTools started for Spigot ${resolvedVersion} — this compiles from source and can take several minutes. Requires Git to be installed.`, 'system');
@@ -132,7 +139,7 @@ function registerWizard(ipcMain, ctx) {
       const resolver = RESOLVERS[software] || RESOLVERS.purpur;
       const { url, name, version: resolvedVersion, sha256 } = await resolver(targetVersion);
       const dest = path.join(ctx.currentServerPath, name);
-      await download(url, dest, onProgress);
+      await download(url, dest, onProgress, signal);
       if (sha256) {
         try {
           const got = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
@@ -141,6 +148,13 @@ function registerWizard(ipcMain, ctx) {
       }
       return { ok: true, files: serverFiles(ctx.currentServerPath), name, version: resolvedVersion };
     } catch (error) { ctx.buildProcess = null; return marketplaceError(error); }
+    finally { ctx.wizardAbort = null; }
+  });
+
+  // Cancel a wizard download in progress (the AbortController created in wizard:create).
+  ipcMain.handle('wizard:cancel', async () => {
+    if (ctx.wizardAbort) { try { ctx.wizardAbort.abort(); } catch {} return { ok: true }; }
+    return { ok: false, error: 'No wizard download is running.' };
   });
 }
 

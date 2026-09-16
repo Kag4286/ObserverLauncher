@@ -81,4 +81,15 @@ async function allowFirewall(port) {
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not create firewall rule — UAC dismissed or rule exists.' };
 }
 
-module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall };
+module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall, extractArchive, createArchive };
+
+// Cross-platform archive helpers used by the Java installer and .mrpack import/export.
+// Windows side wraps PowerShell's Expand-Archive / Compress-Archive (unchanged behaviour).
+async function extractArchive(archivePath, destDir) {
+  const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(archivePath)} -DestinationPath ${psQuote(destDir)} -Force`, 300000);
+  return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive.' };
+}
+async function createArchive(srcPath, destArchive) {
+  const r = await runPowerShell(`Compress-Archive -Path ${psQuote(srcPath)} -DestinationPath ${psQuote(destArchive)} -Force`, 300000);
+  return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not create the archive.' };
+}

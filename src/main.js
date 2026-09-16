@@ -18,6 +18,26 @@
 // IPC channel names are UNCHANGED so preload.js / renderer need no edits.
 const { app, ipcMain, protocol } = require('electron');
 
+// SECURITY/ROBUSTNESS: a second instance would race the first on settings.json, the
+// server folder and the running server process. Refuse to start a second copy and
+// focus the existing window instead.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) { app.quit(); } else {
+  app.on('second-instance', () => {
+    if (ctx.win) { try { if (ctx.win.isMinimized()) ctx.win.restore(); ctx.win.focus(); } catch {} }
+  });
+}
+
+// Surface unexpected crashes instead of dying silently — log to console (DevTools /
+// terminal) and keep a breadcrumb in the in-app console buffer when possible.
+process.on('uncaughtException', err => {
+  try { console.error('[main] uncaughtException:', err); } catch {}
+  try { ctx.appendLog(`Internal error: ${err?.message || err}`, 'error'); } catch {}
+});
+process.on('unhandledRejection', reason => {
+  try { console.error('[main] unhandledRejection:', reason); } catch {}
+});
+
 const { createContext } = require('./main/context.js');
 const { registerServer } = require('./main/server-lifecycle.js');
 const { registerBackups } = require('./main/backups.js');

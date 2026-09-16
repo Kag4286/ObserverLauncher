@@ -8,6 +8,7 @@ const {
   isSafeBackupName,
   isSafeArchiveEntry,
   isSafeWorldName,
+  isSafeUuid,
 } = require('../src/main/validate.js');
 
 let passed = 0;
@@ -69,5 +70,15 @@ ok('world_nether ok', isSafeWorldName('world_nether') === true);
 ok('dash-flag rejected', isSafeWorldName('-rf') === false);
 ok('slash rejected', isSafeWorldName('a/b') === false);
 ok('dotdot rejected', isSafeWorldName('..') === false);
+
+// Player UUIDs — path-traversal guard for <world>/playerdata/<uuid>.dat
+ok('uuid dashed ok', isSafeUuid('069a79f4-44e9-4726-a5be-fca90e38aaf5') === true);
+ok('uuid no-dash ok', isSafeUuid('069a79f444e94726a5befca90e38aaf5') === true);
+ok('uuid uppercase ok', isSafeUuid('069A79F4-44E9-4726-A5BE-FCA90E38AAF5') === true);
+ok('uuid with slash rejected', isSafeUuid('../../etc/passwd') === false);
+ok('uuid short rejected', isSafeUuid('abc') === false);
+ok('uuid empty rejected', isSafeUuid('') === false);
+ok('uuid null rejected', isSafeUuid(null) === false);
+ok('uuid non-hex rejected', isSafeUuid('zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz') === false);
 
 console.log(`\n${passed} passed, 0 failed`);

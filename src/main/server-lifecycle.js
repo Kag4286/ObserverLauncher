@@ -5,7 +5,6 @@
 // resource metrics, auto-restart. This is the most stateful module — every
 // transition goes through ctx.setServerStatus so the UI choke point is kept.
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { loadSettings } = require('./settings.js');
@@ -13,99 +12,12 @@ const { validateStart } = require('./java.js');
 const { serverFiles, detectSoftware, readEula, writeEula, parseServerLine } = require('./server-files.js');
 const platform = require('./platform');
 const { killTree } = require('./kill.js');
-
-// BUGFIX: PS output can carry a culture comma ("45,6712") even after we ask
-// for InvariantCulture (old PS, localized shims). Normalize before Number() so
-// a comma never produces NaN and silently zeroes RAM/CPU.
-function parseMetricValue(raw) {
-  if (raw === null || raw === undefined) return NaN;
-  const s = String(raw).trim();
-  if (!s) return NaN; // empty read → not a number, not a fake 0
-  const n = Number(s.replace(',', '.'));
-  return Number.isFinite(n) ? n : NaN;
-}
+// Metrics sampling and auto-poll were split into their own modules (behaviour unchanged).
+// Re-exported below so existing callers (app-lifecycle.js, tests) keep working.
+const { parseMetricValue, startMetrics } = require('./server-metrics.js');
+const { startAutoPoll } = require('./server-poll.js');
 
 let waitingForDone = false;
-
-function startAutoPoll(ctx, software) {
-  clearInterval(ctx.autoPollTimer);
-  ctx.autoPollTimer = setInterval(() => {
-    if (!ctx.serverProcess || !ctx.serverProcess.stdin.writable) return;
-    ctx.suppressStatusUntil = Date.now() + 4000;
-    try {
-      ctx.serverProcess.stdin.write('list\r\n');
-      if (software === 'paper-like') {
-        ctx.serverProcess.stdin.write('tps\r\n');
-        ctx.serverProcess.stdin.write('tick query\r\n');
-      } else if (software === 'forge') {
-        ctx.serverProcess.stdin.write('forge tps\r\n');
-      }
-    } catch {}
-  }, 5000);
-}
-
-function startMetrics(ctx) {
-  let consecutiveMisses = 0;
-  let lastMetrics = { serverMemory: 0, cpu: 0 };
-  let javaRetryCount = 0;
-  clearInterval(ctx.sampleTimer);
-  ctx.sampleTimer = setInterval(async () => {
-    try {
-      const used = process.memoryUsage().rss / 1024 / 1024;
-      if (!ctx.serverProcess?.pid) {
-        ctx.monitoredPid = null; consecutiveMisses = 0; javaRetryCount = 0;
-        ctx.send('server:metrics', { appMemory: Math.round(used), running: false, timestamp: Date.now(), ...ctx.live });
-        return;
-      }
-      if (!ctx.monitoredPid) {
-        const found = await Promise.race([
-          platform.findJavaDescendant(ctx.serverProcess.pid),
-          new Promise(resolve => setTimeout(() => resolve(null), 3000))
-        ]).catch(() => null);
-        if (found) {
-          ctx.monitoredPid = found;
-          javaRetryCount = 0;
-        } else {
-          javaRetryCount++;
-          if (javaRetryCount >= 2 || ctx.currentSoftware === 'paper-like') {
-            ctx.monitoredPid = ctx.serverProcess.pid;
-          } else {
-            ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: lastMetrics.serverMemory, cpu: lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
-            return;
-          }
-        }
-        if (!ctx.monitoredPid) { ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: 0, cpu: 0, running: true, timestamp: Date.now(), ...ctx.live }); return; }
-      }
-      const metrics = await Promise.race([
-        platform.getProcessMetrics(ctx.monitoredPid),
-        new Promise(resolve => setTimeout(() => resolve(null), 5000))
-      ]).catch(() => null);
-      const r = metrics ? { ok: true, stdout: `${metrics.memoryMB}|${metrics.cpuTime}` } : { ok: false, stdout: '' };
-      if (!r.stdout || !r.stdout.trim()) {
-        consecutiveMisses++;
-        if (consecutiveMisses >= 3) { ctx.monitoredPid = null; javaRetryCount = 0; }
-        ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: lastMetrics.serverMemory, cpu: lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
-        return;
-      }
-      consecutiveMisses = 0;
-      const [memoryRaw, cpuTotalRaw] = String(r.stdout).trim().split('|');
-      const memory = parseMetricValue(memoryRaw), cpuTotal = parseMetricValue(cpuTotalRaw);
-      const now = Date.now();
-      let cpu = 0;
-      if (Number.isFinite(cpuTotal) && ctx.previousCpu && Number.isFinite(ctx.previousCpu.total)) {
-        const deltaSeconds = (now - ctx.previousCpu.at) / 1000;
-        if (deltaSeconds > 0) cpu = Math.max(0, Math.min(100, ((cpuTotal - ctx.previousCpu.total) / deltaSeconds / os.cpus().length) * 100));
-      }
-      if (Number.isFinite(cpuTotal)) ctx.previousCpu = { total: cpuTotal, at: now };
-      if (memory > 20) lastMetrics.serverMemory = memory;
-      if (Number.isFinite(cpu)) lastMetrics.cpu = Math.round(cpu);
-      ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: memory > 20 ? memory : lastMetrics.serverMemory, cpu: Math.round(cpu), running: true, timestamp: now, ...ctx.live });
-    } catch (err) {
-      const used = process.memoryUsage().rss / 1024 / 1024;
-      ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: lastMetrics.serverMemory, cpu: lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
-    }
-  }, 1000);
-}
 
 async function startServerInternal(ctx, settings) {
   if (ctx.serverStatus !== 'stopped') return { ok: false, error: ctx.serverStatus === 'starting' ? 'Server is already starting.' : ctx.serverStatus === 'stopping' ? 'Server is still stopping — wait for it to finish.' : 'Server is already running.' };

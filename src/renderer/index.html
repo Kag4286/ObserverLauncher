@@ -249,6 +249,7 @@
               <span class="wm-seed mono" id="wmSeed">—</span>
               <span class="spacer"></span>
           <span class="wm-coord mono" id="wmCoord">—</span>
+          <span class="wm-goto"><input id="wmGotoInput" class="wm-goto-input mono" data-i18n-placeholder="wm.gotoPh" placeholder="X Z" aria-label="Go to coordinates"><button class="btn sm secondary" id="wmGotoBtn" data-i18n="wm.goto">Go</button></span>
           <button class="filter-chip active" id="wmTerrain" data-i18n="wm.terrain">Terrain</button>
           <button class="btn sm secondary" id="wmExport" data-i18n="wm.export">Export PNG</button>
           <button class="btn sm primary" id="wmAdd" data-i18n="wm.add">+ Waypoint</button>
@@ -468,7 +469,7 @@
           <p class="proxy-notice" id="nswSpigotHint" hidden>Spigot needs <b>Git</b> installed (BuildTools compiles from source) — missing Git fails the build after ~5 min.</p>
           <div class="nsw-progress set-progress" id="nswProgress" hidden>
             <div class="set-progress-track"><div class="set-progress-fill indeterminate" id="nswProgressFill"></div></div>
-            <div class="set-progress-label" id="nswProgressLabel">Starting download…</div>
+            <div class="nsw-progress-row"><span class="set-progress-label" id="nswProgressLabel">Starting download…</span><button class="btn sm danger-ghost" id="nswCancel" data-i18n="nsw.cancel">Cancel</button></div>
           </div>
         </div>
 
@@ -513,4 +514,4 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/01-content.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script></body></html>

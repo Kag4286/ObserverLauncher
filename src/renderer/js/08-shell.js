@@ -109,129 +109,11 @@ $('#saveRamOverview').onclick=async()=>{
   const r=await window.observer.saveSettings(next);state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
 };
 $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value;applyLocale();const next={...getSettings(),locale:currentLocale};const r=await window.observer.saveSettings(next);state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();renderJvmPreview();if(!$('#newServerModal').hidden)nswRender();if(!$('#installModal').hidden){imRenderCompat();imRenderWarns()}};
-// Search + group chips share one filter pass: text matches highlight and auto-open collapsed
-// groups; the active chip narrows which groups are shown at all.
-let propGroupFilter='all';
-function applyPropFilters(){
-  const qRaw=$('#propertiesSearch').value.trim();
-  const q=qRaw.toLowerCase();
-  $$('.prop-group').forEach(g=>{
-    const passGroup=propGroupFilter==='all'||propGroupFilter===g.dataset.groupId;
-    let anyVisible=false;
-    g.querySelectorAll('[data-prop-row]').forEach(row=>{
-      const match=!q||row.dataset.propSearch.toLowerCase().includes(q);
-      row.hidden=!match;
-      if(match)anyVisible=true;
-      const label=row.querySelector('.prop-label');
-      if(label){
-        const orig=label.dataset.orig || (label.dataset.orig=label.innerHTML);
-        if(qRaw && match){
-          const regex=new RegExp(`(${qRaw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`,'gi');
-          label.innerHTML=orig.replace(regex,'<mark>$1</mark>');
-        } else label.innerHTML=orig;
-      }
-      if(match&&q){const det=row.closest('details');if(det)det.open=true}
-    });
-    g.hidden=!passGroup||!anyVisible;
-  });
-  const noResults=$('#propertiesNoResults'); if(noResults){ const anyVisible=$$('.prop-group:not([hidden])').length>0; noResults.hidden=!q || anyVisible; const qEl=$('#propertiesNoResultsQuery'); if(qEl) qEl.textContent=qRaw; }
-}
-$('#propertiesSearch').addEventListener('input',applyPropFilters);
-$$('[data-prop-filter]').forEach(c=>c.onclick=()=>{
-  propGroupFilter=c.dataset.propFilter;
-  $$('[data-prop-filter]').forEach(x=>{const on=x===c;x.classList.toggle('active',on);x.setAttribute('aria-pressed',on?'true':'false')});
-  applyPropFilters();
-});
-// Track unsaved edits in both property editors (see propsDirty above). Programmatic value writes in
-// renderProperties/refreshProxyProperties don't fire 'input', so this only trips on real typing.
-document.addEventListener('input',e=>{const el=e.target;if(el&&(el.closest?.('#propertiesGrid')||el.id==='propertiesRaw'))propsDirty=true});
-$('#saveProperties').onclick=async()=>{
-  if(isProxyServer()){
-    const raw=$('#propertiesRaw').value;
-    if(raw.length>200000) return toast('velocity.toml is too large (>200KB) — check for accidental paste','error');
-    const r=await window.observer.saveRawProperties(raw);if(r.ok)propsDirty=false;return r.ok?toast('velocity.toml saved. Restart the proxy to apply changes.','success'):toast(r.error||'Choose and apply a server folder first.','error');
-  }
-  const p={}; let firstInvalid=null;
-  const validators={
-    'max-players':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>100000) return 'Max players must be an integer 1–100000'; },
-    'server-port':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>65535) return 'Server port must be 1–65535'; },
-    'view-distance':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<2||n>32) return 'View distance must be 2–32'; },
-    'simulation-distance':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<2||n>32) return 'Simulation distance must be 2–32'; },
-    'max-world-size':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>29999984) return 'Max world size must be 1–29999984'; },
-  };
-  $$('[data-property]').forEach(input=>{
-    const key=input.dataset.property;
-    // Boolean properties render as switches — checkboxes carry "on"/"" as .value, so translate.
-    const val=input.type==='checkbox'?(input.checked?'true':'false'):input.value.trim();
-    p[key]=val;
-    const fn=validators[key];
-    if(fn){
-      const err=fn(val);
-      input.style.borderColor=err?'var(--danger)':'';
-      if(err && !firstInvalid){ firstInvalid=input; toast(err,'error'); }
-    } else {
-      input.style.borderColor='';
-    }
-  });
-  if(firstInvalid){ firstInvalid.focus(); return; }
-  const r=await window.observer.saveProperties(p);if(r.ok){propsDirty=false;state.files.properties=p;loadConnectInfo();toast('server.properties updated. Restart server to apply most changes.','success')}else toast('Choose and apply a server folder first.','error')
-};
+// Properties tab (search/filter/save) moved to 10-properties.js.
 $('#createBackup').onclick=async()=>{if(!confirm(t('toast.confirmBackup')))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)};
-let marketItems=[];let marketPage=1;let marketHasNext=false;let marketTotal=null;let marketReqSeq=0;
-// FEATURE: replaced "Load more" (which appended to the same growing list, so paging forward meant
-// scrolling down and paging back meant scrolling all the way back up) with real Prev/Next pages that
-// REPLACE the results and scroll back to the top of the results themselves — no more manual scrolling
-// either direction. Modrinth and Hangar report an exact total, so those sources show "Page N of M";
-// Spiget (Spigot) doesn't expose a total count at all, so Next just stays enabled as long as the last
-// page came back full (the same "probably more" heuristic the old Load More button used).
+// Marketplace state moved to 11-market.js.
 function debounce(fn,ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
-async function runMarketSearch(page){
-  // BUGFIX: rapid typing fired overlapping requests; slower older responses could land AFTER a
-  // newer one and overwrite fresh results with stale ones (felt like the search box "not working").
-  // A sequence token drops any response that is not the latest request.
-  const seq=++marketReqSeq;
-  const source=$('#marketSource').value,kind=$('#marketKind').value,query=$('#marketQuery').value.trim(),version=$('#marketVersion').value,status=$('#marketStatus');
-  marketPage=page;
-  $('#marketSearch').disabled=true;$$('.market-sort').forEach(b=>b.disabled=true);$('#marketPrev').disabled=true;$('#marketNext').disabled=true;status.classList.add('loading'); status.setAttribute('aria-busy','true');
-  // skeleton instead of single text line
-  $('#marketResults').setAttribute('aria-busy','true');
-  $('#marketResults').innerHTML=Array.from({length:4}).map(()=>`<article class="panel glass market-item skeleton" aria-hidden="true"><div class="market-icon skeleton-box"></div><div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w40"></div></div><div class="skeleton-btn"></div></article>`).join('');
-  status.textContent=t('mkt.searching');
-  const r=await window.observer.marketSearch({source,kind,query,version,sort:marketSort,offset:(page-1)*20});
-  if(seq!==marketReqSeq)return; // a newer request superseded this one — drop the stale response
-  $('#marketSearch').disabled=false;$$('.market-sort').forEach(b=>b.disabled=false);status.classList.remove('loading'); status.removeAttribute('aria-busy'); $('#marketResults').removeAttribute('aria-busy');
-  if(!r.ok){
-    status.textContent=`Could not load results: ${r.error}`;
-    const n=$('#marketResults');
-    n.innerHTML=`<article class="panel glass"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>Could not load marketplace</b><p class="text-muted" style="margin:4px 0 0">${esc(r.error)}</p></div><button class="btn primary" onclick="document.getElementById('marketSearch').click()">Retry</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">Check your internet — Modrinth/Hangar/Spiget need online. Try switching Source to Modrinth.</p></article>`;
-    $('#marketPager').hidden=true;
-    const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent='error';
-    toast(r.error,'error');return;
-  }
-  marketItems=r.items.map(x=>({...x,kind}));
-  marketTotal=r.total??null;
-  marketHasNext=marketTotal!=null?page*20<marketTotal:marketItems.length>=20;
-  const sortLabel=marketSort==='downloads'?t('mkt.sortDl'):marketSort==='latest'?t('mkt.sortLatest'):t('mkt.sortRel');
-  const relaxedNote=r.relaxed==='version'?' (no exact match for that game version — showing all versions)':r.relaxed==='loader'?' (no match for this server type — showing all matching mods/plugins)':'';
-  const countLabel=marketTotal!=null?`${marketTotal} ${sortLabel}`:`${marketItems.length} ${sortLabel}`;
-  status.textContent=`${countLabel} · ${source}.${relaxedNote}`;
-  const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent=marketTotal!=null?tf('mkt.found',{a:marketTotal}):`${marketItems.length}`;
-  renderMarket(marketItems);
-  $('#marketPager').hidden=!(page>1||marketHasNext);
-  $('#marketPrev').disabled=page<=1;$('#marketNext').disabled=!marketHasNext;
-  $('#marketPageLabel').textContent=marketTotal!=null?`Page ${page} of ${Math.max(1,Math.ceil(marketTotal/20))}`:`Page ${page}`;
-}
-$('#marketSearch').onclick=()=>runMarketSearch(1);
-$('#marketPrev').onclick=()=>{if(marketPage>1)runMarketSearch(marketPage-1)};
-$('#marketNext').onclick=()=>{if(marketHasNext)runMarketSearch(marketPage+1)};
-const debouncedMarketSearch=debounce(()=>runMarketSearch(1),400);
-$('#marketQuery').addEventListener('input', debouncedMarketSearch);
-$('#marketQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault(); runMarketSearch(1)}});
-function flashMarketField(el){el.classList.remove('just-changed');void el.offsetWidth;el.classList.add('just-changed')}
-$('#marketSource').onchange=e=>{flashMarketField(e.target);runMarketSearch(1)};$('#marketKind').onchange=e=>{flashMarketField(e.target);runMarketSearch(1)};$('#marketVersion').onchange=e=>{flashMarketField(e.target);runMarketSearch(1)};
-$$('.market-sort').forEach(b=>b.onclick=()=>{marketSort=b.dataset.sort;$$('.market-sort').forEach(x=>x.classList.toggle('active',x===b));runMarketSearch(1)});
-$('#importModpack').onclick=async()=>{const r=await window.observer.importModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(`${r.name} imported — ${r.installed} file(s) installed${r.skipped?`, ${r.skipped} client-only file(s) skipped`:''}. Restart the server to use it.`,'success')};
-$('#exportModpack').onclick=async()=>{const r=await window.observer.exportModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(`Exported ${r.count} item(s) to ${r.path}`,'success')};
+// Marketplace search/paging UI moved to 11-market.js.
 window.observer.onBuildDone(v=>{state.files=v.files;refreshUI();toast(v.ok?'Build finished — server jar is ready. Configure settings, then start.':'Build failed — check the Console tab for the error.')});
 function manualPlayer(){const name=$('#playerActionName').value.trim();const bad=playerNameError(name);if(bad){toast(bad);return null}return {uuid:null,name}}
 $('#manualOpBtn').onclick=()=>{const p=manualPlayer();if(p)togglePlayerOp(p,true)};
@@ -301,12 +183,17 @@ $('#showWelcomeAgain').onclick=()=>showOnboarding();
 // FEATURE: "How friends can join" — surfaces the LAN address (instant, no network call) and lets the
 // user look up their public IP on demand. Both are just the IP; the port is read from server.properties
 // (or the Velocity default) so the whole thing stays correct if the user changes server-port.
+let launcherPlatform='win32';
 async function loadConnectInfo(){
   const r=await window.observer.networkInfo();if(!r.ok)return;
   const port=r.port;
+  launcherPlatform=r.platform||'win32';
   $('#connectLocal').value=r.localIps.length?r.localIps.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
   $('#allowFirewall').dataset.port=port;
+  // Linux cannot auto-open the firewall without sudo; relabel the button so it copies the command.
+  const fw=$('#allowFirewall'); if(fw){ fw.textContent = launcherPlatform==='linux' ? 'Copy firewall command' : t('conn.firewall'); }
 }
+
 $('#refreshConnectInfo').onclick=loadConnectInfo;
 $('#checkPublicIp').onclick=async()=>{
   const btn=$('#checkPublicIp');btn.disabled=true;const original=btn.textContent;btn.textContent='…';
@@ -318,6 +205,13 @@ $('#checkPublicIp').onclick=async()=>{
 };
 $('#allowFirewall').onclick=async()=>{
   const port=Number($('#allowFirewall').dataset.port)||25565;
+  // Linux: no auto-elevation. Copy the ufw command for the user to paste in a terminal.
+  if(launcherPlatform==='linux'){
+    const cmd=`sudo ufw allow ${port}/tcp`;
+    try{ await navigator.clipboard.writeText(cmd); toast('Copied: '+cmd+' — run it in a terminal. You may also need to forward the port on your router.','success'); }
+    catch{ toast('Run this in a terminal: '+cmd); }
+    return;
+  }
   if(!confirm(`Add a Windows Firewall rule allowing inbound TCP traffic on port ${port}? A Windows security prompt (UAC) will appear — approve it to continue.`))return;
   const r=await window.observer.allowFirewall(port);
   if(!r.ok)return toast(r.error,'error');
@@ -372,200 +266,10 @@ $('#obCreateNew').onclick=async()=>{
   openNewServerWizard();
 };
 
-// FEATURE: guided 4-step "create a new server" wizard for people who don't already know what
-// software/version/memory means — separate from the full App settings tab (Java path, JVM args,
-// auto-restart...) which stays available for people who already know what they're doing (accessible
-// directly via the Server properties / Launcher settings tabs, unchanged).
-let nsw={step:1,software:'vanilla'};
-// Real-time version data for the wizard — loaded live from each software's official API
-// (wizard:versions IPC) instead of hardcoded chips that drifted out of date.
-let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
-const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity'};
-async function loadNswVersions(software){
-  if(nswVersions.software===software)return;
-  nswVersions={software,list:[],latest:null,raw:false,loading:true,failed:false,error:''};
-  renderNswChips('');
-  $('#nswLatestLabel').textContent=t('nsw.latestSub');
-  const r=await window.observer.wizardVersions(software);
-  if(nswVersions.software!==software)return; // user switched software mid-request
-  nswVersions.loading=false;
-  if(!r||!r.ok){nswVersions.failed=true;nswVersions.error=r?.error||'Could not reach the version API.';}
-  else{nswVersions.list=r.versions||[];nswVersions.latest=r.latest||null;nswVersions.raw=!!r.raw;nswVersions.note=r.note||'';}
-  renderNswChips($('#nswVersionInput')?.value.trim()||'');
-  $('#nswLatestLabel').textContent=nswVersions.latest?`${t('nsw.latest')}: ${nswVersions.latest}`:'';
-  const mode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  if(nswVersions.latest&&mode!=='specific')checkNswJava(nswVersions.latest);
-}
-function renderNswChips(filter){
-  const box=$('#nswVersionChips');if(!box)return;
-  if(nswVersions.loading){box.innerHTML='<span class="nsw2-chiploading">Loading live versions…</span>';return}
-  if(nswVersions.failed){box.innerHTML=`<span class="nsw2-chiploading">${esc(nswVersions.error)} — type a version manually.</span>`;return}
-  const q=(filter||'').toLowerCase();
-  const list=q?nswVersions.list.filter(v=>v.toLowerCase().includes(q)):nswVersions.list;
-  box.innerHTML=list.length?list.map(v=>`<button class="version-chip" data-version="${esc(v)}">${esc(v)}</button>`).join(''):'<span class="nsw2-chiploading">No matches — the exact text you type will be used as-is.</span>';
-}
-function nswValidateVersion(v){
-  if(!v)return'';
-  if(nswVersions.loading)return'Checking the live list…';
-  if(nswVersions.failed)return'Live list unavailable — the download step will verify it.';
-  if(v==='latest')return'';
-  if(nswVersions.list.includes(v))return`✓ ${v} is available for ${NSW_SOFTWARE_LABEL[nsw.software]||nsw.software}.`;
-  const near=nswVersions.list.find(x=>x.startsWith(v));
-  return near?`✗ "${v}" not found — did you mean ${near}?`:`✗ "${v}" is not in the live list for ${NSW_SOFTWARE_LABEL[nsw.software]||nsw.software}.`;
-}
-// HARD-SYNC Java requirement: asks Mojang's manifest (via wizard:java-check) for the authoritative
-// javaVersion of the selected MC version instead of trusting the static mapping. Result is shown
-// live in step 2 and repeated as a "Java" row in the step 4 summary.
-let nswJava={version:'',java:null,exact:false};
-const javaMajorOf=s=>{const m=String(s||'').match(/(?:1\.)?(\d+)/);return m?Number(m[1]):null};
-function renderNswJava(){
-  const el=$('#nswJavaCheck');if(!el)return;
-  if(!nswJava.java){el.hidden=true;return}
-  const jm=state.java&&state.java.ok?javaMajorOf(state.java.version):null;
-  const tooOld=jm!=null&&jm<nswJava.java;
-  el.hidden=false;
-  el.className='nsw-java '+(tooOld?'warn':'ok');
-  el.textContent=(nswJava.exact?'☕ This version runs on Java ':'☕ Estimated: Java ')+nswJava.java+(nswJava.exact?' (verified from Mojang)':'+')+(tooOld?` — ⚠ your Java ${jm} is too old; use auto-install in Settings or pick a newer path.`:tooOld===false&&jm!=null?` — your Java ${jm} is ready.`:'');
-}
-function checkNswJava(v){
-  if(!v||v==='latest'){nswJava={version:'',java:null,exact:false};const el=$('#nswJavaCheck');if(el)el.hidden=true;return}
-  const el=$('#nswJavaCheck');
-  if(el){el.hidden=false;el.className='nsw-java loading';el.textContent='Checking Java requirement…'}
-  window.observer.wizardJavaCheck({software:nsw.software,version:v}).then(r=>{
-    if(r&&r.ok&&r.java){nswJava={version:v,java:r.java,exact:!!r.exact}}
-    else{nswJava={version:v,java:null,exact:false}}
-    renderNswJava();
-  }).catch(()=>{nswJava={version:v,java:null,exact:false};const e2=$('#nswJavaCheck');if(e2)e2.hidden=true});
-}
-function nswRender(){
-  $$('.nsw-step').forEach(s=>s.classList.toggle('active',Number(s.dataset.step)===nsw.step));
-  $$('.nsw2-step').forEach(d=>{const n=Number(d.dataset.dot);d.classList.toggle('active',n===nsw.step);d.classList.toggle('done',n<nsw.step)});
-  $('#nswStepLabel').textContent=t('nsw.step',{a:nsw.step,b:4});
-  $('#nswBack').hidden=nsw.step===1;
-  $('#nswNext').textContent=nsw.step===4?t('nsw.create'):t('nsw.next');
-  const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  const version=versionMode==='specific'?($('#nswVersionInput').value.trim()||'—'):(nswVersions.latest||'Latest');
-  $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
-  $('#nswRailSub2').textContent=version;
-  $('#nswRailSub3').textContent=`${$('#nswMemorySlider').value} GB`;
-  if(nsw.step===2)loadNswVersions(nsw.software);
-  if(nsw.step===3){
-    if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=`Your computer has about ${state.systemMemoryGB} GB of RAM — the server can use part of it. More isn't always better; 2–4 GB is plenty for friends.`}
-    nswUpdateMemory();
-  }
-  if(nsw.step===4){
-    const memory=$('#nswMemorySlider').value;
-    $('#nswSummary').innerHTML=`<div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${nswJava.java?`Java ${nswJava.java}${nswJava.exact?' (verified)':'+'}`:'—'}</b></div><div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div><div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(state.settings.serverPath||'—')}</b></div>`;
-  }
-  const spigotHint=$('#nswSpigotHint'); if(spigotHint) spigotHint.hidden=!(nsw.step===4&&nsw.software==='spigot');
-}
-$$('[data-software]').forEach(c=>c.onclick=()=>{
-  if(nsw.software===c.dataset.software)return;
-  nsw.software=c.dataset.software;
-  $$('[data-software]').forEach(x=>x.classList.toggle('active',x===c));
-  // invalidate the cached live list so step 2 refetches for this software
-  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
-  if(nsw.step===2)loadNswVersions(nsw.software);
-  nswRender();
-});
-$$('input[name="nswVersionMode"]').forEach(r=>r.onchange=()=>{
-  const isSpecific=$$('input[name="nswVersionMode"]').find(x=>x.checked)?.value==='specific';
-  $('#nswVersionInput').disabled=!isSpecific;
-  const picker=$('#nswVersionPicker'); if(picker) picker.hidden=!isSpecific;
-  $$('.nsw-radio-card').forEach(c=>c.classList.toggle('active', c.querySelector('input')?.checked));
-  if(isSpecific){renderNswChips($('#nswVersionInput').value.trim());$('#nswVersionInput')?.focus()}
-  checkNswJava(isSpecific?$('#nswVersionInput').value.trim():nswVersions.latest);
-  nswRender();
-});
-// Chips are rendered live from the API (renderNswChips), so bind once via delegation.
-$('#nswVersionChips').addEventListener('click',e=>{
-  const chip=e.target.closest('.version-chip');if(!chip)return;
-  const v=chip.dataset.version;
-  $('#nswVersionInput').value=v;
-  $('#nswVersionClear').hidden=false;
-  $$('input[name="nswVersionMode"]').forEach(r=>r.checked=r.value==='specific');
-  $('#nswVersionInput').disabled=false;
-  $$('.nsw-radio-card').forEach(c=>c.classList.toggle('active', c.querySelector('input')?.checked));
-  $('#nswVersionInfo').textContent=nswValidateVersion(v);
-  checkNswJava(v);
-  nswRender();
-});
-const debouncedNswValidate=debounce(()=>{
-  const v=$('#nswVersionInput').value.trim();
-  $('#nswVersionClear').hidden=!v;
-  renderNswChips(v);
-  const info=$('#nswVersionInfo');
-  if(info)info.textContent=v?nswValidateVersion(v):'Pick a chip above or type any version — checked live against the official list.';
-  checkNswJava(v);
-  nswRender();
-},250);
-$('#nswVersionInput')?.addEventListener('input',debouncedNswValidate);
-$('#nswVersionClear')?.addEventListener('click',()=>{
-  $('#nswVersionInput').value='';
-  $('#nswVersionClear').hidden=true;
-  renderNswChips('');
-  $('#nswVersionInfo').textContent='Pick a chip above or type any version — checked live against the official list.';
-  $('#nswVersionInput').focus();
-});
-// Memory step: one updater drives the big readout, slider fill, preset chips and the rail.
-function nswUpdateMemory(){
-  const s=$('#nswMemorySlider');
-  const v=Number(s.value)||4,min=Number(s.min)||1,max=Number(s.max)||16;
-  $('#nswMemoryValue').textContent=v;
-  s.style.setProperty('--p',Math.round((v-min)/(max-min)*100)+'%');
-  const desc=$('#nswRamDesc');
-  if(desc){desc.textContent=t('nsw.mem'+(v<=2?1:v<=4?2:v<=8?3:4));desc.className='nsw2-memory-desc '+(v<=4?'ok':v<=8?'warn':'bad')}
-  $$('.nsw2-mempresets .filter-chip').forEach(c=>c.classList.toggle('active',Number(c.dataset.mem)===v));
-  $('#nswRailSub3').textContent=`${v} GB`;
-}
-$$('.nsw2-mempresets .filter-chip').forEach(b=>b.onclick=()=>{$('#nswMemorySlider').value=b.dataset.mem;nswUpdateMemory()});
-$('#nswMemorySlider').addEventListener('input',nswUpdateMemory);
-$('#nswShowTech')?.addEventListener('change', e=>{ const show=e.target.checked; $$('.card-tech').forEach(el=> el.hidden=!show); });
-$('#nswBack').onclick=()=>{nsw.step=Math.max(1,nsw.step-1);nswRender()};
+// The guided "create a new server" wizard now lives in 12-wizard.js (loads after this file).
+// Wizard state/functions moved to 12-wizard.js.
 function formatBytes(n){if(n==null)return'';if(n<1024)return`${n} B`;if(n<1024*1024)return`${(n/1024).toFixed(0)} KB`;return`${(n/1024/1024).toFixed(1)} MB`}
-// FEATURE: real byte progress for the wizard's download step — registered once here (same pattern as
-// onLog/onState/onFiles above) rather than subscribed per-click, so repeated wizard runs don't stack
-// up duplicate listeners. Harmless to keep receiving events when the modal isn't open; the elements
-// just sit updated and hidden.
-window.observer.onWizardProgress(({received,total})=>{
-  const fill=$('#nswProgressFill'),label=$('#nswProgressLabel');if(!fill)return;
-  if(total>0){fill.classList.remove('indeterminate');fill.style.width=`${Math.min(100,Math.round(received/total*100))}%`;label.textContent=`${formatBytes(received)} / ${formatBytes(total)} (${Math.min(100,Math.round(received/total*100))}%)`}
-  else{fill.classList.add('indeterminate');label.textContent=`${formatBytes(received)} downloaded…`}
-});
-$('#nswNext').onclick=async()=>{
-  if(nsw.step<4){nsw.step++;nswRender();return}
-  const software=nsw.software;
-  const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  const version=versionMode==='specific'?$('#nswVersionInput').value.trim():'';
-  const memory=Number($('#nswMemorySlider').value)||4;
-  $('#nswNext').disabled=true;$('#nswNext').textContent='Downloading…';$('#nswBack').disabled=true;
-  $('#nswProgress').hidden=false;$('#nswProgressFill').style.width='0%';$('#nswProgressFill').classList.add('indeterminate');$('#nswProgressLabel').textContent='Starting download…';
-  const settingsNext={...getSettings(),memoryMin:Math.max(1,Math.floor(memory/2)),memoryMax:memory};
-  const sr=await window.observer.saveSettings(settingsNext);state={...state,settings:settingsNext,java:sr.java};
-  const r=await window.observer.wizardCreate({software,version});
-  $('#nswNext').disabled=false;$('#nswBack').disabled=false;$('#nswProgress').hidden=true;
-  if(!r.ok){toast(r.error,'error');return}
-  $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla'};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
-  if(r.building){toast(`${r.name} started in the background — this can take several minutes. Watch the Console tab for progress.`);switchTab('console');return}
-  state.files=r.files;refreshUI();switchTab('overview');
-  toast(`Your server is ready. Press "Start server" at the top when you're ready to play.`,'success');
-};
-function openNewServerWizard(){
-  nsw={step:1,software:'vanilla'};
-  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
-  nswJava={version:'',java:null,exact:false};
-  const jc=$('#nswJavaCheck');if(jc)jc.hidden=true;
-  $$('[data-software]').forEach(x=>x.classList.toggle('active',x.dataset.software==='vanilla'));
-  $('#nswVersionInput').disabled=true;
-  $$('input[name="nswVersionMode"]').forEach(r=>r.checked=r.value==='latest');
-  $$('.nsw-radio-card').forEach(c=>c.classList.toggle('active', c.querySelector('input')?.value==='latest'));
-  $('#nswVersionPicker').hidden=true;
-  $('#nswVersionInput').value='';$('#nswVersionClear').hidden=true;
-  $('#nswLatestLabel').textContent='Resolving latest…';
-  $('#nswMemorySlider').value=4;$('#nswMemoryValue').textContent='4';
-  $('#nswProgress').hidden=true;
-  nswRender();$('#newServerModal').hidden=false;
-}
+// Wizard UI (nsw*) moved to 12-wizard.js.
 $('#newServerClose').onclick=()=>{if($('#nswNext').disabled)return toast('Wait for the download to finish before closing this.','error'); closeOverlayAnimated($('#newServerModal'));};
 // FEATURE: generic modal dismissal — Escape key, or clicking the dimmed backdrop outside the modal
 // card, closes whichever .modal-overlay is currently open. Covers every current and future modal from

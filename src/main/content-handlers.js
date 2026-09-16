@@ -26,6 +26,10 @@ function registerContent(ipcMain, ctx) {
 
   ipcMain.handle('properties:save', async (_, props) => {
     if (!ctx.currentServerPath) return { ok: false };
+    // SECURITY: cap the total size so a runaway/oversized payload can't write a huge file.
+    let total = 0;
+    for (const [k, v] of Object.entries(props || {})) total += String(k).length + String(v).length;
+    if (total > 1024 * 1024) return { ok: false, error: 'Properties payload is too large (max 1 MB).' };
     writeFileAtomic(path.join(ctx.currentServerPath, 'server.properties'), buildPropertiesContent(ctx.currentServerPath, props));
     return { ok: true };
   });
@@ -38,6 +42,7 @@ function registerContent(ipcMain, ctx) {
 
   ipcMain.handle('properties:raw-save', async (_, content) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (String(content || '').length > 1024 * 1024) return { ok: false, error: 'velocity.toml is too large (max 1 MB).' };
     writeFileAtomic(path.join(ctx.currentServerPath, 'velocity.toml'), content);
     return { ok: true };
   });
@@ -113,7 +118,12 @@ function registerContent(ipcMain, ctx) {
       return { ok: false, error: error?.message || 'Could not scan chunks.' };
     }
   });
-  ipcMain.handle('worldmap:waypoints:set', async (_, list) => worldmap.writeWaypoints(ctx.currentServerPath, Array.isArray(list) ? list : []));
+  ipcMain.handle('worldmap:waypoints:set', async (_, list) => {
+    // SECURITY: cap count + total size so a runaway list can't write a huge JSON file.
+    const arr = Array.isArray(list) ? list : [];
+    if (arr.length > 500 || JSON.stringify(arr).length > 512 * 1024) return { ok: false, error: 'Waypoint list is too large (max 500).' };
+    return worldmap.writeWaypoints(ctx.currentServerPath, arr);
+  });
 
   // Real biome preview: reads the actual paletted biome containers from region files.
   // The rect is the chunk range visible in the viewport, so only intersecting regions

@@ -31,7 +31,23 @@ function findFileRecursive(dir, filename, depth = 5) {
 }
 // FEATURE: extracted from main.js — now takes `root` explicitly instead of closing over the
 // module-level currentServerPath variable, so this stays a pure, testable function.
-function safeTarget(root, relative) { const base = path.resolve(root || '.'); const target = path.resolve(base, relative); return target.startsWith(base + path.sep) || target === base ? target : null; }
+function safeTarget(root, relative) {
+  const base = path.resolve(root || '.');
+  const target = path.resolve(base, relative);
+  if (!(target.startsWith(base + path.sep) || target === base)) return null;
+  // SECURITY (symlink escape): path.resolve only normalises the string — a symlink INSIDE the
+  // root (e.g. plugins -> /etc) would still pass the check while reading/writing outside it.
+  // Resolve the real path and re-check. If the target does not exist yet, resolve its parent
+  // (the file is about to be created there) and verify that stays inside the real root.
+  try {
+    const realBase = fs.realpathSync.native ? fs.realpathSync.native(base) : fs.realpathSync(base);
+    let probe = target;
+    try { probe = fs.realpathSync.native ? fs.realpathSync.native(target) : fs.realpathSync(target); }
+    catch { try { probe = path.dirname(target); probe = fs.realpathSync.native ? fs.realpathSync.native(probe) : fs.realpathSync(probe); } catch { return target; } }
+    if (probe === realBase || probe.startsWith(realBase + path.sep)) return target;
+    return null;
+  } catch { return target; }
+}
 // FEATURE: extracted from main.js — takes `root` explicitly (same reasoning as safeTarget above).
 function recordManifestEntry(root, entry) {
   if (!root) return;

@@ -26,18 +26,21 @@ function resolveBackupFile(ctx, name) {
 
 async function createBackupInternal(ctx) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-  const info = serverFiles(ctx.currentServerPath);
+  // Snapshot the root once — the renderer can change ctx.currentServerPath (settings:save)
+  // while this async runs, which would otherwise mix two folders in one backup.
+  const root = ctx.currentServerPath;
+  const info = serverFiles(root);
   if (!info.worlds.length) return { ok: false, error: 'No world folders found.' };
   if (ctx.backupInProgress) return { ok: false, error: 'A backup is already in progress — wait for it to finish.' };
   ctx.backupInProgress = true;
   try {
     if (ctx.serverProcess) { try { ctx.serverProcess.stdin.write('save-off\r\n'); ctx.serverProcess.stdin.write('save-all\r\n'); } catch {} }
-    const dir = safeTarget(ctx.currentServerPath, 'observerlauncher-backups');
+    const dir = safeTarget(root, 'observerlauncher-backups');
     fs.mkdirSync(dir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const out = path.join(dir, `world-backup-${stamp}.zip`);
-    const r = await platform.createBackup({ serverPath: ctx.currentServerPath, worlds: info.worlds, destZip: out });
-    return r.ok ? { ok: true, files: serverFiles(ctx.currentServerPath), name: path.basename(out) } : { ok: false, error: r.error };
+    const r = await platform.createBackup({ serverPath: root, worlds: info.worlds, destZip: out });
+    return r.ok ? { ok: true, files: serverFiles(root), name: path.basename(out) } : { ok: false, error: r.error };
   } finally {
     try { if (ctx.serverProcess && ctx.serverProcess.stdin.writable) ctx.serverProcess.stdin.write('save-on\r\n'); } catch {}
     ctx.backupInProgress = false;

@@ -4,10 +4,10 @@ const os = require('os');
 const path = require('path');
 const { app, dialog } = require('electron');
 const { loadSettings, saveSettings } = require('./settings.js');
-const { detectJava, requiredJavaForJar } = require('./java.js');
+const { detectJava, requiredJavaForJar, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
 const { localIPv4s } = require('./network.js');
-const { download, marketplaceError, psQuote, runPowerShell, withTimeout } = require('./http.js');
+const { download, marketplaceError, withTimeout } = require('./http.js');
 const { findFileRecursive } = require('./fs-utils.js');
 const platform = require('./platform');
 
@@ -54,6 +54,14 @@ function registerSettings(ipcMain, ctx) {
 
   ipcMain.handle('settings:save', async (_, settings) => {
     const merged = { ...loadSettings(), ...settings };
+    // SECURITY: serverPath becomes the root for EVERY file operation (backup, editor save,
+    // player data, content delete). It arrives from the renderer, so refuse anything that is
+    // not an existing directory instead of trusting it verbatim.
+    if (merged.serverPath) {
+      let ok = false;
+      try { ok = fs.statSync(merged.serverPath).isDirectory(); } catch { ok = false; }
+      if (!ok) return { ok: false, error: 'That server folder does not exist or is not a folder.' };
+    }
     ctx.currentServerPath = merged.serverPath;
     ctx.watchServerFolder();
     saveSettings(merged);
@@ -77,7 +85,7 @@ function registerSettings(ipcMain, ctx) {
     const info = serverFiles(ctx.currentServerPath);
     const isProxy = detectSoftware(info) === 'proxy';
     const port = Number(info.properties['server-port']) || (isProxy ? 25577 : 25565);
-    return { ok: true, localIps: localIPv4s(), port };
+    return { ok: true, localIps: localIPv4s(), port, platform: process.platform };
   });
 
   ipcMain.handle('network:public-ip', async () => {
@@ -110,22 +118,22 @@ function registerSettings(ipcMain, ctx) {
       const major = required && required < 21 ? 21 : 25;
       ctx.appendLog(`Downloading a portable Java ${major} runtime from Adoptium (Eclipse Temurin)…`, 'system');
       const arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
-      const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/windows/${arch}/jre/hotspot/normal/eclipse`;
-      zipPath = path.join(app.getPath('temp'), `observerlauncher-jre-${Date.now()}.zip`);
+      const osName = javaRuntimeOs(), ext = javaRuntimeExt(osName), binName = javaBinName(osName);
+      const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${osName}/${arch}/jre/hotspot/normal/eclipse`;
+      zipPath = path.join(app.getPath('temp'), `observerlauncher-jre-${Date.now()}.${ext}`);
       await download(url, zipPath, (received, total) => ctx.send('java:progress', { received, total }));
       const targetDir = path.join(app.getPath('userData'), `jre${major}`);
-      // BUGFIX (a bad install could wipe a working Java): the old code deleted the existing
-      // jre<major> folder BEFORE extracting. If the extract then failed, the user lost the
-      // Java they already had. Extract into a staging folder first; only swap it into place
-      // after java.exe is confirmed present, so a failure leaves the previous install intact.
+      // BUGFIX (a bad install could wipe a working Java): extract into a staging folder first; only
+      // swap it in after the java binary is confirmed present, so a failure leaves the previous install
+      // intact. Cross-platform: PowerShell on Windows, unzip/tar on Linux/mac (was Windows-only).
       const stagingDir = `${targetDir}.staging-${Date.now()}`;
       ctx.appendLog('Extracting Java runtime…', 'system');
       try {
         fs.mkdirSync(stagingDir, { recursive: true });
-        const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(zipPath)} -DestinationPath ${psQuote(stagingDir)} -Force`, 300000);
+        const r = await platform.extractArchive(zipPath, stagingDir);
         if (!r.ok) throw new Error(r.error || 'Could not extract the Java runtime.');
-        const stagedJava = findFileRecursive(stagingDir, 'java.exe');
-        if (!stagedJava) throw new Error('Java runtime was downloaded but java.exe was not found after extracting.');
+        const stagedJava = findFileRecursive(stagingDir, binName);
+        if (!stagedJava) throw new Error(`Java runtime was downloaded but ${binName} was not found after extracting.`);
         // Success — replace the old install with the freshly verified one.
         try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch {}
         fs.renameSync(stagingDir, targetDir);
@@ -133,8 +141,8 @@ function registerSettings(ipcMain, ctx) {
         try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
         throw e;
       }
-      const javaExe = findFileRecursive(targetDir, 'java.exe');
-      if (!javaExe) throw new Error('Java runtime was downloaded but java.exe was not found after extracting.');
+      const javaExe = findFileRecursive(targetDir, binName);
+      if (!javaExe) throw new Error(`Java runtime was downloaded but ${binName} was not found after extracting.`);
       const settings = loadSettings();
       settings.javaPath = javaExe;
       saveSettings(settings);
