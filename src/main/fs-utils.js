@@ -48,6 +48,21 @@ function safeTarget(root, relative) {
     return null;
   } catch { return target; }
 }
+// Startup cleanup (debt #7): writeFileAtomic leaves a `.name.tmp-<pid>-<ts>` file behind if the
+// app is killed between writeFileSync and renameSync. Those orphans never get renamed and just
+// accumulate. Remove any file matching that exact temp shape in `dir` — nothing else matches, so
+// a real file (e.g. settings.json) can never be deleted. Best-effort: errors are ignored.
+function cleanOrphanTmp(dir) {
+  let removed = 0;
+  try {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!e.isFile()) continue;
+      if (!/^\..+\.tmp-\d+-\d+$/.test(e.name)) continue;
+      try { fs.unlinkSync(path.join(dir, e.name)); removed++; } catch {}
+    }
+  } catch {}
+  return removed;
+}
 // FEATURE: extracted from main.js — takes `root` explicitly (same reasoning as safeTarget above).
 function recordManifestEntry(root, entry) {
   if (!root) return;
@@ -56,4 +71,4 @@ function recordManifestEntry(root, entry) {
   writeJsonList(root, 'observerlauncher-manifest.json', list);
 }
 
-module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, findFileRecursive, safeTarget, recordManifestEntry };
+module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp };

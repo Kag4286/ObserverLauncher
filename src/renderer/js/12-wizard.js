@@ -191,7 +191,7 @@ $('#nswNext').onclick=async()=>{
   $('#nswProgress').hidden=false;$('#nswProgressFill').style.width='0%';$('#nswProgressFill').classList.add('indeterminate');$('#nswProgressLabel').textContent='Starting download…';
   $('#nswCancel').hidden=false;
   const settingsNext={...getSettings(),memoryMin:Math.max(1,Math.floor(memory/2)),memoryMax:memory};
-  const sr=await window.observer.saveSettings(settingsNext);state={...state,settings:settingsNext,java:sr.java};
+  const sr=await window.observer.saveSettings(settingsNext);if(!sr||!sr.ok){toast((sr&&sr.error)||t('toast.startUnknown'),'error');$('#nswNext').disabled=false;$('#nswNext').textContent=t('nsw.create');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;return}state={...state,settings:settingsNext,java:sr.java};
   const r=await window.observer.wizardCreate({software,version});
   $('#nswNext').disabled=false;$('#nswNext').textContent=t(nsw.step===4?'nsw.create':'nsw.next');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;
   if(!r.ok){ if(/cancel/i.test(r.error||'')){ toast(t('toast.downloadCancelled')); return; } toast(r.error,'error');return }

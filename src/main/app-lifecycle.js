@@ -8,6 +8,7 @@ const { serverFiles } = require('./server-files.js');
 const { startMetrics } = require('./server-lifecycle.js');
 const { startAutoBackupWatcher } = require('./backups.js');
 const { startScheduler } = require('./scheduler.js');
+const { cleanOrphanTmp } = require('./fs-utils.js');
 const textures = require('./textures');
 
 async function createWindow(ctx) {
@@ -81,6 +82,8 @@ function setupQuitHandler(ctx) {
 }
 
 async function initApp(ctx, ipcMain) {
+  // Remove any .tmp-* orphan left by a crash mid-atomic-write (settings.json etc.).
+  cleanOrphanTmp(app.getPath('userData'));
   textures.init({
     serverNames: () => {
       try { const i = serverFiles(ctx.currentServerPath); return [i.jar, i.launchScript].filter(Boolean); }
