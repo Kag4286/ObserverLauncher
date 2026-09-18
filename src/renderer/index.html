@@ -87,7 +87,10 @@
       </article>
     </section>
     <section id="performance" class="tab">
-      <div class="perf-head"><div><h2 data-i18n="perf.title">Performance</h2><p class="text-muted" data-i18n="perf.headSub">Live telemetry — TPS/MSPT sampled every second from the Java process</p></div><div class="perf-live"><span class="live-dot" id="perfLiveDot"></span><span id="perfLiveText">Offline</span><span class="perf-uptime" id="perfUptime">—</span></div></div>
+      <header class="tab-head">
+        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/gauge.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.perf">TELEMETRY</p><h2 data-i18n="perf.title">Performance</h2><p class="sub" data-i18n="perf.headSub">Live telemetry — TPS/MSPT sampled every second from the Java process</p></div></div>
+        <div class="tab-head-actions"><span class="perf-live"><span class="live-dot" id="perfLiveDot"></span><span id="perfLiveText">Offline</span><span class="perf-uptime" id="perfUptime">—</span></span></div>
+      </header>
       <div class="perf-kpis">
         <article class="perf-kpi glass"><div class="kpi-head"><span class="kpi-icon tps"><img src="./assets/icons/ui/clock.svg" alt="" style="width:18px;height:18px"></span><span>TPS</span><span class="kpi-help" data-i18n-title="perf.help.tps" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfTpsBadge">—</span></div><strong id="perfTps">—</strong><small data-i18n="perf.targetHigher">Target 20.00 • higher is better</small><div class="kpi-bar"><i id="perfTpsBar" style="width:0%"></i></div></article>
         <article class="perf-kpi glass"><div class="kpi-head"><span class="kpi-icon mspt"><img src="./assets/icons/ui/gauge.svg" alt="" style="width:18px;height:18px"></span><span>MSPT</span><span class="kpi-help" data-i18n-title="perf.help.mspt" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfMsptBadge">—</span></div><strong id="perfMspt">—</strong><small id="perfMsptHint" data-i18n="perf.targetMspt">Target under 50 ms</small><div class="kpi-bar mspt"><i id="perfMsptBar" style="width:0%"></i></div></article>
