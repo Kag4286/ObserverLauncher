@@ -136,8 +136,6 @@
 .help-note{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);color:var(--text-dim);font:500 10px var(--font-ui);line-height:1.5}
 .command-help .recent-commands button{border-radius:3px}
 /* PERFORMANCE — redesign */
-.perf-head{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
-.perf-head h2{font-size:18px} .perf-head p{margin:4px 0 0}
 .perf-live{display:flex;gap:8px;align-items:center;border:1px solid var(--border);background:var(--panel);padding:7px 12px;border-radius:999px;font:600 11px var(--font-mono);color:var(--text-muted);flex-shrink:0}
 .perf-live .live-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);box-shadow:0 0 0 4px rgba(255,255,255,.06)}
 .perf-live .live-dot.on{background:var(--success);box-shadow:0 0 8px rgba(0,229,160,.5)}

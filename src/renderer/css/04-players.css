@@ -2,9 +2,6 @@
 /* players roster, inspect modal, equipment. */
 /* PLAYERS — professional roster */
 .roster-panel{display:flex;flex-direction:column;min-height:520px}
-.roster-head{display:flex;justify-content:space-between;gap:14px;align-items:start;padding-bottom:12px;border-bottom:1px solid var(--border);margin:-16px -16px 14px;padding:14px 16px;background:var(--panel-raised);border-radius:4px 4px 0 0}
-.roster-title h3{font-size:14px} .roster-title p{margin:4px 0 0;color:var(--text-muted);font:500 11px var(--font-ui)}
-.roster-actions{display:flex;gap:10px;align-items:center;flex-shrink:0}
 .roster-count{font:700 11px var(--font-mono);letter-spacing:.06em;color:var(--text-muted);border:1px solid var(--border);padding:7px 10px;border-radius:999px;background:var(--field);white-space:nowrap}
 .roster-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .roster-search{position:relative;display:flex;align-items:center}

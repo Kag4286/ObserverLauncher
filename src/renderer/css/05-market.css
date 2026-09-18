@@ -1,15 +1,8 @@
 /* css/05-market.css — split from style.css (lines 316-603); link in numeric order to keep the cascade. */
 /* content + marketplace, scrollbar, responsive. */
 /* CONTENT / MARKETPLACE — redesign */
-.content-head{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
-.content-head h2{font-size:18px} .content-head p{margin:4px 0 0}
-.content-head-stats{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
 .stat-pill{font:600 11px var(--font-mono);padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-muted)}
-.marketplace-head{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);animation:marketHeadIn .22s var(--ease) backwards}
 @keyframes marketHeadIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.marketplace-head h2{font-size:18px} .marketplace-head p{margin:4px 0 0}
-.marketplace-head-actions{flex-shrink:0}
-.marketplace-controls{display:flex;flex-direction:column;gap:14px;animation:marketHeadIn .22s var(--ease) .06s backwards}
 .market-search-bar{display:flex;gap:8px;align-items:center;background:var(--field);border:1px solid var(--field-border);border-radius:4px;padding:6px 6px 6px 2px;transition:border-color .12s, box-shadow .12s, transform .12s}
 .market-search-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak);transform:translateY(-1px)}
 .market-search-bar .search-icon{color:var(--text-dim);padding:6px 0 6px 10px;font-size:14px}
@@ -290,9 +283,6 @@
 @media(max-width:700px){.srv-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px 0}.srv-stats>div{border-left:0;padding:0} .overview-grid{grid-template-columns:1fr} .content-grid{grid-template-columns:1fr} .console-layout{grid-template-columns:1fr} .properties-grid{grid-template-columns:1fr} .settings-groups{grid-template-columns:1fr}}
 
 /* ============ MARKETPLACE REDESIGN (0.7.0) ============ */
-.marketplace-head{align-items:flex-start}
-.marketplace-head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.marketplace-head-actions .btn.sm{padding:7px 12px;font-size:11px}
 
 /* Hero: big search + popular quick-picks */
 .market-hero{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
