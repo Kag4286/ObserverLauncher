@@ -6,8 +6,24 @@ let uptimeStart=null;
 // silently wiping whatever the user had typed but not applied yet. While this flag is set, refreshUI
 // skips re-rendering both editors; it clears on Apply or when the server folder changes.
 let propsDirty=false;
-function updateUptime(){const el=$('#heroUptime');if(!el)return;if(!uptimeStart){el.textContent='—';return}const secs=Math.max(0,Math.floor((Date.now()-uptimeStart)/1000));const h=String(Math.floor(secs/3600)).padStart(2,'0'),m=String(Math.floor(secs%3600/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0');el.textContent=`${h}:${m}:${s}`}
-setInterval(updateUptime,1000);
+// UPTIME: self-correcting to whole seconds of real uptime. A plain setInterval(…,1000)
+// is phase-shifted from when the server actually started, and refreshUI() also calls
+// updateUptime() directly on every state event — so two redraws could land only a few
+// hundred ms apart and the clock appeared to jump faster than one second. Scheduling
+// the next redraw at the next whole-second boundary of uptime keeps visible steps at
+// exactly ~1s no matter when the server started or how often refreshUI runs.
+let uptimeTimer=null;
+function updateUptime(){
+  const el=$('#heroUptime');
+  clearTimeout(uptimeTimer);uptimeTimer=null;
+  if(!el)return;
+  if(!uptimeStart){el.textContent='—';return}
+  const ms=Date.now()-uptimeStart;
+  const secs=Math.max(0,Math.floor(ms/1000));
+  const h=String(Math.floor(secs/3600)).padStart(2,'0'),m=String(Math.floor(secs%3600/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0');
+  el.textContent=`${h}:${m}:${s}`;
+  uptimeTimer=setTimeout(updateUptime,1000-(ms%1000)+5);
+}
 // FEATURE: capability-aware diagnostics — shows what this launcher can measure natively for THIS
 // server (TPS/MSPT via Paper's built-in commands, players via /list) and offers manual commands.
 // The old panel auto-detected Spark and pushed "spark ..." console commands on a timer; that

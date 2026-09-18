@@ -20,6 +20,12 @@ function applyLocale(){
   $$('[data-i18n-html]').forEach(el=>{el.innerHTML=t(el.dataset.i18nHtml)});
   $$('[data-i18n-placeholder]').forEach(el=>{el.placeholder=t(el.dataset.i18nPlaceholder)});
   $$('[data-i18n-title]').forEach(el=>{el.title=t(el.dataset.i18nTitle)});
+  // BUGFIX: the page title (#pageTitle) has no data-i18n — it is set by switchTab. Changing the
+  // language from Settings left it in the old language until the user switched tabs. Re-derive it
+  // from the active nav item here so it updates immediately.
+  const activeNav = document.querySelector('.nav-item.active');
+  const titleEl = document.getElementById('pageTitle');
+  if (activeNav?.dataset.tab && titleEl) titleEl.textContent = t('nav.' + activeNav.dataset.tab) || titles[activeNav.dataset.tab] || titleEl.textContent;
 }
 const tf=t;
 // "?" bubbles: hover shows the native title, click/tap opens an instant translated bubble.

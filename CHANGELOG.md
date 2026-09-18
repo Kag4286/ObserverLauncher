@@ -3,6 +3,40 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.6.0] — 2026-09-18
+
+### Added
+- **CI now runs the test suite on every push and pull request** (`.github/workflows/test.yml`),
+  on both Windows and Linux. Failures are caught before merge, and the Linux runner exercises the
+  platform-specific code paths. README gained a tests badge.
+- **Electron end-to-end (E2E) tests** via Playwright (`tests/e2e/`). They launch the real app
+  with a throwaway user-data dir and assert the renderer boots, every tab renders, the language
+  switch works, etc. Run locally with `npm run test:e2e`; CI runs them too (xvfb on Linux). Kept
+  separate from the unit suite (`npm test`) so neither slows the other down.
+
+### Fixed
+- **Page title did not update when changing the language.** `#pageTitle` has no `data-i18n`
+  (it is set by `switchTab`), so switching the UI language from Settings left the title in the old
+  language until the user clicked another tab. `applyLocale()` now re-derives it from the active
+  nav item. (Found by the new E2E test — a real UX bug.)
+- **Deleting or importing content while the server is running is now handled gracefully.**
+  On Windows a running server keeps plugin/mod jars open, so `fs.unlinkSync` / `fs.copyFileSync`
+  could fail with `EBUSY`/`EPERM` — the IPC call rejected and the UI was left with no message.
+  The backend now catches the lock and returns a clear error, and the renderer asks for
+  confirmation before deleting or importing while the server is up (new content only loads after
+  a restart anyway).
+- **Session uptime could appear to tick faster than one second.** The clock used a plain
+  `setInterval(…, 1000)` (phase-shifted from the real server start) *and* was redrawn directly by
+  `refreshUI()` on every state event, so two redraws could land a few hundred ms apart. It now
+  schedules the next redraw on the next whole-second boundary of the real uptime, so visible steps
+  are always ~1s regardless of when the server started or how often the UI refreshes.
+
+### Changed
+- **`server-lifecycle.js` refactor (no behaviour change).** `startServerInternal` (127 lines) was
+  split into named helpers: `buildLaunchArgs`, `spawnServerProcess`, `handleAutoRestart`. The main
+  function is now ~97 lines and the argument/spawn/auto-restart logic can be reasoned about (and
+  tested) on its own.
+
 ## [0.5.0] — 2026-09-16
 
 ### Added

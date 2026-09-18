@@ -5,6 +5,7 @@
 ObserverLauncher is a desktop app for Windows and Linux that handles the boring parts of hosting a Minecraft server for you: downloading the server software, installing Java, editing config files, opening the firewall, and backing up your world. You pick a folder, choose a server type, and press **Start**.
 
 [![Release](https://img.shields.io/github/v/release/Kag4286/ObserverLauncher?label=release)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+[![Tests](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml/badge.svg)](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
@@ -132,13 +133,13 @@ Running from source additionally requires **Node.js 18 or newer**.
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-0.5.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-0.5.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-0.6.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-0.6.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe`. It is a normal NSIS installer — you can choose the install location, and it sets up auto-update.
-- **Linux:** `chmod +x ObserverLauncher-0.5.0.AppImage` then run it. No installation, no root required.
+- **Linux:** `chmod +x ObserverLauncher-0.6.0.AppImage` then run it. No installation, no root required.
 
 ### Option B — Run from source
 
@@ -379,7 +380,7 @@ The server software is free. Players need a legitimate Minecraft: Java Edition a
 No. The server runs on your own computer. The launcher is only the control panel.
 
 **Can I run more than one server?**
-Yes — just point the launcher at a different folder. Settings (folder, RAM, Java path) are per-folder in practice, so switch folders to switch servers.
+Yes — just point the launcher at a different folder. Settings are shared (one active set, not stored per-folder): the RAM allocation, Java path, JVM arguments and other options apply to whichever folder is currently loaded, so switching folders switches servers but keeps your settings.
 
 **Where are my backups?**
 Inside your server folder, in `observerlauncher-backups/`, as `.zip` files.
@@ -504,6 +505,14 @@ npm test
 ```
 
 Runs every `tests/*.test.js` through `tests/run.js` (plain Node, no framework) and fails fast. The suite covers boot state, the editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace/poll suppression, textures, world-map wiring, player equipment (old and new NBT layouts), download resume, explored-chunk filtering and more.
+
+### Run end-to-end tests
+
+```bash
+npm run test:e2e
+```
+
+Launches the real Electron app with Playwright (`tests/e2e/`) against a throwaway user-data folder, then asserts the renderer boots, every tab renders and the language switch works. Kept separate from the unit suite. On headless Linux CI these run under `xvfb-run` (already wired in `.github/workflows/test.yml`).
 
 ### Build
 

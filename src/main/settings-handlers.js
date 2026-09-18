@@ -62,6 +62,15 @@ function registerSettings(ipcMain, ctx) {
       try { ok = fs.statSync(merged.serverPath).isDirectory(); } catch { ok = false; }
       if (!ok) return { ok: false, error: 'That server folder does not exist or is not a folder.' };
     }
+    // STATE CONSISTENCY (audit #4): ctx.currentServerPath is the root for EVERY file operation —
+    // metrics, player data, world map, backups, editor, content. If it were changed to Server B
+    // while the live process is still running Server A, those features would silently mix data
+    // from two folders. Refuse to switch folders while a server is starting/running/stopping;
+    // other settings (memory, Java, locale, args) still save normally. Smallest safe fix — no
+    // session abstraction needed for a single-server launcher.
+    if (merged.serverPath !== ctx.currentServerPath && ctx.serverStatus !== 'stopped') {
+      return { ok: false, error: 'Stop the server before changing the server folder.' };
+    }
     ctx.currentServerPath = merged.serverPath;
     ctx.watchServerFolder();
     saveSettings(merged);

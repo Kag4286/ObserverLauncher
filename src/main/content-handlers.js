@@ -55,7 +55,14 @@ function registerContent(ipcMain, ctx) {
     if (!folder) return { ok: false, error: 'Unknown content type.' };
     const target = safeTarget(ctx.currentServerPath, path.join(folder, fileName));
     if (!target || !fs.existsSync(target)) return { ok: false, error: 'File not found.' };
-    fs.unlinkSync(target);
+    try {
+      fs.unlinkSync(target);
+    } catch {
+      // BUGFIX (#8): on Windows a running server keeps plugin/mod jars open, so unlink
+      // fails with EBUSY/EPERM. Return a clear error instead of rejecting the IPC,
+      // which used to leave the renderer hanging with no toast.
+      return { ok: false, error: `Could not delete ${fileName} — it may be locked by the running server. Stop the server and try again.` };
+    }
     return { ok: true, files: serverFiles(ctx.currentServerPath) };
   });
 
@@ -78,7 +85,13 @@ function registerContent(ipcMain, ctx) {
       if (kind === 'datapack' && !['.zip', '.jar'].includes(ext)) return { ok: false, error: `${path.basename(file)} is not a .zip/.jar datapack.` };
       if (kind !== 'datapack' && ext !== '.jar') return { ok: false, error: `${path.basename(file)} is not a .jar file.` };
     }
-    for (const file of r.filePaths) fs.copyFileSync(file, path.join(target, path.basename(file)));
+    // BUGFIX (#8): a running server can lock an existing jar of the same name, so
+    // copyFileSync may fail (EBUSY/EPERM). Report which file failed instead of
+    // rejecting the IPC and leaving the UI stuck.
+    for (const file of r.filePaths) {
+      try { fs.copyFileSync(file, path.join(target, path.basename(file))); }
+      catch { return { ok: false, error: `${path.basename(file)} could not be copied — it may be locked by the running server. Stop the server and try again.` }; }
+    }
     return { ok: true, files: serverFiles(ctx.currentServerPath) };
   });
 

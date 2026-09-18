@@ -19,6 +19,51 @@ const { startAutoPoll } = require('./server-poll.js');
 
 let waitingForDone = false;
 
+// Build the JVM argument list. Custom jvmArgs win over the memory sliders; both are split on
+// whitespace with quote support. `jar` is a parameter so this stays a pure, testable function.
+function buildLaunchArgs(settings, isProxy, jar) {
+  const customArgs = String(settings.jvmArgs || '').trim()
+    ? String(settings.jvmArgs).trim().match(/(?:[^\s"]+|"[^"]*")+/g).map(x => x.replace(/^"|"$/g, ''))
+    : [`-Xms${settings.memoryMin || 2}G`, `-Xmx${settings.memoryMax || 6}G`];
+  const args = isProxy ? [...customArgs, '-jar', jar] : [...customArgs, '-jar', jar, 'nogui'];
+  return { customArgs, args };
+}
+
+// Spawn the server process (java -jar … or cmd/bash run.bat/run.sh) and store it on ctx.
+function spawnServerProcess(ctx, serverPath, info, customArgs, args) {
+  if (info.launchScript) {
+    const env = { ...process.env };
+    if (customArgs.length) env.JAVA_TOOL_OPTIONS = customArgs.join(' ');
+    if (info.launchScript.toLowerCase().endsWith('.sh')) {
+      ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
+    } else if (process.platform === 'win32') {
+      ctx.serverProcess = spawn('cmd.exe', ['/d', '/c', info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false, env });
+    } else {
+      ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
+    }
+  } else {
+    ctx.serverProcess = spawn(ctx.javaInfo.path, args, { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false });
+  }
+}
+
+// Auto-restart after an unexpected exit (skipped for manual stops; a clean exit resets the counter).
+function handleAutoRestart(ctx, wasManual, code) {
+  const current = loadSettings();
+  if (wasManual || !current.autoRestart) return;
+  if (code === 0) { ctx.restartAttempts = 0; return; }
+  const maxAttempts = Math.max(1, Number(current.autoRestartMaxAttempts) || 3);
+  const delaySeconds = Math.max(1, Number(current.autoRestartDelaySeconds) || 5);
+  if (ctx.restartAttempts >= maxAttempts) {
+    ctx.appendLog(`Auto-restart stopped after ${maxAttempts} failed attempts in a row — check Console above for the real error before starting again.`, 'error');
+    ctx.restartAttempts = 0;
+    return;
+  }
+  ctx.restartAttempts++;
+  ctx.appendLog(`Auto-restart is on — restarting server in ${delaySeconds}s… (attempt ${ctx.restartAttempts}/${maxAttempts})`, 'system');
+  clearTimeout(ctx.restartTimer);
+  ctx.restartTimer = setTimeout(() => { startServerInternal(ctx, current).catch(() => {}); }, delaySeconds * 1000);
+}
+
 async function startServerInternal(ctx, settings) {
   if (ctx.serverStatus !== 'stopped') return { ok: false, error: ctx.serverStatus === 'starting' ? 'Server is already starting.' : ctx.serverStatus === 'stopping' ? 'Server is still stopping — wait for it to finish.' : 'Server is already running.' };
   if (ctx.buildProcess) return { ok: false, error: 'A build (BuildTools) is still running in this folder — wait for it to finish, check the Console tab.' };
@@ -32,28 +77,11 @@ async function startServerInternal(ctx, settings) {
   const software = detectSoftware(info);
   ctx.currentSoftware = software;
   const isProxy = software === 'proxy';
-  const customArgs = String(settings.jvmArgs || '').trim()
-    ? String(settings.jvmArgs).trim().match(/(?:[^\s"]+|"[^"]*")+/g).map(x => x.replace(/^"|"$/g, ''))
-    : [`-Xms${settings.memoryMin || 2}G`, `-Xmx${settings.memoryMax || 6}G`];
-  const args = isProxy ? [...customArgs, '-jar', info.jar] : [...customArgs, '-jar', info.jar, 'nogui'];
+  const { customArgs, args } = buildLaunchArgs(settings, isProxy, info.jar);
   ctx.appendLog(`Starting ${info.launchScript || info.jar} with ${ctx.javaInfo.path}…`, 'system');
   ctx.manualStop = false;
 
-  if (info.launchScript) {
-    const env = { ...process.env };
-    if (customArgs.length) env.JAVA_TOOL_OPTIONS = customArgs.join(' ');
-    if (info.launchScript.toLowerCase().endsWith('.sh')) {
-      ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: settings.serverPath, env });
-    } else {
-      if (process.platform === 'win32') {
-        ctx.serverProcess = spawn('cmd.exe', ['/d', '/c', info.launchScript, 'nogui'], { cwd: settings.serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false, env });
-      } else {
-        ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: settings.serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
-      }
-    }
-  } else {
-    ctx.serverProcess = spawn(ctx.javaInfo.path, args, { cwd: settings.serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false });
-  }
+  spawnServerProcess(ctx, settings.serverPath, info, customArgs, args);
 
   try { if (!fs.existsSync(path.join(settings.serverPath, 'server.properties'))) ctx.appendLog('First start: server.properties does not exist yet — the "Failed to load properties" ERROR below is expected; the server creates the file on its own and continues.', 'system'); } catch {}
 
@@ -125,20 +153,7 @@ async function startServerInternal(ctx, settings) {
     ctx.setServerStatus('stopped');
     ctx.send('server:live', ctx.live);
     ctx.pushFiles();
-    const current = loadSettings();
-    if (!wasManual && current.autoRestart && code !== 0) {
-      const maxAttempts = Math.max(1, Number(current.autoRestartMaxAttempts) || 3);
-      const delaySeconds = Math.max(1, Number(current.autoRestartDelaySeconds) || 5);
-      if (ctx.restartAttempts >= maxAttempts) {
-        ctx.appendLog(`Auto-restart stopped after ${maxAttempts} failed attempts in a row — check Console above for the real error before starting again.`, 'error');
-        ctx.restartAttempts = 0;
-      } else {
-        ctx.restartAttempts++;
-        ctx.appendLog(`Auto-restart is on — restarting server in ${delaySeconds}s… (attempt ${ctx.restartAttempts}/${maxAttempts})`, 'system');
-        clearTimeout(ctx.restartTimer);
-        ctx.restartTimer = setTimeout(() => { startServerInternal(ctx, current).catch(() => {}); }, delaySeconds * 1000);
-      }
-    } else if (!wasManual && current.autoRestart && code === 0) { ctx.restartAttempts = 0; }
+    handleAutoRestart(ctx, wasManual, code);
   });
 
   ctx.setServerStatus(isProxy ? 'running' : 'starting');

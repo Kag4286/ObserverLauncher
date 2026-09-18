@@ -1,6 +1,6 @@
 {
   "name": "observerlauncher",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A beginner-friendly and advanced-capable desktop launcher for hosting local Minecraft servers on Windows and Linux.",
   "license": "MIT",
   "author": "ObserverLauncher contributors",
@@ -20,7 +20,8 @@
     "build:win": "electron-builder --win nsis",
     "build:linux": "electron-builder --linux AppImage",
     "build:all": "electron-builder --win nsis --linux AppImage",
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "test:e2e": "playwright test"
   },
   "build": {
     "appId": "dev.observerlauncher.minecraftservercontrol",
@@ -60,6 +61,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "electron": "^37.2.6",
     "electron-builder": "^26.0.12"
   },
