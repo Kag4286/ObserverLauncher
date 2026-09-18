@@ -14,6 +14,16 @@ async function launchApp() {
   });
   const win = await app.firstWindow();
   await win.waitForLoadState('domcontentloaded');
+  // CI runner screens can be small (GitHub Actions Windows defaults to 1024x768), which trips
+  // the renderer's 1100px responsive breakpoint -> .rail{display:none}, so the left nav is not
+  // visible and click() times out. Grow the window to the app's real default AND force the rail
+  // visible inside that breakpoint (test-only injection; app behaviour is untouched) so the smoke
+  // tests exercise the desktop layout no matter what screen the runner has.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    if (w) w.setSize(1480, 930);
+  });
+  await win.addStyleTag({ content: '@media(max-width:1100px){.rail{display:flex !important}}' });
   return { app, win, userDataDir };
 }
 
