@@ -85,25 +85,44 @@ If you are comfortable with a terminal and want maximum control, you may not nee
 
 ## Screenshots
 
-**Overview** — the control panel: server status, live metrics, quick actions, and how friends can connect.
+Every tab shares one look — a header strip (icon, section label, title, actions) over a single
+surface, so the app feels like one instrument rather than a pile of screens.
+
+**Overview** — the control panel: server identity, live status, TPS/RAM at a glance, quick actions and how friends can connect.
 
 ![ObserverLauncher Overview tab](docs/screenshot-overview.png)
 
-**World Map** — reads your real world save: seed, spawn, player positions, waypoints, and explored chunks.
+**Console** — a dense live terminal with colour-coded levels (warn/error/command), filters and one-click quick commands.
 
-![ObserverLauncher World Map tab](docs/screenshot-worldmap.png)
+![ObserverLauncher Console tab](docs/screenshot-console.png)
 
-**Marketplace** — search Modrinth, Hangar and SpigotMC in one box and install straight into your server folder.
+**Players** — the roster: online/offline, whitelist, bans and operators, with a quick-action bar that works even while the server is stopped.
 
-![ObserverLauncher Marketplace tab](docs/screenshot-marketplace.png)
+![ObserverLauncher Players tab](docs/screenshot-players.png)
 
 **Player inspector** — a two-column view of a player's stats, equipment, inventory and ender chest, with an automatic `.dat` backup before any edit.
 
 ![ObserverLauncher player inspector](docs/screenshot-player-inspector.png)
 
-**Content library** — a collapsible folder tree of every editable config file in the server.
+**Performance** — live telemetry: TPS, MSPT, server CPU and RAM as KPI cards plus history charts and capability-aware diagnostics.
 
-![ObserverLauncher content file browser](docs/screenshot-file-browser.png)
+![ObserverLauncher Performance tab](docs/screenshot-performance.png)
+
+**Content library** — one list with a Plugins / Mods / Datapacks switch and a filter box, so hundreds of jars are a single scroll.
+
+![ObserverLauncher Content tab](docs/screenshot-content.png)
+
+**Marketplace** — search Modrinth, Hangar and SpigotMC in one box, filter by type and version, and install straight into your server folder.
+
+![ObserverLauncher Marketplace tab](docs/screenshot-marketplace.png)
+
+**Worlds & backups** — world folders on top, and a full-width backup timeline with one-click restore and delete.
+
+![ObserverLauncher Worlds and backups tab](docs/screenshot-worlds.png)
+
+**World Map** — reads your real world save: seed, spawn, player positions, waypoints, and explored chunks.
+
+![ObserverLauncher World Map tab](docs/screenshot-worldmap.png)
 
 **Built-in editor** — edit YAML, JSON, TOML and properties files in place, with syntax highlighting and change detection.
 
@@ -250,6 +269,15 @@ That's it. Everything else — plugins, players, backups, the world map — is o
 
 - A single, numbered column for server folder, Java, reliability, preferences and updates.
 - The **Apply button stays pinned** while you scroll, so you never lose it.
+
+### Server schedule
+
+- **Start and stop the server automatically on a daily window** — set an optional start time, an
+  optional stop time, and the weekdays it applies to (leave days empty for every day).
+- Uses the local system clock; if the computer is asleep at the scheduled time the action is skipped.
+- A scheduled stop never interrupts an in-flight backup, and a scheduled start only runs when the
+  server is fully stopped — it never fights a transition already in progress. A scheduled stop is
+  treated as a manual stop, so auto-restart-on-crash will not revive it.
 
 ### Auto-update
 
