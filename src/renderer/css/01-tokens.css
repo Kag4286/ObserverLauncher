@@ -24,6 +24,12 @@
   --slide-x:10px;
   /* DENSITY: instrument rows, not cards. */
   --row-h:34px; --gap:10px; --pad-panel:14px;
+  /* SPACING SCALE (Phase 1 foundation): every padding/gap must use one of these,
+     not an ad-hoc px. s1..s5 grows ~1.4x each step. */
+  --s1:6px; --s2:10px; --s3:14px; --s4:20px; --s5:28px;
+  /* TYPE SCALE (Phase 1): one size per role. h2 (tab/section title), sub (prose),
+     label (mono technical eyebrow). Kills the 17/18/20px and 11/11.5/12px drift. */
+  --fs-tab:18px; --fs-sec:13px; --fs-sub:12px; --fs-label:10px;
 }
 *{box-sizing:border-box} [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;overflow:hidden}

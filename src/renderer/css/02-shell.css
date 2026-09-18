@@ -76,3 +76,28 @@ is active (renderer adds .wco-app to <html>), reserve its width on the right sid
 .glass:hover{border-color:var(--border-hover)}
 .panel{padding:16px} .panel-head{display:flex;justify-content:space-between;gap:10px;align-items:start;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)}
 .panel-head p{margin:0;color:var(--text-muted);font-size:11px}
+
+/* ============ FOUNDATION (Phase 1 redesign) ============ */
+/* One tab header for every tab. Replaces the 8 ad-hoc variants (.content-head,
+   .marketplace-head, .perf-head, .worlds-hero, .settings-hero, .terminal-head, .roster-head).
+   Layout: [square icon] EYEBROW / Title / subtitle            [actions · stat pills]
+   Phase 1 only ADDS this; tabs are migrated one by one in Phase 2. */
+.tab-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s3);margin-bottom:var(--s3);padding-bottom:var(--s3);border-bottom:1px solid var(--border)}
+.tab-head-id{display:flex;gap:var(--s3);align-items:center;min-width:0}
+.tab-head-icon{width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;border-radius:var(--r);background:var(--field);border:1px solid var(--border)}
+.tab-head-icon img{width:26px;height:26px;display:block}
+.tab-head-text{min-width:0}
+.tab-head-text .eyebrow{display:block;margin-bottom:3px}
+.tab-head-text h2{font-size:var(--fs-tab);line-height:1.15}
+.tab-head-text .sub{margin:4px 0 0;color:var(--text-muted);font:500 var(--fs-sub) var(--font-ui);line-height:1.4}
+.tab-head-actions{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;flex-shrink:0}
+@media(max-width:700px){.tab-head{flex-direction:column;align-items:stretch}}
+
+/* One section head inside a panel/card. Replaces .content-card-head, .panel-header,
+   .settings-card-head, .chart-head, .inspect-section-head. */
+.sec-head-v2{display:flex;gap:var(--s2);align-items:center;margin-bottom:var(--s2)}
+.sec-head-v2 .sec-ico{width:36px;height:36px;flex-shrink:0;display:grid;place-items:center;border-radius:var(--r);background:var(--field);border:1px solid var(--border)}
+.sec-head-v2 .sec-ico img{width:22px;height:22px;display:block}
+.sec-head-v2 h3{font-size:var(--fs-sec);margin:0}
+.sec-head-v2 .sub{margin:2px 0 0;color:var(--text-muted);font:500 var(--fs-sub) var(--font-ui)}
+.sec-head-v2 .spacer{flex:1}
