@@ -29,31 +29,15 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **Orphan `.tmp-*` files** left behind by a crash mid atomic-write are now cleaned up at startup
   (`cleanOrphanTmp`), so they no longer accumulate in the user-data folder.
 
-## [0.7.0] — 2026-09-18
-
-### Added
-- **Server scheduler.** Start and stop the server automatically on a daily window: set an
-  optional start time, an optional stop time, and the weekdays it applies to (empty = every day).
-  Configured in Launcher settings → Schedule, with a plain-language summary of the next run.
-  Uses the local system clock; if the computer is asleep at the scheduled time the action is
-  skipped. A scheduled stop never interrupts an in-flight backup, and a scheduled start only runs
-  when the server is fully stopped (it never fights a transition in progress). The scheduled stop
-  is treated as a manual stop, so auto-restart-on-crash does not revive it.
-- New `tests/scheduler.test.js` (27 asserts) covering the time-window, weekday and state gates.
-
-### Changed
-- **Localization completeness.** ~38 user-facing strings that were still hardcoded English —
-  settings validation errors, player op/whitelist/ban toasts, the no-UUID hint, content-import
-  and copy feedback, properties/velocity.toml save messages, the install-close guard, the
-  player-save confirmation and download-cancelled — now go through `t()` and are translated across
-  all 7 locales (i18n now 539 keys). Some remaining English labels inside the create-server wizard
-  and player-row buttons are still pending (planned for 0.7.1).
-
-### Fixed
-- **The create-server wizard now aborts if saving settings fails**, instead of silently continuing
-  to the download step with unsaved/incorrect settings.
-- **Orphan `.tmp-*` files** left behind by a crash mid atomic-write are now cleaned up at startup
-  (`cleanOrphanTmp`), so they no longer accumulate in the user-data folder.
+### Changed — Marketplace redesign
+- **The Marketplace tab was rebuilt for clarity and density.** A hero search bar with **Popular**
+  quick-pick chips (EssentialsX, LuckPerms, ViaVersion, Spark, WorldEdit, Vault), a segmented
+  **Source** control (Modrinth | Hangar | Spigot) replacing the bare dropdown, a single **Sort**
+  dropdown instead of three buttons, and an **active-filter chip** row that shows what is
+  currently narrowing the results. Results are now a responsive **two-column card grid** (one
+  column under 1100px) with icon, title/author, source + kind badges, a clamped description and a
+  downloads + Install footer. Import modpack / Export setup moved into the tab header. 9 new i18n
+  keys across all 7 locales.
 
 ## [0.6.0] — 2026-09-18
 
