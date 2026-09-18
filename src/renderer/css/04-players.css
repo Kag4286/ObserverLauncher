@@ -75,3 +75,9 @@
 @keyframes itemIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
 .inspect-section .item-cell:hover .item-icon{animation:itemFloat .9s ease-in-out infinite alternate}
 @keyframes itemFloat{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+
+/* ============ PLAYERS TAB REDESIGN (0.7.0) ============ */
+/* Header moved to .tab-head; the panel below is now a plain surface (no .glass wrapper). */
+.roster-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:var(--s3) var(--s4);min-height:0}
+.roster-panel .roster-toolbar{margin-bottom:var(--s2)}
+.roster-panel .players-table{margin-top:var(--s3)}
