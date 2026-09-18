@@ -3,6 +3,18 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.7.1] — 2026-09-18
+
+### Changed
+- **README refresh for the 0.7.0 redesign.** The Screenshots section is now a 10-image tour
+  (one description per tab: overview, console, players, player-inspector, performance, content,
+  marketplace, worlds, worldmap, editor), and the feature tour gained a **Server schedule** section.
+  All screenshots re-captured against the redesigned UI.
+
+### Fixed
+- **Marketplace tab eyebrow duplicated the Content tab's.** Both showed "CONTENT BAY"; the
+  Marketplace now reads "PLUGIN STORE" (all 7 locales).
+
 ## [0.7.0] — 2026-09-18
 
 ### Added
