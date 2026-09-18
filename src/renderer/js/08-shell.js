@@ -111,7 +111,7 @@ $('#saveRamOverview').onclick=async()=>{
 };
 $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value;applyLocale();const next={...getSettings(),locale:currentLocale};const r=await window.observer.saveSettings(next);state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();renderJvmPreview();if(!$('#newServerModal').hidden)nswRender();if(!$('#installModal').hidden){imRenderCompat();imRenderWarns()}};
 // Properties tab (search/filter/save) moved to 10-properties.js.
-$('#createBackup').onclick=async()=>{if(!confirm(t('toast.confirmBackup')))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)};
+$('#createBackup').onclick=async()=>{if(!await confirmDialog({title:t('wld.backupsT'),body:t('toast.confirmBackup'),ok:t('wld.create')}))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)};
 // Marketplace state moved to 11-market.js.
 function debounce(fn,ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 // Marketplace search/paging UI moved to 11-market.js.
@@ -119,11 +119,11 @@ window.observer.onBuildDone(v=>{state.files=v.files;refreshUI();toast(v.ok?'Buil
 function manualPlayer(){const name=$('#playerActionName').value.trim();const bad=playerNameError(name);if(bad){toast(bad);return null}return {uuid:null,name}}
 $('#manualOpBtn').onclick=()=>{const p=manualPlayer();if(p)togglePlayerOp(p,true)};
 $('#manualWhitelistBtn').onclick=()=>{const p=manualPlayer();if(p)togglePlayerWhitelist(p,true)};
-$('#manualBanBtn').onclick=()=>{const p=manualPlayer();if(p&&confirm(`Ban ${p.name}?`))togglePlayerBan(p,true)};
-$('#manualKickBtn').onclick=()=>{const p=manualPlayer();if(p&&confirm(`Kick ${p.name}?`))command(`kick ${p.name}`)};
-$('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast(t('toast.choosePlayer'));if(!confirm(t('toast.applyPlayerConfirm',{n:selectedPlayer.name})))return;const changes={health:$('#pdHealth').value,food:$('#pdFood').value,saturation:$('#pdSaturation').value,xpLevel:$('#pdXpLevel').value,xpTotal:$('#pdXpTotal').value,gameType:$('#pdGameType').value};const r=await window.observer.playerSave({uuid:selectedPlayer.uuid,changes,clearInventory:$('#pdClearInventory').checked});if(!r.ok)return toast(r.error);toast(t('toast.playerSaved',{n:r.backup}));refreshUI()};
+$('#manualBanBtn').onclick=async()=>{const p=manualPlayer();if(p&&await confirmDialog({title:t('ply.ban'),body:`Ban ${p.name}?`,ok:t('ply.ban'),danger:true}))togglePlayerBan(p,true)};
+$('#manualKickBtn').onclick=async()=>{const p=manualPlayer();if(p&&await confirmDialog({title:t('ply.kick'),body:`Kick ${p.name}?`,ok:t('ply.kick'),danger:true}))command(`kick ${p.name}`)};
+$('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast(t('toast.choosePlayer'));if(!await confirmDialog({title:t('pd.apply'),body:t('toast.applyPlayerConfirm',{n:selectedPlayer.name}),ok:t('pd.apply')}))return;const changes={health:$('#pdHealth').value,food:$('#pdFood').value,saturation:$('#pdSaturation').value,xpLevel:$('#pdXpLevel').value,xpTotal:$('#pdXpTotal').value,gameType:$('#pdGameType').value};const r=await window.observer.playerSave({uuid:selectedPlayer.uuid,changes,clearInventory:$('#pdClearInventory').checked});if(!r.ok)return toast(r.error);toast(t('toast.playerSaved',{n:r.backup}));refreshUI()};
 $('#startBtn').onclick=async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||t('toast.startUnknown'),'error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast(t('toast.startRequested'))};$('#stopBtn').onclick=async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)};
-$('#forceStopBtn').onclick=async()=>{if(!confirm(t('top.forceStopConfirm')))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')};
+$('#forceStopBtn').onclick=async()=>{if(!await confirmDialog({title:t('top.forceStop'),body:t('top.forceStopConfirm'),ok:t('top.forceStop'),danger:true}))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')};
 window.observer.onLog(addLog);window.observer.onState(v=>{state.running=v.running;state.status=v.status||(v.running?'running':'stopped');
   if(state.status==='running'&&!uptimeStart)uptimeStart=Date.now();else if(state.status==='stopped')uptimeStart=null;
   refreshUI()});window.observer.onFiles(f=>{state.files=f.files||f;state.javaRequired=f.javaRequired??state.javaRequired;refreshUI()});let lastLivePlayersKey='';
@@ -213,7 +213,7 @@ $('#allowFirewall').onclick=async()=>{
     catch{ toast('Run this in a terminal: '+cmd); }
     return;
   }
-  if(!confirm(`Add a Windows Firewall rule allowing inbound TCP traffic on port ${port}? A Windows security prompt (UAC) will appear — approve it to continue.`))return;
+  if(!await confirmDialog({title:t('conn.firewall'),body:`Add a Windows Firewall rule allowing inbound TCP traffic on port ${port}? A Windows security prompt (UAC) will appear — approve it to continue.`,ok:t('conn.firewall')}))return;
   const r=await window.observer.allowFirewall(port);
   if(!r.ok)return toast(r.error,'error');
   toast(`Port ${port} is now allowed through Windows Firewall. You still need to forward it on your router for friends outside your WiFi.`,'success');
@@ -309,7 +309,7 @@ window.observer.onUpdateProgress(p=>{const st=$('#updateStatus');if(st)st.textCo
 window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.ready')+' <button class="btn primary sm" id="installBtn">'+t('upd.install')+'</button>';const b=$('#installBtn');if(b)b.onclick=async()=>{
   // Installing restarts the app, which stops any running server. Warn first so nobody loses an
   // unsaved world without knowing why the launcher is about to close.
-  if(state.running&&!confirm(t('upd.confirmRunning')))return;
+  if(state.running&&!await confirmDialog({title:t('upd.install'),body:t('upd.confirmRunning'),ok:t('upd.install')}))return;
   try{await window.observer.quitInstall();}catch(e){const s=$('#updateStatus');if(s)s.textContent=e?.message||String(e);}
 };});
 window.observer.onUpdateNone&&window.observer.onUpdateNone(()=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.none');});

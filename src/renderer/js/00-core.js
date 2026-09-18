@@ -71,6 +71,35 @@ function playerNameError(name){
 let toastQueue=[],toastTimer=null;
 function toast(message,kind){toastQueue.push({message,kind});if(toastQueue.length>3)toastQueue.shift();flushToast()}
 function flushToast(){if(toastTimer)return;const item=toastQueue.shift();if(!item)return;const el=$('#toast');el.textContent=item.message;el.className='show '+(item.kind||'');toastTimer=setTimeout(()=>{el.classList.remove('show');toastTimer=null;setTimeout(flushToast,80)},2800)}
+// In-app confirm dialog (replaces native confirm()) — same Promise<boolean> shape so call
+// sites read `if(!await confirmDialog(...)) return;`. One overlay reuses for every prompt;
+// the pending resolver is stored so Escape / Cancel / backdrop all resolve false exactly once.
+//   opts: { title, body, ok, cancel, danger }  body may contain trusted HTML (t() output).
+let _cfResolve=null;
+function confirmDialog(opts){
+  opts=opts||{};
+  const m=$('#confirmModal');
+  if(!m) return Promise.resolve(false);
+  $('#cfTitle').textContent=opts.title||t('cf.title');
+  $('#cfBody').innerHTML=opts.body||'';
+  $('#cfOk').textContent=opts.ok||t('cf.ok');
+  $('#cfCancel').textContent=opts.cancel||t('cf.cancel');
+  const ok=$('#cfOk');ok.className='btn '+(opts.danger?'danger':'primary');
+  const ico=$('#cfIco');if(ico)ico.className='confirm-ico'+(opts.danger?' danger':'');
+  const cancel=$('#cfCancel');if(cancel)cancel.hidden=!!opts.hideCancel;
+  m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  setTimeout(()=>ok.focus(),20);
+  return new Promise(resolve=>{_cfResolve=resolve});
+}
+function closeConfirm(result){
+  const m=$('#confirmModal');if(!m||m.hidden)return;
+  m.classList.remove('show');m.hidden=true;
+  if(_cfResolve){const r=_cfResolve;_cfResolve=null;r(!!result)}
+}
+$('#cfOk')?.addEventListener('click',()=>closeConfirm(true));
+$('#cfCancel')?.addEventListener('click',()=>closeConfirm(false));
+$('#confirmModal')?.addEventListener('click',e=>{if(e.target.id==='confirmModal')closeConfirm(false)});
+document.addEventListener('keydown',e=>{const m=$('#confirmModal');if(!m||m.hidden)return;if(e.key==='Escape')closeConfirm(false);else if(e.key==='Enter')closeConfirm(true)});
 function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;const ctx=canvas.getContext('2d');const r=canvas.getBoundingClientRect();if(!r.width||!r.height) return;const d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);const w=r.width,h=r.height,p=expanded?30:13;const cs=getComputedStyle(document.documentElement);const cAccent=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';const cWarn=cs.getPropertyValue('--chart-cpu').trim()||'#d6a24a';const cSuccess=cs.getPropertyValue('--chart-ram').trim()||'#2fd0a0';const cDanger=cs.getPropertyValue('--danger').trim()||'#e5566a';const cMuted=cs.getPropertyValue('--text-dim').trim()||'#5c6470';const cFont=cs.getPropertyValue('--font-ui').trim()||'Space Grotesk, sans-serif';ctx.clearRect(0,0,w,h);
   if(mode==='tick'){
     // Danger band: bottom 25% of the chart (roughly under ~15 TPS / over ~25ms MSPT) tinted red,

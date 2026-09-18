@@ -135,13 +135,13 @@ async function openPlayerInspector(uuid,name){
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
   renderEquipment(d.armor,d.offhand);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);
 }
-$('#playersList').addEventListener('click',e=>{
+$('#playersList').addEventListener('click',async e=>{
   const btn=e.target.closest('[data-row-action]');if(!btn||btn.disabled)return;
   const action=btn.dataset.rowAction,name=btn.dataset.player,uuid=btn.dataset.uuid||null,p={uuid,name};
   if(action==='op')togglePlayerOp(p,btn.dataset.value==='on');
   else if(action==='whitelist')togglePlayerWhitelist(p,btn.dataset.value==='on');
-  else if(action==='ban'){if(btn.dataset.value==='on'&&!confirm(`Ban ${name}?`))return;togglePlayerBan(p,btn.dataset.value==='on')}
-  else if(action==='kick'){const bad=playerNameError(name);if(bad)return toast(bad);if(confirm(`Kick ${name}?`))command(`kick ${name}`)}
+  else if(action==='ban'){if(btn.dataset.value==='on'&&!await confirmDialog({title:t('ply.ban'),body:`Ban ${name}?`,ok:t('ply.ban'),danger:true}))return;togglePlayerBan(p,btn.dataset.value==='on')}
+  else if(action==='kick'){const bad=playerNameError(name);if(bad)return toast(bad);if(await confirmDialog({title:t('ply.kick'),body:`Kick ${name}?`,ok:t('ply.kick'),danger:true}))command(`kick ${name}`)}
   else if(action==='inspect')openPlayerInspector(uuid,name);
 });
 $('#invSearch')?.addEventListener('input',e=>{invSearchQuery=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#invShowEmpty')?.addEventListener('change',e=>{invShowEmpty=e.target.checked;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#invSort')?.addEventListener('change',e=>{invSortBy=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#playerInspectClose').onclick=closePlayerInspectModal;

@@ -41,8 +41,8 @@ async function openEd(rel,from){
   edShow('editor');
   ta.scrollTop=0;ta.focus();
 }
-function closeEd(){
-  if(edState.dirty&&!confirm(t('ed.confirmCloseDirty')))return;
+async function closeEd(){
+  if(edState.dirty&&!await confirmDialog({title:t('ed.title'),body:t('ed.confirmCloseDirty'),ok:t('ed.back')}))return;
   edShow(edState.from==='browser'?'browser':'bays');
   edState={...edState,rel:null,dirty:false,conflict:false};
 }
@@ -65,8 +65,8 @@ function formatEd(){
   try{ta.value=JSON.stringify(JSON.parse(ta.value),null,2);edMarkDirty();edScheduleView();ta.scrollTop=0}
   catch{toast(t('ed.invalidJson'),'error')}
 }
-function reloadEd(){
-  if(edState.dirty&&!confirm(t('ed.confirmReloadDirty')))return;
+async function reloadEd(){
+  if(edState.dirty&&!await confirmDialog({title:t('ed.reload'),body:t('ed.confirmReloadDirty'),ok:t('ed.reload')}))return;
   edState.conflict=false;$('#edConflict').hidden=true;
   openEd(edState.rel,edState.from);
 }

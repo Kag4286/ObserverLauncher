@@ -358,3 +358,15 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 /* Wizard cancel row: progress label + Cancel button on one line. */
 .nsw-progress-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
 .nsw-progress-row .set-progress-label{margin:0}
+
+/* ============ IN-APP CONFIRM DIALOG (0.7.0) ============ */
+/* Replaces native confirm() — matches the black/cyan design system. */
+.confirm-modal{width:min(440px,100%);padding:0;animation:cfIn .16s var(--ease)}
+@keyframes cfIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+.confirm-head{display:flex;gap:12px;align-items:center;padding:16px 18px 0}
+.confirm-ico{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);color:var(--accent);font:700 16px var(--font-mono)}
+.confirm-ico.danger{background:var(--danger-weak);border-color:rgba(255,59,92,.3);color:var(--danger)}
+.confirm-head h2{font-size:16px}
+.confirm-body{margin:12px 18px 0;color:var(--text-muted);font:500 13px var(--font-ui);line-height:1.55}
+.confirm-body code{color:var(--accent);font:500 12px var(--font-mono)}
+.confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:18px}
