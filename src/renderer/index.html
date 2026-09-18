@@ -187,16 +187,22 @@
       </div>
     </section>
     <section id="marketplace" class="tab">
-      <div class="marketplace-head"><div><h2 data-i18n="mkt.title">Marketplace</h2><p class="text-muted" data-i18n="mkt.sub">Official Modrinth, Hangar and Spigot — install directly to your server folder</p></div><div class="marketplace-head-actions"><span class="stat-pill" id="marketplaceCount">—</span></div></div>
-      <div class="panel glass marketplace-controls">
-        <div class="market-search-bar"><span class="search-icon">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. ViaVersion, Spark, LuckPerms, WorldEdit"><button class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
-        <div class="market-filters">
-          <label><span data-i18n="mkt.source">Source</span><select id="marketSource"><option value="modrinth">Modrinth</option><option value="hangar">Hangar</option><option value="spigot">Spigot</option></select></label>
-          <label><span data-i18n="mkt.type">Type</span><select id="marketKind"><option value="plugin">Plugin (Paper/Purpur)</option><option value="forge">Forge / NeoForge mod</option><option value="fabric">Fabric mod</option><option value="datapack">Datapack</option><option value="modpack">Modpack (full pack)</option></select></label>
-          <label><span data-i18n="mkt.version">Version</span><select id="marketVersion"><option value="">All versions</option></select></label>
-          <div class="market-picks"><button class="btn secondary market-sort active" data-sort="downloads" data-i18n="mkt.sortDl">Most downloaded</button><button class="btn secondary market-sort" data-sort="latest" data-i18n="mkt.sortLatest">Latest</button><button class="btn secondary market-sort" data-sort="all" data-i18n="mkt.sortRel">All / relevance</button></div>
-        </div>
+      <div class="marketplace-head">
+        <div><p class="eyebrow" data-i18n="eyebrow.market">CONTENT BAY</p><h2 data-i18n="mkt.title">Marketplace</h2><p class="text-muted" data-i18n="mkt.sub">Official Modrinth, Hangar and Spigot — install directly to your server folder</p></div>
+        <div class="marketplace-head-actions"><button class="btn secondary sm" id="importModpack" data-i18n="mkt.importPack">Import modpack</button><button class="btn secondary sm" id="exportModpack" data-i18n="mkt.exportPack">Export setup</button><span class="stat-pill" id="marketplaceCount">—</span></div>
       </div>
+      <div class="market-hero">
+        <div class="market-search-bar"><span class="search-icon">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. ViaVersion, Spark, LuckPerms, WorldEdit"><button class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
+        <div class="market-quick"><span class="market-quick-label" data-i18n="mkt.popular">Popular</span><button class="quick-chip" data-quick="EssentialsX">EssentialsX</button><button class="quick-chip" data-quick="LuckPerms">LuckPerms</button><button class="quick-chip" data-quick="ViaVersion">ViaVersion</button><button class="quick-chip" data-quick="Spark">Spark</button><button class="quick-chip" data-quick="WorldEdit">WorldEdit</button><button class="quick-chip" data-quick="Vault">Vault</button></div>
+      </div>
+      <div class="market-toolbar">
+        <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button></div>
+        <input type="hidden" id="marketSource" value="modrinth">
+        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="forge" data-i18n="mkt.forgeType">Forge / NeoForge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion"><option value="">All versions</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
+      </div>
+      <div id="marketChips" class="market-chips" hidden></div>
       <div id="marketStatus" class="market-status" data-i18n="mkt.searching">Loading popular results…</div>
       <div id="marketResults" class="market-results"></div>
       <div id="marketPager" class="market-pager" hidden><button class="btn secondary" id="marketPrev" data-i18n="mkt.prev">← Previous</button><span id="marketPageLabel">Page 1</span><button class="btn secondary" id="marketNext" data-i18n="mkt.next">Next →</button></div>
