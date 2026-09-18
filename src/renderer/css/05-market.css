@@ -361,3 +361,11 @@
 .content-list li[hidden]{display:none!important}
 .content-list li .file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 @media(max-width:700px){.content-toolbar-actions{margin-left:0;width:100%}.content-search{max-width:none}}
+
+/* ============ WORLDS TAB REDESIGN (0.7.0) ============ */
+/* Two full-width stacked sections (worlds on top, backups below) instead of a split grid —
+   the backup timeline gets the whole width, worlds (usually 3 folders) stay a compact row. */
+.wld-section{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:var(--s3) var(--s4);margin-bottom:var(--s3)}
+.wld-section:last-child{margin-bottom:0}
+.wld-section .sec-note{margin-top:var(--s2)}
+.wld-section .bk-timeline{max-height:none}

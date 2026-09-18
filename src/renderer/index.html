@@ -201,32 +201,24 @@
     </section>
     <section id="worlds" class="tab">
       <div id="worldsProxyNotice" class="proxy-notice" hidden data-i18n-html="wld.proxyNotice">This server is a <b>proxy (Velocity)</b> — it doesn't have worlds or backups of its own. Manage worlds on the backend servers it connects to instead.</div>
-      <div class="flat-wrap">
-        <header class="flat-head">
-          <div class="flat-head-id"><span class="hero-icon big"><img src="./assets/icons/ui/cube.svg" alt=""></span><div><p class="eyebrow" data-i18n="eyebrow.storage">STORAGE</p><h2 data-i18n="wld.title">Worlds &amp; backups</h2><p class="sub" data-i18n="wld.sub">World folders and ZIP snapshots — stored locally inside your server folder.</p></div></div>
-          <div class="flat-stats">
-            <div class="flat-stat"><b id="worldsCountPill">0</b><small>WORLDS</small></div>
-            <div class="flat-stat accent"><b id="backupsCountPill">0</b><small>BACKUPS</small></div>
-          </div>
-        </header>
-        <div class="flat-cols">
-          <div class="flat-col">
-            <div class="flat-sec">
-              <div class="sec-head"><img src="./assets/icons/ui/cube.svg" alt=""><h3 data-i18n="wld.foldersT">World folders</h3><small data-i18n-html="wld.foldersHint">from <code>level-name</code></small><span class="spacer"></span><button class="btn sm secondary" data-open="." data-i18n="wld.serverFolder">Server folder ↗</button></div>
-              <div id="worldsList" class="wld-list"></div>
-            </div>
-          <div class="sec-note" data-i18n-html="wld.note">Folders live on disk — change <code>level-name</code> in Server properties to switch worlds.</div>
-          </div>
-          <div class="flat-col">
-            <div class="flat-sec">
-              <div class="sec-head"><img src="./assets/icons/ui/coin.svg" alt=""><h3 data-i18n="wld.backupsT">Backups</h3><small data-i18n="wld.backupsHint"><code>save-off</code> safe</small><span class="spacer"></span><button class="btn sm primary" id="createBackup" data-i18n="wld.create">+ Create backup</button></div>
-              <div class="wld-tools"><div id="autoBackupStatus" class="auto-backup-status"></div><div id="backupsTotal" class="backups-total"></div></div>
-              <div id="backupsList" class="bk-timeline"></div>
-              <div class="backup-empty" id="backupEmpty" hidden><span class="backup-empty-icon">◈</span><b data-i18n="wld.noBackups">No backups yet</b><span data-i18n-html="wld.noBackupsSub">Create your first snapshot — the server is saved (<code>save-all</code>) before the zip starts.</span></div>
-            </div>
-          </div>
+      <header class="tab-head">
+        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/cube.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.storage">STORAGE</p><h2 data-i18n="wld.title">Worlds &amp; backups</h2><p class="sub" data-i18n="wld.sub">World folders and ZIP snapshots — stored locally inside your server folder.</p></div></div>
+        <div class="flat-stats">
+          <div class="flat-stat"><b id="worldsCountPill">0</b><small>WORLDS</small></div>
+          <div class="flat-stat accent"><b id="backupsCountPill">0</b><small>BACKUPS</small></div>
         </div>
-      </div>
+      </header>
+      <section class="wld-section">
+        <div class="sec-head-v2"><span class="sec-ico"><img src="./assets/icons/ui/cube.svg" alt=""></span><div><h3 data-i18n="wld.foldersT">World folders</h3><p class="sub" data-i18n-html="wld.foldersHint">from <code>level-name</code></p></div><span class="spacer"></span><button class="btn sm secondary" data-open="." data-i18n="wld.serverFolder">Server folder ↗</button></div>
+        <div id="worldsList" class="wld-list"></div>
+        <div class="sec-note" data-i18n-html="wld.note">Folders live on disk — change <code>level-name</code> in Server properties to switch worlds.</div>
+      </section>
+      <section class="wld-section">
+        <div class="sec-head-v2"><span class="sec-ico"><img src="./assets/icons/ui/coin.svg" alt=""></span><div><h3 data-i18n="wld.backupsT">Backups</h3><p class="sub" data-i18n-html="wld.backupsHint"><code>save-off</code> safe</p></div><span class="spacer"></span><button class="btn sm primary" id="createBackup" data-i18n="wld.create">+ Create backup</button></div>
+        <div class="wld-tools"><div id="autoBackupStatus" class="auto-backup-status"></div><div id="backupsTotal" class="backups-total"></div></div>
+        <div id="backupsList" class="bk-timeline"></div>
+        <div class="backup-empty" id="backupEmpty" hidden><span class="backup-empty-icon">◈</span><b data-i18n="wld.noBackups">No backups yet</b><span data-i18n-html="wld.noBackupsSub">Create your first snapshot — the server is saved (<code>save-all</code>) before the zip starts.</span></div>
+      </section>
     </section>
         <section id="worldmap" class="tab">
           <div class="flat-head">
