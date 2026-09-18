@@ -331,6 +331,20 @@
               </div>
             </div>
           </section>
+          <!-- Schedule -->
+          <section class="flat-cell flat-span2">
+            <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="sch.title">Schedule</h3><small data-i18n="sch.sub">Start and stop the server automatically at set times</small></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="sch.enable">Enable scheduler</b><small data-i18n="sch.enableSub">Uses this PC's local clock. If the computer is asleep at the scheduled time, the action is skipped.</small></div><label class="switch"><input type="checkbox" id="scheduleEnabledInput"><span class="slider"></span></label></div>
+            <div id="scheduleFields" class="restart-grid" hidden>
+              <label><span data-i18n="sch.startT">Start at</span><input id="scheduleStartInput" type="time"><small data-i18n="sch.startSub">Leave empty to disable auto-start</small></label>
+              <label><span data-i18n="sch.stopT">Stop at</span><input id="scheduleStopInput" type="time"><small data-i18n="sch.stopSub">Leave empty to disable auto-stop</small></label>
+            </div>
+            <div id="scheduleDaysRow" class="schedule-days-row set-chips" hidden>
+              <span class="hint" data-i18n="sch.days">Days</span>
+              <button type="button" class="filter-chip" data-day="1" data-i18n="sch.day1">Mon</button><button type="button" class="filter-chip" data-day="2" data-i18n="sch.day2">Tue</button><button type="button" class="filter-chip" data-day="3" data-i18n="sch.day3">Wed</button><button type="button" class="filter-chip" data-day="4" data-i18n="sch.day4">Thu</button><button type="button" class="filter-chip" data-day="5" data-i18n="sch.day5">Fri</button><button type="button" class="filter-chip" data-day="6" data-i18n="sch.day6">Sat</button><button type="button" class="filter-chip" data-day="0" data-i18n="sch.day0">Sun</button>
+            </div>
+            <div id="scheduleNext" class="field-hint" hidden></div>
+          </section>
           <!-- Updates -->
           <section class="flat-cell flat-span2">
             <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>

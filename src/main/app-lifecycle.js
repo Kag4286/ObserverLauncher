@@ -7,6 +7,7 @@ const { detectJava } = require('./java.js');
 const { serverFiles } = require('./server-files.js');
 const { startMetrics } = require('./server-lifecycle.js');
 const { startAutoBackupWatcher } = require('./backups.js');
+const { startScheduler } = require('./scheduler.js');
 const textures = require('./textures');
 
 async function createWindow(ctx) {
@@ -62,6 +63,7 @@ function setupQuitHandler(ctx) {
     clearInterval(ctx.sampleTimer);
     clearInterval(ctx.autoPollTimer);
     clearInterval(ctx.autoBackupTimer);
+    clearInterval(ctx.schedulerTimer);
     if (quitHandled || (!ctx.serverProcess && !ctx.buildProcess)) return;
     event.preventDefault();
     quitHandled = true;
@@ -91,6 +93,7 @@ async function initApp(ctx, ipcMain) {
   ctx.javaInfo = await detectJava(loadSettings().javaPath || 'java');
   startMetrics(ctx);
   startAutoBackupWatcher(ctx);
+  startScheduler(ctx);
 }
 
 module.exports = { killTree, createWindow, setupAutoUpdater, setupQuitHandler, initApp };

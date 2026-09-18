@@ -33,6 +33,8 @@ function createContext() {
     restartTimer: null,
     restartAttempts: 0,
     autoBackupTimer: null,
+    schedulerTimer: null,
+    schedulerLastFired: { start: null, stop: null },
     backupInProgress: false,
     lastAutoBackupAt: 0,
     buildProcess: null,
