@@ -3,6 +3,58 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.7.0] — 2026-09-18
+
+### Added
+- **Server scheduler.** Start and stop the server automatically on a daily window: set an
+  optional start time, an optional stop time, and the weekdays it applies to (empty = every day).
+  Configured in Launcher settings → Schedule, with a plain-language summary of the next run.
+  Uses the local system clock; if the computer is asleep at the scheduled time the action is
+  skipped. A scheduled stop never interrupts an in-flight backup, and a scheduled start only runs
+  when the server is fully stopped (it never fights a transition in progress). The scheduled stop
+  is treated as a manual stop, so auto-restart-on-crash does not revive it.
+- New `tests/scheduler.test.js` (27 asserts) covering the time-window, weekday and state gates.
+
+### Changed
+- **Localization completeness.** ~38 user-facing strings that were still hardcoded English —
+  settings validation errors, player op/whitelist/ban toasts, the no-UUID hint, content-import
+  and copy feedback, properties/velocity.toml save messages, the install-close guard, the
+  player-save confirmation and download-cancelled — now go through `t()` and are translated across
+  all 7 locales (i18n now 539 keys). Some remaining English labels inside the create-server wizard
+  and player-row buttons are still pending (planned for 0.7.1).
+
+### Fixed
+- **The create-server wizard now aborts if saving settings fails**, instead of silently continuing
+  to the download step with unsaved/incorrect settings.
+- **Orphan `.tmp-*` files** left behind by a crash mid atomic-write are now cleaned up at startup
+  (`cleanOrphanTmp`), so they no longer accumulate in the user-data folder.
+
+## [0.7.0] — 2026-09-18
+
+### Added
+- **Server scheduler.** Start and stop the server automatically on a daily window: set an
+  optional start time, an optional stop time, and the weekdays it applies to (empty = every day).
+  Configured in Launcher settings → Schedule, with a plain-language summary of the next run.
+  Uses the local system clock; if the computer is asleep at the scheduled time the action is
+  skipped. A scheduled stop never interrupts an in-flight backup, and a scheduled start only runs
+  when the server is fully stopped (it never fights a transition in progress). The scheduled stop
+  is treated as a manual stop, so auto-restart-on-crash does not revive it.
+- New `tests/scheduler.test.js` (27 asserts) covering the time-window, weekday and state gates.
+
+### Changed
+- **Localization completeness.** ~38 user-facing strings that were still hardcoded English —
+  settings validation errors, player op/whitelist/ban toasts, the no-UUID hint, content-import
+  and copy feedback, properties/velocity.toml save messages, the install-close guard, the
+  player-save confirmation and download-cancelled — now go through `t()` and are translated across
+  all 7 locales (i18n now 539 keys). Some remaining English labels inside the create-server wizard
+  and player-row buttons are still pending (planned for 0.7.1).
+
+### Fixed
+- **The create-server wizard now aborts if saving settings fails**, instead of silently continuing
+  to the download step with unsaved/incorrect settings.
+- **Orphan `.tmp-*` files** left behind by a crash mid atomic-write are now cleaned up at startup
+  (`cleanOrphanTmp`), so they no longer accumulate in the user-data folder.
+
 ## [0.6.0] — 2026-09-18
 
 ### Added
