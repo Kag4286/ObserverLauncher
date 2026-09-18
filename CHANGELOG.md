@@ -15,12 +15,33 @@ All notable changes to ObserverLauncher are documented here. Format follows
   is treated as a manual stop, so auto-restart-on-crash does not revive it.
 - New `tests/scheduler.test.js` (27 asserts) covering the time-window, weekday and state gates.
 
-### Changed
+### Changed — full UI/UX redesign
+- **One consistent tab header everywhere.** Eight ad-hoc header styles (`.content-head`,
+  `.marketplace-head`, `.perf-head`, `.worlds-hero`, `.settings-hero`, `.roster-head`, `.flat-head`,
+  `.terminal-head`) collapsed into a single **`.tab-head`** component (icon + eyebrow + title +
+  subtitle + actions). Applied to Content, Worlds, Players, Performance, Settings, World Map,
+  Marketplace and Properties. Overview (hero dashboard) and Console (terminal) keep their bespoke,
+  function-specific headers by design.
+- **Design-language foundation.** Added spacing (`--s1..--s5`) and type (`--fs-tab/sec/sub/label`)
+  scales plus a canonical `.sec-head-v2` section header, so panels stop drifting in size/radius.
+- **Content tab reworked for large plugin/mod sets.** The old three narrow columns (each with its
+  own tiny scroll) are gone — now a single tall list with a **Plugins | Mods | Datapacks**
+  segmented switch and a **filter box**, so hundreds of jars are one scroll, not three.
+- **Worlds & backups** now stack as two full-width sections (worlds on top, the backup timeline
+  below at full width) instead of a cramped split grid.
+- **Marketplace rebuilt** for clarity and density: hero search with **Popular** quick-pick chips
+  (EssentialsX, LuckPerms, ViaVersion, Spark, WorldEdit, Vault), a segmented **Source** control
+  (Modrinth | Hangar | Spigot), a single **Sort** dropdown, an **active-filter chip** row, and a
+  responsive **two-column card grid** of results (icon, title/author, source + kind badges, clamped
+  description, downloads + Install).
+- **Native `confirm()` dialogs replaced** by an in-app, on-brand confirm dialog (`confirmDialog()`)
+  across all 16 call sites — backup, restore, delete, ban, kick, force-stop, firewall, update
+  install, editor close/reload and content-import-while-running no longer show the white OS chrome.
 - **Localization completeness.** ~38 user-facing strings that were still hardcoded English —
   settings validation errors, player op/whitelist/ban toasts, the no-UUID hint, content-import
   and copy feedback, properties/velocity.toml save messages, the install-close guard, the
   player-save confirmation and download-cancelled — now go through `t()` and are translated across
-  all 7 locales (i18n now 539 keys). Some remaining English labels inside the create-server wizard
+  all 7 locales (i18n now 555 keys). Some remaining English labels inside the create-server wizard
   and player-row buttons are still pending (planned for 0.7.1).
 
 ### Fixed
@@ -28,16 +49,9 @@ All notable changes to ObserverLauncher are documented here. Format follows
   to the download step with unsaved/incorrect settings.
 - **Orphan `.tmp-*` files** left behind by a crash mid atomic-write are now cleaned up at startup
   (`cleanOrphanTmp`), so they no longer accumulate in the user-data folder.
-
-### Changed — Marketplace redesign
-- **The Marketplace tab was rebuilt for clarity and density.** A hero search bar with **Popular**
-  quick-pick chips (EssentialsX, LuckPerms, ViaVersion, Spark, WorldEdit, Vault), a segmented
-  **Source** control (Modrinth | Hangar | Spigot) replacing the bare dropdown, a single **Sort**
-  dropdown instead of three buttons, and an **active-filter chip** row that shows what is
-  currently narrowing the results. Results are now a responsive **two-column card grid** (one
-  column under 1100px) with icon, title/author, source + kind badges, a clamped description and a
-  downloads + Install footer. Import modpack / Export setup moved into the tab header. 9 new i18n
-  keys across all 7 locales.
+- **Duplicate element IDs in the Marketplace header** (`importModpack` / `exportModpack`) collided
+  with the Content tab's buttons, so only one of each pair was wired — the other silently did
+  nothing. Removed the duplicates.
 
 ## [0.6.0] — 2026-09-18
 
