@@ -39,8 +39,8 @@ document.addEventListener('input',e=>{const el=e.target;if(el&&(el.closest?.('#p
 $('#saveProperties').onclick=async()=>{
   if(isProxyServer()){
     const raw=$('#propertiesRaw').value;
-    if(raw.length>200000) return toast('velocity.toml is too large (>200KB) — check for accidental paste','error');
-    const r=await window.observer.saveRawProperties(raw);if(r.ok)propsDirty=false;return r.ok?toast('velocity.toml saved. Restart the proxy to apply changes.','success'):toast(r.error||'Choose and apply a server folder first.','error');
+    if(raw.length>200000) return toast(t('toast.tomlBig'),'error');
+    const r=await window.observer.saveRawProperties(raw);if(r.ok)propsDirty=false;return r.ok?toast(t('toast.tomlSaved'),'success'):toast(r.error||t('toast.propsFolder'),'error');
   }
   const p={}; let firstInvalid=null;
   const validators={
@@ -65,5 +65,5 @@ $('#saveProperties').onclick=async()=>{
     }
   });
   if(firstInvalid){ firstInvalid.focus(); return; }
-  const r=await window.observer.saveProperties(p);if(r.ok){propsDirty=false;state.files.properties=p;loadConnectInfo();toast('server.properties updated. Restart server to apply most changes.','success')}else toast('Choose and apply a server folder first.','error')
+  const r=await window.observer.saveProperties(p);if(r.ok){propsDirty=false;state.files.properties=p;loadConnectInfo();toast(t('toast.propsSaved'),'success')}else toast(t('toast.propsFolder'),'error')
 };

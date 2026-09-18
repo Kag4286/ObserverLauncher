@@ -294,7 +294,7 @@ function wmJump(x,z){wm.cam={x,z};wmDraw()}
 function wmGoTo(){
   const el=$('#wmGotoInput');if(!el)return;
   const nums=String(el.value).match(/-?\d+(?:\.\d+)?/g);
-  if(!nums||nums.length<2){toast('Enter coordinates like 120 -340');return}
+  if(!nums||nums.length<2){toast(t('wm.badCoords'));return}
   wmJump(Number(nums[0]),Number(nums[1]));
 }
 $('#wmGotoBtn')?.addEventListener('click',wmGoTo);
@@ -368,7 +368,7 @@ async function wmAddWaypoint(x,z){
   const wp={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,x:Math.round(x),y:64,z:Math.round(z),dim:wm.dim,color:WM_COLORS[wm.waypoints.length%WM_COLORS.length]};
   wm.waypoints.push(wp);
   const r=await window.observer.worldmapSetWaypoints(wm.waypoints);
-  if(!r||!r.ok) toast('Could not save waypoint','error');
+  if(!r||!r.ok) toast(t('toast.wpSaveFail'),'error');
   else toast(name+' ✓','success');
   wmRenderList();wmDraw();
   wmJump(x,z);

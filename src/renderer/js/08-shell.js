@@ -55,7 +55,7 @@ function switchTab(tab){
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
   if(tab==='worldmap'&&typeof wmLoad==='function')wmLoad().catch(e=>toast(`World Map failed to load: ${e?.message||e}`,'error'));
 }
-async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast('Invalid command — single line only.');const r=await window.observer.command(c);if(!r.ok)toast(r.error)}
+async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t('toast.cmdInvalid'));const r=await window.observer.command(c);if(!r.ok)toast(r.error)}
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
 function renderRecentCommands(){const wrap=$('#recentCommands'),group=$('#recentCommandsGroup');if(!wrap||!group)return;if(!cmdHistory.length){group.hidden=true;return}group.hidden=false;wrap.innerHTML='';cmdHistory.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.title=c;b.onclick=()=>command(c);wrap.append(b)})}
@@ -68,7 +68,7 @@ $('#nav')?.addEventListener('keydown', e=>{
   else if(e.key==='Home'){ e.preventDefault(); items[0]?.focus(); }
   else if(e.key==='End'){ e.preventDefault(); items[items.length-1]?.focus(); }
 });
-$$('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));$$('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));$$('[data-command]').forEach(b=>b.onclick=()=>{pushCmdHistory(b.dataset.command);command(b.dataset.command)});$$('[data-open]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.open));$$('[data-import]').forEach(b=>b.onclick=async()=>{const r=await window.observer.importContent(b.dataset.import);if(r.ok){state.files=r.files;refreshUI();toast('Content imported. Restart the server before using it.')}else if(!r.cancelled)toast(r.error)});
+$$('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));$$('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));$$('[data-command]').forEach(b=>b.onclick=()=>{pushCmdHistory(b.dataset.command);command(b.dataset.command)});$$('[data-open]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.open));$$('[data-import]').forEach(b=>b.onclick=async()=>{const r=await window.observer.importContent(b.dataset.import);if(r.ok){state.files=r.files;refreshUI();toast(t('toast.importedRestart'))}else if(!r.cancelled)toast(r.error)});
 $('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#welcomeCreateBtn')?.addEventListener('click', async()=>{ const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'}); if(folder) openNewServerWizard(); });$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
 $$('.log-filters .filter-chip').forEach(chip=>chip.onclick=()=>{
   logFilter=chip.dataset.logFilter;
@@ -91,13 +91,13 @@ $('#saveSettings').onclick=async()=>{
   const folderInput=$('#serverFolderInput'), javaInput=$('#javaPathInput');
   if(folderInput) folderInput.style.borderColor='';
   if(javaInput) javaInput.style.borderColor='';
-  if(!next.serverPath){ if(folderInput){ folderInput.style.borderColor='var(--danger)'; folderInput.focus(); } return toast('Server folder is required — choose a folder or create a new server.','error'); }
-  if(next.memoryMax < next.memoryMin) return toast('Maximum memory must be at least minimum memory.','error');
-  if(next.memoryMax>32) return toast('Maximum memory is very high (>32GB) — ensure your PC has enough RAM.','error');
-  if(next.memoryMin<1) return toast('Minimum memory must be at least 1GB.','error');
-  if(next.jvmArgs && next.jvmArgs.length>2000) return toast('JVM arguments are too long (>2000 chars).','error');
-  if(next.jvmArgs && /["'<>|]/.test(next.jvmArgs)) return toast('JVM arguments contain invalid characters.','error');
-  if(state.java?.arch==='32-bit' && next.memoryMax>2) return toast('32-bit Java detected — cannot allocate >2GB RAM. Install 64-bit Java or lower Maximum memory.','error');
+  if(!next.serverPath){ if(folderInput){ folderInput.style.borderColor='var(--danger)'; folderInput.focus(); } return toast(t('set.errFolderReq'),'error'); }
+  if(next.memoryMax < next.memoryMin) return toast(t('set.errMemOrder'),'error');
+  if(next.memoryMax>32) return toast(t('set.errMemHigh'),'error');
+  if(next.memoryMin<1) return toast(t('set.errMemMin'),'error');
+  if(next.jvmArgs && next.jvmArgs.length>2000) return toast(t('set.errJvmLong'),'error');
+  if(next.jvmArgs && /["'<>|]/.test(next.jvmArgs)) return toast(t('set.errJvmChars'),'error');
+  if(state.java?.arch==='32-bit' && next.memoryMax>2) return toast(t('set.errJava32'),'error');
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(r.error,'error');
   if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
@@ -106,7 +106,7 @@ $('#saveSettings').onclick=async()=>{
 };
 $('#saveRamOverview').onclick=async()=>{
   const next=getSettings();
-  if(next.memoryMax<next.memoryMin)return toast('Maximum memory must be at least minimum memory.','error');
+  if(next.memoryMax<next.memoryMin)return toast(t('set.errMemOrder'),'error');
   const r=await window.observer.saveSettings(next);state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
 };
 $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value;applyLocale();const next={...getSettings(),locale:currentLocale};const r=await window.observer.saveSettings(next);state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();renderJvmPreview();if(!$('#newServerModal').hidden)nswRender();if(!$('#installModal').hidden){imRenderCompat();imRenderWarns()}};
@@ -121,8 +121,8 @@ $('#manualOpBtn').onclick=()=>{const p=manualPlayer();if(p)togglePlayerOp(p,true
 $('#manualWhitelistBtn').onclick=()=>{const p=manualPlayer();if(p)togglePlayerWhitelist(p,true)};
 $('#manualBanBtn').onclick=()=>{const p=manualPlayer();if(p&&confirm(`Ban ${p.name}?`))togglePlayerBan(p,true)};
 $('#manualKickBtn').onclick=()=>{const p=manualPlayer();if(p&&confirm(`Kick ${p.name}?`))command(`kick ${p.name}`)};
-$('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast('Choose a player with offline data first.');if(!confirm(`Apply player data for ${selectedPlayer.name}? ObserverLauncher will create a backup first.`))return;const changes={health:$('#pdHealth').value,food:$('#pdFood').value,saturation:$('#pdSaturation').value,xpLevel:$('#pdXpLevel').value,xpTotal:$('#pdXpTotal').value,gameType:$('#pdGameType').value};const r=await window.observer.playerSave({uuid:selectedPlayer.uuid,changes,clearInventory:$('#pdClearInventory').checked});if(!r.ok)return toast(r.error);toast(`Player data saved; backup: ${r.backup}`);refreshUI()};
-$('#startBtn').onclick=async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||'Start failed for an unknown reason.','error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast('Server start requested. Check Console for output.')};$('#stopBtn').onclick=async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)};
+$('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast(t('toast.choosePlayer'));if(!confirm(t('toast.applyPlayerConfirm',{n:selectedPlayer.name})))return;const changes={health:$('#pdHealth').value,food:$('#pdFood').value,saturation:$('#pdSaturation').value,xpLevel:$('#pdXpLevel').value,xpTotal:$('#pdXpTotal').value,gameType:$('#pdGameType').value};const r=await window.observer.playerSave({uuid:selectedPlayer.uuid,changes,clearInventory:$('#pdClearInventory').checked});if(!r.ok)return toast(r.error);toast(t('toast.playerSaved',{n:r.backup}));refreshUI()};
+$('#startBtn').onclick=async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||t('toast.startUnknown'),'error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast(t('toast.startRequested'))};$('#stopBtn').onclick=async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)};
 $('#forceStopBtn').onclick=async()=>{if(!confirm(t('top.forceStopConfirm')))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')};
 window.observer.onLog(addLog);window.observer.onState(v=>{state.running=v.running;state.status=v.status||(v.running?'running':'stopped');
   if(state.status==='running'&&!uptimeStart)uptimeStart=Date.now();else if(state.status==='stopped')uptimeStart=null;
@@ -219,13 +219,13 @@ $('#allowFirewall').onclick=async()=>{
   toast(`Port ${port} is now allowed through Windows Firewall. You still need to forward it on your router for friends outside your WiFi.`,'success');
 };
 $$('[data-copy]').forEach(b=>b.onclick=async()=>{
-  const input=$(b.dataset.copy);if(!input||!input.value||input.value==='—')return toast('Nothing to copy yet.');
+  const input=$(b.dataset.copy);if(!input||!input.value||input.value==='—')return toast(t('toast.nothingToCopy'));
   try{
     await navigator.clipboard.writeText(input.value);
     const orig=b.textContent; b.textContent='Copied!'; b.classList.add('copied');
     toast(t('toast.copied'),'success');
     setTimeout(()=>{b.textContent=orig; b.classList.remove('copied')}, 1400);
-  }catch{toast('Could not copy — select and copy manually.','error')}
+  }catch{toast(t('toast.copyFailed'),'error')}
 });
 
 // FEATURE: one-click portable Java install — shown only when Java isn't already detected, so
@@ -271,7 +271,7 @@ $('#obCreateNew').onclick=async()=>{
 // Wizard state/functions moved to 12-wizard.js.
 function formatBytes(n){if(n==null)return'';if(n<1024)return`${n} B`;if(n<1024*1024)return`${(n/1024).toFixed(0)} KB`;return`${(n/1024/1024).toFixed(1)} MB`}
 // Wizard UI (nsw*) moved to 12-wizard.js.
-$('#newServerClose').onclick=()=>{if($('#nswNext').disabled)return toast('Wait for the download to finish before closing this.','error'); closeOverlayAnimated($('#newServerModal'));};
+$('#newServerClose').onclick=()=>{if($('#nswNext').disabled)return toast(t('toast.waitDownload'),'error'); closeOverlayAnimated($('#newServerModal'));};
 // FEATURE: generic modal dismissal — Escape key, or clicking the dimmed backdrop outside the modal
 // card, closes whichever .modal-overlay is currently open. Covers every current and future modal from
 // one place instead of each modal needing its own escape-hatch wiring (see the note above on why that

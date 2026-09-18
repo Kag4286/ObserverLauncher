@@ -171,7 +171,7 @@ function openInstallModal(item){
     const b2=$('#imInstall');b2.disabled=false;b2.textContent='Install';
   });
 }
-function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast('Wait for the install to finish — closing now would leave a half-written file.','error');if(m.hidden)return;m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent='Install'}
+function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast(t('toast.waitInstall'),'error');if(m.hidden)return;m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent='Install'}
 $('#imClose').onclick=closeInstallModal;
 $('#imCancel').onclick=closeInstallModal;
 $('#imInstall').onclick=()=>{if(installState.done)return closeInstallModal();if(installState.busy)return;startInstall()};

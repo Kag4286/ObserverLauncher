@@ -194,7 +194,7 @@ $('#nswNext').onclick=async()=>{
   const sr=await window.observer.saveSettings(settingsNext);state={...state,settings:settingsNext,java:sr.java};
   const r=await window.observer.wizardCreate({software,version});
   $('#nswNext').disabled=false;$('#nswNext').textContent=t(nsw.step===4?'nsw.create':'nsw.next');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;
-  if(!r.ok){ if(/cancel/i.test(r.error||'')){ toast('Download cancelled.'); return; } toast(r.error,'error');return }
+  if(!r.ok){ if(/cancel/i.test(r.error||'')){ toast(t('toast.downloadCancelled')); return; } toast(r.error,'error');return }
   $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla'};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
   if(r.building){toast(`${r.name} started in the background — this can take several minutes. Watch the Console tab for progress.`);switchTab('console');return}
   state.files=r.files;refreshUI();switchTab('overview');
