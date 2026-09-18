@@ -340,3 +340,24 @@
 .market-item .mi-foot small{font:500 10px var(--font-mono);color:var(--text-dim)}
 .market-item .mi-foot .btn{margin-left:auto;padding:8px 16px}
 @media(max-width:700px){.market-item{grid-template-columns:48px 1fr}.market-item .market-icon{width:48px;height:48px}.market-item .mi-foot .btn{margin-left:0;width:100%}}
+
+/* ============ CONTENT TAB REDESIGN (0.7.0) ============ */
+.content-toolbar{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;margin-bottom:var(--s2)}
+.content-seg{display:inline-flex;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r);padding:3px;gap:2px}
+.content-seg .seg{font:600 12px var(--font-ui);padding:7px 16px;border:0;border-radius:calc(var(--r) - 2px);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .12s var(--ease)}
+.content-seg .seg:hover{color:var(--text)}
+.content-seg .seg.active{background:var(--accent);color:var(--accent-ink);box-shadow:0 0 12px var(--accent-weak)}
+.content-search{position:relative;display:flex;align-items:center;flex:1;min-width:160px;max-width:340px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r);padding:0 10px}
+.content-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.content-search .search-icon{color:var(--text-dim);font-size:14px}
+.content-search input{flex:1;background:transparent;border:0;color:var(--text);font:12px var(--font-ui);outline:0;padding:9px 6px;min-width:0}
+.content-toolbar-actions{display:flex;gap:var(--s2);align-items:center;margin-left:auto;flex-wrap:wrap}
+/* One tall list — grows with the viewport, no per-column scroll. */
+.content-listwrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.content-list{list-style:none;margin:0;padding:0;max-height:none;border:0;border-radius:0;background:transparent;overflow:auto;min-height:120px}
+.content-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);font:500 12.5px var(--font-mono);background:transparent;transition:background .1s}
+.content-list li:last-child{border-bottom:0}
+.content-list li:hover{background:var(--panel-raised)}
+.content-list li[hidden]{display:none!important}
+.content-list li .file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+@media(max-width:700px){.content-toolbar-actions{margin-left:0;width:100%}.content-search{max-width:none}}

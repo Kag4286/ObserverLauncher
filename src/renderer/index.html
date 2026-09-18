@@ -112,31 +112,23 @@
         <span class="ed-entry-arrow">→</span>
       </div>
       <div class="flat-wrap" id="contentBays">
-        <div class="flat-cols cols3">
-          <div class="flat-col">
-            <div class="flat-sec">
-              <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="cnt.plugins">Plugins</h3><small data-i18n="cnt.pluginsHint">Paper · Purpur · Leaf</small></div>
-              <ul id="pluginsList" class="file-list"></ul>
-              <div class="sec-actions"><button class="btn sm primary" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button><button class="text-btn" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button></div>
-              <div class="sec-actions"><button class="text-btn" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button></div>
-            </div>
+        <div class="content-toolbar">
+          <div class="content-seg" id="contentSeg" role="tablist" aria-label="Content type">
+            <button type="button" class="seg active" data-ckind="plugin" data-i18n="cnt.plugins">Plugins</button>
+            <button type="button" class="seg" data-ckind="mod" data-i18n="cnt.mods">Mods</button>
+            <button type="button" class="seg" data-ckind="datapack" data-i18n="cnt.datapacks">Datapacks</button>
           </div>
-          <div class="flat-col">
-            <div class="flat-sec">
-              <div class="sec-head"><img src="./assets/icons/ui/shield.svg" alt=""><h3 data-i18n="cnt.mods">Mods</h3><small data-i18n="cnt.modsHint">Forge · NeoForge · Fabric</small></div>
-              <ul id="modsList" class="file-list"></ul>
-              <div class="sec-actions"><button class="btn sm primary" data-import="mod" data-i18n="cnt.importJar">Import .jar</button><button class="text-btn" data-open="mods" data-i18n="cnt.open">Open folder ↗</button></div>
-              <div class="sec-actions"><button class="text-btn" data-market-jump="mod" data-i18n="cnt.market">Browse Marketplace →</button></div>
-            </div>
+          <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…"></div>
+          <div class="content-toolbar-actions">
+            <button class="btn sm primary" id="contentImport" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button>
+            <button class="text-btn" id="contentOpen" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button>
+            <button class="text-btn" id="contentMarket" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button>
           </div>
-          <div class="flat-col">
-            <div class="flat-sec">
-              <div class="sec-head"><img src="./assets/icons/ui/grid.svg" alt=""><h3 data-i18n="cnt.datapacks">Datapacks</h3><small><code>world/datapacks</code></small></div>
-              <ul id="datapacksList" class="file-list"></ul>
-              <div class="sec-actions"><button class="btn sm primary" data-import="datapack" data-i18n="cnt.importZip">Import .zip</button><button class="text-btn" data-open="world/datapacks" data-i18n="cnt.open">Open folder ↗</button></div>
-              <div class="sec-actions"><button class="text-btn" data-market-jump="datapack" data-i18n="cnt.market">Browse Marketplace →</button></div>
-            </div>
-          </div>
+        </div>
+        <div class="content-listwrap">
+          <ul id="pluginsList" class="file-list content-list"></ul>
+          <ul id="modsList" class="file-list content-list" hidden></ul>
+          <ul id="datapacksList" class="file-list content-list" hidden></ul>
         </div>
         <div class="sec-note center" data-i18n="cnt.restart">New files load on the next server start — the launcher never hot-swaps content while running.</div>
         <div class="flat-grid2">
