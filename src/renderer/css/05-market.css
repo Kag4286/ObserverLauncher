@@ -369,3 +369,7 @@
 .wld-section:last-child{margin-bottom:0}
 .wld-section .sec-note{margin-top:var(--s2)}
 .wld-section .bk-timeline{max-height:none}
+
+/* ============ SETTINGS TAB REDESIGN (0.7.0) ============ */
+/* Header is now .tab-head but must stay sticky within the scrolling settings list. */
+#settingsHead{position:sticky;top:0;z-index:6;margin-bottom:0;border-radius:var(--r-lg) var(--r-lg) 0 0;box-shadow:0 6px 16px rgba(0,0,0,.28)}

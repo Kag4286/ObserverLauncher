@@ -227,13 +227,13 @@
       </section>
     </section>
         <section id="worldmap" class="tab">
-          <div class="flat-head">
-            <div class="flat-head-id"><span class="hero-icon big"><img src="./assets/icons/ui/folder.svg" alt=""></span><div><p class="eyebrow" data-i18n="wm.eyebrow">CARTOGRAPHY</p><h2 data-i18n="nav.worldmap">World Map</h2><p class="sub" id="wmInfo" data-i18n="wm.info">Real data from your world save — seed, spawn, players and your waypoints.</p></div></div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <header class="tab-head">
+            <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/folder.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="wm.eyebrow">CARTOGRAPHY</p><h2 data-i18n="nav.worldmap">World Map</h2><p class="sub" id="wmInfo" data-i18n="wm.info">Real data from your world save — seed, spawn, players and your waypoints.</p></div></div>
+            <div class="tab-head-actions">
               <button class="btn sm secondary" id="wmReload" data-i18n="ed.reload">Reload</button>
               <button class="btn sm secondary" id="wmCopySeed" data-i18n="wm.copySeed">Copy seed</button>
             </div>
-          </div>
+          </header>
           <div id="wmNoWorld" class="flat-wrap" hidden><div class="wld-none" style="padding:40px 14px"><img src="./assets/icons/ui/grid.svg" alt=""><div><b data-i18n="wm.noWorldT">No world found</b><span data-i18n="wm.noWorldS">Start the server once — level.dat appears in the server folder and the map comes alive.</span></div><button class="btn secondary sm" id="wmReload2" data-i18n="ed.reload">Reload</button></div></div>
           <div id="wmApp" class="flat-wrap" hidden>
             <div class="wm-toolbar">
@@ -285,8 +285,8 @@
     </section>
     <section id="settings" class="tab">
       <div class="flat-wrap">
-        <header class="flat-head">
-          <div class="flat-head-id"><span class="hero-icon big"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" data-i18n="set.sub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
+        <header class="tab-head" id="settingsHead">
+          <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" data-i18n="set.sub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
           <button class="btn primary" id="saveSettings" data-i18n="set.apply">Apply settings</button>
         </header>
         <div class="flat-grid2">
