@@ -4,7 +4,7 @@
 // exact version picker, warnings and byte progress replace the old native confirm() prompts.
 // Card grid: icon + title/author + source/kind badges + clamped description + meta foot + Install.
 // The kind badge class carries the colour (plugin/mod/datapack), source badge shows the registry.
-function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel glass market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';return `<article class="panel glass market-item"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||'Unknown author')}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span></div><p>${esc(x.description||'No description')}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small><button class="btn primary" data-market-install="${i}">Install</button></div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
+function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel glass market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';return `<article class="panel glass market-item"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span></div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small><button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button></div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
   const item=items[Number(b.dataset.marketInstall)];
   openInstallModal(item);
 })}
@@ -40,12 +40,12 @@ function imRenderCompat(){
   if(item.kind==='modpack'&&chosen){
     const gv=chosen.gameVersions||[];
     const match=!gameV||gv.includes(gameV);
-    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(match,gv.length?[...gv].reverse().slice(0,3).join(', '):'—',!match)}${match?'':`<small class="im-sub">server: ${esc(gameV||'unknown')}</small>`}</div>`);
+    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(match,gv.length?[...gv].reverse().slice(0,3).join(', '):'—',!match)}${match?'':`<small class="im-sub">${t('mkt.serverShort',{v:esc(gameV||'unknown')})}</small>`}</div>`);
     const ld=(chosen.loaders||[]).filter(l=>!/datapack|minecraft/i.test(l));
     const loaderOk=srv.loader==='unknown'?null:(ld.length?ld.some(l=>l===srv.loader||(srv.loader==='paper'&&/paper|spigot|bukkit/.test(l))):null);
     cells.push(`<div class="im-compat-cell"><small>LOADER</small>${imBadge(ld.length?(loaderOk===null?null:loaderOk):null,ld.length?ld.join(' / '):'vanilla',loaderOk===false)}</div>`);
   } else {
-    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(gameV?(chosen?(chosen.gameVersions||[]).includes(gameV):null):null,gameV||'all versions',chosen&&gameV&&!(chosen.gameVersions||[]).includes(gameV))}</div>`);
+    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(gameV?(chosen?(chosen.gameVersions||[]).includes(gameV):null):null,gameV||t('mkt.allVersionsShort'),chosen&&gameV&&!(chosen.gameVersions||[]).includes(gameV))}</div>`);
     const itemLoaders=item.loaders||[];
     const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind]||null;
@@ -88,7 +88,7 @@ function imRenderWarns(){
     const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind];
     if(wanted&&itemLoaders.length&&srv.loader!=='unknown'&&!itemLoaders.some(l=>wanted.includes(srv.loader)&&wanted.includes(l))&&!wanted.includes(srv.loader))warns.push(t('im.warnLoader',{l:esc(itemLoaders.join('/')),s:esc(srv.loader)}));
-    warns.push(`Installs into <code>${esc(item.kind==='datapack'?(state.files?.datapackFolder||'world/datapacks'):item.kind==='mod'?'mods':'plugins')}/</code> — restart the server to load it.`);
+    warns.push(t('mkt.installsInto',{p:esc(item.kind==='datapack'?(state.files?.datapackFolder||'world/datapacks'):item.kind==='mod'?'mods':'plugins')}));
   }
   el.innerHTML=warns.map(w=>`<li>${w}</li>`).join('');
   $('#imWarnSection').hidden=!warns.length;
@@ -101,7 +101,7 @@ function imSetBusy(busy,phase,label){
   btn.disabled=busy;cancel.disabled=busy;
   $('#imClose').disabled=busy;
   prog.hidden=!busy&&!installState.done;
-  if(busy){btn.textContent='Installing…';$('#imPhase').textContent=phase||'DOWNLOADING';if(label)$('#imBarLabel').textContent=label}
+  if(busy){btn.textContent=t('im.installing');$('#imPhase').textContent=phase||t('im.downloading');if(label)$('#imBarLabel').textContent=label}
 }
 function imRenderVersionPicker(){
   const sec=$('#imVersionSection'),sel=$('#imVersion');
@@ -119,7 +119,7 @@ function imSetDone(r){
   $('#imBar').style.width='100%';$('#imBar').classList.add('ok');
   $('#imBarLabel').textContent=(r.installed!=null?`${r.installed} file(s) installed${r.skipped?`, ${r.skipped} client-only skipped`:''}`:(r.name||'OK'))+t('im.restartNote');
   $('#imFileWrap').hidden=true;
-  const btn=$('#imInstall');btn.disabled=false;btn.textContent='Close';
+  const btn=$('#imInstall');btn.disabled=false;btn.textContent=t('im.close');
   $('#imCancel').hidden=true;
   $('#imNote').textContent='';
   state.files=r.files||state.files;refreshUI();
@@ -127,7 +127,7 @@ function imSetDone(r){
 function imSetError(msg){
   installState.busy=false;
   const card=$('#installModal .im');if(card)card.classList.remove('installing');
-  const btn=$('#imInstall');btn.disabled=false;btn.textContent='Retry';
+  const btn=$('#imInstall');btn.disabled=false;btn.textContent=t('im.retry');
   $('#imCancel').hidden=false;$('#imCancel').disabled=false;$('#imClose').disabled=false;
   $('#imProgressSection').hidden=false;
   $('#imPhase').textContent=t('im.failed');
@@ -143,15 +143,15 @@ async function startInstall(){
     if(item.kind==='modpack')r=await window.observer.installMarketModpack({id:item.id,version:item.version,versionId:versionId||undefined});
     else r=await window.observer.marketInstall({...item,versionId:versionId||undefined});
     if(r.ok){imSetDone(r);toast(t('toast.installed',{n:r.name||item.title}),'success')}
-    else imSetError(r.error||'Install failed.');
-  }catch(e){imSetError(e?.message||'Install failed.')}
+    else imSetError(r.error||t('mkt.installFailed'));
+  }catch(e){imSetError(e?.message||t('mkt.installFailed'))}
 }
 function openInstallModal(item){
   installState={item,detail:null,versionId:null,busy:false,done:false};
   const card=$('#installModal .im');if(card)card.classList.remove('installing','success');
   $('#installModal').hidden=false;
   $('#imTitle').textContent=item.title||'—';
-  $('#imMeta').textContent=`${item.author||'Unknown author'} · ${item.source} · ${Number(item.downloads||0).toLocaleString()} downloads`;
+  $('#imMeta').textContent=`${item.author||t('mkt.unknownAuthor')} · ${item.source} · ${t('mkt.downloads',{n:Number(item.downloads||0).toLocaleString()})}`;
   $('#imKind').textContent=item.kind;
   $('#imDesc').textContent=item.description||'';
   $('#imIcon').src=item.icon||'';
@@ -159,21 +159,21 @@ function openInstallModal(item){
   $('#imNote').textContent='';
   $('#imProgressSection').hidden=true;
   $('#imBar').classList.remove('ok','bad');
-  const btn=$('#imInstall');btn.disabled=true;btn.textContent='Loading…';
+  const btn=$('#imInstall');btn.disabled=true;btn.textContent=t('mkt.loading');
   $('#imCancel').hidden=false;$('#imCancel').disabled=false;$('#imClose').disabled=false;
-  $('#imCompat').innerHTML='<span class="nsw2-chiploading">Checking compatibility…</span>';
+  $('#imCompat').innerHTML=`<span class="nsw2-chiploading">${t('mkt.checkingCompat')}</span>`;
   $('#imWarns').innerHTML='';
   window.observer.marketDetail(item).then(d=>{
     if(installState.item!==item)return; // modal was reopened for another item meanwhile
-    if(!d||!d.ok){$('#imCompat').innerHTML=`<span class="im-badge bad">Could not load details: ${esc(d?.error||'unknown')}</span>`;const b2=$('#imInstall');b2.disabled=false;b2.textContent='Install anyway';return}
+    if(!d||!d.ok){$('#imCompat').innerHTML=`<span class="im-badge bad">${t('mkt.couldNotLoad',{m:esc(d?.error||'unknown')})}</span>`;const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.installAnyway');return}
     installState.detail=d;
     imRenderVersionPicker();
     installState.versionId=installState.detail.versions?.[0]?.id||null;
     imRenderCompat();imRenderWarns();
-    const b2=$('#imInstall');b2.disabled=false;b2.textContent='Install';
+    const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.install');
   });
 }
-function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast(t('toast.waitInstall'),'error');if(m.hidden)return;m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent='Install'}
+function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast(t('toast.waitInstall'),'error');if(m.hidden)return;m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent=t('mkt.install')}
 $('#imClose').onclick=closeInstallModal;
 $('#imCancel').onclick=closeInstallModal;
 $('#imInstall').onclick=()=>{if(installState.done)return closeInstallModal();if(installState.busy)return;startInstall()};

@@ -45,6 +45,12 @@ function createContext() {
     edWatcher: null,
     edWatchMtime: 0,
     edWatchDebounce: null,
+    // Public tunnel (src/main/tunnel.js): Playit agent process + state, null until started.
+    tunnelProcess: null,
+    tunnelProvider: null,
+    tunnelStatus: 'stopped',
+    tunnelAddress: null,
+    tunnelClaimUrl: null,
     // MCP integration (src/mcp/server.js): HTTP server + token, null until started.
     mcpServer: null,
     mcpToken: null,

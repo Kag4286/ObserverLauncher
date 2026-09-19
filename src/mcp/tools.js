@@ -12,8 +12,9 @@ const { readLevel, readPlayers, readWaypoints } = require('../main/worldmap.js')
 const { localIPv4s } = require('../main/network.js');
 const { requiredJavaForJar } = require('../main/java.js');
 const editor = require('../main/editor.js');
-const { json, withTimeout } = require('../main/http.js');
+const { json } = require('../main/http.js');
 const { importMrpackFromPath } = require('../main/modpacks.js');
+const { searchMarket } = require('../main/marketplace.js');
 
 const ok = r => (r && typeof r === 'object' && 'ok' in r) ? r : { ok: true, result: r };
 const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server folder selected.'); return ctx.currentServerPath; };
@@ -120,37 +121,17 @@ async function tGetNetworkInfo(ctx) {
 }
 async function tGetJavaInfo(ctx) { return { ok: true, result: ctx.javaInfo || null }; }
 async function tSearchMarketplace(ctx, a) {
+  // Delegates to the SAME search the GUI marketplace uses (src/main/marketplace.js), so Modrinth,
+  // Hangar and Spigot are all supported and the facet/loader logic never drifts between the two.
   const source = a.source || 'modrinth';
   const kind = a.kind || 'plugin';
   const query = String(a.query || '').trim();
   const version = a.version || '';
   const sort = a.sort || 'downloads';
-  if (source !== 'modrinth') return { ok: false, error: 'Only source=modrinth is supported by the MCP search tool for now.' };
-  // Facets mirror src/main/marketplace.js: Modrinth expects an array of OR-groups (each inner
-  // array = alternatives). Building it as string-quoted fragments (the old code) produced a
-  // double-encoded, wrong filter. Plugin/mod loaders use the same groups the GUI search uses.
-  const loaderGroups = {
-    plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
-    forge: ['loaders:forge', 'loaders:neoforge'],
-    fabric: ['loaders:fabric', 'loaders:quilt'],
-  };
-  const filters = [];
-  if (kind === 'modpack') filters.push(['project_type:modpack']);
-  else if (kind === 'datapack') filters.push(['project_type:datapack']);
-  else {
-    filters.push(['project_type:mod']);
-    filters.push(loaderGroups[kind] || loaderGroups.plugin);
-  }
-  if (version) filters.push(['versions:' + version]);
-  let url = 'https://api.modrinth.com/v2/search?query=' + encodeURIComponent(query) + '&limit=20&index=' + (sort === 'latest' ? 'newest' : 'downloads') + '&facets=' + encodeURIComponent(JSON.stringify(filters));
-  const { signal, cancel } = withTimeout(15000);
+  const offset = Number(a.offset) || 0;
   try {
-    const r = await fetch(url, { signal });
-    const d = await r.json();
-    const items = (d.hits || []).map(h => ({ id: h.project_id, title: h.title, description: h.description, author: h.author, downloads: h.downloads, icon: h.icon_url, source: 'modrinth' }));
-    return { ok: true, result: { total: d.total_hits, items } };
+    return { ok: true, result: await searchMarket({ source, kind, query, version, sort, offset }) };
   } catch (e) { return { ok: false, error: e?.message || 'Search failed.' }; }
-  finally { cancel(); }
 }
 async function tListMarketVersions(ctx, a) {
   const id = String(a.id || '');
@@ -239,6 +220,7 @@ const SETTABLE = {
   autoBackupMinutes: v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1440,
   locale: v => typeof v === 'string' && v.length <= 10,
   jvmArgs: v => typeof v === 'string' && v.length <= 2000 && !/["'<>|]/.test(v),
+  playitPath: v => typeof v === 'string' && v.length <= 500,
 };
 async function tSetSetting(ctx, a) {
   const key = String(a.key || '');
@@ -386,6 +368,51 @@ async function tRestoreBackup(ctx, a) {
   return ok(r);
 }
 
+async function tGetSchedule(ctx) {
+  const s = loadSettings();
+  return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };
+}
+async function tSetSchedule(ctx, a) {
+  const { parseTime } = require('../main/scheduler.js');
+  const { saveSettings } = require('../main/settings.js');
+  const VALID_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const s = loadSettings();
+  if (a.enabled !== undefined) {
+    if (typeof a.enabled !== 'boolean') return { ok: false, error: 'enabled must be a boolean.' };
+    s.scheduleEnabled = a.enabled;
+  }
+  if (a.startTime !== undefined) {
+    if (a.startTime !== '' && !parseTime(a.startTime)) return { ok: false, error: 'startTime must be HH:MM (24h) or empty.' };
+    s.scheduleStartTime = String(a.startTime);
+  }
+  if (a.stopTime !== undefined) {
+    if (a.stopTime !== '' && !parseTime(a.stopTime)) return { ok: false, error: 'stopTime must be HH:MM (24h) or empty.' };
+    s.scheduleStopTime = String(a.stopTime);
+  }
+  if (a.days !== undefined) {
+    if (!Array.isArray(a.days) || a.days.some(d => !VALID_DAYS.includes(String(d).toLowerCase()))) {
+      return { ok: false, error: 'days must be an array of ' + VALID_DAYS.join('/') + ' (empty = every day).' };
+    }
+    s.scheduleDays = a.days.map(d => String(d).toLowerCase());
+  }
+  saveSettings(s);
+  return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };
+}
+async function tListWaypoints(ctx) {
+  const root = ctx.currentServerPath;
+  if (!root) return { ok: false, error: 'Choose and apply a server folder first.' };
+  const { readWaypoints } = require('../main/worldmap.js');
+  return { ok: true, result: readWaypoints(root) };
+}
+async function tKickPlayer(ctx, a) {
+  const name = String(a.name || '').trim();
+  if (!name) return { ok: false, error: 'name is required.' };
+  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) return { ok: false, error: 'Invalid player name — use 3-16 letters, numbers or underscores.' };
+  if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
+  ctx.serverProcess.stdin.write('kick ' + name + '\r\n');
+  return { ok: true, result: { kicked: name } };
+}
+
 const S = (props, required) => ({ type: 'object', properties: props || {}, required: required || [] });
 const STR = desc => ({ type: 'string', description: desc });
 
@@ -405,7 +432,7 @@ const TOOLS = [
   { name: 'list_backups', risk: 'read', description: 'Backup files with size + date.', inputSchema: S(), handler: tListBackups },
   { name: 'get_network_info', risk: 'read', description: 'LAN IPs and server port.', inputSchema: S(), handler: tGetNetworkInfo },
   { name: 'get_java_info', risk: 'read', description: 'Detected Java version/path/arch.', inputSchema: S(), handler: tGetJavaInfo },
-  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth for plugins/mods/datapacks/modpacks.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), version: STR('MC version'), sort: STR('downloads|latest') }), handler: tSearchMarketplace },
+  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar or Spigot for plugins/mods/datapacks/modpacks.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot (default modrinth)'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
   { name: 'list_market_versions', risk: 'read', description: 'Versions of a Modrinth project.', inputSchema: S({ id: STR('project id/slug') }, ['id']), handler: tListMarketVersions },
   { name: 'start_server', risk: 'write', description: 'Start the server.', inputSchema: S(), handler: tStartServer },
   { name: 'send_console_command', risk: 'write', description: 'Send one command to the running server.', inputSchema: S({ command: STR('single-line command') }, ['command']), handler: tSendCommand },
@@ -415,8 +442,12 @@ const TOOLS = [
   { name: 'edit_file', risk: 'write', description: 'Replace oldString with newString in a file.', inputSchema: S({ path: STR('relative path'), oldString: STR('exact text'), newString: STR('replacement') }, ['path', 'oldString', 'newString']), handler: tEditFile },
   { name: 'create_backup', risk: 'write', description: 'Create a world backup (ZIP).', inputSchema: S(), handler: tCreateBackup },
   { name: 'get_settings', risk: 'read', description: 'Read launcher settings (RAM, Java, auto-restart, locale, backup interval).', inputSchema: S(), handler: tGetSettings },
+  { name: 'get_schedule', risk: 'read', description: 'Read the server schedule (enabled, start/stop time, weekdays).', inputSchema: S(), handler: tGetSchedule },
+  { name: 'list_waypoints', risk: 'read', description: 'List World Map waypoints (id, name, x, z, dimension).', inputSchema: S(), handler: tListWaypoints },
   { name: 'install_java', risk: 'write', description: 'Download and install a portable Java runtime (Adoptium) matching the server needs.', inputSchema: S(), handler: tInstallJava },
   { name: 'set_setting', risk: 'write', description: 'Change one launcher setting (memoryMin/Max, autoRestart, autoEula, autoBackupMinutes, locale, jvmArgs). serverPath is NOT settable.', inputSchema: S({ key: STR('setting name'), value: { description: 'new value' } }, ['key', 'value']), handler: tSetSetting },
+  { name: 'set_schedule', risk: 'write', description: 'Set the server schedule. Any of enabled (bool), startTime/stopTime (HH:MM 24h or ""), days (array of mon..sun, empty = every day).', inputSchema: S({ enabled: { type: 'boolean', description: 'true = scheduler on' }, startTime: STR('HH:MM (24h) or empty to disable'), stopTime: STR('HH:MM (24h) or empty to disable'), days: { type: 'array', items: { type: 'string' }, description: 'weekdays mon..sun (empty = every day)' } }), handler: tSetSchedule },
+  { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name') }, ['name']), handler: tKickPlayer },
   { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack from Modrinth.', inputSchema: S({ id: STR('project id/slug'), kind: STR('plugin|mod|datapack'), versionId: STR('exact version id') }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },

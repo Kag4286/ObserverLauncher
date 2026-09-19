@@ -56,5 +56,15 @@ const rf = getTool('read_file');
 check('read_file requires path', (rf.inputSchema.required || []).includes('path'));
 check('read_file path is string', rf.inputSchema.properties.path.type === 'string');
 
+// --- 0.9.0 additions ---
+check('get_schedule is read', getTool('get_schedule')?.risk === 'read');
+check('set_schedule is write', getTool('set_schedule')?.risk === 'write');
+check('list_waypoints is read', getTool('list_waypoints')?.risk === 'read');
+check('kick_player is write', getTool('kick_player')?.risk === 'write');
+check('kick_player requires name', (getTool('kick_player').inputSchema.required || []).includes('name'));
+// search_marketplace now advertises a source param (Modrinth/Hangar/Spigot parity)
+check('search_marketplace has source param', 'source' in (getTool('search_marketplace').inputSchema.properties || {}));
+check('search_marketplace has offset param', 'offset' in (getTool('search_marketplace').inputSchema.properties || {}));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

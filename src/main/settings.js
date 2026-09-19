@@ -25,7 +25,7 @@ function loadSettings() {
     return migrated;
   } catch {
     const { min, max } = defaultMemoryGB();
-    return { version: latestVersion, serverPath: '', javaPath: '', memoryMin: min, memoryMax: max, jvmArgs: '', autoEula: true, onboarded: false, autoRestart: false, autoRestartMaxAttempts: 3, autoRestartDelaySeconds: 5, autoBackupMinutes: 0, locale: 'en', scheduleEnabled: false, scheduleStartTime: '', scheduleStopTime: '', scheduleDays: [], mcpEnabled: false, mcpAutoAllowWrite: false };
+    return { version: latestVersion, serverPath: '', javaPath: '', memoryMin: min, memoryMax: max, jvmArgs: '', autoEula: true, onboarded: false, autoRestart: false, autoRestartMaxAttempts: 3, autoRestartDelaySeconds: 5, autoBackupMinutes: 0, locale: 'en', scheduleEnabled: false, scheduleStartTime: '', scheduleStopTime: '', scheduleDays: [], mcpEnabled: false, mcpAutoAllowWrite: false, playitPath: '' };
   }
 }
 function saveSettings(settings) {

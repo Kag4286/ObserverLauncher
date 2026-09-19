@@ -6,6 +6,54 @@ const path = require('path');
 const { serverFiles } = require('./server-files.js');
 const { safeTarget, recordManifestEntry } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
+
+// Pure marketplace search shared by the IPC handler (GUI) and the MCP search_marketplace tool, so
+// both support the same three sources and never drift. Caller is responsible for try/catch.
+async function searchMarket(opts) {
+  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0 } = opts || {};
+  const skip = Math.max(0, Number(offset) || 0);
+  if (source === 'modrinth') {
+    const loaderGroups = {
+      plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
+      forge: ['loaders:forge', 'loaders:neoforge'],
+      fabric: ['loaders:fabric', 'loaders:quilt'],
+    };
+    const index = sort === 'latest' ? 'newest' : sort === 'downloads' ? 'downloads' : 'relevance';
+    let lastTotal = null;
+    const runSearch = async filters => {
+      const facets = encodeURIComponent(JSON.stringify(filters));
+      const data = await json(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&index=${index}&facets=${facets}`);
+      lastTotal = data.total_hits ?? null;
+      return data.hits || [];
+    };
+    let hits, relaxed = null;
+    if (kind === 'modpack') {
+      hits = await runSearch([['project_type:modpack']]);
+    } else if (kind === 'datapack') {
+      hits = await runSearch([['project_type:datapack']]);
+      if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['loaders:datapack']]); if (hits.length) relaxed = 'loader'; }
+      if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['categories:datapack']]); if (hits.length) relaxed = 'loader'; }
+    } else {
+      const loaderGroup = loaderGroups[kind] || loaderGroups.plugin;
+      let filters = [['project_type:mod'], loaderGroup];
+      if (version) filters.push([`versions:${version}`]);
+      hits = await runSearch(filters);
+      if (!hits.length && skip === 0 && version) { hits = await runSearch([['project_type:mod'], loaderGroup]); if (hits.length) relaxed = 'version'; }
+      if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod']]); if (hits.length) relaxed = 'loader'; }
+    }
+    return { ok: true, relaxed, total: lastTotal, items: hits.map(x => ({ source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: x.env || null, loaders: x.loaders || [], date: x.date_created || null })) };
+  }
+  if (source === 'hangar') {
+    const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updatedAt' : '-stars';
+    const data = await json(`https://hangar.papermc.io/api/v1/projects?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&sort=${encodeURIComponent(order)}`);
+    const rows = data.result || data.projects || [];
+    return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, version })) };
+  }
+  const page = Math.floor(skip / 20) + 1;
+  const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=20&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
+  return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: x.author?.username || 'Spigot author', description: x.tag || x.description || '', downloads: x.downloads || 0, version })) };
+}
+
 function registerMarketplace(ipcMain, ctx) {
   ipcMain.handle('market:versions', async () => {
     try {
@@ -15,50 +63,8 @@ function registerMarketplace(ipcMain, ctx) {
     } catch (error) { return marketplaceError(error); }
   });
 
-  ipcMain.handle('market:search', async (_, { source, kind, query, version, sort, offset }) => {
-    const skip = Math.max(0, Number(offset) || 0);
-    try {
-      if (source === 'modrinth') {
-        const loaderGroups = {
-          plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
-          forge: ['loaders:forge', 'loaders:neoforge'],
-          fabric: ['loaders:fabric', 'loaders:quilt'],
-        };
-        const index = sort === 'latest' ? 'newest' : sort === 'downloads' ? 'downloads' : 'relevance';
-        let lastTotal = null;
-        const runSearch = async filters => {
-          const facets = encodeURIComponent(JSON.stringify(filters));
-          const data = await json(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&index=${index}&facets=${facets}`);
-          lastTotal = data.total_hits ?? null;
-          return data.hits || [];
-        };
-        let hits, relaxed = null;
-        if (kind === 'modpack') {
-          hits = await runSearch([['project_type:modpack']]);
-        } else if (kind === 'datapack') {
-          hits = await runSearch([['project_type:datapack']]);
-          if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['loaders:datapack']]); if (hits.length) relaxed = 'loader'; }
-          if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['categories:datapack']]); if (hits.length) relaxed = 'loader'; }
-        } else {
-          const loaderGroup = loaderGroups[kind] || loaderGroups.plugin;
-          let filters = [['project_type:mod'], loaderGroup];
-          if (version) filters.push([`versions:${version}`]);
-          hits = await runSearch(filters);
-          if (!hits.length && skip === 0 && version) { hits = await runSearch([['project_type:mod'], loaderGroup]); if (hits.length) relaxed = 'version'; }
-          if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod']]); if (hits.length) relaxed = 'loader'; }
-        }
-        return { ok: true, relaxed, total: lastTotal, items: hits.map(x => ({ source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: x.env || null, loaders: x.loaders || [], date: x.date_created || null })) };
-      }
-      if (source === 'hangar') {
-        const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updatedAt' : '-stars';
-        const data = await json(`https://hangar.papermc.io/api/v1/projects?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&sort=${encodeURIComponent(order)}`);
-        const rows = data.result || data.projects || [];
-        return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, version })) };
-      }
-      const page = Math.floor(skip / 20) + 1;
-      const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=20&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
-      return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: x.author?.username || 'Spigot author', description: x.tag || x.description || '', downloads: x.downloads || 0, version })) };
-    } catch (error) { return marketplaceError(error); }
+  ipcMain.handle('market:search', async (_, opts) => {
+    try { return await searchMarket(opts); } catch (error) { return marketplaceError(error); }
   });
 
   ipcMain.handle('market:detail', async (_, item) => {
@@ -117,4 +123,4 @@ function registerMarketplace(ipcMain, ctx) {
   });
 }
 
-module.exports = { registerMarketplace };
+module.exports = { registerMarketplace, searchMarket };

@@ -19,18 +19,18 @@ async function runMarketSearch(page){
   if(seq!==marketReqSeq)return; // a newer request superseded this one — drop the stale response
   $('#marketSearch').disabled=false;$('#marketSort').disabled=false;status.classList.remove('loading'); status.removeAttribute('aria-busy'); $('#marketResults').removeAttribute('aria-busy');
   if(!r.ok){
-    status.textContent=`Could not load results: ${r.error}`;
+    status.textContent=t('mkt.couldNotLoadResults',{m:r.error});
     const n=$('#marketResults');
-    n.innerHTML=`<article class="panel glass"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>Could not load marketplace</b><p class="text-muted" style="margin:4px 0 0">${esc(r.error)}</p></div><button class="btn primary" onclick="document.getElementById('marketSearch').click()">Retry</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">Check your internet — Modrinth/Hangar/Spiget need online. Try switching Source to Modrinth.</p></article>`;
+    n.innerHTML=`<article class="panel glass"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>${t('mkt.couldNotLoadMarket')}</b><p class="text-muted" style="margin:4px 0 0">${esc(r.error)}</p></div><button class="btn primary" onclick="document.getElementById('marketSearch').click()">${t('mkt.retry')}</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">${t('mkt.checkInternet')}</p></article>`;
     $('#marketPager').hidden=true;
-    const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent='error';
+    const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent=t('mkt.error');
     toast(r.error,'error');return;
   }
   marketItems=r.items.map(x=>({...x,kind}));
   marketTotal=r.total??null;
   marketHasNext=marketTotal!=null?page*20<marketTotal:marketItems.length>=20;
   const sortLabel=marketSort==='downloads'?t('mkt.sortDl'):marketSort==='latest'?t('mkt.sortLatest'):t('mkt.sortRel');
-  const relaxedNote=r.relaxed==='version'?' (no exact match for that game version — showing all versions)':r.relaxed==='loader'?' (no match for this server type — showing all matching mods/plugins)':'';
+  const relaxedNote=r.relaxed==='version'?t('mkt.relaxedVersion'):r.relaxed==='loader'?t('mkt.relaxedLoader'):'';
   const countLabel=marketTotal!=null?`${marketTotal} ${sortLabel}`:`${marketItems.length} ${sortLabel}`;
   status.textContent=`${countLabel} · ${source}.${relaxedNote}`;
   const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent=marketTotal!=null?tf('mkt.found',{a:marketTotal}):`${marketItems.length}`;
@@ -38,7 +38,7 @@ async function runMarketSearch(page){
   if(typeof renderMarketChips==='function')renderMarketChips();
   $('#marketPager').hidden=!(page>1||marketHasNext);
   $('#marketPrev').disabled=page<=1;$('#marketNext').disabled=!marketHasNext;
-  $('#marketPageLabel').textContent=marketTotal!=null?`Page ${page} of ${Math.max(1,Math.ceil(marketTotal/20))}`:`Page ${page}`;
+  $('#marketPageLabel').textContent=marketTotal!=null?t('mkt.pageOf',{p:page,t:Math.max(1,Math.ceil(marketTotal/20))}):t('mkt.page',{p:page});
 }
 $('#marketSearch').onclick=()=>runMarketSearch(1);
 $('#marketPrev').onclick=()=>{if(marketPage>1)runMarketSearch(marketPage-1)};
@@ -65,5 +65,5 @@ function renderMarketChips(){
   box.hidden=!chips.length;
   box.innerHTML=chips.length?chips.map(c=>`<span class="market-chip">${esc(c.label)}</span>`).join(''):'';
 }
-$('#importModpack').onclick=async()=>{const r=await window.observer.importModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(`${r.name} imported — ${r.installed} file(s) installed${r.skipped?`, ${r.skipped} client-only file(s) skipped`:''}. Restart the server to use it.`,'success')};
-$('#exportModpack').onclick=async()=>{const r=await window.observer.exportModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(`Exported ${r.count} item(s) to ${r.path}`,'success')};
+$('#importModpack').onclick=async()=>{const r=await window.observer.importModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('mkt.imported',{n:r.name,c:r.installed,s:r.skipped?t('mkt.importedSkipped',{k:r.skipped}):''}),'success')};
+$('#exportModpack').onclick=async()=>{const r=await window.observer.exportModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('mkt.exported',{c:r.count,p:r.path}),'success')};

@@ -3,6 +3,58 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.9.0] — 2026-09-19
+
+Play your server over the internet without port forwarding, plus a round of polish: the
+i18n debt is closed, MCP marketplace search reaches full source parity, the metrics sampler
+is hardened, and the console can be exported.
+
+### Added — Public tunnel (Playit.gg)
+- **Share your server to the internet without port forwarding.** A new panel on the Overview
+  "How friends can join" card starts the [Playit.gg](https://playit.gg) agent, which gives your
+  server a public address (`name.playit.gg`) anyone can join — no router configuration. First run
+  shows the claim link to link the machine to your Playit account; the address is fixed, unlike
+  free rotating tunnels.
+- **Safe by construction.** Never auto-starts: the button opens a clear confirmation ("this opens
+  your server to the internet") and only works while the server is running. The tunnel is torn down
+  automatically when the server stops, the folder changes, or the app quits. The provider is a
+  fixed enum and the claim link is opened externally only if it is `https://` on a `playit.gg` host.
+- **One-click agent install.** If no Playit agent is found, the app downloads the right build from
+  the official GitHub release automatically (no manual path hunting) — the same way it already
+  installs Java. The **Set up Playit** button then starts the Playit background service and opens the
+  playit.gg dashboard, where you create the tunnel. The public address is pasted into the app (the
+  Playit agent does not expose it over the command line). A **Browse…** button lets advanced users
+  point at an existing `playit.exe`.
+- New `src/main/tunnel.js` + `tests/tunnel.test.js` (address/claim parsing, provider validation).
+
+### Added
+- **Export the console log to a `.txt` file.** A new **Export** button in the Console header.
+- **Four new MCP tools** (44 total): `get_schedule` / `set_schedule` (read/set the server
+  start-stop schedule), `list_waypoints` (World Map waypoints) and `kick_player` (kick an online
+  player). Risk tiers follow the existing model (read free, write asks).
+- **Export the console log to a `.txt` file.** A new **Export** button in the Console header writes
+  the current buffer (up to 2000 lines, with timestamps) wherever you choose. New IPC
+  `console:export` + `con.export`/`con.exported`/`con.exportFailed` i18n keys.
+
+### Changed
+- **`search_marketplace` now supports all three sources.** The MCP tool previously accepted only
+  `source=modrinth`; it now delegates to the **same** pure `searchMarket()` the GUI marketplace uses,
+  so Modrinth, **Hangar** and **Spigot** all work over MCP and the facet/loader logic can no longer
+  drift between the two. New `source` and `offset` parameters.
+- **Closed the localization debt** carried since 0.7.0. Hardcoded English strings across the renderer
+  (create-server wizard, player row actions, marketplace install dialog, Worlds, shell/connect,
+  player-data inspector) now go through `t()`. i18n grew **579 → 682 keys** across all 7 locales.
+
+### Fixed
+- **Metrics sampler could overlap itself.** `startMetrics` used `setInterval(async …)` without
+  awaiting the previous tick, so a slow sample (Java-descendant lookup ~3s, process metrics ~5s)
+  could let the next tick start first — overlapping `server:metrics` sends and racing the CPU-delta
+  baseline, which made the CPU% readout jitter. The tick is now a guarded, awaitable unit.
+- **Pointless idle metrics traffic.** While the server was stopped the sampler still pushed a metrics
+  event every second (~86k/day). The idle push is now throttled to about once every 5 seconds.
+
+---
+
 ## [0.8.0] — 2026-09-19
 
 ### Added — MCP / AI integration (major feature)

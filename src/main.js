@@ -47,6 +47,7 @@ const { registerModpacks } = require('./main/modpacks.js');
 const { registerWizard } = require('./main/wizard.js');
 const { registerSettings } = require('./main/settings-handlers.js');
 const { registerContent } = require('./main/content-handlers.js');
+const { registerTunnel, stopTunnel } = require('./main/tunnel.js');
 const { createWindow, setupAutoUpdater, setupQuitHandler, initApp } = require('./main/app-lifecycle.js');
 const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
 const { registerMcpConfirm } = require('./mcp/confirm.js');
@@ -65,6 +66,7 @@ registerModpacks(ipcMain, ctx);
 registerWizard(ipcMain, ctx);
 registerSettings(ipcMain, ctx);
 registerContent(ipcMain, ctx);
+registerTunnel(ipcMain, ctx);
 registerMcpConfirm(ipcMain, ctx);
 
 app.whenReady().then(async () => {
@@ -89,7 +91,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 // Stop the MCP server and remove its bridge config on the way out, so a stale token/port file
 // never lingers to confuse the next launch.
-app.on('before-quit', () => { try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} });
+app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} });
 setupQuitHandler(ctx);
 
 // Exported for smoke tests (require without launching Electron windows).

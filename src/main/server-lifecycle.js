@@ -153,6 +153,8 @@ async function startServerInternal(ctx, settings) {
     ctx.setServerStatus('stopped');
     ctx.send('server:live', ctx.live);
     ctx.pushFiles();
+    // SECURITY: never leave the public tunnel up once the server is down.
+    try { require('./tunnel.js').stopTunnel(ctx); } catch {}
     handleAutoRestart(ctx, wasManual, code);
   });
 

@@ -152,13 +152,13 @@ Running from source additionally requires **Node.js 18 or newer**.
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-0.8.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-0.8.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-0.9.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-0.9.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe`. It is a normal NSIS installer — you can choose the install location, and it sets up auto-update.
-- **Linux:** `chmod +x ObserverLauncher-0.8.0.AppImage` then run it. No installation, no root required.
+- **Linux:** `chmod +x ObserverLauncher-0.9.0.AppImage` then run it. No installation, no root required.
 
 ### Option B — Run from source
 
@@ -189,7 +189,7 @@ The launcher checks GitHub Releases on startup and shows a notification when a n
 5. **Accept the EULA.** Minecraft servers require accepting Mojang's EULA. The launcher can write `eula=true` for you (enable **Accept EULA automatically** in Settings), or you can edit `eula.txt` yourself.
 6. **Set memory.** In the stats row, set **Allocate RAM** (min / max in GB) and click **Apply**. A good rule of thumb is roughly half your system RAM, but leave room for the OS.
 7. **Press Start.** The status pill moves through *Starting → Running*. The first launch creates `server.properties` and world folders — an initial `Failed to load properties` error is expected and harmless.
-8. **Invite friends.** The *How friends can join* panel shows the address to share. On the same Wi-Fi, use the local address as-is. Over the internet, you also need to forward the port on your router — the **Allow this port through Windows Firewall** button only opens the OS firewall, it does not touch your router.
+8. **Invite friends.** The *How friends can join* panel shows the address to share. On the same Wi-Fi, use the local address as-is. For friends elsewhere you can either forward the port on your router yourself, or click **Share to internet** — that starts the [Playit.gg](https://playit.gg) agent and gives the server a public address with no router setup (install the agent first; see Known limitations).
 
 That's it. Everything else — plugins, players, backups, the world map — is optional.
 
@@ -492,7 +492,7 @@ All requests are made directly from your machine to the official sources.
 - **Spigot needs Git** and compiles slowly.
 - **Velocity proxies don't tick a world**, so their TPS/MSPT panel shows N/A by design.
 - **No macOS auto-update path**, and auto-update requires the packaged installer/AppImage.
-- **Port forwarding is still on you** — the launcher cannot configure your router.
+- **Port forwarding is still on you by default.** The launcher cannot configure your router. The optional **Share to internet** feature (Playit.gg) avoids the router entirely, but it requires the Playit agent installed separately and links the machine to a Playit account.
 - **Spigot needs a JDK.** The one-click Java install fetches a JRE, which runs a server but cannot compile Spigot's BuildTools — install a full JDK if you plan to use Spigot.
 
 ### Linux notes

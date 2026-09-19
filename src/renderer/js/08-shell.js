@@ -69,7 +69,7 @@ $('#nav')?.addEventListener('keydown', e=>{
   else if(e.key==='End'){ e.preventDefault(); items[items.length-1]?.focus(); }
 });
 $$('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));$$('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));$$('[data-command]').forEach(b=>b.onclick=()=>{pushCmdHistory(b.dataset.command);command(b.dataset.command)});$$('[data-open]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.open));$$('[data-import]').forEach(b=>b.onclick=async()=>{const r=await window.observer.importContent(b.dataset.import);if(r.ok){state.files=r.files;refreshUI();toast(t('toast.importedRestart'))}else if(!r.cancelled)toast(r.error)});
-$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#welcomeCreateBtn')?.addEventListener('click', async()=>{ const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'}); if(folder) openNewServerWizard(); });$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
+$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#welcomeCreateBtn')?.addEventListener('click', async()=>{ const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'}); if(folder) openNewServerWizard(); });$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
 $$('.log-filters .filter-chip').forEach(chip=>chip.onclick=()=>{
   logFilter=chip.dataset.logFilter;
   $$('.log-filters .filter-chip').forEach(c=>{ const on=c===chip; c.classList.toggle('active',on); c.setAttribute('aria-pressed', on?'true':'false'); });
@@ -157,20 +157,20 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   if(ramOv) ramOv.className=ramClass;
   if(perfRamEl2) perfRamEl2.className=ramClass;
   // perf badges + bars
-  const setBadge=(id,val,good,mid)=>{const el=$(id); if(!el) return; const level=val==null?'':val>=good?'ok':val>=mid?'warn':'bad'; el.className='kpi-badge '+(level||''); el.textContent=val==null?'—':level==='ok'?'Good':level==='warn'?'Warn':'Critical'; };
+  const setBadge=(id,val,good,mid)=>{const el=$(id); if(!el) return; const level=val==null?'':val>=good?'ok':val>=mid?'warn':'bad'; el.className='kpi-badge '+(level||''); el.textContent=val==null?'—':level==='ok'?t('perf.badgeGood'):level==='warn'?t('perf.badgeWarn'):t('perf.badgeCritical'); };
   setBadge('#perfTpsBadge', displayTps, 19, 17); setBadge('#perfMsptBadge', displayMspt!=null? (100 - Math.min(100,displayMspt)):null, 60, 30); // invert mspt for badge
   setBadge('#perfCpuBadge', v.cpu, 40, 70); // lower is better, so invert logic: we treat high as bad
-  const perfCpuBadge=$('#perfCpuBadge'); if(perfCpuBadge && v.cpu!=null){ perfCpuBadge.className='kpi-badge '+(v.cpu<60?'ok':v.cpu<85?'warn':'bad'); perfCpuBadge.textContent=v.cpu<60?'Good':v.cpu<85?'High':'Critical'; }
+  const perfCpuBadge=$('#perfCpuBadge'); if(perfCpuBadge && v.cpu!=null){ perfCpuBadge.className='kpi-badge '+(v.cpu<60?'ok':v.cpu<85?'warn':'bad'); perfCpuBadge.textContent=v.cpu<60?t('perf.badgeGood'):v.cpu<85?t('perf.badgeHigh'):t('perf.badgeCritical'); }
   setBadge('#perfRamBadge', ram, 30, 60); // placeholder, will override below
-  const ramBadge=$('#perfRamBadge'); if(ramBadge && ram!=null){ ramBadge.className='kpi-badge '+(ram<75?'ok':ram<90?'warn':'bad'); ramBadge.textContent=ram<75?'Good':ram<90?'High':'Critical'; } else if(ramBadge && ram==null){ ramBadge.className='kpi-badge'; ramBadge.textContent='—'; }
+  const ramBadge=$('#perfRamBadge'); if(ramBadge && ram!=null){ ramBadge.className='kpi-badge '+(ram<75?'ok':ram<90?'warn':'bad'); ramBadge.textContent=ram<75?t('perf.badgeGood'):ram<90?t('perf.badgeHigh'):t('perf.badgeCritical'); } else if(ramBadge && ram==null){ ramBadge.className='kpi-badge'; ramBadge.textContent='—'; }
   const bar=(id,pct)=>{const el=$(id); if(el) el.style.width=(pct==null?0:Math.max(4,Math.min(100,pct)))+'%';};
   bar('#perfTpsBar', displayTps!=null? (displayTps/20*100):null); bar('#perfMsptBar', displayMspt!=null? Math.min(100, displayMspt/100*100):null); bar('#perfCpuBar', v.cpu); bar('#perfRamBar', ram);
   const liveDot=$('#perfLiveDot'), liveText=$('#perfLiveText'), uptimeEl=$('#perfUptime'); if(liveDot){ liveDot.className='live-dot'+(v.running?' on':''); } if(liveText) liveText.textContent=v.running?`${t('con.live')} • ${t('top.running')}`:t('top.offline'); if(uptimeEl) uptimeEl.textContent=uptimeStart? document.getElementById('heroUptime')?.textContent || '—' : '—';
-  const launcherMem=$('#perfLauncherMem'); if(launcherMem) launcherMem.textContent=`${v.appMemory||0} MB launcher`;
+  const launcherMem=$('#perfLauncherMem'); if(launcherMem) launcherMem.textContent=t('perf.ramLauncher',{n:v.appMemory||0});
   const tickEmpty=$('#tickChartEmpty'), resEmpty=$('#resourceChartEmpty');
   if(tickEmpty) tickEmpty.hidden=!!(displayTps!=null || displayMspt!=null);
   if(resEmpty) resEmpty.hidden=!!(v.cpu!=null || ram!=null);
-  const liveBadge=$('#resourceLiveBadge'); if(liveBadge){ liveBadge.textContent=v.running?'● LIVE':'○ OFFLINE'; liveBadge.style.color=v.running?'var(--success)':'var(--text-dim)'; liveBadge.style.borderColor=v.running?'rgba(0,229,160,.25)':'var(--border)'; }
+  const liveBadge=$('#resourceLiveBadge'); if(liveBadge){ liveBadge.textContent=v.running?t('perf.live'):t('perf.offlineBadge'); liveBadge.style.color=v.running?'var(--success)':'var(--text-dim)'; liveBadge.style.borderColor=v.running?'rgba(0,229,160,.25)':'var(--border)'; }
   metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')});
  // Fallback: nếu main gửi chậm hoặc miss, vẫn giữ UI đồng bộ mỗi 2s từ lastMetrics/live
  setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const displayTps=v.tps??state.live?.tps??null; const displayMspt=v.mspt??state.live?.mspt??null; if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
@@ -179,7 +179,7 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
 // FEATURE: Aikar's flags preset (a widely recommended JVM/G1GC config for Paper/Purpur servers),
 // auto-filled from the current memoryMin/memoryMax instead of making the user type the long flag string.
 function aikarFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Dusing.aikars.flags=https://mcflags.emc.gs -Dfile.encoding=UTF-8`}
-$('#applyAikarFlags').onclick=()=>{const min=Number($('#memoryMinInput').value)||2,max=Number($('#memoryMaxInput').value)||6;$('#jvmArgsInput').value=aikarFlags(min,max);toast("Aikar's flags filled in — remember to click Apply settings to save.")};
+$('#applyAikarFlags').onclick=()=>{const min=Number($('#memoryMinInput').value)||2,max=Number($('#memoryMaxInput').value)||6;$('#jvmArgsInput').value=aikarFlags(min,max);toast(t('set.aikarFilled'))};
 $('#showWelcomeAgain').onclick=()=>showOnboarding();
 
 // FEATURE: "How friends can join" — surfaces the LAN address (instant, no network call) and lets the
@@ -193,9 +193,21 @@ async function loadConnectInfo(){
   $('#connectLocal').value=r.localIps.length?r.localIps.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
   $('#allowFirewall').dataset.port=port;
   // Linux cannot auto-open the firewall without sudo; relabel the button so it copies the command.
-  const fw=$('#allowFirewall'); if(fw){ fw.textContent = launcherPlatform==='linux' ? 'Copy firewall command' : t('conn.firewall'); }
+  const fw=$('#allowFirewall'); if(fw){ fw.textContent = launcherPlatform==='linux' ? t('conn.copyFwCmd') : t('conn.firewall'); }
 }
 
+$('#tunnelStart').onclick=async()=>{if(!await confirmDialog({title:t('tun.start'),body:t('tun.confirm'),ok:t('tun.start'),danger:true}))return;const r=await window.observer.tunnelStart('playit');if(!r.ok)return toast(r.error,'error');toast(t('tun.started'),'success')};
+$('#tunnelDashboard').onclick=()=>window.observer.tunnelOpenUrl('https://playit.gg/account/tunnels');
+const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||'';tunnelManual.addEventListener('change',()=>localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim()))}
+async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();applyTunnelStatus(s)}catch{}}
+function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelStart'),msg=$('#tunnelMsg');if(!pill)return;
+  const st=s?.status||'stopped';pill.textContent=st==='running'?t('tun.live'):st==='installing'?t('tun.installing'):st==='starting'?t('tun.starting'):st==='error'?t('tun.error'):t('tun.off');pill.className='tunnel-pill '+st;
+  if(startBtn)startBtn.disabled=st==='installing'||st==='starting';
+  if(msg){if(st==='installing'){msg.hidden=false;msg.textContent=t('tun.downloading')}else if(st==='error'){msg.hidden=false;msg.textContent=t('tun.serviceError')}else{msg.hidden=true;msg.textContent=''}}}
+window.observer.onTunnelStatus(applyTunnelStatus);
+refreshTunnelUI();
+setInterval(refreshTunnelUI,15000);
+$('#playitBrowse')?.addEventListener('click',async()=>{const f=await window.observer.pickPlayitFile();if(f){const inp=$('#playitPathInput');inp.value=f;inp.dispatchEvent(new Event('input',{bubbles:true}))}});
 $('#refreshConnectInfo').onclick=loadConnectInfo;
 $('#checkPublicIp').onclick=async()=>{
   const btn=$('#checkPublicIp');btn.disabled=true;const original=btn.textContent;btn.textContent='…';
@@ -210,20 +222,20 @@ $('#allowFirewall').onclick=async()=>{
   // Linux: no auto-elevation. Copy the ufw command for the user to paste in a terminal.
   if(launcherPlatform==='linux'){
     const cmd=`sudo ufw allow ${port}/tcp`;
-    try{ await navigator.clipboard.writeText(cmd); toast('Copied: '+cmd+' — run it in a terminal. You may also need to forward the port on your router.','success'); }
-    catch{ toast('Run this in a terminal: '+cmd); }
+    try{ await navigator.clipboard.writeText(cmd); toast(t('conn.fwCopiedLinux',{c:cmd}),'success'); }
+    catch{ toast(t('conn.fwRunLinux',{c:cmd})); }
     return;
   }
-  if(!await confirmDialog({title:t('conn.firewall'),body:`Add a Windows Firewall rule allowing inbound TCP traffic on port ${port}? A Windows security prompt (UAC) will appear — approve it to continue.`,ok:t('conn.firewall')}))return;
+  if(!await confirmDialog({title:t('conn.firewall'),body:t('conn.fwConfirmBody',{p:port}),ok:t('conn.firewall')}))return;
   const r=await window.observer.allowFirewall(port);
   if(!r.ok)return toast(r.error,'error');
-  toast(`Port ${port} is now allowed through Windows Firewall. You still need to forward it on your router for friends outside your WiFi.`,'success');
+  toast(t('conn.fwAllowed',{p:port}),'success');
 };
 $$('[data-copy]').forEach(b=>b.onclick=async()=>{
   const input=$(b.dataset.copy);if(!input||!input.value||input.value==='—')return toast(t('toast.nothingToCopy'));
   try{
     await navigator.clipboard.writeText(input.value);
-    const orig=b.textContent; b.textContent='Copied!'; b.classList.add('copied');
+    const orig=b.textContent; b.textContent=t('set.copied'); b.classList.add('copied');
     toast(t('toast.copied'),'success');
     setTimeout(()=>{b.textContent=orig; b.classList.remove('copied')}, 1400);
   }catch{toast(t('toast.copyFailed'),'error')}
@@ -238,8 +250,8 @@ window.observer.onJavaProgress(({received, total})=>{
   else { fill.classList.add('indeterminate'); label.textContent=`${formatBytes(received)} downloaded…`; }
 });
 $('#javaAutoInstall').onclick=async()=>{
-  const btn=$('#javaAutoInstall');btn.disabled=true;const original=btn.textContent;btn.textContent='Downloading Java… this can take a minute';
-  $('#javaProgress').hidden=false; $('#javaProgressFill').style.width='0%'; $('#javaProgressFill').classList.add('indeterminate'); $('#javaProgressLabel').textContent='Starting download…';
+  const btn=$('#javaAutoInstall');btn.disabled=true;const original=btn.textContent;btn.textContent=t('set.javaDownloading');
+  $('#javaProgress').hidden=false; $('#javaProgressFill').style.width='0%'; $('#javaProgressFill').classList.add('indeterminate'); $('#javaProgressLabel').textContent=t('nsw.startingDownload');
   const r=await window.observer.javaAutoInstall();
   btn.disabled=false;btn.textContent=original; $('#javaProgress').hidden=true;
   if(!r.ok)return toast(r.error,'error');

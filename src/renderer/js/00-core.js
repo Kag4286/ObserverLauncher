@@ -63,9 +63,9 @@ const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 // feedback (the backend re-validates as defense in depth).
 function isSafePlayerName(name){return typeof name==='string'&&/^[A-Za-z0-9_]{3,16}$/.test(name)}
 function playerNameError(name){
-  if(!name) return 'Type a name first.';
-  if(/[\r\n]/.test(name)) return 'Invalid player name — line breaks are not allowed.';
-  if(!isSafePlayerName(name)) return 'Invalid player name — use 3-16 letters, numbers or underscores.';
+  if(!name) return t('ply.nameFirst');
+  if(/[\r\n]/.test(name)) return t('ply.nameLineBreak');
+  if(!isSafePlayerName(name)) return t('ply.nameInvalid');
   return null;
 }
 let toastQueue=[],toastTimer=null;

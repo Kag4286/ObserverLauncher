@@ -17,7 +17,7 @@ async function loadNswVersions(software){
   const r=await window.observer.wizardVersions(software);
   if(nswVersions.software!==software)return; // user switched software mid-request
   nswVersions.loading=false;
-  if(!r||!r.ok){nswVersions.failed=true;nswVersions.error=r?.error||'Could not reach the version API.';}
+  if(!r||!r.ok){nswVersions.failed=true;nswVersions.error=r?.error||t('nsw.apiFail');}
   else{nswVersions.list=r.versions||[];nswVersions.latest=r.latest||null;nswVersions.raw=!!r.raw;nswVersions.note=r.note||'';}
   renderNswChips($('#nswVersionInput')?.value.trim()||'');
   $('#nswLatestLabel').textContent=nswVersions.latest?`${t('nsw.latest')}: ${nswVersions.latest}`:'';
@@ -26,20 +26,21 @@ async function loadNswVersions(software){
 }
 function renderNswChips(filter){
   const box=$('#nswVersionChips');if(!box)return;
-  if(nswVersions.loading){box.innerHTML='<span class="nsw2-chiploading">Loading live versions…</span>';return}
-  if(nswVersions.failed){box.innerHTML=`<span class="nsw2-chiploading">${esc(nswVersions.error)} — type a version manually.</span>`;return}
+  if(nswVersions.loading){box.innerHTML=`<span class="nsw2-chiploading">${t('nsw.loadingVersions')}</span>`;return}
+  if(nswVersions.failed){box.innerHTML=`<span class="nsw2-chiploading">${esc(nswVersions.error)} — ${t('nsw.typeManually')}</span>`;return}
   const q=(filter||'').toLowerCase();
   const list=q?nswVersions.list.filter(v=>v.toLowerCase().includes(q)):nswVersions.list;
-  box.innerHTML=list.length?list.map(v=>`<button class="version-chip" data-version="${esc(v)}">${esc(v)}</button>`).join(''):'<span class="nsw2-chiploading">No matches — the exact text you type will be used as-is.</span>';
+  box.innerHTML=list.length?list.map(v=>`<button class="version-chip" data-version="${esc(v)}">${esc(v)}</button>`).join(''):`<span class="nsw2-chiploading">${t('nsw.noMatches')}</span>`;
 }
 function nswValidateVersion(v){
   if(!v)return'';
-  if(nswVersions.loading)return'Checking the live list…';
-  if(nswVersions.failed)return'Live list unavailable — the download step will verify it.';
+  if(nswVersions.loading)return t('nsw.checkingList');
+  if(nswVersions.failed)return t('nsw.listUnavailable');
   if(v==='latest')return'';
-  if(nswVersions.list.includes(v))return`✓ ${v} is available for ${NSW_SOFTWARE_LABEL[nsw.software]||nsw.software}.`;
+  const sw=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
+  if(nswVersions.list.includes(v))return t('nsw.available',{v,s:sw});
   const near=nswVersions.list.find(x=>x.startsWith(v));
-  return near?`✗ "${v}" not found — did you mean ${near}?`:`✗ "${v}" is not in the live list for ${NSW_SOFTWARE_LABEL[nsw.software]||nsw.software}.`;
+  return near?t('nsw.didYouMean',{v,n:near}):t('nsw.notInList',{v,s:sw});
 }
 // HARD-SYNC Java requirement: asks Mojang's manifest (via wizard:java-check) for the authoritative
 // javaVersion of the selected MC version instead of trusting the static mapping. Result is shown
@@ -53,12 +54,12 @@ function renderNswJava(){
   const tooOld=jm!=null&&jm<nswJava.java;
   el.hidden=false;
   el.className='nsw-java '+(tooOld?'warn':'ok');
-  el.textContent=(nswJava.exact?'☕ This version runs on Java ':'☕ Estimated: Java ')+nswJava.java+(nswJava.exact?' (verified from Mojang)':'+')+(tooOld?` — ⚠ your Java ${jm} is too old; use auto-install in Settings or pick a newer path.`:tooOld===false&&jm!=null?` — your Java ${jm} is ready.`:'');
+  el.textContent=(nswJava.exact?t('nsw.javaRunsOn',{v:nswJava.java}):t('nsw.javaEstimated',{v:nswJava.java}))+(nswJava.exact?t('nsw.javaVerified'):'+')+(tooOld?t('nsw.javaTooOld',{v:jm}):tooOld===false&&jm!=null?t('nsw.javaReady',{v:jm}):'');
 }
 function checkNswJava(v){
   if(!v||v==='latest'){nswJava={version:'',java:null,exact:false};const el=$('#nswJavaCheck');if(el)el.hidden=true;return}
   const el=$('#nswJavaCheck');
-  if(el){el.hidden=false;el.className='nsw-java loading';el.textContent='Checking Java requirement…'}
+  if(el){el.hidden=false;el.className='nsw-java loading';el.textContent=t('nsw.checkingJava')}
   window.observer.wizardJavaCheck({software:nsw.software,version:v}).then(r=>{
     if(r&&r.ok&&r.java){nswJava={version:v,java:r.java,exact:!!r.exact}}
     else{nswJava={version:v,java:null,exact:false}}
@@ -72,13 +73,13 @@ function nswRender(){
   $('#nswBack').hidden=nsw.step===1;
   $('#nswNext').textContent=nsw.step===4?t('nsw.create'):t('nsw.next');
   const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  const version=versionMode==='specific'?($('#nswVersionInput').value.trim()||'—'):(nswVersions.latest||'Latest');
+  const version=versionMode==='specific'?($('#nswVersionInput').value.trim()||'—'):(nswVersions.latest||t('nsw.latestWord'));
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
   $('#nswRailSub3').textContent=`${$('#nswMemorySlider').value} GB`;
   if(nsw.step===2)loadNswVersions(nsw.software);
   if(nsw.step===3){
-    if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=`Your computer has about ${state.systemMemoryGB} GB of RAM — the server can use part of it. More isn't always better; 2–4 GB is plenty for friends.`}
+    if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=t('nsw.ramHint',{n:state.systemMemoryGB})}
     nswUpdateMemory();
   }
   if(nsw.step===4){
@@ -123,7 +124,7 @@ const debouncedNswValidate=debounce(()=>{
   $('#nswVersionClear').hidden=!v;
   renderNswChips(v);
   const info=$('#nswVersionInfo');
-  if(info)info.textContent=v?nswValidateVersion(v):'Pick a chip above or type any version — checked live against the official list.';
+  if(info)info.textContent=v?nswValidateVersion(v):t('nsw.pickChip');
   checkNswJava(v);
   nswRender();
 },250);
@@ -132,7 +133,7 @@ $('#nswVersionClear')?.addEventListener('click',()=>{
   $('#nswVersionInput').value='';
   $('#nswVersionClear').hidden=true;
   renderNswChips('');
-  $('#nswVersionInfo').textContent='Pick a chip above or type any version — checked live against the official list.';
+  $('#nswVersionInfo').textContent=t('nsw.pickChip');
   $('#nswVersionInput').focus();
 });
 // Memory step: one updater drives the big readout, slider fill, preset chips and the rail.
@@ -170,11 +171,11 @@ function nswVersionError(){
   const mode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
   if(mode!=='specific')return null;
   const v=$('#nswVersionInput').value.trim();
-  if(!v)return 'Type a version, or switch back to "Use latest".';
+  if(!v)return t('nsw.typeVersion');
   // Only hard-block when the live list loaded successfully and clearly lacks this version.
   if(!nswVersions.loading&&!nswVersions.failed&&nswVersions.list.length&&!nswVersions.list.includes(v)){
     const near=nswVersions.list.find(x=>x.startsWith(v));
-    return near?`"${v}" is not available — did you mean ${near}?`:`"${v}" is not in the official version list for ${NSW_SOFTWARE_LABEL[nsw.software]||nsw.software}.`;
+    return near?t('nsw.notAvailableDid',{v,n:near}):t('nsw.notInOfficial',{v,s:NSW_SOFTWARE_LABEL[nsw.software]||nsw.software});
   }
   return null;
 }
@@ -187,8 +188,8 @@ $('#nswNext').onclick=async()=>{
   const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
   const version=versionMode==='specific'?$('#nswVersionInput').value.trim():'';
   const memory=Number($('#nswMemorySlider').value)||4;
-  $('#nswNext').disabled=true;$('#nswNext').textContent='Downloading…';$('#nswBack').disabled=true;
-  $('#nswProgress').hidden=false;$('#nswProgressFill').style.width='0%';$('#nswProgressFill').classList.add('indeterminate');$('#nswProgressLabel').textContent='Starting download…';
+  $('#nswNext').disabled=true;$('#nswNext').textContent=t('nsw.downloading');$('#nswBack').disabled=true;
+  $('#nswProgress').hidden=false;$('#nswProgressFill').style.width='0%';$('#nswProgressFill').classList.add('indeterminate');$('#nswProgressLabel').textContent=t('nsw.startingDownload');
   $('#nswCancel').hidden=false;
   const settingsNext={...getSettings(),memoryMin:Math.max(1,Math.floor(memory/2)),memoryMax:memory};
   const sr=await window.observer.saveSettings(settingsNext);if(!sr||!sr.ok){toast((sr&&sr.error)||t('toast.startUnknown'),'error');$('#nswNext').disabled=false;$('#nswNext').textContent=t('nsw.create');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;return}state={...state,settings:settingsNext,java:sr.java};
@@ -196,9 +197,9 @@ $('#nswNext').onclick=async()=>{
   $('#nswNext').disabled=false;$('#nswNext').textContent=t(nsw.step===4?'nsw.create':'nsw.next');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;
   if(!r.ok){ if(/cancel/i.test(r.error||'')){ toast(t('toast.downloadCancelled')); return; } toast(r.error,'error');return }
   $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla'};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
-  if(r.building){toast(`${r.name} started in the background — this can take several minutes. Watch the Console tab for progress.`);switchTab('console');return}
+  if(r.building){toast(t('nsw.building',{n:r.name}));switchTab('console');return}
   state.files=r.files;refreshUI();switchTab('overview');
-  toast(`Your server is ready. Press "Start server" at the top when you're ready to play.`,'success');
+  toast(t('nsw.ready'),'success');
 };
 function openNewServerWizard(){
   nsw={step:1,software:'vanilla'};
@@ -211,7 +212,7 @@ function openNewServerWizard(){
   $$('.nsw-radio-card').forEach(c=>c.classList.toggle('active', c.querySelector('input')?.value==='latest'));
   $('#nswVersionPicker').hidden=true;
   $('#nswVersionInput').value='';$('#nswVersionClear').hidden=true;
-  $('#nswLatestLabel').textContent='Resolving latest…';
+  $('#nswLatestLabel').textContent=t('nsw.resolvingLatest');
   $('#nswMemorySlider').value=4;$('#nswMemoryValue').textContent='4';
   $('#nswProgress').hidden=true;
   nswRender();$('#newServerModal').hidden=false;

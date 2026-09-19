@@ -70,6 +70,16 @@ function registerSettings(ipcMain, ctx) {
     return r.canceled ? null : r.filePaths[0];
   });
 
+  // Pick the Playit agent executable directly, so users don't have to type/paste the path by hand.
+  ipcMain.handle('dialog:playit-file', async () => {
+    const r = await dialog.showOpenDialog(ctx.win, {
+      title: 'Select the Playit agent executable',
+      properties: ['openFile'],
+      filters: process.platform === 'win32' ? [{ name: 'Executable', extensions: ['exe'] }] : [],
+    });
+    return r.canceled ? null : r.filePaths[0];
+  });
+
   ipcMain.handle('settings:save', async (_, settings) => {
     const merged = { ...loadSettings(), ...settings };
     // SECURITY: serverPath becomes the root for EVERY file operation (backup, editor save,
@@ -148,6 +158,27 @@ function registerSettings(ipcMain, ctx) {
   });
 
   ipcMain.handle('java:auto-install', async () => autoInstallJava(ctx));
+
+  // FEATURE (0.9.0): export the in-memory console buffer to a text file the user picks. The buffer
+  // lives in the main process (ctx.consoleBuffer, capped 2000 lines) so it survives renderer clears.
+  ipcMain.handle('console:export', async () => {
+    try {
+      const lines = Array.isArray(ctx.consoleBuffer) ? ctx.consoleBuffer : [];
+      if (!lines.length) return { ok: false, error: 'Nothing to export yet.' };
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const saveDialog = await dialog.showSaveDialog(ctx.win, {
+        title: 'Export console log',
+        defaultPath: `server-console-${stamp}.txt`,
+        filters: [{ name: 'Text file', extensions: ['txt'] }],
+      });
+      if (saveDialog.canceled || !saveDialog.filePath) return { ok: false, cancelled: true };
+      const body = lines.map(l => `[${l.time}] ${l.text}`).join('\n') + '\n';
+      fs.writeFileSync(saveDialog.filePath, body, 'utf8');
+      return { ok: true, path: saveDialog.filePath, count: lines.length };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not export the console log.' };
+    }
+  });
 }
 
 // Shared by the IPC handler and the MCP tool. Downloads a portable Adoptium JRE chosen from the
