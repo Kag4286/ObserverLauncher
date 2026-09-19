@@ -67,6 +67,8 @@ function fetchToolsFromApp() {
       let data = ''; res.on('data', c => data += c);
       res.on('end', () => { try { const j = JSON.parse(data); resolve(Array.isArray(j.tools) ? j.tools : null); } catch { resolve(null); } });
     });
+    // TIMEOUT: if the app is wedged, do not hang tools/list forever — fall back to the static list.
+    req.setTimeout(4000, () => { try { req.destroy(); } catch {} resolve(null); });
     req.on('error', () => resolve(null));
     req.end();
   });
@@ -81,8 +83,10 @@ async function fetchTools() {
   return cachedTools;
 }
 
-// Static tool list mirrored from src/mcp/tools.js (name + description + schema). Kept in sync
-// manually; the app is the source of truth for behaviour, this is just the advertisement.
+// Offline fallback tool list (name + description only). Used ONLY when the app is unreachable —
+// at that point every call fails with "app not running", so a full inputSchema would be
+// misleading anyway. When the app IS running, fetchTools() pulls the real schemas via GET /tools.
+// Kept in sync with src/mcp/tools.js by hand (names + descriptions only).
 const STATIC_TOOLS = [
   ['get_status', 'Server status, folder, jar, software and Java info.'],
   ['read_console', 'Recent console/log lines.'],
@@ -112,7 +116,6 @@ const STATIC_TOOLS = [
   ['install_local_jar', 'Copy a local .jar into plugins/mods.'],
   ['import_modpack_path', 'Import a .mrpack from a local path.'],
   ['export_modpack', 'Export current setup to a .mrpack at a path.'],
-  ['save_player_data', 'Apply edits to a player .dat.'],
   ['op_player', 'Grant/revoke operator.'],
   ['whitelist_player', 'Add/remove from whitelist.'],
   ['ban_player', 'Ban/unban a player.'],

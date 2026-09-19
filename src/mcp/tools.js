@@ -273,11 +273,13 @@ async function tInstallLocalJar(ctx, a) {
 async function tImportModpackPath(ctx, a) {
   const src = String(a.path || '');
   if (!src || !fs.existsSync(src)) return { ok: false, error: 'Modpack file not found.' };
+  if (!/\.(mrpack|zip)$/i.test(src)) return { ok: false, error: 'Expected a .mrpack (or .zip) file.' };
   return ok(await importMrpackFromPath(ctx, src, undefined, 'mcp'));
 }
 async function tExportModpack(ctx, a) {
   const dest = String(a.path || '');
   if (!dest) return { ok: false, error: 'path is required.' };
+  if (!/\.mrpack$/i.test(dest)) return { ok: false, error: 'Destination must end in .mrpack.' };
   const root = needPath(ctx);
   const manifest = readJsonList(root, 'observerlauncher-manifest.json');
   if (!manifest.length) return { ok: false, error: 'Nothing to export (no Marketplace-installed content).' };

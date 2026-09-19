@@ -333,6 +333,8 @@ window.observer.onMcpConfirmRequest?.(req => {
   const riskLabel=req.risk==='destroy'?t('mcp.riskDestroy'):t('mcp.riskWrite');
   let argText='';
   try{argText=JSON.stringify(req.args||{},null,2)}catch{argText=''}
+  // Truncate the preview so a 2MB write_file payload does not blow up the dialog DOM.
+  if(argText.length>2000)argText=argText.slice(0,2000)+'\n… ('+(argText.length-2000)+' more chars)';
   const body=(req.risk==='destroy'?t('mcp.confirmDestroy'):t('mcp.confirmWrite',{t:req.tool}))
     +`\n\n`+t('mcp.tool')+`: `+req.tool+`  ·  `+t('mcp.risk')+`: `+riskLabel
     +(argText&&argText!=='{}'?`\n\n`+t('mcp.args')+`:\n`+argText:'');
