@@ -53,8 +53,12 @@ async function tListFiles(ctx, a) {
   const rel = a.path || '.';
   const target = safeTarget(root, rel);
   if (!target) return { ok: false, error: 'Path outside the server folder.' };
-  const entries = fs.readdirSync(target, { withFileTypes: true }).map(e => ({ name: e.name, dir: e.isDirectory() }));
-  return { ok: true, result: { path: rel, entries } };
+  const all = fs.readdirSync(target, { withFileTypes: true })
+    .map(e => ({ name: e.name, dir: e.isDirectory() }))
+    .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+  const CAP = 500;
+  const entries = all.slice(0, CAP);
+  return { ok: true, result: { path: rel, entries, truncated: all.length > CAP, total: all.length } };
 }
 async function tReadFile(ctx, a) {
   const root = needPath(ctx);
@@ -67,15 +71,21 @@ async function tSearchFiles(ctx, a) {
   if (!q) return { ok: false, error: 'query is required.' };
   const list = editor.listFiles(root);
   if (!list.ok) return list;
-  const files = (list.files || []).slice(0, 2000);
+  // Runs in the Electron main process — a big scan must not freeze the UI. Cap file count +
+  // total bytes, and yield to the event loop every 25 files.
+  const files = (list.files || []).slice(0, 800);
+  const MAX_SCAN_BYTES = 40 * 1024 * 1024;
+  const ql = q.toLowerCase();
   const hits = [];
+  let scanned = 0, i = 0;
   for (const rel of files) {
+    if (hits.length >= 200 || scanned >= MAX_SCAN_BYTES) break;
     const t = safeTarget(root, rel); if (!t) continue;
-    let txt; try { const st = fs.statSync(t); if (st.size > 2 * 1024 * 1024) continue; txt = fs.readFileSync(t, 'utf8'); } catch { continue; }
-    txt.split(/\r?\n/).forEach((line, i) => { if (line.toLowerCase().includes(q.toLowerCase()) && hits.length < 200) hits.push({ path: rel, line: i + 1, text: line.slice(0, 300) }); });
-    if (hits.length >= 200) break;
+    let txt; try { const st = fs.statSync(t); if (st.size > 2 * 1024 * 1024) continue; scanned += st.size; txt = fs.readFileSync(t, 'utf8'); } catch { continue; }
+    txt.split(/\r?\n/).forEach((line, li) => { if (hits.length < 200 && line.toLowerCase().includes(ql)) hits.push({ path: rel, line: li + 1, text: line.slice(0, 300) }); });
+    if (++i % 25 === 0) await new Promise(r => setImmediate(r));
   }
-  return { ok: true, result: { query: q, hits } };
+  return { ok: true, result: { query: q, hits, scannedFiles: i, truncated: scanned >= MAX_SCAN_BYTES } };
 }
 async function tListContent(ctx) {
   const f = serverFiles(needPath(ctx));

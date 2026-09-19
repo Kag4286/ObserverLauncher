@@ -7,13 +7,21 @@ const pending = new Map();
 function registerMcpConfirm(ipcMain, ctx) {
   ipcMain.on('mcp:confirm-response', (_e, payload) => {
     const id = payload && payload.reqId;
-    const fn = pending.get(id);
-    if (fn) { pending.delete(id); fn(!!payload.allow); }
+    const entry = pending.get(id);
+    if (entry) { pending.delete(id); entry.cb(!!payload.allow); }
   });
   // server.js expects ctx.onMcpConfirm(req, cb) where req = { reqId, tool, args, risk }.
   ctx.onMcpConfirm = (req, cb) => {
-    pending.set(req.reqId, cb);
-    try { ctx.send('mcp:confirm-request', req); } catch { pending.delete(req.reqId); cb(false); }
+    // server.js resolves its own call at 60s but never calls cb back on timeout, so the pending
+    // entry would leak. This side owns a slightly longer timer that just drops the stale entry
+    // (the tool call is already denied by server.js). Also sweeps older leftovers defensively.
+    const now = Date.now();
+    for (const [id, entry] of pending) { if (now - entry.at > 70000) pending.delete(id); }
+    const timer = setTimeout(() => { pending.delete(req.reqId); }, 61000);
+    const wrapped = v => { clearTimeout(timer); cb(v); };
+    pending.set(req.reqId, { cb: wrapped, at: now });
+    try { ctx.send('mcp:confirm-request', req); }
+    catch { clearTimeout(timer); pending.delete(req.reqId); cb(false); }
   };
 }
 

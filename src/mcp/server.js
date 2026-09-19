@@ -107,8 +107,19 @@ function startMcpServer(ctx) {
     if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
     if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
     let body = '';
-    req.on('data', c => { body += c; if (body.length > MAX_BODY) req.destroy(); });
+    let tooBig = false;
+    req.on('data', c => {
+      if (tooBig) return;
+      body += c;
+      if (Buffer.byteLength(body) > MAX_BODY) {
+        tooBig = true;
+        res.writeHead(413, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Request too large (max 4 MB).' }));
+        req.destroy();
+      }
+    });
     req.on('end', async () => {
+      if (tooBig) return; // 413 already sent
       let payload;
       try { payload = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end('bad json'); }
       const settings = require('../main/settings.js').loadSettings();
@@ -128,7 +139,9 @@ function startMcpServer(ctx) {
     // Write the bridge config so a client can point bridge.js here.
     try {
       fs.mkdirSync(path.dirname(bridgeConfigPath()), { recursive: true });
-      fs.writeFileSync(bridgeConfigPath(), JSON.stringify({ port, token, pid: process.pid, script: bridgeScriptPath() }, null, 2));
+      let appVersion = 'dev';
+      try { appVersion = require('electron').app.getVersion(); } catch {}
+      fs.writeFileSync(bridgeConfigPath(), JSON.stringify({ port, token, pid: process.pid, script: bridgeScriptPath(), appVersion }, null, 2));
     } catch (e) { try { ctx.appendLog(`MCP: could not write bridge config — ${e?.message || e}`, 'error'); } catch {} }
     try { ctx.appendLog(`MCP server listening on 127.0.0.1:${port} (${TOOLS.length} tools).`, 'system'); } catch {}
   });

@@ -132,12 +132,13 @@ async function handle(msg) {
   const { id, method, params } = msg;
   if (method === 'initialize') {
     return reply(id, {
-      protocolVersion: (params && params.protocolVersion) || '2024-11-05',
-      capabilities: { tools: {} },
-      serverInfo: { name: 'observerlauncher', version: '0.8.0' },
+      protocolVersion: (params && params.protocolVersion) || '2025-06-18',
+      capabilities: { tools: { listChanged: false } },
+      serverInfo: { name: 'observerlauncher', version: (readConfig() || {}).appVersion || 'dev' },
     });
   }
   if (method === 'notifications/initialized') return; // no response
+  if (method === 'ping') return reply(id, {});
   if (method === 'tools/list') {
     const tools = await fetchTools();
     return reply(id, { tools });
