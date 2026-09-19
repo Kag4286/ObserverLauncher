@@ -311,10 +311,8 @@ async function tExportModpack(ctx, a) {
   if (!r.ok) return { ok: false, error: r.error || 'Archive failed.' };
   return { ok: true, result: { count: files.length, path: dest } };
 }
-async function tSavePlayerData(ctx) {
-  return { ok: false, error: 'Editing player stats over MCP is not supported yet - use the GUI player editor.' };
-}
-const { readPlayer, whitelistToggle, banToggle, opToggle } = require('../main/players.js');
+async function tSavePlayerData(ctx, a) { return ok(await savePlayer(ctx, { uuid: a.uuid, changes: a.changes || {}, clearInventory: !!a.clearInventory })); }
+const { readPlayer, whitelistToggle, banToggle, opToggle, savePlayer } = require('../main/players.js');
 async function tReadPlayer(ctx, a) { return ok(await readPlayer(ctx, a.uuid, a.name)); }
 async function tOpPlayer(ctx, a) { needPath(ctx); return ok(await opToggle(ctx, { uuid: a.uuid || null, name: a.name, op: a.on !== false })); }
 async function tWhitelistPlayer(ctx, a) { needPath(ctx); return ok(await whitelistToggle(ctx, { uuid: a.uuid || null, name: a.name, add: a.add !== false })); }
@@ -391,6 +389,7 @@ const TOOLS = [
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
+  { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat (health/food/xp/gamemode). Server must be stopped; a backup is written first.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object', description: 'health, food, saturation, xpLevel, xpTotal, gameType' }, clearInventory: { type: 'boolean', description: 'also clear inventory + equipment' } }, ['uuid']), handler: tSavePlayerData },
   { name: 'op_player', risk: 'write', description: 'Grant or revoke operator.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' } }, ['name']), handler: tOpPlayer },
   { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },
   { name: 'ban_player', risk: 'write', description: 'Ban or unban a player.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)') }, ['name']), handler: tBanPlayer },

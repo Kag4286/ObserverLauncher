@@ -85,7 +85,11 @@ function registerPlayers(ipcMain, ctx) {
   ipcMain.handle('player:ban-toggle', async (_, args) => banToggle(ctx, args));
   ipcMain.handle('player:op-toggle', async (_, args) => opToggle(ctx, args));
 
-  ipcMain.handle('player:save', async (_, { uuid, changes, clearInventory }) => {
+  ipcMain.handle('player:save', async (_, args) => savePlayer(ctx, args));
+}
+
+// Pure: apply validated edits to a player's .dat (backup first). Shared by IPC + MCP.
+async function savePlayer(ctx, { uuid, changes, clearInventory }) {
     try {
       if (ctx.serverProcess) return { ok: false, error: 'Stop the server before editing player data.' };
       // SECURITY: uuid is joined into the player .dat path — reject non-UUID input up front.
@@ -129,7 +133,6 @@ function registerPlayers(ipcMain, ctx) {
       fs.writeFileSync(player.file, zlib.gzipSync(nbt.writeUncompressed(player.parsed.parsed, player.type)));
       return { ok: true, backup: path.basename(backup), data: (await readPlayerData(ctx.currentServerPath, uuid)).data };
     } catch (error) { return marketplaceError(error); }
-  });
 }
 
-module.exports = { registerPlayers, readPlayer, whitelistToggle, banToggle, opToggle, checkPlayerInput };
+module.exports = { registerPlayers, readPlayer, whitelistToggle, banToggle, opToggle, savePlayer, checkPlayerInput };
