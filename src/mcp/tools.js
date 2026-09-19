@@ -170,10 +170,18 @@ async function tSetRawProperties(ctx, a) {
   writeFileAtomic(path.join(root, 'velocity.toml'), content);
   return { ok: true };
 }
+// SECURITY: write/edit only touch the SAME allowlisted text extensions the built-in editor
+// accepts (editor.ALLOWED). Without this an AI could overwrite a .jar/.dat with text — silently
+// corrupting a plugin or player file — via a plain 'write' tier tool.
+function assertEditable(aPath) {
+  const ext = path.extname(String(aPath || '')).toLowerCase();
+  if (!editor.ALLOWED.includes(ext)) throw new Error('Refused: "' + ext + '" is not an editable text type. Allowed: ' + editor.ALLOWED.join(', '));
+}
 async function tWriteFile(ctx, a) {
   const root = needPath(ctx);
   const target = safeTarget(root, a.path);
   if (!target) return { ok: false, error: 'Path outside the server folder.' };
+  assertEditable(a.path);
   if (String(a.content || '').length > 2 * 1024 * 1024) return { ok: false, error: 'Content too large (max 2 MB).' };
   const { writeFileAtomic } = require('../main/fs-utils.js');
   writeFileAtomic(target, String(a.content || ''));
@@ -183,6 +191,7 @@ async function tEditFile(ctx, a) {
   const root = needPath(ctx);
   const target = safeTarget(root, a.path);
   if (!target) return { ok: false, error: 'Path outside the server folder.' };
+  assertEditable(a.path);
   let txt; try { txt = fs.readFileSync(target, 'utf8'); } catch { return { ok: false, error: 'File not found.' }; }
   const oldS = String(a.oldString || ''), newS = String(a.newString || '');
   if (!oldS) return { ok: false, error: 'oldString is required.' };
@@ -216,6 +225,13 @@ async function tInstallLocalJar(ctx, a) {
   const root = needPath(ctx);
   const src = String(a.path || '');
   if (!src || !fs.existsSync(src)) return { ok: false, error: 'Source file not found.' };
+  // SECURITY: this is the ONE tool that reads a file outside the server root (the user picks a
+  // .jar from Downloads). Guard it: .jar only, must be a regular file, capped size. This blocks
+  // a prompt-injected AI from copying e.g. /etc/passwd or an arbitrary .exe into the server.
+  const st = fs.statSync(src);
+  if (!st.isFile()) return { ok: false, error: 'Source is not a file.' };
+  if (!/\.jar$/i.test(src)) return { ok: false, error: 'Only .jar files can be installed.' };
+  if (st.size > 100 * 1024 * 1024) return { ok: false, error: 'File too large (max 100 MB).' };
   const kind = a.kind || 'plugin';
   const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : kind === 'mod' ? 'mods' : 'plugins';
   const dest = safeTarget(root, path.join(folder, path.basename(src)));
@@ -264,11 +280,13 @@ async function tExportModpack(ctx, a) {
   return { ok: true, result: { count: files.length, path: dest } };
 }
 async function tSavePlayerData(ctx) {
-  return { ok: false, error: 'MCP save_player_data is not wired yet - use the GUI player editor.' };
+  return { ok: false, error: 'Editing player stats over MCP is not supported yet - use the GUI player editor.' };
 }
-function playerStub(kind) {
-  return async function() { return { ok: false, error: 'MCP ' + kind + ' is not wired yet - use the GUI for player management.' }; };
-}
+const { readPlayer, whitelistToggle, banToggle, opToggle } = require('../main/players.js');
+async function tReadPlayer(ctx, a) { return ok(await readPlayer(ctx, a.uuid)); }
+async function tOpPlayer(ctx, a) { needPath(ctx); return ok(await opToggle(ctx, { uuid: a.uuid || null, name: a.name, op: a.on !== false })); }
+async function tWhitelistPlayer(ctx, a) { needPath(ctx); return ok(await whitelistToggle(ctx, { uuid: a.uuid || null, name: a.name, add: a.add !== false })); }
+async function tBanPlayer(ctx, a) { needPath(ctx); return ok(await banToggle(ctx, { uuid: a.uuid || null, name: a.name, ban: a.ban !== false, reason: a.reason })); }
 
 // ---- DESTROY tools ----
 async function tStopServer(ctx) {
@@ -316,7 +334,7 @@ const TOOLS = [
   { name: 'get_status', risk: 'read', description: 'Server status, folder, jar, software and Java info.', inputSchema: S(), handler: tGetStatus },
   { name: 'read_console', risk: 'read', description: 'Recent console/log lines.', inputSchema: S({ lines: { type: 'number' } }), handler: tReadConsole },
   { name: 'list_players', risk: 'read', description: 'Online, whitelisted, banned, op and known players.', inputSchema: S(), handler: tListPlayers },
-  { name: 'get_player_data', risk: 'read', description: 'Read one player .dat (stats/inventory).', inputSchema: S({ uuid: STR('player UUID'), name: STR('player name') }), handler: tGetPlayerData },
+  { name: 'get_player_data', risk: 'read', description: 'Read one player .dat (stats/inventory) by UUID.', inputSchema: S({ uuid: STR('player UUID') }, ['uuid']), handler: tReadPlayer },
   { name: 'list_files', risk: 'read', description: 'List a directory inside the server folder.', inputSchema: S({ path: STR('relative dir, default .') }), handler: tListFiles },
   { name: 'read_file', risk: 'read', description: 'Read a text file inside the server folder.', inputSchema: S({ path: STR('relative file path') }, ['path']), handler: tReadFile },
   { name: 'search_files', risk: 'read', description: 'Grep text files inside the server folder.', inputSchema: S({ query: STR('substring') }, ['query']), handler: tSearchFiles },
@@ -341,10 +359,9 @@ const TOOLS = [
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
-  { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object' } }, ['uuid']), handler: tSavePlayerData },
-  { name: 'op_player', risk: 'write', description: 'Grant/revoke operator.', inputSchema: S({ name: STR('player name'), on: { type: 'boolean' } }), handler: playerStub('op_player') },
-  { name: 'whitelist_player', risk: 'write', description: 'Add/remove from whitelist.', inputSchema: S({ name: STR('player name'), add: { type: 'boolean' } }), handler: playerStub('whitelist_player') },
-  { name: 'ban_player', risk: 'write', description: 'Ban/unban a player.', inputSchema: S({ name: STR('player name'), ban: { type: 'boolean' } }), handler: playerStub('ban_player') },
+  { name: 'op_player', risk: 'write', description: 'Grant or revoke operator.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' } }, ['name']), handler: tOpPlayer },
+  { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },
+  { name: 'ban_player', risk: 'write', description: 'Ban or unban a player.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)') }, ['name']), handler: tBanPlayer },
   { name: 'stop_server', risk: 'destroy', description: 'Gracefully stop the server.', inputSchema: S(), handler: tStopServer },
   { name: 'force_stop_server', risk: 'destroy', description: 'Kill the server process tree.', inputSchema: S(), handler: tForceStopServer },
   { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name') }, ['name']), handler: tDeleteContent },

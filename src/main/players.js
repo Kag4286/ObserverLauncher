@@ -23,61 +23,63 @@ function checkPlayerInput({ name, reason, uuid }) {
   return null;
 }
 
+// ---- Pure player actions (shared by the IPC handlers AND the MCP tools) ----
+// Extracted so src/mcp/tools.js reuses the exact same validated logic.
+async function readPlayer(ctx, uuid) {
+  if (!isSafeUuid(uuid)) return { ok: false, error: 'Invalid player UUID.' };
+  try { return { ok: true, ...(await readPlayerData(ctx.currentServerPath, uuid)) }; }
+  catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data for UUID ${uuid}.` }; }
+}
+async function whitelistToggle(ctx, { uuid, name, add }) {
+  if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+  const bad = checkPlayerInput({ name, uuid });
+  if (bad) return { ok: false, error: bad };
+  if (ctx.serverProcess) {
+    ctx.serverProcess.stdin.write(`whitelist ${add ? 'add' : 'remove'} ${name}\r\n`);
+    ctx.appendLog(`> whitelist ${add ? 'add' : 'remove'} ${name}`, 'command');
+  } else {
+    let list = readJsonList(ctx.currentServerPath, 'whitelist.json').filter(x => x.uuid !== uuid);
+    if (add) list.push({ uuid, name });
+    writeJsonList(ctx.currentServerPath, 'whitelist.json', list);
+  }
+  return { ok: true, files: serverFiles(ctx.currentServerPath) };
+}
+async function banToggle(ctx, { uuid, name, ban, reason }) {
+  if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+  const bad = checkPlayerInput({ name, reason, uuid });
+  if (bad) return { ok: false, error: bad };
+  if (ctx.serverProcess) {
+    const cmd = ban ? `ban ${name} ${reason || ''}`.trim() : `pardon ${name}`;
+    ctx.serverProcess.stdin.write(cmd + '\r\n');
+    ctx.appendLog(`> ${cmd}`, 'command');
+  } else {
+    let list = readJsonList(ctx.currentServerPath, 'banned-players.json').filter(x => x.uuid !== uuid);
+    if (ban) list.push({ uuid, name, created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
+    writeJsonList(ctx.currentServerPath, 'banned-players.json', list);
+  }
+  return { ok: true, files: serverFiles(ctx.currentServerPath) };
+}
+async function opToggle(ctx, { uuid, name, op }) {
+  if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+  const bad = checkPlayerInput({ name, uuid });
+  if (bad) return { ok: false, error: bad };
+  if (ctx.serverProcess) {
+    const cmd = op ? `op ${name}` : `deop ${name}`;
+    ctx.serverProcess.stdin.write(cmd + '\r\n');
+    ctx.appendLog(`> ${cmd}`, 'command');
+  } else {
+    let list = readJsonList(ctx.currentServerPath, 'ops.json').filter(x => x.uuid !== uuid);
+    if (op) list.push({ uuid, name, level: 4, bypassesPlayerLimit: false });
+    writeJsonList(ctx.currentServerPath, 'ops.json', list);
+  }
+  return { ok: true, files: serverFiles(ctx.currentServerPath) };
+}
+
 function registerPlayers(ipcMain, ctx) {
-  ipcMain.handle('player:read', async (_, uuid) => {
-    // SECURITY: uuid is joined into <world>/playerdata/<uuid>.dat — reject anything that is
-    // not a plain UUID before touching the filesystem.
-    if (!isSafeUuid(uuid)) return { ok: false, error: 'Invalid player UUID.' };
-    try { return { ok: true, ...(await readPlayerData(ctx.currentServerPath, uuid)) }; }
-    catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data for UUID ${uuid}.` }; }
-  });
-
-  ipcMain.handle('player:whitelist-toggle', async (_, { uuid, name, add }) => {
-    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const bad = checkPlayerInput({ name, uuid });
-    if (bad) return { ok: false, error: bad };
-    if (ctx.serverProcess) {
-      ctx.serverProcess.stdin.write(`whitelist ${add ? 'add' : 'remove'} ${name}\r\n`);
-      ctx.appendLog(`> whitelist ${add ? 'add' : 'remove'} ${name}`, 'command');
-    } else {
-      let list = readJsonList(ctx.currentServerPath, 'whitelist.json').filter(x => x.uuid !== uuid);
-      if (add) list.push({ uuid, name });
-      writeJsonList(ctx.currentServerPath, 'whitelist.json', list);
-    }
-    return { ok: true, files: serverFiles(ctx.currentServerPath) };
-  });
-
-  ipcMain.handle('player:ban-toggle', async (_, { uuid, name, ban, reason }) => {
-    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const bad = checkPlayerInput({ name, reason, uuid });
-    if (bad) return { ok: false, error: bad };
-    if (ctx.serverProcess) {
-      const cmd = ban ? `ban ${name} ${reason || ''}`.trim() : `pardon ${name}`;
-      ctx.serverProcess.stdin.write(cmd + '\r\n');
-      ctx.appendLog(`> ${cmd}`, 'command');
-    } else {
-      let list = readJsonList(ctx.currentServerPath, 'banned-players.json').filter(x => x.uuid !== uuid);
-      if (ban) list.push({ uuid, name, created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
-      writeJsonList(ctx.currentServerPath, 'banned-players.json', list);
-    }
-    return { ok: true, files: serverFiles(ctx.currentServerPath) };
-  });
-
-  ipcMain.handle('player:op-toggle', async (_, { uuid, name, op }) => {
-    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const bad = checkPlayerInput({ name, uuid });
-    if (bad) return { ok: false, error: bad };
-    if (ctx.serverProcess) {
-      const cmd = op ? `op ${name}` : `deop ${name}`;
-      ctx.serverProcess.stdin.write(cmd + '\r\n');
-      ctx.appendLog(`> ${cmd}`, 'command');
-    } else {
-      let list = readJsonList(ctx.currentServerPath, 'ops.json').filter(x => x.uuid !== uuid);
-      if (op) list.push({ uuid, name, level: 4, bypassesPlayerLimit: false });
-      writeJsonList(ctx.currentServerPath, 'ops.json', list);
-    }
-    return { ok: true, files: serverFiles(ctx.currentServerPath) };
-  });
+  ipcMain.handle('player:read', async (_, uuid) => readPlayer(ctx, uuid));
+  ipcMain.handle('player:whitelist-toggle', async (_, args) => whitelistToggle(ctx, args));
+  ipcMain.handle('player:ban-toggle', async (_, args) => banToggle(ctx, args));
+  ipcMain.handle('player:op-toggle', async (_, args) => opToggle(ctx, args));
 
   ipcMain.handle('player:save', async (_, { uuid, changes, clearInventory }) => {
     try {
@@ -126,4 +128,4 @@ function registerPlayers(ipcMain, ctx) {
   });
 }
 
-module.exports = { registerPlayers };
+module.exports = { registerPlayers, readPlayer, whitelistToggle, banToggle, opToggle, checkPlayerInput };
