@@ -48,6 +48,7 @@ const { registerWizard } = require('./main/wizard.js');
 const { registerSettings } = require('./main/settings-handlers.js');
 const { registerContent } = require('./main/content-handlers.js');
 const { createWindow, setupAutoUpdater, setupQuitHandler, initApp } = require('./main/app-lifecycle.js');
+const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
 
 // Custom tex:// icon scheme — MUST be registered as privileged before the
 // app is ready, or Chromium treats it as non-standard and <img> loads fail.
@@ -76,6 +77,11 @@ app.whenReady().then(async () => {
   await initApp(ctx, ipcMain);
   await createWindow(ctx);
   setupAutoUpdater(ctx, ipcMain);
+  // MCP integration: only start the loopback server when the user enabled it in Settings.
+  // Toggling it later is handled by settings:save (see settings-handlers.js).
+  try { if (require('./main/settings.js').loadSettings().mcpEnabled) startMcpServer(ctx); } catch {}
+  ctx.startMcpServer = () => startMcpServer(ctx);
+  ctx.stopMcpServer = () => stopMcpServer(ctx);
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

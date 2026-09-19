@@ -45,6 +45,11 @@ function createContext() {
     edWatcher: null,
     edWatchMtime: 0,
     edWatchDebounce: null,
+    // MCP integration (src/mcp/server.js): HTTP server + token, null until started.
+    mcpServer: null,
+    mcpToken: null,
+    mcpPort: null,
+    onMcpConfirm: null, // set by the renderer bridge when a write/destroy tool needs approval
   };
 
   function send(channel, data) {
