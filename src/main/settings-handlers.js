@@ -38,7 +38,7 @@ function registerSettings(ipcMain, ctx) {
       live: ctx.live,
       systemMemoryGB: Math.round(os.totalmem() / (1024 ** 3)),
       javaRequired,
-      mcp: { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite }
+      mcp: { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite, script: (() => { try { return require('../mcp/server.js').bridgeScriptPath(); } catch { return null; } })() }
     };
   });
 

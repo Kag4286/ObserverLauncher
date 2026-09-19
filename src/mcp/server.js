@@ -25,6 +25,15 @@ function bridgeConfigPath() {
   return path.join(app.getPath('userData'), 'mcp-bridge.json');
 }
 
+// Absolute path to bridge.js as an MCP client must invoke it. In a packaged build the file is
+// unpacked OUTSIDE app.asar (asarUnpack in package.json), so `node app.asar/bridge.js` would fail;
+// rewrite the asar segment to app.asar.unpacked. In dev it is just the source path.
+function bridgeScriptPath() {
+  let p = path.join(__dirname, 'bridge.js');
+  if (p.includes('app.asar')) p = p.replace('app.asar', 'app.asar.unpacked');
+  return p;
+}
+
 // Ask the renderer to confirm a write/destroy tool. Resolves true/false. Times out to false
 // after 60s so a headless/closed window can never hang a tool call forever.
 function confirmOnGui(ctx, tool, args, risk) {
@@ -111,7 +120,7 @@ function startMcpServer(ctx) {
     // Write the bridge config so a client can point bridge.js here.
     try {
       fs.mkdirSync(path.dirname(bridgeConfigPath()), { recursive: true });
-      fs.writeFileSync(bridgeConfigPath(), JSON.stringify({ port, token, pid: process.pid }, null, 2));
+      fs.writeFileSync(bridgeConfigPath(), JSON.stringify({ port, token, pid: process.pid, script: bridgeScriptPath() }, null, 2));
     } catch (e) { try { ctx.appendLog(`MCP: could not write bridge config — ${e?.message || e}`, 'error'); } catch {} }
     try { ctx.appendLog(`MCP server listening on 127.0.0.1:${port} (${TOOLS.length} tools).`, 'system'); } catch {}
   });
@@ -125,4 +134,4 @@ function stopMcpServer(ctx) {
   try { fs.rmSync(bridgeConfigPath(), { force: true }); } catch {}
 }
 
-module.exports = { startMcpServer, stopMcpServer, callTool, bridgeConfigPath };
+module.exports = { startMcpServer, stopMcpServer, callTool, bridgeConfigPath, bridgeScriptPath };

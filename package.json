@@ -31,6 +31,9 @@
       "src/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "src/mcp/bridge.js"
+    ],
     "publish": [
       {
         "provider": "github",
