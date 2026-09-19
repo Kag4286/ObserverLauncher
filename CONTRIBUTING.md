@@ -13,8 +13,9 @@ Thanks for taking a look. This project is small, so the process is intentionally
 
 ```bash
 npm install
-npm start     # launch the app in development mode
-npm test      # run the full test suite
+npm start        # launch the app in development mode
+npm test         # unit/regression suite (node tests/run.js)
+npm run test:e2e # Playwright smoke tests against the real Electron app
 ```
 
 The app is plain Electron — **no bundler, no build step for development**. There are three layers:
@@ -24,10 +25,11 @@ The app is plain Electron — **no bundler, no build step for development**. The
   `src/main/`:
   - Feature modules (stateful, take `ipcMain` + `ctx`): `context.js`, `server-lifecycle.js`,
     `backups.js`, `players.js`, `marketplace.js`, `modpacks.js`, `wizard.js`, `settings-handlers.js`,
-    `content-handlers.js`, `app-lifecycle.js`.
+    `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`.
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
-    `validate.js`, `migrations.js`, `kill.js`.
+    `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`.
+  - `mcp/` — optional MCP/AI integration (see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang).
   - `platform/` — Windows/Linux process-tree walking, metrics and firewall (`win32.js`, `linux.js`,
@@ -35,6 +37,8 @@ The app is plain Electron — **no bundler, no build step for development**. The
 
   Each of these modules is a plain `require()`-able file with no dependency on a running window, so
   it can be unit-tested in isolation.
+
+- **MCP** (`src/mcp/`) — optional local-only AI integration. `tools.js` is the tool registry (name, risk tier, schema, handler): read tools run freely, write tools ask in-app, destructive always ask. `server.js` is a loopback HTTP server (127.0.0.1, random port, fresh token) started when enabled; `bridge.js` is a dependency-free stdio MCP server a client launches that forwards calls to the app (runs on the app's own binary via `ELECTRON_RUN_AS_NODE=1`, no system Node needed); `confirm.js` bridges write/destroy calls to the in-app dialog. Handlers reuse the same backend functions the IPC layer uses.
 
 - **Preload** (`src/preload.js`) — the **only** bridge between main and renderer. It exposes
   `window.observer.*` over `contextBridge`. `contextIsolation` is on and `nodeIntegration` is off,
@@ -44,9 +48,10 @@ The app is plain Electron — **no bundler, no build step for development**. The
   - `css/` — styles split by area (`01-tokens.css` … `09-pulse.css`).
   - `locales/` — one file per language; `meta.js` loads **first** (it defines `window.LOCALES` and
     `LOCALES_META`).
-  - `js/` — per-tab logic (`00-core.js` … `08-shell.js`), loaded as classic scripts. There is no
+  - `js/` — per-tab logic (`00-core.js` … `12-wizard.js`), loaded as classic scripts. There is no
     module system and no bundler, so **load order matters** — a file that uses something defined in a
-    later file will throw at load time.
+    later file will throw at load time. Anything called during boot / `refreshUI()` must live in a
+    file that loads *before* its caller (this has caused real regressions).
 
 ## Minecraft data formats change between versions
 
@@ -104,7 +109,9 @@ add a regression test with a synthesized NBT fixture (see
 3. Add a matching `<option>` to the `#languageSelect` dropdown in `src/renderer/index.html`.
 4. Make sure the new file is loaded: it must be required the same way the other languages are (see
    `tests/i18n.test.js` and how `index.html` includes the locale files).
-5. Run `npm test` — the i18n test checks that every locale has every key the `en` block defines.
+5. Run `npm test` — the i18n test checks every locale has every key the `en` block defines, and
+   that every key referenced from `index.html` **and** from `t('…')`/`tf('…')` literals in
+   `src/renderer/js/*.js` actually exists in `en`. (Dynamic/concatenated keys are skipped.)
 
 Not every string in the app goes through `data-i18n` yet. Extending coverage (adding
 `data-i18n` / `data-i18n-placeholder` / `data-i18n-title` attributes to more elements, and the

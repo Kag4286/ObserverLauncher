@@ -529,7 +529,7 @@ The app follows a clean three-layer split. Understanding it makes contributing m
 ┌─────────────────────────────────────────────────────────────┐
 │  RENDERER  (src/renderer/)  — UI only, no Node access       │
 │  index.html loads css/* → locales/* → js/* in NUMERIC order  │
-│  js/00-core … js/08-shell (classic scripts, no bundler)      │
+│  js/00-core … js/12-wizard (classic scripts, no bundler)     │
 └───────────────────────────┬─────────────────────────────────┘
                             │  window.observer.*  (IPC)
 ┌───────────────────────────┴─────────────────────────────────┐
@@ -549,6 +549,7 @@ The app follows a clean three-layer split. Understanding it makes contributing m
 │   editor · worldmap · textures · validate · migrations        │
 │  Per-software download resolvers:  adapters/                  │
 │  Per-OS process/metrics/firewall:  platform/ (win32, linux)   │
+│  Optional MCP/AI server + stdio bridge:  mcp/                 │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -569,7 +570,7 @@ The app follows a clean three-layer split. Understanding it makes contributing m
 npm test
 ```
 
-Runs every `tests/*.test.js` through `tests/run.js` (plain Node, no framework) and fails fast. The suite covers boot state, the editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace/poll suppression, textures, world-map wiring, player equipment (old and new NBT layouts), download resume, explored-chunk filtering and more.
+Runs every `tests/*.test.js` through `tests/run.js` (plain Node, no framework) and fails fast. The suite covers boot state, the editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace/poll suppression, textures, world-map wiring, player equipment (old and new NBT layouts), download resume, explored-chunk filtering, the scheduler, modpack compatibility, MCP (tool registry, HTTP server, and the stdio bridge over a real child process) and more.
 
 ### Run end-to-end tests
 
@@ -610,7 +611,7 @@ ObserverLauncher/
 │   │   └── platform/    # Windows/Linux process + metrics + firewall
 │   └── renderer/        # UI
 │       ├── index.html   # Shell (loads css/*, locales/*, js/* in order)
-│       ├── js/          # Frontend per tab (00-core … 08-shell)
+│       ├── js/          # Frontend per tab (00-core … 12-wizard)
 │       ├── css/         # Styles per area (01-tokens … 09-pulse)
 │       └── locales/     # One file per language (meta.js first)
 ├── tests/               # Unit tests (node tests/run.js)
