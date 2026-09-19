@@ -81,12 +81,15 @@ app.whenReady().then(async () => {
   setupAutoUpdater(ctx, ipcMain);
   // MCP integration: only start the loopback server when the user enabled it in Settings.
   // Toggling it later is handled by settings:save (see settings-handlers.js).
-  try { if (require('./main/settings.js').loadSettings().mcpEnabled) startMcpServer(ctx); } catch {}
+  try { const mcpOn = require('./main/settings.js').loadSettings().mcpEnabled; ctx.currentMcpEnabled = !!mcpOn; if (mcpOn) startMcpServer(ctx); } catch {}
   ctx.startMcpServer = () => startMcpServer(ctx);
   ctx.stopMcpServer = () => stopMcpServer(ctx);
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+// Stop the MCP server and remove its bridge config on the way out, so a stale token/port file
+// never lingers to confuse the next launch.
+app.on('before-quit', () => { try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} });
 setupQuitHandler(ctx);
 
 // Exported for smoke tests (require without launching Electron windows).
