@@ -8,7 +8,62 @@ const { serverFiles } = require('./server-files.js');
 const { readJsonList, fileHashes, safeTarget } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
 const platform = require('./platform');
-async function importMrpackFromPath(ctx, mrpackPath, onInfo) {
+// ============ MODPACK COMPATIBILITY (0.8.0) ============
+// A .mrpack declares its target in modrinth.index.json's `dependencies`:
+//   { "minecraft": "1.20.1", "forge": "47.2.0" }  (or neoforge / fabric-loader / quilt-loader)
+// Import used to ignore this entirely, so a Fabric 1.20.1 pack could be dropped into a Paper
+// 1.21 server and silently break. These helpers are pure (no I/O) so the mapping is unit-tested.
+const LOADER_KEYS = ['neoforge', 'forge', 'fabric-loader', 'quilt-loader'];
+// Finer loader detection than server-files.detectSoftware (which folds forge+neoforge into 'forge'):
+// compatibility needs to tell Forge from NeoForge and Fabric from Quilt.
+function detectServerCompat(info) {
+  const name = String((info && (info.jar || info.launchScript)) || '').toLowerCase();
+  if (/velocity|bungee|waterfall/.test(name)) return { mc: null, loader: 'proxy' };
+  if (/neoforge/.test(name)) return { mc: mcFromJar(name), loader: 'neoforge' };
+  if (/forge/.test(name)) return { mc: mcFromJar(name), loader: 'forge' };
+  if (/quilt/.test(name)) return { mc: mcFromJar(name), loader: 'quilt' };
+  if (/fabric/.test(name)) return { mc: mcFromJar(name), loader: 'fabric' };
+  if (/paper|purpur|leaf|folia/.test(name) || (info && info.hasSpigotConfig)) return { mc: mcFromJar(name), loader: 'paper' };
+  return { mc: mcFromJar(name), loader: 'vanilla' };
+}
+function mcFromJar(name) {
+  const m = String(name || '').match(/\b(1\.\d{1,2}(?:\.\d{1,2})?|26\.\d{1,2})\b/);
+  return m ? m[1] : null;
+}
+// Compare a pack's declared dependencies against the current server.
+//   deps:   index.dependencies (may be missing/empty)
+//   server: { mc, loader } from detectServerCompat
+// Returns { mc:{want,have,ok}, loader:{want,have,ok}, warnings:[...] } — warnings empty = compatible.
+function mrpackCompat(deps, server) {
+  deps = deps || {};
+  server = server || {};
+  const wantMc = deps.minecraft || null;
+  const loaderKey = LOADER_KEYS.find(k => deps[k]);
+  const wantLoader = loaderKey || null;
+  const warnings = [];
+  const mc = { want: wantMc, have: server.mc || null, ok: true };
+  // Only flag a MISMATCH when both sides are known — unknown version is not a warning.
+  if (wantMc && server.mc && wantMc !== server.mc) { mc.ok = false; warnings.push('mc'); }
+  const loader = { want: wantLoader, have: server.loader || null, ok: true };
+  if (wantLoader) {
+    const h = server.loader;
+    // Quilt/Fabric are interchangeable at the loader level for compatibility purposes.
+    const fabricGroup = ['fabric', 'quilt'];
+    const ok =
+      (wantLoader === 'forge' && h === 'forge') ||
+      (wantLoader === 'neoforge' && h === 'neoforge') ||
+      (wantLoader === 'fabric-loader' && fabricGroup.includes(h)) ||
+      (wantLoader === 'quilt-loader' && fabricGroup.includes(h));
+    if (h && !ok) { loader.ok = false; warnings.push('loader'); }
+  } else {
+    // Pack declares no loader → vanilla pack. Warn if the server runs a mod loader, since the
+    // pack's files may still be fine but the expectation differs.
+    if (server.loader && server.loader !== 'vanilla' && server.loader !== 'paper') { loader.ok = true; }
+  }
+  return { mc, loader, warnings };
+}
+
+async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
   let tempZip, extractDir;
   try {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
@@ -22,6 +77,25 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo) {
     const indexPath = path.join(extractDir, 'modrinth.index.json');
     if (!fs.existsSync(indexPath)) throw new Error('Not a valid .mrpack file (missing modrinth.index.json).');
     const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    // COMPAT: compare the pack's declared loader/MC against the current server. For a local
+    // import we ask the user before installing a mismatched pack ("Install anyway" allowed);
+    // for the Marketplace path the renderer already shows a warning panel, so we only report.
+    const compat = mrpackCompat(index.dependencies, detectServerCompat(serverFiles(ctx.currentServerPath)));
+    if (compat.warnings.length) {
+      onInfo?.({ phase: 'compat', warnings: compat.warnings, mc: compat.mc, loader: compat.loader });
+      if (source === 'local') {
+        const lines = [];
+        if (compat.warnings.includes('mc')) lines.push(`• Minecraft version: pack targets ${compat.mc.want}, this server is ${compat.mc.have}`);
+        if (compat.warnings.includes('loader')) lines.push(`• Loader: pack targets ${compat.loader.want}, this server is ${compat.loader.have}`);
+        const choice = await dialog.showMessageBox(ctx.win, {
+          type: 'warning', buttons: ['Cancel', 'Install anyway'], defaultId: 0, cancelId: 0,
+          title: 'Modpack may not be compatible',
+          message: 'This modpack does not match your server:',
+          detail: lines.join('\n') + '\n\nInstalling it may make the server fail to start. Continue anyway?'
+        });
+        if (choice.response !== 1) return { ok: false, cancelled: true };
+      }
+    }
     let installed = 0, skipped = 0;
     const installable = [];
     for (const file of index.files || []) {
@@ -43,10 +117,32 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo) {
     }
     const overridesDir = path.join(extractDir, 'overrides');
     if (fs.existsSync(overridesDir)) {
-      const sensitive = ['server.properties', 'eula.txt'].filter(f => fs.existsSync(path.join(overridesDir, f)) && fs.existsSync(path.join(ctx.currentServerPath, f)));
+      // List EVERY override that would replace an existing file (not just server.properties/eula.txt),
+      // so the user sees exactly what the pack is about to overwrite. `sensitive` (config the user
+      // edited by hand) gets a stronger warning; anything else is still listed for transparency.
+      const sensitiveSet = new Set(['server.properties', 'eula.txt']);
+      const clobbered = [];
+      const walk = (rel) => {
+        let entries; try { entries = fs.readdirSync(path.join(overridesDir, rel), { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+          const r = rel ? `${rel}/${e.name}` : e.name;
+          if (e.isDirectory()) { walk(r); continue; }
+          if (fs.existsSync(path.join(ctx.currentServerPath, r))) clobbered.push(r);
+        }
+      };
+      walk('');
       let proceed = true;
-      if (sensitive.length) {
-        const choice = await dialog.showMessageBox(ctx.win, { type: 'warning', buttons: ['Cancel', 'Overwrite'], defaultId: 0, cancelId: 0, title: 'Modpack wants to overwrite existing config', message: `This modpack includes its own ${sensitive.join(' and ')}, which would replace what you already have configured. Overwrite?` });
+      if (clobbered.length) {
+        const sensitiveHit = clobbered.filter(f => sensitiveSet.has(f));
+        const head = clobbered.slice(0, 8).join('\n');
+        const more = clobbered.length > 8 ? `\n…and ${clobbered.length - 8} more` : '';
+        const detail = head + more + (sensitiveHit.length ? '\n\n⚠ This includes server.properties/eula.txt you may have configured yourself.' : '');
+        const choice = await dialog.showMessageBox(ctx.win, {
+          type: 'warning', buttons: ['Cancel', 'Overwrite'], defaultId: 0, cancelId: 0,
+          title: 'Modpack will overwrite existing files',
+          message: `This modpack includes ${clobbered.length} file(s) that already exist in your server folder and would be replaced:`,
+          detail: detail + '\n\nOverwrite them?'
+        });
         proceed = choice.response === 1;
       }
       if (proceed) fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });
@@ -70,7 +166,7 @@ function registerModpacks(ipcMain, ctx) {
       if (!file) throw new Error('No .mrpack file was found for this modpack.');
       tempMrpack = path.join(app.getPath('temp'), `observerlauncher-market-modpack-${Date.now()}.mrpack`);
       await download(file.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: file.filename, received, total }));
-      return await importMrpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info));
+      return await importMrpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info), 'market');
     } catch (error) { return marketplaceError(error); }
     finally { try { if (tempMrpack) fs.rmSync(tempMrpack, { force: true }); } catch {} }
   });
@@ -79,7 +175,7 @@ function registerModpacks(ipcMain, ctx) {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     const picked = await dialog.showOpenDialog(ctx.win, { title: 'Import a modpack (.mrpack)', properties: ['openFile'], filters: [{ name: 'Modrinth modpack', extensions: ['mrpack', 'zip'] }] });
     if (picked.canceled || !picked.filePaths[0]) return { ok: false, cancelled: true };
-    return importMrpackFromPath(ctx, picked.filePaths[0]);
+    return importMrpackFromPath(ctx, picked.filePaths[0], undefined, 'local');
   });
 
   ipcMain.handle('modpack:export', async () => {
@@ -88,19 +184,45 @@ function registerModpacks(ipcMain, ctx) {
       if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
       const manifest = readJsonList(ctx.currentServerPath, 'observerlauncher-manifest.json');
       if (!manifest.length) return { ok: false, error: 'Nothing to export yet — only plugins/mods installed through the Marketplace are tracked. Manually copied files can\'t be traced back to a download URL.' };
-      const levelName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+      const server = serverFiles(ctx.currentServerPath);
+      const levelName = server.properties['level-name'] || 'world';
       const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', datapack: path.join(levelName, 'datapacks'), mod: 'mods' };
       const files = [];
+      const tracked = new Set();
       for (const entry of manifest) {
         const folder = destFolders[entry.kind] || 'plugins';
         const filePath = path.join(ctx.currentServerPath, folder, entry.fileName);
         if (!fs.existsSync(filePath)) continue;
+        tracked.add(`${folder.replace(/\\/g, '/')}/${entry.fileName}`);
         const stat = fs.statSync(filePath);
         files.push({ path: `${folder.replace(/\\/g, '/')}/${entry.fileName}`, hashes: fileHashes(filePath), downloads: [entry.sourceUrl], fileSize: stat.size, env: { client: 'optional', server: 'required' } });
       }
       if (!files.length) return { ok: false, error: 'None of the previously installed plugins/mods still exist on disk.' };
+      // Warn about jars that are NOT tracked (manually copied) — they will be left out of the pack,
+      // which can surprise the user when a friend imports it and something is missing.
+      const untracked = [];
+      for (const [folder, list] of [['plugins', server.plugins], ['mods', server.mods]]) {
+        for (const name of (list || [])) if (!tracked.has(`${folder}/${name}`)) untracked.push(name);
+      }
+      if (untracked.length) {
+        const choice = await dialog.showMessageBox(ctx.win, {
+          type: 'info', buttons: ['Continue', 'Cancel'], defaultId: 0, cancelId: 1,
+          title: 'Some files can\'t be exported',
+          message: `${untracked.length} plugin/mod file(s) weren't installed through the Marketplace and can't be traced to a download URL.`,
+          detail: untracked.slice(0, 8).join('\n') + (untracked.length > 8 ? `\n…and ${untracked.length - 8} more` : '') + '\n\nThey will be left out of the exported pack. Continue?'
+        });
+        if (choice.response !== 0) return { ok: false, cancelled: true };
+      }
       const folderName = path.basename(ctx.currentServerPath) || 'ObserverLauncher server';
-      const index = { formatVersion: 1, game: 'minecraft', versionId: `${folderName}-${Date.now()}`, name: folderName, summary: `Exported from ObserverLauncher — ${files.length} item(s).`, files, dependencies: {} };
+      // Write real dependencies (MC version + loader) so other launchers know what to build.
+      // Paper-like servers get only `minecraft` (Modrinth has no "paper" loader key; paper packs
+      // are usually distributed as plugin lists, not loader packs).
+      const sc = detectServerCompat(server);
+      const dependencies = {};
+      if (sc.mc) dependencies.minecraft = sc.mc;
+      const loaderDepKey = { neoforge: 'neoforge', forge: 'forge', fabric: 'fabric-loader', quilt: 'quilt-loader' }[sc.loader];
+      if (loaderDepKey) dependencies[loaderDepKey] = 'latest';
+      const index = { formatVersion: 1, game: 'minecraft', versionId: `${folderName}-${Date.now()}`, name: folderName, summary: `Exported from ObserverLauncher — ${files.length} item(s).`, files, dependencies };
       const saveDialog = await dialog.showSaveDialog(ctx.win, { title: 'Export modpack', defaultPath: `${folderName}.mrpack`, filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }] });
       if (saveDialog.canceled || !saveDialog.filePath) return { ok: false, cancelled: true };
       stagingDir = path.join(app.getPath('temp'), `observerlauncher-export-${Date.now()}`);
@@ -115,4 +237,4 @@ function registerModpacks(ipcMain, ctx) {
   });
 }
 
-module.exports = { importMrpackFromPath, registerModpacks };
+module.exports = { importMrpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar };
