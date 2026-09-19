@@ -3,6 +3,25 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.8.0] — 2026-09-19
+
+### Added
+- **Modpack compatibility checking.** Importing a `.mrpack` now reads its declared
+  `dependencies` (Minecraft version + `forge` / `neoforge` / `fabric-loader` / `quilt-loader`) and
+  compares them with the current server. On a mismatch, a local import asks before installing
+  ("Cancel" / "Install anyway"); the Marketplace path reports through its existing warning panel.
+  No warning is raised when either side's version is unknown, so unknown packs are never blocked.
+- New `tests/modpack-compat.test.js` (27 asserts) for the detection + comparison helpers.
+
+### Changed
+- **Modpack export writes real dependencies** (Minecraft version + loader) instead of an empty
+  object, so other launchers know what to build. Paper-like servers export only the Minecraft
+  version (Modrinth has no paper loader key).
+- **Modpack import lists every file it would overwrite** (previously only `server.properties` and
+  `eula.txt`), with a stronger warning when those config files are among them.
+- **Export warns about untracked files** — plugins/mods copied in by hand can't be traced to a
+  download URL and would be silently missing from the pack; the user is now told and can cancel.
+
 ## [0.7.1] — 2026-09-18
 
 ### Changed

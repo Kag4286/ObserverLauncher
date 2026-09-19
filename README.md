@@ -152,13 +152,13 @@ Running from source additionally requires **Node.js 18 or newer**.
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-0.7.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-0.7.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-0.8.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-0.8.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe`. It is a normal NSIS installer — you can choose the install location, and it sets up auto-update.
-- **Linux:** `chmod +x ObserverLauncher-0.7.0.AppImage` then run it. No installation, no root required.
+- **Linux:** `chmod +x ObserverLauncher-0.8.0.AppImage` then run it. No installation, no root required.
 
 ### Option B — Run from source
 
@@ -224,7 +224,7 @@ That's it. Everything else — plugins, players, backups, the world map — is o
 - Search **Modrinth, Hangar and SpigotMC** in one box.
 - Shows **compatibility before you install** (game version, loader, server-side support) against the server the launcher detected.
 - **Explicit version picker** with per-file download progress.
-- **Import and export** standard Modrinth `.mrpack` files.
+- **Import and export** standard Modrinth `.mrpack` files. Import checks the pack's declared Minecraft version and mod loader against your server and warns before installing a mismatch (never blocked — "Install anyway" is always available). Export writes real dependencies so other launchers know what to build.
 
 ### Config editor
 
