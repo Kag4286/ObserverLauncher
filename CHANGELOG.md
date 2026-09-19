@@ -5,20 +5,64 @@ All notable changes to ObserverLauncher are documented here. Format follows
 
 ## [0.8.0] — 2026-09-19
 
-### Added
-- **MCP / AI integration.** ObserverLauncher can expose its backend to any MCP client (Claude
-  Desktop, Cursor, …) so an assistant can read and control the server in natural language. A small
-  dependency-free bridge (`src/mcp/bridge.js`) speaks MCP over stdio and forwards calls to the app
-  over loopback HTTP (127.0.0.1, random port, fresh 32-byte token each launch). 40 tools cover
-  status, console, players (read by UUID or name, op/whitelist/ban, save data), files
-  (read/search/write/edit), content, properties, world, backups, settings, Java auto-install,
-  marketplace search/install, modpack import/export and lifecycle control. A 3-tier permission
-  model gates everything: read tools run freely, write tools ask in-app first (skippable via
-  "auto-allow write"), destructive tools always ask. Enable it in **Settings → MCP / AI**; the
-  section shows a live status pill and toasts when an AI client connects, and "Copy MCP config"
-  grabs the client JSON (runs the bridge with the app's own binary — no system Node needed).
-- `tests/mcp-tools.test.js`, `tests/mcp-server.test.js` (real HTTP boot) and
-  `tests/mcp-bridge-stdio.test.js` (spawns the bridge and drives MCP JSON-RPC over stdio).
+### Added — MCP / AI integration (major feature)
+ObserverLauncher can now act as an **MCP server**, so any MCP client (Claude Desktop, Cursor, …)
+can read and control the server in natural language — check status, read the console, manage files,
+install plugins, import modpacks, and more.
+
+**Architecture**
+- `src/mcp/tools.js` — a **40-tool registry**. Each tool declares a name, description, JSON input
+  schema and a **risk tier**, and its handler reuses the *same* backend function the GUI/IPC layer
+  uses (no duplicated logic). The 40 tools:
+  - *Read (18):* `get_status`, `read_console`, `list_players`, `get_player_data` (by UUID **or**
+    name), `list_files`, `read_file`, `search_files`, `list_content`, `get_properties`,
+    `get_raw_properties`, `get_world_info`, `list_worlds`, `list_backups`, `get_network_info`,
+    `get_java_info`, `get_settings`, `search_marketplace`, `list_market_versions`.
+  - *Write (17):* `start_server`, `send_console_command`, `set_property`, `set_raw_properties`,
+    `write_file`, `edit_file`, `create_backup`, `install_from_market`, `install_local_jar`,
+    `import_modpack_path`, `export_modpack`, `save_player_data`, `op_player`, `whitelist_player`,
+    `ban_player`, `install_java`, `set_setting`.
+  - *Destroy (5):* `stop_server`, `force_stop_server`, `delete_content`, `delete_backup`,
+    `restore_backup`.
+- `src/mcp/server.js` — a loopback HTTP server the app starts when MCP is enabled. Binds
+  **`127.0.0.1` only** on a **random port**, with a **fresh 32-byte bearer token every launch**
+  (written to `userData/mcp-bridge.json`). `GET /tools` serves the real schemas; `POST /rpc` runs a
+  tool. Oversized bodies get a real `413`.
+- `src/mcp/bridge.js` — a **dependency-free** stdio MCP server the client launches. It implements
+  `initialize` / `tools/list` / `tools/call` / `ping` directly (no SDK), fetches the real tool
+  schemas from the app over HTTP, and forwards calls. It runs on the app's **own binary** via
+  `ELECTRON_RUN_AS_NODE=1`, so a packaged install needs **no system Node.js**.
+- `src/mcp/confirm.js` — bridges a pending write/destroy tool call to the in-app confirm dialog
+  (`mcp:confirm-request` / `mcp:confirm-response`), with a 61s cleanup timer so the pending map
+  never leaks.
+
+**Permission model (3 tiers)**
+- **read** — runs freely.
+- **write** — asks for an in-app confirmation first; skippable with the *Auto-allow write tools*
+  setting. Destructive tools are never covered by that setting.
+- **destroy** — **always** asks; a 60s timeout denies.
+
+**Security**
+- Loopback-only, random port, per-launch token; the token file is removed on quit.
+- `install_local_jar` accepts only a `.jar` (regular file, ≤100 MB) — the one tool that reads
+  outside the server root.
+- `write_file` / `edit_file` enforce the editor's text-extension allowlist (an AI can't overwrite a
+  `.jar`/`.dat` with text), and `set_setting` uses a per-key allowlist that deliberately **excludes
+  `serverPath`** (the root of every file op stays GUI-only).
+- `install_from_market` validates download URLs (`isSafeDownloadUrl`) and picks by version/loader
+  instead of blindly taking the first build.
+- `search_files` caps files + bytes and yields to the event loop so a big scan can't freeze the UI.
+
+**Settings UI**
+- New **MCP / AI** section: enable toggle, auto-allow-write toggle, a live **LIVE/OFF** pill with
+  the listening port, and **Copy MCP config** (emits the exact client JSON — app binary +
+  `ELECTRON_RUN_AS_NODE` + `OBSERVER_MCP_USERDATA`). The app toasts + logs when an AI client first
+  connects.
+
+**Tests**
+- `tests/mcp-tools.test.js` (registry/risk/schema), `tests/mcp-server.test.js` (boots the real HTTP
+  server: auth 401/200, `/tools`, tool call, destroy denied) and `tests/mcp-bridge-stdio.test.js`
+  (spawns `bridge.js` as a child process and drives MCP JSON-RPC over stdio against a fake app).
 - **Modpack compatibility checking.** Importing a `.mrpack` now reads its declared
   `dependencies` (Minecraft version + `forge` / `neoforge` / `fabric-loader` / `quilt-loader`) and
   compares them with the current server. On a mismatch, a local import asks before installing
