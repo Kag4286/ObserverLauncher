@@ -15,5 +15,6 @@ contextBridge.exposeInMainWorld('observer', {
   onUpdateNone: cb => ipcRenderer.on('app:update-none', (_, d) => cb(d)),
   onUpdateError: cb => ipcRenderer.on('app:update-error', (_, d) => cb(d)),
   onMcpConfirmRequest: cb => ipcRenderer.on('mcp:confirm-request', (_, d) => cb(d)),
+  onMcpClient: cb => ipcRenderer.on('mcp:client', (_, d) => cb(d)),
   respondMcpConfirm: payload => ipcRenderer.send('mcp:confirm-response', payload)
 });

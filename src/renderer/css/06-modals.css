@@ -370,3 +370,10 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .confirm-body{margin:12px 18px 0;color:var(--text-muted);font:500 13px var(--font-ui);line-height:1.55}
 .confirm-body code{color:var(--accent);font:500 12px var(--font-mono)}
 .confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:18px}
+
+/* ============ MCP SECTION HIGHLIGHT (0.9.0) ============ */
+/* Make the MCP/AI block stand out: cyan left edge + tinted header + live pill. */
+.mcp-section{border-left:3px solid var(--accent);background:linear-gradient(90deg, var(--accent-weak), transparent 30%)}
+.mcp-section .sec-head h3{color:var(--accent)}
+.mcp-pill{margin-left:auto;font:700 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-dim)}
+.mcp-pill.on{border-color:rgba(0,229,160,.4);background:var(--success-weak);color:var(--success)}

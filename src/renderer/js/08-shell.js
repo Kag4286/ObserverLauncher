@@ -59,7 +59,7 @@ async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
 function renderRecentCommands(){const wrap=$('#recentCommands'),group=$('#recentCommandsGroup');if(!wrap||!group)return;if(!cmdHistory.length){group.hidden=true;return}group.hidden=false;wrap.innerHTML='';cmdHistory.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.title=c;b.onclick=()=>command(c);wrap.append(b)})}
-async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};propsDirty=false;markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
+async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
 $$('.nav-item').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $('#nav')?.addEventListener('keydown', e=>{
   const items=[...$$('.nav-item')]; const idx=items.indexOf(document.activeElement);
@@ -101,7 +101,8 @@ $('#saveSettings').onclick=async()=>{
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(r.error,'error');
   if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
-  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};propsDirty=false;markSettingsSaved();refreshUI();
+  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();
+  if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 };
 $('#saveRamOverview').onclick=async()=>{
@@ -328,6 +329,8 @@ window.observer.onState(v=>{if(v.status==='running')pulseStart();else pulseStop(
 // MCP write/destroy confirmation: the main process forwards a pending tool call here; we show
 // an in-app dialog (same style as everything else) and send the user's answer back so the MCP
 // tool call can proceed or be denied. Read-only tools never reach this path.
+// Notify when an AI client first connects to the MCP server.
+window.observer.onMcpClient?.(() => { toast(t('mcp.clientConnected'), 'success'); });
 window.observer.onMcpConfirmRequest?.(req => {
   if(!req||!req.reqId)return;
   const riskLabel=req.risk==='destroy'?t('mcp.riskDestroy'):t('mcp.riskWrite');

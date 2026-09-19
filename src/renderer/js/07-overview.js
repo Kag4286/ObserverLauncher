@@ -170,7 +170,10 @@ function syncMcpFields(s){
   const en=$('#mcpEnabledInput');if(en)en.checked=!!s.mcpEnabled;
   const aw=$('#mcpAutoWriteInput');if(aw)aw.checked=!!s.mcpAutoAllowWrite;
   const st=$('#mcpStatus');
-  if(st){const m=state.mcp||{};st.textContent=m.running?t('mcp.running',{p:m.port}):t('mcp.stopped');st.style.color=m.running?'var(--success)':'var(--text-dim)'}
+  const m=state.mcp||{};
+  if(st){st.textContent=m.running?t('mcp.running',{p:m.port}):t('mcp.stopped');st.style.color=m.running?'var(--success)':'var(--text-dim)'}
+  const pill=$('#mcpPill');
+  if(pill){pill.textContent=m.running?t('mcp.live'):t('mcp.off');pill.className='mcp-pill'+(m.running?' on':'')}
 }
 $('#mcpCopyConfig')?.addEventListener('click',async()=>{
   const c=(state.mcp&&state.mcp.config)||{command:'<path-to-ObserverLauncher>',args:['<userData>/mcp/bridge.js'],env:{ELECTRON_RUN_AS_NODE:'1',OBSERVER_MCP_USERDATA:'<userData>'}};

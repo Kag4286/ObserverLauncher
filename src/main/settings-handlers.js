@@ -97,15 +97,20 @@ function registerSettings(ipcMain, ctx) {
     if (nowMcp && !wasMcp && typeof ctx.startMcpServer === 'function') { try { ctx.startMcpServer(); } catch {} }
     else if (!nowMcp && wasMcp && typeof ctx.stopMcpServer === 'function') { try { ctx.stopMcpServer(); } catch {} }
     ctx.currentMcpEnabled = nowMcp;
+    // startMcpServer sets ctx.mcpPort from listen()'s async callback — wait briefly so the status
+    // we return (and the UI shows) is accurate instead of a stale null "stopped".
+    if (nowMcp) { for (let i = 0; i < 50 && !ctx.mcpPort; i++) await new Promise(r => setTimeout(r, 20)); }
     ctx.currentServerPath = merged.serverPath;
     ctx.watchServerFolder();
     saveSettings(merged);
     ctx.javaInfo = await detectJava(merged.javaPath || 'java');
+    const mcpStatus = { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!merged.mcpAutoAllowWrite };
     return {
       java: ctx.javaInfo,
       files: serverFiles(ctx.currentServerPath),
       eulaAccepted: readEula(ctx.currentServerPath),
-      javaRequired: requiredJavaForJar(serverFiles(ctx.currentServerPath).jar) || null
+      javaRequired: requiredJavaForJar(serverFiles(ctx.currentServerPath).jar) || null,
+      mcp: mcpStatus
     };
   });
 
