@@ -37,7 +37,8 @@ function registerSettings(ipcMain, ctx) {
       logs: ctx.consoleBuffer,
       live: ctx.live,
       systemMemoryGB: Math.round(os.totalmem() / (1024 ** 3)),
-      javaRequired
+      javaRequired,
+      mcp: { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite }
     };
   });
 
@@ -71,6 +72,14 @@ function registerSettings(ipcMain, ctx) {
     if (merged.serverPath !== ctx.currentServerPath && ctx.serverStatus !== 'stopped') {
       return { ok: false, error: 'Stop the server before changing the server folder.' };
     }
+    // MCP toggle: start the loopback server when enabled, stop it when disabled (done before
+    // saveSettings so the saved value matches the running state). ctx exposes
+    // startMcpServer/stopMcpServer from main.js after ready.
+    const wasMcp = !!ctx.currentMcpEnabled;
+    const nowMcp = !!merged.mcpEnabled;
+    if (nowMcp && !wasMcp && typeof ctx.startMcpServer === 'function') { try { ctx.startMcpServer(); } catch {} }
+    else if (!nowMcp && wasMcp && typeof ctx.stopMcpServer === 'function') { try { ctx.stopMcpServer(); } catch {} }
+    ctx.currentMcpEnabled = nowMcp;
     ctx.currentServerPath = merged.serverPath;
     ctx.watchServerFolder();
     saveSettings(merged);

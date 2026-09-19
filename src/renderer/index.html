@@ -349,6 +349,13 @@
               <span id="updateStatus" class="field-hint"></span>
             </div>
           </section>
+          <!-- MCP / AI -->
+          <section class="flat-cell flat-span2">
+            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="mcp.title">MCP / AI integration</h3><small data-i18n="mcp.sub">Let an MCP client read and control your server</small></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.enable">Enable MCP server</b><small data-i18n="mcp.enableSub">Starts a local-only (127.0.0.1) server with a fresh token each launch. The app must stay open.</small></div><label class="switch"><input type="checkbox" id="mcpEnabledInput"><span class="slider"></span></label></div>
+            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="mcp.autoWrite">Auto-allow write tools</b><small data-i18n="mcp.autoWriteSub">Skip the confirmation for write tools. Destructive tools always ask.</small></div><label class="switch"><input type="checkbox" id="mcpAutoWriteInput"><span class="slider"></span></label></div>
+            <div class="input-row" style="margin-top:12px"><span class="hint" id="mcpStatus" data-i18n="mcp.stopped">Stopped</span><button type="button" class="btn secondary sm" id="mcpCopyConfig" style="margin-left:auto" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
+          </section>
           <!-- Advanced JVM -->
           <details class="flat-cell flat-span2 set-advanced">
             <summary><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.advT">Advanced — JVM arguments</h3><small data-i18n="set.advD">power users · overrides the RAM sliders on Overview</small><span class="set-chevron">▸</span></summary>

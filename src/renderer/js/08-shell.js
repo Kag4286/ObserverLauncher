@@ -324,3 +324,19 @@ function pulseTick(){if(!pulseTicks.length)return;pulseTicks.forEach(t=>t.classL
 function pulseStart(){pulseStop();pulsePos=0;pulseTimer=setInterval(pulseTick,625)} // 8 ticks × 625ms ≈ 5s poll
 function pulseStop(){clearInterval(pulseTimer);pulseTimer=null;pulsePos=0;pulseTicks.forEach(t=>t.classList.remove('done'))}
 window.observer.onState(v=>{if(v.status==='running')pulseStart();else pulseStop()});
+
+// MCP write/destroy confirmation: the main process forwards a pending tool call here; we show
+// an in-app dialog (same style as everything else) and send the user's answer back so the MCP
+// tool call can proceed or be denied. Read-only tools never reach this path.
+window.observer.onMcpConfirmRequest?.(req => {
+  if(!req||!req.reqId)return;
+  const riskLabel=req.risk==='destroy'?t('mcp.riskDestroy'):t('mcp.riskWrite');
+  let argText='';
+  try{argText=JSON.stringify(req.args||{},null,2)}catch{argText=''}
+  const body=(req.risk==='destroy'?t('mcp.confirmDestroy'):t('mcp.confirmWrite',{t:req.tool}))
+    +`\n\n`+t('mcp.tool')+`: `+req.tool+`  ·  `+t('mcp.risk')+`: `+riskLabel
+    +(argText&&argText!=='{}'?`\n\n`+t('mcp.args')+`:\n`+argText:'');
+  confirmDialog({title:t('mcp.confirmTitle'),body:esc(body).replace(/\n/g,'<br>'),ok:t('mcp.allow'),cancel:t('mcp.deny'),danger:req.risk==='destroy'})
+    .then(allow=>window.observer.respondMcpConfirm({reqId:req.reqId,allow:!!allow}))
+    .catch(()=>window.observer.respondMcpConfirm({reqId:req.reqId,allow:false}));
+});

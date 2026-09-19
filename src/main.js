@@ -49,6 +49,7 @@ const { registerSettings } = require('./main/settings-handlers.js');
 const { registerContent } = require('./main/content-handlers.js');
 const { createWindow, setupAutoUpdater, setupQuitHandler, initApp } = require('./main/app-lifecycle.js');
 const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
+const { registerMcpConfirm } = require('./mcp/confirm.js');
 
 // Custom tex:// icon scheme — MUST be registered as privileged before the
 // app is ready, or Chromium treats it as non-standard and <img> loads fail.
@@ -64,6 +65,7 @@ registerModpacks(ipcMain, ctx);
 registerWizard(ipcMain, ctx);
 registerSettings(ipcMain, ctx);
 registerContent(ipcMain, ctx);
+registerMcpConfirm(ipcMain, ctx);
 
 app.whenReady().then(async () => {
   // BUGFIX (Start dead on launch): initApp used to run AFTER createWindow, so the

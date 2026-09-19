@@ -59,8 +59,30 @@ async function callTool(ctx, toolName, args, cfg) {
   }
 }
 
+// Generate a user-runnable launcher script + MCP client config so the packaged app (where the
+// bridge lives inside app.asar and cannot be run directly) still works. We extract bridge.js to
+// userData on first use and point the script at it. Best-effort: failure is logged, not fatal.
+function ensureLauncherScript() {
+  try {
+    const userData = app.getPath('userData');
+    const bridgeSrc = path.join(__dirname, 'bridge.js');
+    const bridgeDst = path.join(userData, 'mcp', 'bridge.js');
+    fs.mkdirSync(path.dirname(bridgeDst), { recursive: true });
+    fs.copyFileSync(bridgeSrc, bridgeDst);
+    const cfg = { mcpServers: { observerlauncher: {
+      command: process.platform === 'win32' ? 'node' : 'node',
+      args: [bridgeDst],
+      env: { OBSERVER_MCP_USERDATA: userData },
+    } } };
+    const cfgPath = path.join(userData, 'mcp', 'mcp-config.json');
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    return { bridgeDst, cfgPath };
+  } catch { return null; }
+}
+
 function startMcpServer(ctx) {
   stopMcpServer(ctx);
+  ctx.mcpLauncher = ensureLauncherScript();
   const token = crypto.randomBytes(32).toString('hex');
   const server = http.createServer((req, res) => {
     // Only POST /rpc is served. Anything else → 404.
