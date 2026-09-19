@@ -25,10 +25,14 @@ function checkPlayerInput({ name, reason, uuid }) {
 
 // ---- Pure player actions (shared by the IPC handlers AND the MCP tools) ----
 // Extracted so src/mcp/tools.js reuses the exact same validated logic.
-async function readPlayer(ctx, uuid) {
-  if (!isSafeUuid(uuid)) return { ok: false, error: 'Invalid player UUID.' };
-  try { return { ok: true, ...(await readPlayerData(ctx.currentServerPath, uuid)) }; }
-  catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data for UUID ${uuid}.` }; }
+async function readPlayer(ctx, uuid, name) {
+  // Accept a UUID, or a name (resolved to the offline UUID on disk). Need at least one.
+  const hasUuid = isSafeUuid(uuid);
+  const hasName = typeof name === 'string' && name.length >= 1 && name.length <= 16;
+  if (!hasUuid && !hasName) return { ok: false, error: 'Provide a valid player UUID or a name.' };
+  if (uuid && !hasUuid) return { ok: false, error: 'Invalid player UUID.' };
+  try { return { ok: true, ...(await readPlayerData(ctx.currentServerPath, hasUuid ? uuid : null, hasName ? name : undefined)) }; }
+  catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data.` }; }
 }
 async function whitelistToggle(ctx, { uuid, name, add }) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };

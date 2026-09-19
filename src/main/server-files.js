@@ -110,10 +110,11 @@ function buildPropertiesContent(root, props) {
 // BUGFIX (item count showing as undefined): 1.21.5+ / 26.x item stacks use
 // lowercase `count`; pre-1.20.5 files used `Count`. Normalize both here.
 function stackOf(item) { return { id: item.id, count: item.count ?? item.Count ?? 1 }; }
-async function readPlayerData(root, uuid) {
+async function readPlayerData(root, uuid, name) {
   if (!root) throw new Error('No server folder is selected.');
   const files = serverFiles(root);
-  const knownName = files?.knownPlayers?.find(p => String(p.uuid) === String(uuid))?.name;
+  // Name can be supplied directly (lookup by name) or resolved from usercache when we have a uuid.
+  const knownName = name || files?.knownPlayers?.find(p => String(p.uuid) === String(uuid))?.name;
   const file = findPlayerDataFile(root, files.properties, uuid, knownName);
   if (!file) {
     // FEATURE: online and offline (name-derived) UUIDs are both tried above via offlineUUID() —

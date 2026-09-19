@@ -315,7 +315,7 @@ async function tSavePlayerData(ctx) {
   return { ok: false, error: 'Editing player stats over MCP is not supported yet - use the GUI player editor.' };
 }
 const { readPlayer, whitelistToggle, banToggle, opToggle } = require('../main/players.js');
-async function tReadPlayer(ctx, a) { return ok(await readPlayer(ctx, a.uuid)); }
+async function tReadPlayer(ctx, a) { return ok(await readPlayer(ctx, a.uuid, a.name)); }
 async function tOpPlayer(ctx, a) { needPath(ctx); return ok(await opToggle(ctx, { uuid: a.uuid || null, name: a.name, op: a.on !== false })); }
 async function tWhitelistPlayer(ctx, a) { needPath(ctx); return ok(await whitelistToggle(ctx, { uuid: a.uuid || null, name: a.name, add: a.add !== false })); }
 async function tBanPlayer(ctx, a) { needPath(ctx); return ok(await banToggle(ctx, { uuid: a.uuid || null, name: a.name, ban: a.ban !== false, reason: a.reason })); }
@@ -366,7 +366,7 @@ const TOOLS = [
   { name: 'get_status', risk: 'read', description: 'Server status, folder, jar, software and Java info.', inputSchema: S(), handler: tGetStatus },
   { name: 'read_console', risk: 'read', description: 'Recent console/log lines.', inputSchema: S({ lines: { type: 'number' } }), handler: tReadConsole },
   { name: 'list_players', risk: 'read', description: 'Online, whitelisted, banned, op and known players.', inputSchema: S(), handler: tListPlayers },
-  { name: 'get_player_data', risk: 'read', description: 'Read one player .dat (stats/inventory) by UUID.', inputSchema: S({ uuid: STR('player UUID') }, ['uuid']), handler: tReadPlayer },
+  { name: 'get_player_data', risk: 'read', description: 'Read one player .dat (stats/inventory) by UUID or name.', inputSchema: S({ uuid: STR('player UUID (optional)'), name: STR('player name (optional)') }), handler: tReadPlayer },
   { name: 'list_files', risk: 'read', description: 'List a directory inside the server folder.', inputSchema: S({ path: STR('relative dir, default .') }), handler: tListFiles },
   { name: 'read_file', risk: 'read', description: 'Read a text file inside the server folder.', inputSchema: S({ path: STR('relative file path') }, ['path']), handler: tReadFile },
   { name: 'search_files', risk: 'read', description: 'Grep text files inside the server folder.', inputSchema: S({ query: STR('substring') }, ['query']), handler: tSearchFiles },
