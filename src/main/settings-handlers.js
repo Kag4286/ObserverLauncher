@@ -106,6 +106,7 @@ function registerSettings(ipcMain, ctx) {
     ctx.javaInfo = await detectJava(merged.javaPath || 'java');
     const mcpStatus = { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!merged.mcpAutoAllowWrite };
     return {
+      ok: true,
       java: ctx.javaInfo,
       files: serverFiles(ctx.currentServerPath),
       eulaAccepted: readEula(ctx.currentServerPath),
