@@ -127,7 +127,7 @@ $('#startBtn').onclick=async()=>{let r;try{r=await window.observer.start(getSett
 $('#forceStopBtn').onclick=async()=>{if(!await confirmDialog({title:t('top.forceStop'),body:t('top.forceStopConfirm'),ok:t('top.forceStop'),danger:true}))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')};
 window.observer.onLog(addLog);window.observer.onState(v=>{state.running=v.running;state.status=v.status||(v.running?'running':'stopped');
   if(state.status==='running'&&!uptimeStart)uptimeStart=Date.now();else if(state.status==='stopped')uptimeStart=null;
-  refreshUI()});window.observer.onFiles(f=>{state.files=f.files||f;state.javaRequired=f.javaRequired??state.javaRequired;refreshUI()});let lastLivePlayersKey='';
+  refreshUI()});window.observer.onFiles(f=>{state.files=f.files||f;if(f.eulaAccepted!==undefined)state.eulaAccepted=f.eulaAccepted;state.javaRequired=f.javaRequired??state.javaRequired;refreshUI()});let lastLivePlayersKey='';
 let lastMetrics=null;
 function applyLiveToUI(live){
   try{

@@ -12,7 +12,7 @@
 // so behaviour stays identical to the old monolithic main.js.
 const fs = require('fs');
 const path = require('path');
-const { serverFiles } = require('./server-files.js');
+const { serverFiles, readEula } = require('./server-files.js');
 
 function createContext() {
   const ctx = {
@@ -71,7 +71,12 @@ function createContext() {
 
   function pushFiles() {
     try {
-      send('server:files', serverFiles(ctx.currentServerPath));
+      const files = serverFiles(ctx.currentServerPath);
+      // Include eulaAccepted so a server start (which writes eula.txt) is reflected in the UI —
+      // the renderer merges this in onFiles; without it the Overview EULA chip stayed "pending".
+      let eulaAccepted = false;
+      try { eulaAccepted = readEula(ctx.currentServerPath); } catch {}
+      send('server:files', { files, eulaAccepted, javaRequired: null });
     } catch {}
   }
 
