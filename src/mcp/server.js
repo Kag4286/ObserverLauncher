@@ -103,7 +103,7 @@ function startMcpServer(ctx) {
     req.on('end', async () => {
       let payload;
       try { payload = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end('bad json'); }
-      const settings = require('../settings.js').loadSettings();
+      const settings = require('../main/settings.js').loadSettings();
       const cfg = { autoAllowWrite: !!settings.mcpAutoAllowWrite };
       const result = await callTool(ctx, payload.tool, payload.args, cfg);
       const out = JSON.stringify(result);
