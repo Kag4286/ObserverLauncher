@@ -302,10 +302,18 @@ server (127.0.0.1, random port, a fresh token every launch) and writes its conne
 ```json
 {
   "mcpServers": {
-    "observerlauncher": { "command": "node", "args": ["<install-dir>/resources/app.asar.unpacked/src/mcp/bridge.js"] }
+    "observerlauncher": {
+      "command": "<path-to-ObserverLauncher>",
+      "args": ["<userData>/mcp/bridge.js"],
+      "env": { "ELECTRON_RUN_AS_NODE": "1", "OBSERVER_MCP_USERDATA": "<userData>" }
+    }
   }
 }
 ```
+
+The exact JSON (with the real paths filled in) is what the **Copy MCP config** button puts on your
+clipboard — paste that. The launcher runs the bridge with its OWN binary (`ELECTRON_RUN_AS_NODE=1`),
+so **you do not need Node.js installed**.
 
 **Permissions.** Tools are tiered: **read** tools run freely; **write** tools (install, edit files,
 send a command) ask for confirmation in the app first — you can switch on *Auto-allow write tools*

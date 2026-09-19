@@ -78,14 +78,17 @@ function ensureLauncherScript() {
     const bridgeDst = path.join(userData, 'mcp', 'bridge.js');
     fs.mkdirSync(path.dirname(bridgeDst), { recursive: true });
     fs.copyFileSync(bridgeSrc, bridgeDst);
+    // Use the running executable itself as the Node runtime (ELECTRON_RUN_AS_NODE=1 turns the
+    // Electron/app binary into a plain Node process). This means a packaged install works even if
+    // the user has NO system Node.js — the old config hardcoded `node` and failed for them.
     const cfg = { mcpServers: { observerlauncher: {
-      command: process.platform === 'win32' ? 'node' : 'node',
+      command: process.execPath,
       args: [bridgeDst],
-      env: { OBSERVER_MCP_USERDATA: userData },
+      env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: userData },
     } } };
     const cfgPath = path.join(userData, 'mcp', 'mcp-config.json');
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-    return { bridgeDst, cfgPath };
+    return { bridgeDst, cfgPath, command: process.execPath };
   } catch { return null; }
 }
 

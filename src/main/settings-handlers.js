@@ -46,7 +46,7 @@ function registerSettings(ipcMain, ctx) {
         let config = null;
         try {
           if (ctx.mcpLauncher && ctx.mcpLauncher.bridgeDst) {
-            config = { command: 'node', args: [ctx.mcpLauncher.bridgeDst], env: { OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
+            config = { command: ctx.mcpLauncher.command || process.execPath, args: [ctx.mcpLauncher.bridgeDst], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
           } else {
             const { bridgeScriptPath } = require('../mcp/server.js');
             config = { command: 'node', args: [bridgeScriptPath()] };
