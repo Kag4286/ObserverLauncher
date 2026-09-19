@@ -48,8 +48,10 @@ function registerSettings(ipcMain, ctx) {
           if (ctx.mcpLauncher && ctx.mcpLauncher.bridgeDst) {
             config = { command: ctx.mcpLauncher.command || process.execPath, args: [ctx.mcpLauncher.bridgeDst], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
           } else {
+            // Fallback before the launcher has been generated: still use the app binary as Node so
+            // the config never depends on a system Node.js install.
             const { bridgeScriptPath } = require('../mcp/server.js');
-            config = { command: 'node', args: [bridgeScriptPath()] };
+            config = { command: process.execPath, args: [bridgeScriptPath()], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
           }
         } catch {}
         return { enabled: !!ctx.mcpServer, running, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite, config };
