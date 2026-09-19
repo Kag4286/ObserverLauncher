@@ -79,6 +79,14 @@ install plugins, import modpacks, and more.
 - **Export warns about untracked files** — plugins/mods copied in by hand can't be traced to a
   download URL and would be silently missing from the pack; the user is now told and can cancel.
 
+### Fixed
+- **Overview EULA chip never updated after a start.** `server:files` carried only the file list, so
+  when the server wrote `eula.txt` on first start the "EULA will be accepted on start" chip stayed
+  put. The push now includes `eulaAccepted` and the renderer merges it.
+- **Settings header overlapped the section list.** The Launcher-settings header was `position:
+  sticky`; with the taller `.tab-head` strip it looked stuck over the first rows. It now scrolls
+  with the list.
+
 ## [0.7.1] — 2026-09-18
 
 ### Changed
