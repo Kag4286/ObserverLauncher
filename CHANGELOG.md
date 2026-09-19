@@ -9,12 +9,16 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **MCP / AI integration.** ObserverLauncher can expose its backend to any MCP client (Claude
   Desktop, Cursor, …) so an assistant can read and control the server in natural language. A small
   dependency-free bridge (`src/mcp/bridge.js`) speaks MCP over stdio and forwards calls to the app
-  over loopback HTTP (127.0.0.1, random port, fresh 32-byte token each launch). ~37 tools cover
-  status, console, players, files (read/search/write/edit), content, properties, world, backups,
+  over loopback HTTP (127.0.0.1, random port, fresh 32-byte token each launch). 40 tools cover
+  status, console, players (read by UUID or name, op/whitelist/ban, save data), files
+  (read/search/write/edit), content, properties, world, backups, settings, Java auto-install,
   marketplace search/install, modpack import/export and lifecycle control. A 3-tier permission
   model gates everything: read tools run freely, write tools ask in-app first (skippable via
-  "auto-allow write"), destructive tools always ask. Enable it in **Settings → MCP / AI** and use
-  "Copy MCP config" to grab the client JSON.
+  "auto-allow write"), destructive tools always ask. Enable it in **Settings → MCP / AI**; the
+  section shows a live status pill and toasts when an AI client connects, and "Copy MCP config"
+  grabs the client JSON (runs the bridge with the app's own binary — no system Node needed).
+- `tests/mcp-tools.test.js`, `tests/mcp-server.test.js` (real HTTP boot) and
+  `tests/mcp-bridge-stdio.test.js` (spawns the bridge and drives MCP JSON-RPC over stdio).
 - **Modpack compatibility checking.** Importing a `.mrpack` now reads its declared
   `dependencies` (Minecraft version + `forge` / `neoforge` / `fabric-loader` / `quilt-loader`) and
   compares them with the current server. On a mismatch, a local import asks before installing
