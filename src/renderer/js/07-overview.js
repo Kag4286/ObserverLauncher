@@ -173,8 +173,8 @@ function syncMcpFields(s){
   if(st){const m=state.mcp||{};st.textContent=m.running?t('mcp.running',{p:m.port}):t('mcp.stopped');st.style.color=m.running?'var(--success)':'var(--text-dim)'}
 }
 $('#mcpCopyConfig')?.addEventListener('click',async()=>{
-  const script=(state.mcp&&state.mcp.script)||'<path-to-ObserverLauncher>/src/mcp/bridge.js';
-  const cfg={mcpServers:{observerlauncher:{command:'node',args:[script]}}};
+  const c=(state.mcp&&state.mcp.config)||{command:'node',args:['<path-to-ObserverLauncher>/src/mcp/bridge.js']};
+  const cfg={mcpServers:{observerlauncher:c}};
   try{await navigator.clipboard.writeText(JSON.stringify(cfg,null,2));toast(t('mcp.copied'),'success')}catch{toast('Copy failed','error')}
 });
 const BACKUP_PRESETS=[0,15,30,60];

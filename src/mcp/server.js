@@ -94,9 +94,17 @@ function startMcpServer(ctx) {
   ctx.mcpLauncher = ensureLauncherScript();
   const token = crypto.randomBytes(32).toString('hex');
   const server = http.createServer((req, res) => {
-    // Only POST /rpc is served. Anything else → 404.
-    if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
     const auth = req.headers['authorization'] || '';
+    // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
+    // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.
+    if (req.method === 'GET' && req.url === '/tools') {
+      if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
+      const tools = TOOLS.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ tools }));
+    }
+    // Only POST /rpc is served beyond that. Anything else → 404.
+    if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
     if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
     let body = '';
     req.on('data', c => { body += c; if (body.length > MAX_BODY) req.destroy(); });

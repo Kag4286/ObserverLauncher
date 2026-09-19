@@ -116,12 +116,23 @@ async function tSearchMarketplace(ctx, a) {
   const version = a.version || '';
   const sort = a.sort || 'downloads';
   if (source !== 'modrinth') return { ok: false, error: 'Only source=modrinth is supported by the MCP search tool for now.' };
-  const typeMap = { plugin: 'bukkit', forge: 'forge', fabric: 'fabric', datapack: 'datapack', modpack: 'modpack', mod: 'mod' };
-  const facets = [];
-  if (typeMap[kind]) facets.push('project_type:' + typeMap[kind]);
-  if (version) facets.push('versions:' + version);
-  let url = 'https://api.modrinth.com/v2/search?query=' + encodeURIComponent(query) + '&limit=20&index=' + (sort === 'latest' ? 'newest' : 'downloads');
-  if (facets.length) url += '&facets=' + encodeURIComponent(JSON.stringify([facets.map(f => JSON.stringify([f]))]));
+  // Facets mirror src/main/marketplace.js: Modrinth expects an array of OR-groups (each inner
+  // array = alternatives). Building it as string-quoted fragments (the old code) produced a
+  // double-encoded, wrong filter. Plugin/mod loaders use the same groups the GUI search uses.
+  const loaderGroups = {
+    plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
+    forge: ['loaders:forge', 'loaders:neoforge'],
+    fabric: ['loaders:fabric', 'loaders:quilt'],
+  };
+  const filters = [];
+  if (kind === 'modpack') filters.push(['project_type:modpack']);
+  else if (kind === 'datapack') filters.push(['project_type:datapack']);
+  else {
+    filters.push(['project_type:mod']);
+    filters.push(loaderGroups[kind] || loaderGroups.plugin);
+  }
+  if (version) filters.push(['versions:' + version]);
+  let url = 'https://api.modrinth.com/v2/search?query=' + encodeURIComponent(query) + '&limit=20&index=' + (sort === 'latest' ? 'newest' : 'downloads') + '&facets=' + encodeURIComponent(JSON.stringify(filters));
   const { signal, cancel } = withTimeout(15000);
   try {
     const r = await fetch(url, { signal });
@@ -204,21 +215,30 @@ async function tCreateBackup(ctx) { return ok(await createBackupInternal(ctx)); 
 async function tInstallFromMarket(ctx, a) {
   const id = String(a.id || '');
   if (!id) return { ok: false, error: 'id is required.' };
-  const kind = a.kind || 'plugin';
+  const kind = ['forge', 'fabric', 'datapack', 'mod'].includes(a.kind) ? a.kind : 'plugin';
+  const version = a.version || '';
   const versions = await json('https://api.modrinth.com/v2/project/' + encodeURIComponent(id) + '/version');
-  const target = a.versionId ? versions.find(v => v.id === a.versionId) : versions[0];
-  if (!target) return { ok: false, error: 'No version found.' };
-  const file = (target.files || []).find(f => /\.jar$/i.test(f.filename)) || (target.files || [])[0];
+  if (!Array.isArray(versions) || !versions.length) return { ok: false, error: 'No versions found for this project.' };
+  // Mirror market:install: pick by explicit versionId, else by MC version + the right loader group,
+  // never blindly versions[0] (which can be the wrong game version or a client-only build).
+  const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'] }[kind];
+  const byVersion = versions.filter(v => !version || (v.game_versions || []).includes(version));
+  let target = a.versionId ? versions.find(v => v.id === a.versionId) : null;
+  if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
+  if (!target) return { ok: false, error: 'No matching version.' };
+  const file = (target.files || []).find(f => f.primary) || (target.files || []).find(f => /\.jar$|\.zip$/i.test(f.filename)) || (target.files || [])[0];
   if (!file) return { ok: false, error: 'No downloadable file.' };
+  const { isSafeDownloadUrl } = require('../main/validate.js');
+  if (!isSafeDownloadUrl(file.url)) return { ok: false, error: 'Refused: download URL is not an allowlisted public host.' };
   const root = needPath(ctx);
-  const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : kind === 'mod' ? 'mods' : 'plugins';
+  const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : (kind === 'mod' || kind === 'forge' || kind === 'fabric') ? 'mods' : 'plugins';
   const dest = safeTarget(root, path.join(folder, file.filename));
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   const { download } = require('../main/http.js');
   const { recordManifestEntry } = require('../main/fs-utils.js');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   await download(file.url, dest);
-  try { recordManifestEntry(root, { kind, fileName: file.filename, sourceUrl: file.url }); } catch {}
+  try { recordManifestEntry(root, { kind, fileName: file.filename, sourceUrl: file.url, source: 'modrinth', installedAt: new Date().toISOString() }); } catch {}
   return { ok: true, result: { name: file.filename, files: serverFiles(root) } };
 }
 async function tInstallLocalJar(ctx, a) {

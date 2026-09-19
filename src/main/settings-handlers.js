@@ -38,7 +38,22 @@ function registerSettings(ipcMain, ctx) {
       live: ctx.live,
       systemMemoryGB: Math.round(os.totalmem() / (1024 ** 3)),
       javaRequired,
-      mcp: { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite, script: (() => { try { return require('../mcp/server.js').bridgeScriptPath(); } catch { return null; } })() }
+      mcp: (() => {
+        const running = !!ctx.mcpPort;
+        // Client config: prefer the extracted launcher (userData/mcp/bridge.js + OBSERVER_MCP_USERDATA)
+        // because that is the ONE path that works in both dev and a packaged build. Fall back to the
+        // raw bridge path only if the launcher could not be created.
+        let config = null;
+        try {
+          if (ctx.mcpLauncher && ctx.mcpLauncher.bridgeDst) {
+            config = { command: 'node', args: [ctx.mcpLauncher.bridgeDst], env: { OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
+          } else {
+            const { bridgeScriptPath } = require('../mcp/server.js');
+            config = { command: 'node', args: [bridgeScriptPath()] };
+          }
+        } catch {}
+        return { enabled: !!ctx.mcpServer, running, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite, config };
+      })()
     };
   });
 

@@ -56,15 +56,27 @@ function callApp(tool, args) {
   });
 }
 
-// Tool list is fetched lazily from the app on tools/list. We cache briefly so a client that
-// lists then calls doesn't double-hit the app.
+// GET the real tool list (with full inputSchema) from the app. Falls back to the static
+// name/description list if the app isn't reachable, so tools/list still answers — the actual
+// call will then explain that the app is off.
+function fetchToolsFromApp() {
+  return new Promise(resolve => {
+    const cfg = readConfig();
+    if (!cfg || !cfg.port || !cfg.token) return resolve(null);
+    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: '/tools', method: 'GET', headers: { authorization: 'Bearer ' + cfg.token } }, res => {
+      let data = ''; res.on('data', c => data += c);
+      res.on('end', () => { try { const j = JSON.parse(data); resolve(Array.isArray(j.tools) ? j.tools : null); } catch { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
 let cachedTools = null;
 let cachedAt = 0;
 async function fetchTools() {
   if (cachedTools && Date.now() - cachedAt < 5000) return cachedTools;
-  // The app exposes tool metadata through get_status? No — the bridge ships the static list
-  // itself so tools/list works even before the app is reachable (the call will explain if not).
-  cachedTools = STATIC_TOOLS;
+  const fromApp = await fetchToolsFromApp();
+  cachedTools = fromApp || STATIC_TOOLS;
   cachedAt = Date.now();
   return cachedTools;
 }
