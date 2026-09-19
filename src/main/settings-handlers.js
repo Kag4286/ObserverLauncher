@@ -141,7 +141,12 @@ function registerSettings(ipcMain, ctx) {
     return platform.allowFirewall(p);
   });
 
-  ipcMain.handle('java:auto-install', async () => {
+  ipcMain.handle('java:auto-install', async () => autoInstallJava(ctx));
+}
+
+// Shared by the IPC handler and the MCP tool. Downloads a portable Adoptium JRE chosen from the
+// server jar's requirement (min Java 21), stages it, verifies the binary, then swaps it in.
+async function autoInstallJava(ctx) {
     if (javaInstalling) return { ok: false, error: 'A Java install is already in progress — check the Console tab.' };
     if (ctx.javaInfo?.ok) return { ok: false, error: 'Java is already detected — no need to install it again.' };
     javaInstalling = true;
@@ -192,7 +197,6 @@ function registerSettings(ipcMain, ctx) {
       javaInstalling = false;
       try { if (zipPath) fs.rmSync(zipPath, { force: true }); } catch {}
     }
-  });
 }
 
-module.exports = { registerSettings };
+module.exports = { registerSettings, autoInstallJava };

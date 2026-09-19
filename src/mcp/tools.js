@@ -222,6 +222,35 @@ async function tEditFile(ctx, a) {
   return { ok: true };
 }
 async function tCreateBackup(ctx) { return ok(await createBackupInternal(ctx)); }
+async function tInstallJava(ctx) {
+  const { autoInstallJava } = require('../main/settings-handlers.js');
+  return ok(await autoInstallJava(ctx));
+}
+async function tGetSettings(ctx) {
+  const s = loadSettings();
+  return { ok: true, result: { serverPath: s.serverPath || null, javaPath: s.javaPath || null, memoryMin: s.memoryMin, memoryMax: s.memoryMax, jvmArgs: s.jvmArgs || '', autoEula: !!s.autoEula, autoRestart: !!s.autoRestart, locale: s.locale || 'en', autoBackupMinutes: s.autoBackupMinutes || 0 } };
+}
+// serverPath is intentionally NOT settable over MCP (root of every file op) — GUI only.
+const SETTABLE = {
+  memoryMin: v => Number.isFinite(Number(v)) && Number(v) >= 1 && Number(v) <= 64,
+  memoryMax: v => Number.isFinite(Number(v)) && Number(v) >= 1 && Number(v) <= 64,
+  autoRestart: v => typeof v === 'boolean',
+  autoEula: v => typeof v === 'boolean',
+  autoBackupMinutes: v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1440,
+  locale: v => typeof v === 'string' && v.length <= 10,
+  jvmArgs: v => typeof v === 'string' && v.length <= 2000 && !/["'<>|]/.test(v),
+};
+async function tSetSetting(ctx, a) {
+  const key = String(a.key || '');
+  if (!SETTABLE[key]) return { ok: false, error: 'Key not settable over MCP: ' + key + '. Allowed: ' + Object.keys(SETTABLE).join(', ') };
+  if (!SETTABLE[key](a.value)) return { ok: false, error: 'Invalid value for ' + key + '.' };
+  const { saveSettings } = require('../main/settings.js');
+  const s = loadSettings();
+  s[key] = a.value;
+  if (Number(s.memoryMax) < Number(s.memoryMin)) return { ok: false, error: 'memoryMax must be >= memoryMin.' };
+  saveSettings(s);
+  return { ok: true, result: { key, value: a.value } };
+}
 async function tInstallFromMarket(ctx, a) {
   const id = String(a.id || '');
   if (!id) return { ok: false, error: 'id is required.' };
@@ -385,6 +414,9 @@ const TOOLS = [
   { name: 'write_file', risk: 'write', description: 'Write a text file inside the server folder.', inputSchema: S({ path: STR('relative path'), content: STR('full content') }, ['path', 'content']), handler: tWriteFile },
   { name: 'edit_file', risk: 'write', description: 'Replace oldString with newString in a file.', inputSchema: S({ path: STR('relative path'), oldString: STR('exact text'), newString: STR('replacement') }, ['path', 'oldString', 'newString']), handler: tEditFile },
   { name: 'create_backup', risk: 'write', description: 'Create a world backup (ZIP).', inputSchema: S(), handler: tCreateBackup },
+  { name: 'get_settings', risk: 'read', description: 'Read launcher settings (RAM, Java, auto-restart, locale, backup interval).', inputSchema: S(), handler: tGetSettings },
+  { name: 'install_java', risk: 'write', description: 'Download and install a portable Java runtime (Adoptium) matching the server needs.', inputSchema: S(), handler: tInstallJava },
+  { name: 'set_setting', risk: 'write', description: 'Change one launcher setting (memoryMin/Max, autoRestart, autoEula, autoBackupMinutes, locale, jvmArgs). serverPath is NOT settable.', inputSchema: S({ key: STR('setting name'), value: { description: 'new value' } }, ['key', 'value']), handler: tSetSetting },
   { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack from Modrinth.', inputSchema: S({ id: STR('project id/slug'), kind: STR('plugin|mod|datapack'), versionId: STR('exact version id') }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
