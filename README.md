@@ -287,6 +287,35 @@ That's it. Everything else — plugins, players, backups, the world map — is o
 
 ---
 
+## MCP / AI integration
+
+ObserverLauncher can act as an **MCP server**, so an AI assistant (Claude Desktop, Cursor, or any
+MCP client) can read and control your server in natural language — check status, read the console,
+manage files, install plugins, import modpacks, and more.
+
+**Enable it:** Settings → **MCP / AI** → *Enable MCP server*. The launcher starts a **local-only**
+server (127.0.0.1, random port, a fresh token every launch) and writes its connection info to
+`mcp-bridge.json` in the launcher's data folder. The app must stay open while the client is used.
+
+**Connect a client:** click **Copy MCP config** and paste it into your client's MCP settings, e.g.:
+
+```json
+{
+  "mcpServers": {
+    "observerlauncher": { "command": "node", "args": ["<install-dir>/resources/app.asar.unpacked/src/mcp/bridge.js"] }
+  }
+}
+```
+
+**Permissions.** Tools are tiered: **read** tools run freely; **write** tools (install, edit files,
+send a command) ask for confirmation in the app first — you can switch on *Auto-allow write tools*
+to skip that; **destructive** tools (stop, delete, restore) always ask and can never be auto-approved.
+
+> MCP needs the launcher to be running and the integration enabled. Nothing is exposed beyond
+> `127.0.0.1`, and the token changes every launch.
+
+---
+
 ## Supported server software
 
 | Software | How it's obtained | Native TPS/MSPT? |

@@ -6,6 +6,15 @@ All notable changes to ObserverLauncher are documented here. Format follows
 ## [0.8.0] — 2026-09-19
 
 ### Added
+- **MCP / AI integration.** ObserverLauncher can expose its backend to any MCP client (Claude
+  Desktop, Cursor, …) so an assistant can read and control the server in natural language. A small
+  dependency-free bridge (`src/mcp/bridge.js`) speaks MCP over stdio and forwards calls to the app
+  over loopback HTTP (127.0.0.1, random port, fresh 32-byte token each launch). ~37 tools cover
+  status, console, players, files (read/search/write/edit), content, properties, world, backups,
+  marketplace search/install, modpack import/export and lifecycle control. A 3-tier permission
+  model gates everything: read tools run freely, write tools ask in-app first (skippable via
+  "auto-allow write"), destructive tools always ask. Enable it in **Settings → MCP / AI** and use
+  "Copy MCP config" to grab the client JSON.
 - **Modpack compatibility checking.** Importing a `.mrpack` now reads its declared
   `dependencies` (Minecraft version + `forge` / `neoforge` / `fabric-loader` / `quilt-loader`) and
   compares them with the current server. On a mismatch, a local import asks before installing
