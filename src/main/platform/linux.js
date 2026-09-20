@@ -208,6 +208,17 @@ module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreB
 
 // Cross-platform archive helpers (Linux side). .zip -> unzip, .tar.gz/.tgz -> tar.
 async function extractArchive(archivePath, destDir) {
+  // SECURITY (zip-slip): a .mrpack / JRE archive is untrusted input. `unzip -o` and `tar -xzf`
+  // happily write absolute paths and `../` entries OUTSIDE destDir. List entries first and
+  // refuse the whole archive on the first unsafe path — the same guard restoreBackup already uses.
+  const { isSafeArchiveEntry } = require('../validate.js');
+  try {
+    const entries = await listArchiveEntries(archivePath);
+    if (entries) {
+      const bad = entries.find(e => !isSafeArchiveEntry(e));
+      if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
+    }
+  } catch {}
   const isZip = /\.zip$/i.test(archivePath);
   if (isZip) {
     const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);

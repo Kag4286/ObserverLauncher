@@ -130,7 +130,10 @@ async function savePlayer(ctx, { uuid, changes, clearInventory }) {
       fs.mkdirSync(backupDir, { recursive: true });
       const backup = path.join(backupDir, `playerdata-${uuid}-${new Date().toISOString().replace(/[:.]/g, '-')}.dat`);
       fs.copyFileSync(player.file, backup);
-      fs.writeFileSync(player.file, zlib.gzipSync(nbt.writeUncompressed(player.parsed.parsed, player.type)));
+      // ATOMIC: a plain writeFileSync can leave a truncated .dat if the app is killed mid-write —
+      // the file being written is the one that breaks. writeFileAtomic writes a temp then renames.
+      const { writeFileAtomic } = require('./fs-utils.js');
+      writeFileAtomic(player.file, zlib.gzipSync(nbt.writeUncompressed(player.parsed.parsed, player.type)));
       return { ok: true, backup: path.basename(backup), data: (await readPlayerData(ctx.currentServerPath, uuid)).data };
     } catch (error) { return marketplaceError(error); }
 }

@@ -74,6 +74,10 @@ function registerContent(ipcMain, ctx) {
     const r = await dialog.showOpenDialog(ctx.win, { title: `Import ${kind}`, properties: ['openFile', 'multiSelections'], filters: [{ name: kind === 'datapack' ? 'Datapacks' : 'Java archives', extensions: kind === 'datapack' ? ['zip', 'jar'] : ['jar'] }] });
     if (r.canceled) return { ok: false, cancelled: true };
     const target = safeTarget(ctx.currentServerPath, folder);
+    // Defensive: safeTarget returns null when the path escapes the server root (e.g. a weird
+    // level-name). Without this guard, fs.mkdirSync(null) would throw inside the handler and
+    // reject the IPC. The folder is a fixed literal today, but the level-name is user-controlled.
+    if (!target) return { ok: false, error: 'Could not resolve the destination folder inside the server.' };
     fs.mkdirSync(target, { recursive: true });
     const MAX_IMPORT_BYTES = 500 * 1024 * 1024;
     for (const file of r.filePaths) {

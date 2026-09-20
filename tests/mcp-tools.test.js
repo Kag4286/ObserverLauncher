@@ -66,5 +66,32 @@ check('kick_player requires name', (getTool('kick_player').inputSchema.required 
 check('search_marketplace has source param', 'source' in (getTool('search_marketplace').inputSchema.properties || {}));
 check('search_marketplace has offset param', 'offset' in (getTool('search_marketplace').inputSchema.properties || {}));
 
+// --- 1.2.0 doctor + MCP upgrade ---
+for (const name of ['diagnose_server', 'analyze_console', 'explain_crash', 'check_performance', 'validate_config', 'check_port', 'read_many_files', 'doctor_report', 'read_audit_log', 'prepare_and_start', 'safe_restart']) {
+  check('doctor tool exists: ' + name, !!getTool(name));
+}
+check('diagnose_server is read', riskOf('diagnose_server') === 'read');
+check('doctor_report is read', riskOf('doctor_report') === 'read');
+check('read_audit_log is read', riskOf('read_audit_log') === 'read');
+check('prepare_and_start is write', riskOf('prepare_and_start') === 'write');
+// safe_restart stops a running server -> must be destroy (same class as stop_server), not write.
+check('safe_restart is destroy', riskOf('safe_restart') === 'destroy');
+// install_from_market advertises a source param so Hangar/Spigot installs are reachable (parity with search).
+check('install_from_market has source param', 'source' in (getTool('install_from_market').inputSchema.properties || {}));
+check('read_many_files requires paths', (getTool('read_many_files').inputSchema.required || []).includes('paths'));
+
+// --- STATIC_TOOLS drift guard (this class of bug shipped 3 times) ---
+// bridge.js offline list must name the SAME tools as the live registry. Parse the source instead of
+// require()-ing bridge.js (which attaches a stdin listener and would hang the test runner).
+const bridgeSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'mcp', 'bridge.js'), 'utf8');
+const staticNames = [...bridgeSrc.matchAll(/\['([a-z_]+)',\s*'/g)].map(m => m[1]);
+const liveNames = TOOLS.map(t => t.name);
+const missingOffline = liveNames.filter(n => !staticNames.includes(n));
+const staleOffline = staticNames.filter(n => !liveNames.includes(n));
+if (missingOffline.length) console.log('  missing from STATIC_TOOLS:', missingOffline.join(', '));
+if (staleOffline.length) console.log('  stale in STATIC_TOOLS:', staleOffline.join(', '));
+check('STATIC_TOOLS has no missing tools', missingOffline.length === 0);
+check('STATIC_TOOLS has no stale tools', staleOffline.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

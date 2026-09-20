@@ -54,6 +54,36 @@ async function searchMarket(opts) {
   return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: x.author?.username || 'Spigot author', description: x.tag || x.description || '', downloads: x.downloads || 0, version })) };
 }
 
+// Pure-ish download resolver shared by the IPC handler AND the MCP install_from_market tool, so
+// BOTH support Modrinth + Hangar + Spigot and the version/loader picking never drifts. Throws on
+// failure. Returns { url, filename, source }.
+async function resolveMarketDownload(item) {
+  const kind = ['forge', 'fabric', 'datapack', 'mod'].includes(item.kind) ? item.kind : 'plugin';
+  if (item.source === 'modrinth' || !item.source) {
+    const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
+    const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'] }[kind];
+    const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
+    let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
+    if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
+    if (!target?.files?.[0]) throw new Error('No downloadable version was found.');
+    const f = target.files.find(x => x.primary) || target.files[0];
+    return { url: f.url, filename: f.filename, source: 'modrinth' };
+  }
+  if (item.source === 'hangar') {
+    const [owner, slug] = String(item.id).split('/');
+    const versions = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=20`);
+    const target = (versions.result || []).find(v => v.downloads?.PAPER?.downloadUrl);
+    const file = target?.downloads?.PAPER;
+    if (!file) throw new Error('No Paper download was found for this Hangar project.');
+    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar' };
+  }
+  if (item.source === 'spigot') {
+    const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
+    return { url: `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`, filename: `${title}.jar`, source: 'spigot' };
+  }
+  throw new Error('Unsupported marketplace source.');
+}
+
 function registerMarketplace(ipcMain, ctx) {
   ipcMain.handle('market:versions', async () => {
     try {
@@ -90,31 +120,7 @@ function registerMarketplace(ipcMain, ctx) {
       const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', datapack: path.join(levelName, 'datapacks') };
       const destDir = safeTarget(ctx.currentServerPath, destFolders[kind]);
       fs.mkdirSync(destDir, { recursive: true });
-      let url, filename;
-      if (item.source === 'modrinth') {
-        const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
-        const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'] }[kind];
-        const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
-        let target = null;
-        if (item.versionId) target = versions.find(v => v.id === item.versionId) || null;
-        if (!target) {
-          target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
-        }
-        if (!target?.files?.[0]) throw new Error('No downloadable version was found.');
-        url = target.files.find(f => f.primary)?.url || target.files[0].url;
-        filename = target.files.find(f => f.primary)?.filename || target.files[0].filename;
-      } else if (item.source === 'hangar') {
-        const [owner, slug] = String(item.id).split('/');
-        const versions = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=20`);
-        const target = (versions.result || []).find(v => v.downloads?.PAPER?.downloadUrl);
-        const file = target?.downloads?.PAPER;
-        if (!file) throw new Error('No Paper download was found for this Hangar project.');
-        url = file.downloadUrl;
-        filename = file.fileInfo?.name || `${slug}.jar`;
-      } else if (item.source === 'spigot') {
-        url = `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`;
-        filename = `${item.title.replace(/[^\w.-]+/g, '_')}.jar`;
-      } else throw new Error('Unsupported marketplace source.');
+      const { url, filename } = await resolveMarketDownload(item);
       const dest = path.join(destDir, path.basename(filename));
       await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }));
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, installedAt: new Date().toISOString() });
@@ -123,4 +129,4 @@ function registerMarketplace(ipcMain, ctx) {
   });
 }
 
-module.exports = { registerMarketplace, searchMarket };
+module.exports = { registerMarketplace, searchMarket, resolveMarketDownload };

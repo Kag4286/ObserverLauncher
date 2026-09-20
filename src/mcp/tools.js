@@ -3,18 +3,19 @@
 // Handlers reuse the SAME backend functions the IPC layer uses, so behaviour is identical.
 const fs = require('fs');
 const path = require('path');
-const { serverFiles, readPlayerData, findPlayerDataFile } = require('../main/server-files.js');
+const { serverFiles, readPlayerData, findPlayerDataFile, readEula } = require('../main/server-files.js');
 const { safeTarget, readJsonList } = require('../main/fs-utils.js');
 const { loadSettings } = require('../main/settings.js');
 const { startServerInternal, forceStopServer } = require('../main/server-lifecycle.js');
 const { createBackupInternal } = require('../main/backups.js');
 const { readLevel, readPlayers, readWaypoints } = require('../main/worldmap.js');
 const { localIPv4s } = require('../main/network.js');
-const { requiredJavaForJar } = require('../main/java.js');
+const { requiredJavaForJar, javaMajor } = require('../main/java.js');
+const doctor = require('./doctor.js');
 const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
 const { importMrpackFromPath } = require('../main/modpacks.js');
-const { searchMarket } = require('../main/marketplace.js');
+const { searchMarket, resolveMarketDownload } = require('../main/marketplace.js');
 
 const ok = r => (r && typeof r === 'object' && 'ok' in r) ? r : { ok: true, result: r };
 const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server folder selected.'); return ctx.currentServerPath; };
@@ -38,16 +39,6 @@ async function tReadConsole(ctx, a) {
 async function tListPlayers(ctx) {
   const f = serverFiles(needPath(ctx));
   return { ok: true, result: { online: ctx.live?.players || [], whitelist: f.whitelist || [], banned: f.banned || [], ops: f.ops || [], known: f.knownPlayers || [] } };
-}
-async function tGetPlayerData(ctx, a) {
-  const root = needPath(ctx);
-  const uuid = a.uuid || null, name = a.name || null;
-  let file = null;
-  if (uuid) file = findPlayerDataFile(root, uuid);
-  else if (name) file = findPlayerDataFile(root, name);
-  if (!file) return { ok: false, error: 'Player data file not found.' };
-  const r = readPlayerData(file);
-  return ok(r);
 }
 async function tListFiles(ctx, a) {
   const root = needPath(ctx);
@@ -146,7 +137,7 @@ async function tStartServer(ctx) { return ok(await startServerInternal(ctx, load
 async function tSendCommand(ctx, a) {
   const cmd = String(a.command || '').trim();
   if (!cmd) return { ok: false, error: 'command is required.' };
-  if (/[\r\n]/.test(cmd)) return { ok: false, error: 'Command must be single-line.' };
+  if (cmd.length > 2000 || /[\r\n]/.test(cmd)) return { ok: false, error: 'Command must be single-line, max 2000 characters.' };
   if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
   ctx.serverProcess.stdin.write(cmd + '\r\n');
   ctx.lastManualCommandAt = Date.now();
@@ -221,6 +212,9 @@ const SETTABLE = {
   locale: v => typeof v === 'string' && v.length <= 10,
   jvmArgs: v => typeof v === 'string' && v.length <= 2000 && !/["'<>|]/.test(v),
   playitPath: v => typeof v === 'string' && v.length <= 500,
+  // MCP safety toggles (1.2.0): an AI may flip these only if the user allows the write tier.
+  mcpReadOnly: v => typeof v === 'boolean',
+  mcpAutoAllowWrite: v => typeof v === 'boolean',
 };
 async function tSetSetting(ctx, a) {
   const key = String(a.key || '');
@@ -237,30 +231,24 @@ async function tInstallFromMarket(ctx, a) {
   const id = String(a.id || '');
   if (!id) return { ok: false, error: 'id is required.' };
   const kind = ['forge', 'fabric', 'datapack', 'mod'].includes(a.kind) ? a.kind : 'plugin';
-  const version = a.version || '';
-  const versions = await json('https://api.modrinth.com/v2/project/' + encodeURIComponent(id) + '/version');
-  if (!Array.isArray(versions) || !versions.length) return { ok: false, error: 'No versions found for this project.' };
-  // Mirror market:install: pick by explicit versionId, else by MC version + the right loader group,
-  // never blindly versions[0] (which can be the wrong game version or a client-only build).
-  const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'] }[kind];
-  const byVersion = versions.filter(v => !version || (v.game_versions || []).includes(version));
-  let target = a.versionId ? versions.find(v => v.id === a.versionId) : null;
-  if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
-  if (!target) return { ok: false, error: 'No matching version.' };
-  const file = (target.files || []).find(f => f.primary) || (target.files || []).find(f => /\.jar$|\.zip$/i.test(f.filename)) || (target.files || [])[0];
-  if (!file) return { ok: false, error: 'No downloadable file.' };
+  const source = ['modrinth', 'hangar', 'spigot'].includes(a.source) ? a.source : 'modrinth';
+  // PARITY: use the SAME resolver the GUI market:install uses, so install now supports Modrinth,
+  // Hangar and Spigot — not just Modrinth (search already offered all three).
+  let dl;
+  try { dl = await resolveMarketDownload({ id, kind, source, version: a.version || '', versionId: a.versionId, title: a.title }); }
+  catch (e) { return { ok: false, error: e?.message || 'No download found.' }; }
   const { isSafeDownloadUrl } = require('../main/validate.js');
-  if (!isSafeDownloadUrl(file.url)) return { ok: false, error: 'Refused: download URL is not an allowlisted public host.' };
+  if (!isSafeDownloadUrl(dl.url)) return { ok: false, error: 'Refused: download URL is not an allowlisted public host.' };
   const root = needPath(ctx);
   const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : (kind === 'mod' || kind === 'forge' || kind === 'fabric') ? 'mods' : 'plugins';
-  const dest = safeTarget(root, path.join(folder, file.filename));
+  const dest = safeTarget(root, path.join(folder, path.basename(dl.filename)));
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   const { download } = require('../main/http.js');
   const { recordManifestEntry } = require('../main/fs-utils.js');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  await download(file.url, dest);
-  try { recordManifestEntry(root, { kind, fileName: file.filename, sourceUrl: file.url, source: 'modrinth', installedAt: new Date().toISOString() }); } catch {}
-  return { ok: true, result: { name: file.filename, files: serverFiles(root) } };
+  await download(dl.url, dest);
+  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, installedAt: new Date().toISOString() }); } catch {}
+  return { ok: true, result: { name: dl.filename, files: serverFiles(root) } };
 }
 async function tInstallLocalJar(ctx, a) {
   const root = needPath(ctx);
@@ -301,10 +289,15 @@ async function tExportModpack(ctx, a) {
   const files = [];
   for (const entry of manifest) {
     const folder = destFolders[entry.kind] || 'plugins';
-    const fp = path.join(root, folder, entry.fileName);
-    if (!fs.existsSync(fp)) continue;
+    // SECURITY: entry.fileName comes from a hand-editable manifest on disk. Only accept a plain
+    // basename (no path separators) and resolve through safeTarget, so a crafted entry can neither
+    // escape the server folder nor step into another subfolder. Mirrors the IPC modpack:export guard.
+    const fileName = String(entry.fileName || '');
+    if (!fileName || fileName !== path.basename(fileName)) continue;
+    const fp = safeTarget(root, path.join(folder, fileName));
+    if (!fp || !fs.existsSync(fp) || !fs.statSync(fp).isFile()) continue;
     const st = fs.statSync(fp);
-    files.push({ path: folder.replace(/\\/g, '/') + '/' + entry.fileName, hashes: fileHashes(fp), downloads: [entry.sourceUrl], fileSize: st.size, env: { client: 'optional', server: 'required' } });
+    files.push({ path: folder.replace(/\\/g, '/') + '/' + fileName, hashes: fileHashes(fp), downloads: [entry.sourceUrl], fileSize: st.size, env: { client: 'optional', server: 'required' } });
   }
   if (!files.length) return { ok: false, error: 'None of the tracked files still exist on disk.' };
   const { detectServerCompat } = require('../main/modpacks.js');
@@ -404,13 +397,127 @@ async function tListWaypoints(ctx) {
   const { readWaypoints } = require('../main/worldmap.js');
   return { ok: true, result: readWaypoints(root) };
 }
+async function tReadAuditLog(ctx, a) {
+  const n = Math.min(Math.max(1, Number(a.lines) || 100), 500);
+  try {
+    const file = require('path').join(require('electron').app.getPath('userData'), 'mcp-audit.log');
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-n);
+    return { ok: true, result: { lines, count: lines.length } };
+  } catch { return { ok: true, result: { lines: [], count: 0, note: 'No audit log yet - write/destroy tool calls are recorded here.' } }; }
+}
 async function tKickPlayer(ctx, a) {
   const name = String(a.name || '').trim();
   if (!name) return { ok: false, error: 'name is required.' };
-  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) return { ok: false, error: 'Invalid player name — use 3-16 letters, numbers or underscores.' };
+  const { isSafePlayerName } = require('../main/validate.js');
+  if (!isSafePlayerName(name)) return { ok: false, error: 'Invalid player name - use 3-16 letters, numbers or underscores.' };
   if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
   ctx.serverProcess.stdin.write('kick ' + name + '\r\n');
   return { ok: true, result: { kicked: name } };
+}
+
+// ---- SERVER DOCTOR (1.2.0) ---- read-only diagnostics + composite workflows.
+async function tDiagnoseServer(ctx) {
+  const root = ctx.currentServerPath || '';
+  const s = loadSettings();
+  let files = {}; try { files = serverFiles(root); } catch {}
+  const javaRequired = files.jar ? (requiredJavaForJar(files.jar) || null) : null;
+  let eulaAccepted = false; try { eulaAccepted = readEula(root); } catch {}
+  const port = Number(files.properties?.['server-port']) || 25565;
+  let portFree = null;
+  // Only test the port when stopped — a running server holds it by design.
+  if (ctx.serverStatus === 'stopped') { try { portFree = (await doctor.checkPortFree(port)).free; } catch {} }
+  const lastCrash = doctor.latestCrashReport(root);
+  const result = doctor.diagnoseFromData({
+    serverPath: root, hasJar: !!files.jar, jar: files.jar, hasLaunchScript: !!files.launchScript, launchScript: files.launchScript,
+    java: ctx.javaInfo, javaMajor: javaMajor(ctx.javaInfo?.version), javaRequired, eulaAccepted, port, portFree,
+    worlds: files.worlds, backups: files.backups, memoryMax: s.memoryMax, lastCrash: lastCrash ? lastCrash.name : null,
+  });
+  return { ok: true, result };
+}
+async function tAnalyzeConsole(ctx, a) {
+  const n = Math.min(Math.max(1, Number(a.lines) || 500), 2000);
+  const buf = (ctx.consoleBuffer || []).slice(-n);
+  const analysis = doctor.analyzeConsoleLines(buf);
+  return { ok: true, result: { scanned: buf.length, errors: analysis.errors, warns: analysis.warns, issues: analysis.issues } };
+}
+async function tExplainCrash(ctx) {
+  const root = needPath(ctx);
+  const latest = doctor.latestCrashReport(root);
+  if (!latest) return { ok: true, result: { found: false, message: 'No crash reports found in crash-reports/.' } };
+  let text = '';
+  try { text = fs.readFileSync(latest.file, 'utf8'); } catch (e) { return { ok: false, error: 'Could not read the crash report: ' + (e.code || e.message) }; }
+  return { ok: true, result: { found: true, file: latest.name, mtime: latest.mtime, ...doctor.summarizeCrashText(text) } };
+}
+async function tCheckPerformance(ctx) {
+  const live = ctx.live || {};
+  const tps = live.tps ?? null, mspt = live.mspt ?? null, players = (live.players || []).length;
+  const notes = [];
+  const push = (level, detail, fix) => notes.push({ level, detail, fix: fix || null });
+  if (ctx.serverStatus !== 'running') push('info', 'Server is not running - live metrics are unavailable.');
+  if (tps != null) { if (tps < 15) push('error', `TPS ${tps} - the server is struggling.`, 'Reduce view-distance, remove heavy plugins, or allocate more RAM.'); else if (tps < 19) push('warn', `TPS ${tps} - mild lag.`, 'Consider lowering view-distance or plugin load.'); else push('ok', `TPS ${tps} - healthy.`); }
+  if (mspt != null) { if (mspt > 50) push('error', `MSPT ${mspt}ms - above the 50ms tick budget.`, 'The main thread cannot keep up; reduce load.'); else if (mspt > 40) push('warn', `MSPT ${mspt}ms - close to the 50ms budget.`); else push('ok', `MSPT ${mspt}ms - healthy.`); }
+  return { ok: true, result: { running: ctx.serverStatus === 'running', tps, mspt, players, notes } };
+}
+async function tValidateConfig(ctx) {
+  const root = needPath(ctx);
+  const files = serverFiles(root);
+  let worldDirs = [];
+  try { worldDirs = fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name); } catch {}
+  return { ok: true, result: { checks: doctor.validateProperties(files.properties || {}, worldDirs) } };
+}
+async function tCheckPort(ctx, a) {
+  let port = Number(a.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    let props = {}; try { props = serverFiles(ctx.currentServerPath || '').properties || {}; } catch {}
+    port = Number(props['server-port']) || 25565;
+  }
+  const r = await doctor.checkPortFree(port);
+  return { ok: true, result: { port, ...r } };
+}
+async function tReadManyFiles(ctx, a) {
+  const root = needPath(ctx);
+  const paths = Array.isArray(a.paths) ? a.paths.slice(0, 5) : [];
+  if (!paths.length) return { ok: false, error: 'paths must be a non-empty array (max 5).' };
+  const out = [];
+  for (const rel of paths) {
+    // Reuse the editor's rails (safeTarget + binary sniff + size cap) so a .jar/.dat can't be
+    // returned as utf8 garbage. editor.openFile already runs everything we need.
+    const r = editor.openFile(root, rel);
+    if (!r.ok) { out.push({ path: rel, ok: false, error: r.error }); continue; }
+    out.push({ path: rel, ok: true, content: r.content, readOnly: r.readOnly, size: r.size });
+  }
+  return { ok: true, result: { files: out } };
+}
+// --- Composite workflows (Phase 2): chain the doctor's checks into safe multi-step actions. ---
+async function tPrepareAndStart(ctx) {
+  const diag = await tDiagnoseServer(ctx);
+  const errors = (diag.result?.checks || []).filter(c => c.level === 'error');
+  if (errors.length) return { ok: false, error: 'Cannot start - fix these first: ' + errors.map(e => e.detail).join(' ') };
+  let backup = null;
+  try { const b = await createBackupInternal(ctx, { auto: true }); if (b.ok) backup = b.name; } catch {}
+  const r = await startServerInternal(ctx, loadSettings());
+  return r.ok ? { ok: true, result: { backup, start: r } } : { ok: false, error: r.error, result: { backup } };
+}
+async function tSafeRestart(ctx) {
+  if (ctx.serverStatus === 'stopped') return { ok: false, error: 'Server is not running - use start_server instead.' };
+  let backup = null;
+  try { const b = await createBackupInternal(ctx, { auto: true }); if (b.ok) backup = b.name; } catch {}
+  ctx.manualStop = true;
+  clearTimeout(ctx.restartTimer);
+  try { if (ctx.serverProcess?.stdin?.writable) ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
+  const deadline = Date.now() + 30000;
+  while (ctx.serverProcess && Date.now() < deadline) await new Promise(r => setTimeout(r, 500));
+  if (ctx.serverProcess) return { ok: false, error: 'Server did not stop within 30s - force_stop_server may be needed.', result: { backup } };
+  const r = await startServerInternal(ctx, loadSettings());
+  return r.ok ? { ok: true, result: { backup, start: r } } : { ok: false, error: r.error, result: { backup } };
+}
+async function tDoctorReport(ctx) {
+  const diag = await tDiagnoseServer(ctx);
+  const cons = await tAnalyzeConsole(ctx, { lines: 500 });
+  const perf = await tCheckPerformance(ctx);
+  let config = { checks: [] }; try { config = (await tValidateConfig(ctx)).result; } catch {}
+  let crash = { found: false }; try { crash = (await tExplainCrash(ctx)).result; } catch {}
+  return { ok: true, result: { healthy: diag.result?.healthy ?? null, checks: diag.result?.checks || [], console: cons.result, performance: perf.result, config: config.checks, crash } };
 }
 
 const S = (props, required) => ({ type: 'object', properties: props || {}, required: required || [] });
@@ -434,6 +541,15 @@ const TOOLS = [
   { name: 'get_java_info', risk: 'read', description: 'Detected Java version/path/arch.', inputSchema: S(), handler: tGetJavaInfo },
   { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar or Spigot for plugins/mods/datapacks/modpacks.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot (default modrinth)'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
   { name: 'list_market_versions', risk: 'read', description: 'Versions of a Modrinth project.', inputSchema: S({ id: STR('project id/slug') }, ['id']), handler: tListMarketVersions },
+  { name: 'diagnose_server', risk: 'read', description: 'Full server health check: folder, jar, Java version/arch, EULA, port, world, backups, recent crash. Returns per-check level (ok/warn/error) + fixes.', inputSchema: S(), handler: tDiagnoseServer },
+  { name: 'analyze_console', risk: 'read', description: 'Scan the console buffer for errors/warnings (OOM, port-busy, exceptions, lag), grouped and ranked.', inputSchema: S({ lines: { type: 'number', description: 'lines to scan (default 500, max 2000)' } }), handler: tAnalyzeConsole },
+  { name: 'explain_crash', risk: 'read', description: 'Summarise the newest crash-report (description, version, cause chain).', inputSchema: S(), handler: tExplainCrash },
+  { name: 'check_performance', risk: 'read', description: 'TPS/MSPT/players with threshold warnings (does the server keep up?).', inputSchema: S(), handler: tCheckPerformance },
+  { name: 'validate_config', risk: 'read', description: 'Validate server.properties: port, level-name exists, view-distance, simulation-distance, max-players.', inputSchema: S(), handler: tValidateConfig },
+  { name: 'check_port', risk: 'read', description: 'Check whether the server port is free (bind test).', inputSchema: S({ port: { type: 'number', description: 'port to test (default: server-port)' } }), handler: tCheckPort },
+  { name: 'read_many_files', risk: 'read', description: 'Read up to 5 text files in one call (batch, cheaper than 5 read_file calls).', inputSchema: S({ paths: { type: 'array', items: { type: 'string' }, description: 'relative file paths (max 5)' } }, ['paths']), handler: tReadManyFiles },
+  { name: 'doctor_report', risk: 'read', description: 'One-shot full report: diagnose + console analysis + performance + config + crash, combined.', inputSchema: S(), handler: tDoctorReport },
+  { name: 'read_audit_log', risk: 'read', description: 'Recent MCP write/destroy actions (what an assistant changed), newest last.', inputSchema: S({ lines: { type: 'number', description: 'lines (default 100, max 500)' } }), handler: tReadAuditLog },
   { name: 'start_server', risk: 'write', description: 'Start the server.', inputSchema: S(), handler: tStartServer },
   { name: 'send_console_command', risk: 'write', description: 'Send one command to the running server.', inputSchema: S({ command: STR('single-line command') }, ['command']), handler: tSendCommand },
   { name: 'set_property', risk: 'write', description: 'Set one server.properties key.', inputSchema: S({ key: STR('property key'), value: STR('value') }, ['key']), handler: tSetProperty },
@@ -448,10 +564,12 @@ const TOOLS = [
   { name: 'set_setting', risk: 'write', description: 'Change one launcher setting (memoryMin/Max, autoRestart, autoEula, autoBackupMinutes, locale, jvmArgs). serverPath is NOT settable.', inputSchema: S({ key: STR('setting name'), value: { description: 'new value' } }, ['key', 'value']), handler: tSetSetting },
   { name: 'set_schedule', risk: 'write', description: 'Set the server schedule. Any of enabled (bool), startTime/stopTime (HH:MM 24h or ""), days (array of mon..sun, empty = every day).', inputSchema: S({ enabled: { type: 'boolean', description: 'true = scheduler on' }, startTime: STR('HH:MM (24h) or empty to disable'), stopTime: STR('HH:MM (24h) or empty to disable'), days: { type: 'array', items: { type: 'string' }, description: 'weekdays mon..sun (empty = every day)' } }), handler: tSetSchedule },
   { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name') }, ['name']), handler: tKickPlayer },
-  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack from Modrinth.', inputSchema: S({ id: STR('project id/slug'), kind: STR('plugin|mod|datapack'), versionId: STR('exact version id') }, ['id']), handler: tInstallFromMarket },
+  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack from Modrinth, Hangar or Spigot (same resolver as the GUI).', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack'), source: STR('modrinth|hangar|spigot (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)') }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
+  { name: 'prepare_and_start', risk: 'write', description: 'Diagnose first (refuse on hard errors) -> create a safety backup -> start the server.', inputSchema: S(), handler: tPrepareAndStart },
+  { name: 'safe_restart', risk: 'destroy', description: 'Back up, gracefully stop (waits up to 30s), then start again. Stops a running server - always requires confirmation (same class as stop_server).', inputSchema: S(), handler: tSafeRestart },
   { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat (health/food/xp/gamemode). Server must be stopped; a backup is written first.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object', description: 'health, food, saturation, xpLevel, xpTotal, gameType' }, clearInventory: { type: 'boolean', description: 'also clear inventory + equipment' } }, ['uuid']), handler: tSavePlayerData },
   { name: 'op_player', risk: 'write', description: 'Grant or revoke operator.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' } }, ['name']), handler: tOpPlayer },
   { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },

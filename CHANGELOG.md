@@ -3,6 +3,78 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] — 2026-09-20
+
+A hardening **and** World Map detail release. No new user-facing features — the focus was a deep
+backend security/robustness audit plus real per-cell biomes on the map.
+
+### Security
+- **Fixed a zip-slip vulnerability on Linux** (`platform/linux.js::extractArchive`). The archive
+  extraction used by modpack import (`.mrpack`) and the Java installer did not pre-check entry
+  paths, so a crafted archive could write files outside the destination folder. It now lists the
+  entries and refuses the whole archive on the first unsafe path — the same guard `restoreBackup`
+  already used. (Windows was unaffected: `Expand-Archive` blocks this itself.)
+- **Closed a path-parity gap in the MCP `export_modpack` tool.** It joined a hand-editable
+  manifest's `fileName` straight into a path, unlike the IPC `modpack:export` path which was
+  hardened in 1.0.0. Both now require a plain basename and resolve through `safeTarget`.
+
+### Fixed
+- **Player `.dat` edits are now atomic** (`players.js::savePlayer`). A crash mid-write could
+  truncate a player file; it now goes through `writeFileAtomic` (a backup is still taken first).
+- **Memory settings are validated on save** (`settings:save`). `memoryMin`/`memoryMax` are clamped
+  to a 1–64 GB integer range with `max >= min`, matching what the MCP `set_setting` path already
+  enforced — a bad value can no longer produce an invalid `-Xms`/`-Xmx` flag.
+- **`content:import` guards a null destination** before `mkdirSync`, so a malformed `level-name`
+  can no longer throw and reject the IPC.
+- **MCP tool cleanup.** Removed dead, wrong-signature `get_player_data` helper code;
+  `send_console_command` now caps input at 2000 characters; `kick_player` reuses the shared
+  `isSafePlayerName` validator instead of an inline regex.
+
+### Added
+- **World Map: real per-cell biomes (4×4 per chunk).** The backend used to collapse each chunk's
+  paletted biome container to a single surface biome, so coastlines and biome edges rendered as
+  one flat colour. `readBiomes` now also returns a 4×4 grid of per-column biomes
+  (`biomeGridFromSection`), and the renderer paints each cell with its own biome colour — so
+  chunk-internal biome boundaries (ocean meeting plains, forest edges) show up when zoomed in.
+  Falls back to the single whole-chunk biome when a grid is unavailable. No extra disk I/O.
+
+### Added — MCP "Server Doctor" (turn an AI client into a real server manager)
+- **New diagnostics tools (read-only).** `diagnose_server` (full health check: folder, jar, Java
+  version/arch, EULA, port, world, backups, recent crash — each with a level and a concrete fix),
+  `analyze_console` (groups console errors/warnings — OOM, port-busy, exceptions, lag — by
+  signature and ranks them), `explain_crash` (summarises the newest crash-report),
+  `check_performance` (TPS/MSPT thresholds), `validate_config` (server.properties checks),
+  `check_port` (bind test), `read_many_files` (batch up to 5), and `doctor_report` (one-shot
+  combined report).
+- **Composite safe workflows (write, GUI-confirmed).** `prepare_and_start` refuses on hard errors,
+  takes a safety backup, then starts; `safe_restart` backs up, gracefully stops (waits up to 30s),
+  then starts again.
+- **`read_audit_log`** — every write/destroy MCP call is appended to `userData/mcp-audit.log`
+  (capped ~256 KB) so the user and the AI can see exactly what changed.
+- **Resources.** The MCP server now advertises `observer://server/{status,properties,console,diagnosis}`
+  so a client can pull state as context without spending a tool call.
+
+### Changed — MCP protocol & safety
+- **`initialize` now returns `instructions`** telling the client what it can read freely, that
+  write/destroy need approval, and the doctor workflow to follow.
+- **Tool results carry `structuredContent`** (machine-readable) alongside the text blob.
+- **Read-only mode** (`mcpReadOnly`): when on, write/destroy tools are refused before any dialog,
+  so an AI can explore with zero risk. Settable via `set_setting`.
+- **Per-tool rate limit** (60/min) in the MCP HTTP server so a runaway client loop cannot hammer
+  the main process.
+
+### Notes
+- `npm test` (27 files — new `tests/mcp-doctor.test.js`, 31 asserts) and the E2E suite remain green.
+  New tests cover the 4×4 biome grid and the doctor's pure analysis helpers.
+- Still not verified on real Linux hardware (no machine/tester available) — the Linux fixes are
+  logic- and unit-verified only.
+- MCP tool count grew from 44 to 55 (doctor + composites + audit log).
+- Post-review fixes: `safe_restart` moved to the **destroy** tier (it stops a running server, so it
+  always confirms); `install_from_market` gained a `source` param and now installs from Modrinth,
+  **Hangar and Spigot** (shares the GUI's resolver); the offline `STATIC_TOOLS` list in `bridge.js`
+  is complete again and a regression test now fails if it drifts from the live registry;
+  `read_many_files` uses the editor's rails (binary sniff) instead of reading any file as text.
+
 ## [1.1.1] — 2026-09-20
 
 A small follow-up to 1.1.0: documentation brought in line with the new interface, and a fresh

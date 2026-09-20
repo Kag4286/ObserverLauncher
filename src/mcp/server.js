@@ -19,6 +19,17 @@ const crypto = require('crypto');
 const { app } = require('electron');
 const { TOOLS, getTool } = require('./tools.js');
 
+// RESOURCES (1.2.0): expose server state as read-only MCP resources so an AI client can pull
+// context without spending a tool call. Each URI maps to an existing read tool's result.
+async function resourceForUri(ctx, uri) {
+  const call = async name => { const t = getTool(name); return t ? await t.handler(ctx, {}) : { ok: false, error: 'tool missing: ' + name }; };
+  if (uri === 'observer://server/status') return call('get_status');
+  if (uri === 'observer://server/properties') return call('get_properties');
+  if (uri === 'observer://server/console') return call('read_console');
+  if (uri === 'observer://server/diagnosis') return call('diagnose_server');
+  return { ok: false, error: 'Unknown resource: ' + uri };
+}
+
 const MAX_BODY = 4 * 1024 * 1024; // 4 MB — generous for file writes, capped to avoid abuse
 
 function bridgeConfigPath() {
@@ -50,19 +61,36 @@ function confirmOnGui(ctx, tool, args, risk) {
   });
 }
 
+// AUDIT LOG (1.2.0): append every write/destroy call to userData/mcp-audit.log so the user (and
+// the AI via read_audit_log) can see exactly what an assistant changed. Best-effort, capped at
+// ~256 KB so it can never grow unbounded.
+function auditLog(tool, risk, result) {
+  try {
+    const file = path.join(app.getPath('userData'), 'mcp-audit.log');
+    try { if (fs.statSync(file).size > 256 * 1024) fs.rmSync(file, { force: true }); } catch {}
+    const line = `${new Date().toISOString()}\t${risk}\t${tool}\t${result && result.ok === false ? 'denied/error: ' + (result.error || '') : 'ok'}\n`;
+    fs.appendFileSync(file, line);
+  } catch {}
+}
+
 // Route one tool call. `args` is whatever the MCP client sent.
 async function callTool(ctx, toolName, args, cfg) {
   const tool = getTool(toolName);
   if (!tool) return { ok: false, error: `Unknown tool: ${toolName}` };
+  // READ-ONLY MODE (1.2.0): let an AI explore freely with zero risk. write/destroy are refused
+  // before any confirm dialog is even shown.
+  if (cfg.readOnly && tool.risk !== 'read') return { ok: false, error: `Read-only mode is on - "${toolName}" (${tool.risk}) is blocked. A human can disable it in Settings > MCP.` };
   if (tool.risk === 'write' && !cfg.autoAllowWrite) {
     const yes = await confirmOnGui(ctx, toolName, args, 'write');
-    if (!yes) return { ok: false, error: 'Denied by user (write tool).' };
+    if (!yes) { auditLog(toolName, 'write', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (write tool).' }; }
   } else if (tool.risk === 'destroy') {
     const yes = await confirmOnGui(ctx, toolName, args, 'destroy');
-    if (!yes) return { ok: false, error: 'Denied by user (destructive tool).' };
+    if (!yes) { auditLog(toolName, 'destroy', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (destructive tool).' }; }
   }
   try {
-    return await tool.handler(ctx, args || {});
+    const r = await tool.handler(ctx, args || {});
+    if (tool.risk !== 'read') auditLog(toolName, tool.risk, r);
+    return r;
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
@@ -103,6 +131,18 @@ function startMcpServer(ctx) {
     try { ctx.appendLog('MCP: an AI client connected.', 'system'); } catch {}
     try { ctx.send('mcp:client', { connected: true }); } catch {}
   };
+  // RATE LIMIT (1.2.0): a simple token bucket per tool name. An AI that spins in a tight loop
+  // (e.g. polling in a bad retry) could otherwise hammer the main process. 60 calls/min per tool is
+  // far above any legitimate use, but stops runaway loops.
+  const buckets = new Map();
+  const rateLimited = name => {
+    const now = Date.now();
+    const b = buckets.get(name) || { tokens: 60, at: now };
+    b.tokens = Math.min(60, b.tokens + ((now - b.at) / 60000) * 60);
+    b.at = now;
+    if (b.tokens < 1) { buckets.set(name, b); return true; }
+    b.tokens -= 1; buckets.set(name, b); return false;
+  };
   const server = http.createServer((req, res) => {
     // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
     // Origin header and connects by IP. A browser page on any site can still POST to 127.0.0.1
@@ -122,6 +162,18 @@ function startMcpServer(ctx) {
       const tools = TOOLS.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ tools }));
+    }
+    // GET /resource?uri=... returns one resource body as JSON. Auth required (loopback + token).
+    if (req.method === 'GET' && req.url.startsWith('/resource')) {
+      if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
+      let uri = '';
+      try { uri = new URL(req.url, 'http://127.0.0.1').searchParams.get('uri') || ''; } catch {}
+      resourceForUri(ctx, uri).then(result => {
+        const ok = result && result.ok !== false;
+        res.writeHead(ok ? 200 : 404, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(ok ? { ok: true, data: result.result ?? result } : { ok: false, error: (result && result.error) || 'not available' }));
+      }).catch(e => { res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: e?.message || String(e) })); });
+      return;
     }
     // Only POST /rpc is served beyond that. Anything else → 404.
     if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
@@ -144,7 +196,11 @@ function startMcpServer(ctx) {
       let payload;
       try { payload = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end('bad json'); }
       const settings = require('../main/settings.js').loadSettings();
-      const cfg = { autoAllowWrite: !!settings.mcpAutoAllowWrite };
+      const cfg = { autoAllowWrite: !!settings.mcpAutoAllowWrite, readOnly: !!settings.mcpReadOnly };
+      if (rateLimited(String(payload.tool || ''))) {
+        res.writeHead(429, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (60/min per tool) - slow down and retry.' }));
+      }
       const result = await callTool(ctx, payload.tool, payload.args, cfg);
       const out = JSON.stringify(result);
       res.writeHead(200, { 'content-type': 'application/json' });

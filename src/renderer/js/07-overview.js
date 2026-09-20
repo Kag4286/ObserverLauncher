@@ -172,6 +172,7 @@ function syncMcpFields(s){
   s=s||state.settings||{};
   const en=$('#mcpEnabledInput');if(en)en.checked=!!s.mcpEnabled;
   const aw=$('#mcpAutoWriteInput');if(aw)aw.checked=!!s.mcpAutoAllowWrite;
+  const ro=$('#mcpReadOnlyInput');if(ro)ro.checked=!!s.mcpReadOnly;
   const st=$('#mcpStatus');
   const m=state.mcp||{};
   if(st){st.textContent=m.running?t('mcp.running',{p:m.port}):t('mcp.stopped');st.style.color=m.running?'var(--success)':'var(--text-dim)'}
@@ -201,7 +202,7 @@ $$('.backup-chip-row .filter-chip').forEach(chip=>chip.onclick=()=>{
   $('#autoBackupMinutesInput').value=v;syncBackupChips(Number(v));
 });
 $('#autoBackupCustomInput')?.addEventListener('input',()=>{$('#autoBackupMinutesInput').value=Number($('#autoBackupCustomInput').value)||0});
-function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,locale:$('#languageSelect').value}}
+function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,locale:$('#languageSelect').value}}
 // Launcher settings polish: an "unsaved changes" dot on Apply, a folder health line and a live
 // preview of the exact command line the launcher will run for this server.
 let settingsDirty=false;

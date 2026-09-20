@@ -97,13 +97,13 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-1.1.1-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-1.1.1.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-1.2.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-1.2.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe` (a normal NSIS installer — you can choose the install location; it sets up auto-update).
-- **Linux:** `chmod +x ObserverLauncher-1.1.1.AppImage` then run it. No installation, no root.
+- **Linux:** `chmod +x ObserverLauncher-1.2.0.AppImage` then run it. No installation, no root.
 
 ### Option B — Run from source
 

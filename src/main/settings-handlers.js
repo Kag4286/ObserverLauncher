@@ -82,6 +82,13 @@ function registerSettings(ipcMain, ctx) {
 
   ipcMain.handle('settings:save', async (_, settings) => {
     const merged = { ...loadSettings(), ...settings };
+    // SECURITY/VALIDATION: memoryMin/Max arrive from the renderer and become -Xms/-Xmx. Clamp them
+    // to a sane 1..64 GB integer range (the MCP set_setting path already validates this) so a bad
+    // value can never produce an invalid JVM flag or a nonsensical swap (max < min).
+    const clampMem = v => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(64, Math.max(1, n)) : null; };
+    if (merged.memoryMin !== undefined) { const m = clampMem(merged.memoryMin); if (m !== null) merged.memoryMin = m; }
+    if (merged.memoryMax !== undefined) { const m = clampMem(merged.memoryMax); if (m !== null) merged.memoryMax = m; }
+    if (Number(merged.memoryMax) < Number(merged.memoryMin)) merged.memoryMax = merged.memoryMin;
     // SECURITY: serverPath becomes the root for EVERY file operation (backup, editor save,
     // player data, content delete). It arrives from the renderer, so refuse anything that is
     // not an existing directory instead of trusting it verbatim.

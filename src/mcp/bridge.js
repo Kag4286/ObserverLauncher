@@ -32,6 +32,18 @@ function readConfig() {
   try { return JSON.parse(fs.readFileSync(bridgeConfigPath(), 'utf8')); } catch { return null; }
 }
 
+// Guidance sent to the MCP client at initialize time. This is how the AI learns it is talking to a
+// Minecraft server MANAGER: what it can read freely, that write/destroy need GUI approval, and the
+// doctor workflow to follow when something is wrong.
+const INSTRUCTIONS = [
+  'You are connected to ObserverLauncher, a desktop launcher that hosts a local Minecraft server on the user\'s PC.',
+  'READ tools are free: use them to inspect status, console, players, files, world and performance before acting.',
+  'WRITE tools change the server and require GUI approval unless the user enabled auto-allow-write; DESTROY tools always ask.',
+  'WORKFLOW when something is wrong: call doctor_report (one-shot) or diagnose_server + analyze_console + explain_crash; each check returns a level (ok/warn/error) and a concrete fix.',
+  'SAFE CHANGE: prefer prepare_and_start / safe_restart so a backup is taken and the health checks pass first.',
+  'You cannot set the server folder over MCP - that is GUI-only. Respect that serverPath is fixed.',
+].join('\n');
+
 // Forward one tool call to the app. Resolves a tool result object {ok,result|error}.
 function callApp(tool, args) {
   return new Promise(resolve => {
@@ -55,6 +67,29 @@ function callApp(tool, args) {
     req.write(body); req.end();
   });
 }
+
+// GET a resource body from the app (resources/read). Returns {text} or null on any failure.
+function fetchResource(uri) {
+  return new Promise(resolve => {
+    const cfg = readConfig();
+    if (!cfg || !cfg.port || !cfg.token) return resolve(null);
+    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: '/resource?uri=' + encodeURIComponent(uri), method: 'GET', headers: { authorization: 'Bearer ' + cfg.token } }, res => {
+      let data = ''; res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+    });
+    req.setTimeout(5000, () => { try { req.destroy(); } catch {} resolve(null); });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+// Fixed resource list (the app owns the real bodies). Advertised so the AI can pull server state
+// as context instead of spending a tool call.
+const STATIC_RESOURCES = [
+  { uri: 'observer://server/status', name: 'Server status', description: 'Folder, jar, software, Java, running state.', mimeType: 'application/json' },
+  { uri: 'observer://server/properties', name: 'server.properties', description: 'Parsed server.properties.', mimeType: 'application/json' },
+  { uri: 'observer://server/console', name: 'Console buffer', description: 'Recent console lines.', mimeType: 'application/json' },
+  { uri: 'observer://server/diagnosis', name: 'Health diagnosis', description: 'The doctor health check result.', mimeType: 'application/json' },
+];
 
 // GET the real tool list (with full inputSchema) from the app. Falls back to the static
 // name/description list if the app isn't reachable, so tools/list still answers — the actual
@@ -87,11 +122,14 @@ async function fetchTools() {
 // at that point every call fails with "app not running", so a full inputSchema would be
 // misleading anyway. When the app IS running, fetchTools() pulls the real schemas via GET /tools.
 // Kept in sync with src/mcp/tools.js by hand (names + descriptions only).
+// IMPORTANT: this list must stay complete and in sync with src/mcp/tools.js. A previous version
+// drifted (missing settings/schedule/java/player/audit tools), so an offline tools/list lied.
+// Order matches tools.js. Names + descriptions only (no schema needed offline).
 const STATIC_TOOLS = [
   ['get_status', 'Server status, folder, jar, software and Java info.'],
   ['read_console', 'Recent console/log lines.'],
   ['list_players', 'Online, whitelisted, banned, op and known players.'],
-  ['get_player_data', 'Read one player .dat (stats/inventory).'],
+  ['get_player_data', 'Read one player .dat (stats/inventory) by UUID or name.'],
   ['list_files', 'List a directory inside the server folder.'],
   ['read_file', 'Read a text file inside the server folder.'],
   ['search_files', 'Grep text files inside the server folder.'],
@@ -103,8 +141,17 @@ const STATIC_TOOLS = [
   ['list_backups', 'Backup files with size + date.'],
   ['get_network_info', 'LAN IPs and server port.'],
   ['get_java_info', 'Detected Java version/path/arch.'],
-  ['search_marketplace', 'Search Modrinth for plugins/mods/datapacks/modpacks.'],
+  ['search_marketplace', 'Search Modrinth, Hangar or Spigot.'],
   ['list_market_versions', 'Versions of a Modrinth project.'],
+  ['diagnose_server', 'Full server health check with per-check level + fixes.'],
+  ['analyze_console', 'Scan the console for errors/warnings, grouped and ranked.'],
+  ['explain_crash', 'Summarise the newest crash report.'],
+  ['check_performance', 'TPS/MSPT/players with threshold warnings.'],
+  ['validate_config', 'Validate server.properties.'],
+  ['check_port', 'Check whether the server port is free.'],
+  ['read_many_files', 'Read up to 5 text files in one call.'],
+  ['doctor_report', 'One-shot combined health report.'],
+  ['read_audit_log', 'Recent MCP write/destroy actions.'],
   ['start_server', 'Start the server.'],
   ['send_console_command', 'Send one command to the running server.'],
   ['set_property', 'Set one server.properties key.'],
@@ -112,10 +159,20 @@ const STATIC_TOOLS = [
   ['write_file', 'Write a text file inside the server folder.'],
   ['edit_file', 'Replace oldString with newString in a file.'],
   ['create_backup', 'Create a world backup (ZIP).'],
-  ['install_from_market', 'Install a plugin/mod/datapack from Modrinth.'],
+  ['get_settings', 'Read launcher settings.'],
+  ['get_schedule', 'Read the server schedule.'],
+  ['list_waypoints', 'List World Map waypoints.'],
+  ['install_java', 'Download and install a portable Java runtime.'],
+  ['set_setting', 'Change one launcher setting (serverPath NOT settable).'],
+  ['set_schedule', 'Set the server schedule.'],
+  ['kick_player', 'Kick an online player.'],
+  ['install_from_market', 'Install a plugin/mod/datapack from Modrinth, Hangar or Spigot.'],
   ['install_local_jar', 'Copy a local .jar into plugins/mods.'],
   ['import_modpack_path', 'Import a .mrpack from a local path.'],
   ['export_modpack', 'Export current setup to a .mrpack at a path.'],
+  ['prepare_and_start', 'Diagnose -> backup -> start the server.'],
+  ['safe_restart', 'Back up, stop, then start again.'],
+  ['save_player_data', 'Apply edits to a player .dat.'],
   ['op_player', 'Grant/revoke operator.'],
   ['whitelist_player', 'Add/remove from whitelist.'],
   ['ban_player', 'Ban/unban a player.'],
@@ -136,8 +193,9 @@ async function handle(msg) {
   if (method === 'initialize') {
     return reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2025-06-18',
-      capabilities: { tools: { listChanged: false } },
+      capabilities: { tools: { listChanged: false }, resources: { listChanged: false, subscribe: false } },
       serverInfo: { name: 'observerlauncher', version: (readConfig() || {}).appVersion || 'dev' },
+      instructions: INSTRUCTIONS,
     });
   }
   if (method === 'notifications/initialized') return; // no response
@@ -146,12 +204,25 @@ async function handle(msg) {
     const tools = await fetchTools();
     return reply(id, { tools });
   }
+  if (method === 'resources/list') {
+    return reply(id, { resources: STATIC_RESOURCES });
+  }
+  if (method === 'resources/read') {
+    const uri = params && params.uri;
+    const r = uri ? await fetchResource(uri) : null;
+    if (!r || !r.ok) return replyError(id, -32602, (r && r.error) || 'Resource not available (is ObserverLauncher running?).');
+    const text = typeof r.text === 'string' ? r.text : JSON.stringify(r.data ?? r, null, 2);
+    return reply(id, { contents: [{ uri, mimeType: r.mimeType || 'application/json', text }] });
+  }
   if (method === 'tools/call') {
     const name = params && params.name;
     const args = (params && params.arguments) || {};
     const r = await callApp(name, args);
-    const text = r.ok ? JSON.stringify(r.result === undefined ? { ok: true } : r.result, null, 2) : ('Error: ' + (r.error || 'unknown'));
-    return reply(id, { content: [{ type: 'text', text }], isError: !r.ok });
+    const payload = r.ok ? (r.result === undefined ? { ok: true } : r.result) : { ok: false, error: r.error || 'unknown' };
+    const text = r.ok ? JSON.stringify(payload, null, 2) : ('Error: ' + (r.error || 'unknown'));
+    // structuredContent (MCP 2025-06-18): the machine-readable form, so a client can act on fields
+    // (e.g. doctor checks[].level/fix) without re-parsing the text blob.
+    return reply(id, { content: [{ type: 'text', text }], structuredContent: payload, isError: !r.ok });
   }
   if (id !== undefined && id !== null) replyError(id, -32601, 'Method not found: ' + method);
 }

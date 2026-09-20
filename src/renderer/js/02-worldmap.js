@@ -95,10 +95,22 @@ function wmChunkColors(ck,cx,cz){
   const rec=wm.biomes.get(ck);
   let out;
   if(rec&&rec[2]!==undefined){
+    // rec = [cx, cz, biome, heights?, water?, grid?]. rec[5] (1.2.0) is a 4x4 grid of per-cell
+    // biome ids — real biome boundaries inside one chunk (coastlines, forest edges) instead of a
+    // single flat colour. Falls back to the whole-chunk biome when the grid is absent.
+    const grid=rec[5];
     const base=biomeColor(rec[2]);
     if(rec[3]){
       out=new Array(16);
-      for(let i=0;i<16;i++){let c=shadeHex(base,rec[3][i]);if(rec[4]&&rec[4][i])c=mixHex(c,'#2E5A8A',0.6);out[i]=c}
+      for(let i=0;i<16;i++){
+        const cellBase=grid?biomeColor(grid[i]):base;
+        let c=shadeHex(cellBase,rec[3][i]);
+        if(rec[4]&&rec[4][i])c=mixHex(c,'#2E5A8A',0.6);
+        out[i]=c;
+      }
+    } else if(grid){
+      out=new Array(16);
+      for(let i=0;i<16;i++)out[i]=grid[i]?biomeColor(grid[i]):'#20262E';
     } else out=[rec[2]?base:'#20262E'];
   } else if(rec){ out=['#20262E']; }
   else { out=null; } // not loaded — caller uses seed wash

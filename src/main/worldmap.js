@@ -247,6 +247,30 @@ function sectionBiome(sec) {
   for (const k in count) if (count[k] > bestN) { bestN = count[k]; best = Number(k); }
   return b.palette[best] || b.palette[0] || null;
 }
+// BIOME GRID (1.2.0): a section's biome container is 4x4x4 (64 cells). sectionBiome() collapses it
+// to ONE biome for the whole chunk, so coastlines / biome edges looked like a single flat colour.
+// This keeps a 4x4 grid — one biome per surface column — so the renderer can paint real biome
+// boundaries inside a chunk. For each column we take the MAJORITY biome across its 4 vertical
+// cells (order-independent: robust to the y/z/x packing order). Pure, so it is unit-tested.
+function biomeGridFromSection(sec) {
+  const b = sec && sec.biomes;
+  if (!b || !Array.isArray(b.palette) || !b.palette.length) return null;
+  const pal = b.palette;
+  if (!b.data || !b.data.length) return new Array(16).fill(pal[0] || null); // single-biome section
+  const bits = Math.max(1, Math.ceil(Math.log2(pal.length)));
+  const cells = unpackPalette(b.data, bits, 64);
+  const grid = new Array(16);
+  for (let oz = 0; oz < 4; oz++) {
+    for (let ox = 0; ox < 4; ox++) {
+      const count = {};
+      for (let y = 0; y < 4; y++) { const c = cells[ox + oz * 4 + y * 16] | 0; count[c] = (count[c] || 0) + 1; }
+      let best = 0, bestN = -1;
+      for (const k in count) if (count[k] > bestN) { bestN = count[k]; best = Number(k); }
+      grid[oz * 4 + ox] = pal[best] || pal[0] || null;
+    }
+  }
+  return grid;
+}
 function readChunkNbt(fp, sectorOff) {
   let fd;
   try {
@@ -294,12 +318,12 @@ async function readBiomes(root, levelName, dim, rect) {
           const cx = rx * 32 + (i % 32), cz = rz * 32 + Math.floor(i / 32);
           if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
           const ck = cx + ',' + cz;
-          if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) out.push(rec.h ? [cx, cz, rec.b, rec.h, rec.w] : [cx, cz, rec.b]); continue; }
+          if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) { const row = [cx, cz, rec.b]; if (rec.h) { row.push(rec.h, rec.w); if (rec.g) row.push(rec.g); } out.push(row); } continue; }
           const nbtData = await readChunkNbt(fp, v >>> 8);
-          let biome = null, relief = null;
+          let biome = null, biomeGrid = null, relief = null;
           if (nbtData) {
             const secs = (nbtData.sections || []).slice().sort((a, b) => (a.Y | 0) - (b.Y | 0));
-            for (const sec of secs.reverse()) { const b = sectionBiome(sec); if (b) { biome = b; break; } }
+            for (const sec of secs.reverse()) { const b = sectionBiome(sec); if (b) { biome = b; biomeGrid = biomeGridFromSection(sec); break; } }
             // Real heightmap (no extra I/O — already parsed). Gives the renderer actual terrain
             // relief + water instead of the seed-noise approximation.
             const hm = nbtData.Heightmaps;
@@ -309,12 +333,16 @@ async function readBiomes(root, levelName, dim, rect) {
               relief = downsampleHeights(motion, ocean, 4);
             }
           }
-          const rec = relief ? { b: biome, h: relief.heights, w: relief.water } : { b: biome };
+          const rec = { b: biome };
+          if (relief) { rec.h = relief.heights; rec.w = relief.water; }
+          if (biomeGrid) rec.g = biomeGrid;
           entry.chunks.set(ck, rec);
           // Push null-biome chunks too (as [cx,cz,null]) so the renderer can tell "checked, no
           // biome data" apart from "not fetched yet" and shade it differently. h/w (when present)
-          // carry the real 4x4 heightmap + water mask.
-          out.push(relief ? [cx, cz, biome, relief.heights, relief.water] : [cx, cz, biome]);
+          // carry the real 4x4 heightmap + water mask; g (when present) the 16 per-cell biomes.
+          const row = [cx, cz, biome];
+          if (relief) { row.push(relief.heights, relief.water); if (biomeGrid) row.push(biomeGrid); }
+          out.push(row);
         }
       }
     }
@@ -339,4 +367,4 @@ function writeWaypoints(root, list) {
   } catch (e) { return { ok: false, error: e.code || 'writeError' }; }
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, unpackHeightmap, downsampleHeights };
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, unpackHeightmap, downsampleHeights, biomeGridFromSection };

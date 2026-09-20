@@ -77,6 +77,31 @@ fs.writeFileSync(path.join(root, 'usercache.json'), JSON.stringify([{ uuid: uuid
   const allDry = wm.downsampleHeights(grid, grid.map(v => v + 5), 4);
   ck('no water when ocean >= motion', allDry && allDry.water.every(w => w === false));
 
+  // --- biome grid (1.2.0): 4x4 per-cell biomes ---
+  // pack arbitrary-bit values into big-endian longs, matching unpackPalette's layout.
+  const packBits = (vals, bits) => {
+    const longs = [];
+    const per = Math.floor(64 / bits);
+    for (let i = 0; i < vals.length; i += per) {
+      let b = 0n;
+      for (let j = 0; j < per && i + j < vals.length; j++) b |= BigInt(vals[i + j] & ((1 << bits) - 1)) << BigInt(j * bits);
+      longs.push([Number((b >> 32n) & 0xffffffffn), Number(b & 0xffffffffn)]);
+    }
+    return longs;
+  };
+  const single = wm.biomeGridFromSection({ biomes: { palette: ['minecraft:plains'] } });
+  ck('biome grid: single-biome section -> 16 cells', Array.isArray(single) && single.length === 16);
+  ck('biome grid: single-biome cells all palette[0]', single && single.every(x => x === 'minecraft:plains'));
+  ck('biome grid: rejects missing palette', wm.biomeGridFromSection({}) === null);
+  // multi-biome: make column (ox0,oz0) all-ocean, everything else plains. cell = ox + oz*4 + y*16.
+  const cells64 = new Array(64).fill(0);
+  for (let y = 0; y < 4; y++) cells64[0 + 0 * 4 + y * 16] = 1; // palette index 1 = ocean
+  const multi = wm.biomeGridFromSection({ biomes: { palette: ['minecraft:plains', 'minecraft:ocean'], data: packBits(cells64, 1) } });
+  ck('biome grid: multi returns 16 cells', multi && multi.length === 16);
+  ck('biome grid: ocean column at [0]', multi && multi[0] === 'minecraft:ocean');
+  ck('biome grid: plains at [1]', multi && multi[1] === 'minecraft:plains');
+  ck('biome grid: plains at [15]', multi && multi[15] === 'minecraft:plains');
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
