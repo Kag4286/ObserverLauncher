@@ -49,7 +49,7 @@ surface area — the feature set from 0.9.0 is now rounded off, hardened and mad
   other purposes. Auto-tunnel does nothing unless you enable it, and only acts while the server is
   actually running.
 
-### Changed
+### Changed — Player inspector rebuild
 - **Player inspector rebuilt into 3 tabs.** Reading, live admin and risky file edits no longer sit
   side by side. **Overview** is read-only (stats, equipment, inventory, ender chest). **Live
   actions** run as server commands and work **while the server is running** (gamemode, XP, give
