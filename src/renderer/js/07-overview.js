@@ -24,33 +24,27 @@ function updateUptime(){
   el.textContent=`${h}:${m}:${s}`;
   uptimeTimer=setTimeout(updateUptime,1000-(ms%1000)+5);
 }
-// FEATURE: capability-aware diagnostics — shows what this launcher can measure natively for THIS
-// server (TPS/MSPT via Paper's built-in commands, players via /list) and offers manual commands.
-// The old panel auto-detected Spark and pushed "spark ..." console commands on a timer; that
-// automation is gone (it spammed unknown-command errors on servers without it and duplicated what
-// Paper already reports natively). Deep profiling stays available as a MANUAL Marketplace install.
+// FEATURE: capability-aware diagnostics — one quiet line inside a collapsed
+// "Details & tools" disclosure. New users see numbers first; the explanation
+// and manual commands wait until asked for. (Previously this panel showed a
+// paragraph + 3 checklist rows + 4 buttons + a hint, all at once.)
 function renderPerfDiagnostics(){
   const n=$('#perfDiagnostics');if(!n)return;
   const jar=String(state.files?.jar||'');
   const proxy=/velocity|bungee|waterfall/i.test(jar);
   const paperLike=/paper|purpur|leaf|folia/i.test(jar)||!!state.files?.hasSpigotConfig;
-  const L={full:t('perf.badgeFull'),partial:t('perf.badgePartial'),bodyF:t('perf.diagBodyFull'),bodyP:t('perf.diagBodyPartial'),tpsOk:t('perf.diagTpsOk'),tpsNo:t('perf.diagTpsNo'),msptOk:t('perf.diagMsptOk'),msptNo:t('perf.diagMsptNo'),plOk:t('perf.diagPlayersOk'),list:t('perf.diagListBtn'),spark:t('perf.diagSparkBtn'),hint:t('perf.diagSparkHint')};
-  if(proxy){n.innerHTML=`<div class="diag-head"><span class="diag-icon">◆</span><div><b>Proxy detected</b><p>Velocity proxies don't tick a world — TPS/MSPT belong to the backend servers behind it.</p></div><span class="diag-badge">N/A</span></div>`;return}
-  const tps=paperLike?L.tpsOk:L.tpsNo;
-  const mspt=paperLike?L.msptOk:L.msptNo;
+  if(proxy){n.innerHTML=`<div class="diag-head"><span class="diag-icon">◆</span><div><b>Proxy detected</b><p>TPS belongs to the backend servers, not this proxy.</p></div><span class="diag-badge">N/A</span></div>`;return}
+  const L={full:t('perf.badgeFull'),partial:t('perf.badgePartial'),bodyF:t('perf.diagBodyFull'),bodyP:t('perf.diagBodyPartial'),list:t('perf.diagListBtn'),spark:t('perf.diagSparkBtn')};
   n.innerHTML=`
     <div class="diag-head"><span class="diag-icon ${paperLike?'ok':''}">${paperLike?'✓':'◆'}</span><div><b>${t('perf.diagT')}</b><p>${paperLike?L.bodyF:L.bodyP}</p></div><span class="diag-badge ${paperLike?'ok':''}">${paperLike?L.full:L.partial}</span></div>
-    <ul class="diag-benefits"><li>${paperLike?'✓':'○'} ${tps}</li><li>${paperLike?'✓':'○'} ${mspt}</li><li>✓ ${L.plOk}</li></ul>
     <div class="diag-actions">
-      ${paperLike?`<button class="btn secondary" data-command="tps">${t('perf.requestTps')}</button><button class="btn secondary" data-command="tick query">Query tick times</button>`:''}
-      <button class="btn secondary" data-command="list">${L.list}</button>
-      <button class="btn secondary" data-tab-jump="marketplace">${L.spark}</button>
-      <span class="diag-hint">${L.hint}</span>
+      <button class="btn secondary sm" data-command="list">${L.list}</button>
+      <button class="btn secondary sm" data-tab-jump="marketplace">${L.spark}</button>
     </div>`;
   n.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>command(b.dataset.command));
   n.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));
 }
-function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=`Your system has about ${state.systemMemoryGB} GB of RAM. When set, JVM args override the two memory fields above.`;$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():'Your Minecraft server';$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):t('ov.hintNone')))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
+function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';if($('#autoTunnelInput'))$('#autoTunnelInput').checked=!!s.autoTunnel;if($('#autoTunnelQuick'))$('#autoTunnelQuick').checked=!!s.autoTunnel;$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=`Your system has about ${state.systemMemoryGB} GB of RAM. When set, JVM args override the two memory fields above.`;$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():'Your Minecraft server';$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):t('ov.hintNone')))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
   const proxy=isProxyServer();$('#eulaStatus').textContent=proxy?t('ov.eulaProxy'):(state.eulaAccepted?t('set.eulaOk').replace('✓ ',''):t('ov.eulaPending'));
   $('#worldsProxyNotice').hidden=!proxy;$('#playersProxyNotice').hidden=!proxy;
   $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
@@ -104,6 +98,10 @@ function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale
   // escape hatch when graceful Stop hangs or was already requested.
   const forceBtn=$('#forceStopBtn');if(forceBtn)forceBtn.disabled=state.status==='stopped';
   if(welcomeCard) welcomeCard.classList.toggle('needs-attention', !hasFolder || !hasJar);
+  const miniEmpty=$('#miniChartEmpty'); if(miniEmpty) miniEmpty.hidden = state.status!=='stopped';
+  // Performance tab: single offline banner + dimmed numbers while stopped.
+  const perfSec=$('#performance'); if(perfSec) perfSec.classList.toggle('is-live', state.status==='running');
+  const perfStatus=$('#perfStatus'); if(perfStatus) perfStatus.hidden = state.status!=='stopped';
   requestAnimationFrame(()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')})}
 // FEATURE: plain-language setup checklist for beginners — one glance says what
 // is missing (folder / server file / Java / EULA) instead of making them decode
@@ -198,7 +196,7 @@ $$('.backup-chip-row .filter-chip').forEach(chip=>chip.onclick=()=>{
   $('#autoBackupMinutesInput').value=v;syncBackupChips(Number(v));
 });
 $('#autoBackupCustomInput')?.addEventListener('input',()=>{$('#autoBackupMinutesInput').value=Number($('#autoBackupCustomInput').value)||0});
-function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,locale:$('#languageSelect').value}}
+function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,locale:$('#languageSelect').value}}
 // Launcher settings polish: an "unsaved changes" dot on Apply, a folder health line and a live
 // preview of the exact command line the launcher will run for this server.
 let settingsDirty=false;

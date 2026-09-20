@@ -49,6 +49,34 @@ fs.writeFileSync(path.join(root, 'usercache.json'), JSON.stringify([{ uuid: uuid
   const P2 = await wm.readPlayers(root, 'My World');
   ck('root playerdata fallback', P2.players.length === 1);
   fs.rmSync(root, { recursive: true, force: true });
+
+  // --- heightmap pure helpers ---
+  // pack 9-bit values into big-endian longs ([hi,lo]) the same way Minecraft does.
+  const pack9 = (vals) => {
+    const longs = [];
+    for (let i = 0; i < vals.length; i += 7) {
+      let b = 0n;
+      for (let j = 0; j < 7 && i + j < vals.length; j++) b |= BigInt(vals[i + j] & 0x1ff) << BigInt(j * 9);
+      longs.push([Number((b >> 32n) & 0xffffffffn), Number(b & 0xffffffffn)]);
+    }
+    return longs;
+  };
+  const grid = new Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) grid[z * 16 + x] = (x + z) & 0x1ff;
+  const un = wm.unpackHeightmap(pack9(grid), 9, 256);
+  ck('unpackHeightmap length 256', Array.isArray(un) && un.length === 256);
+  ck('unpackHeightmap value roundtrip', un && un[0] === 0 && un[255] === ((15 + 15) & 0x1ff));
+  ck('unpackHeightmap rejects empty', wm.unpackHeightmap([], 9, 256) === null);
+
+  const ocean = grid.map(v => Math.max(0, v - 1));
+  const ds = wm.downsampleHeights(un, ocean, 4);
+  ck('downsample 4x4 -> 16 cells', ds && ds.heights.length === 16 && ds.water.length === 16);
+  ck('downsample max keeps ridge', ds && ds.heights[15] === un[255]);
+  ck('downsample null on missing input', wm.downsampleHeights(null, ocean, 4) === null);
+  const allWet = wm.downsampleHeights(grid.map(v => v + 5), grid, 4);
+  ck('water majority detected', allWet && allWet.water.every(Boolean));
+  const allDry = wm.downsampleHeights(grid, grid.map(v => v + 5), 4);
+  ck('no water when ocean >= motion', allDry && allDry.water.every(w => w === false));
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

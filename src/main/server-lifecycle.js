@@ -113,6 +113,7 @@ async function startServerInternal(ctx, settings) {
       waitingForDone = false;
       startAutoPoll(ctx, software);
       ctx.setServerStatus('running');
+      try { require('./tunnel.js').autoStartTunnel(ctx).catch(() => {}); } catch {}
     }
   }, 15000);
   setTimeout(() => { if (ctx.serverProcess === startedProcess) ctx.restartAttempts = 0; }, 30000);
@@ -126,6 +127,7 @@ async function startServerInternal(ctx, settings) {
         ctx.restartAttempts = 0;
         ctx.setServerStatus('running');
         ctx.pushFiles();
+        try { require('./tunnel.js').autoStartTunnel(ctx).catch(() => {}); } catch {}
       }
       const isAutoPollStatus = Date.now() < ctx.suppressStatusUntil
         && Date.now() - ctx.lastManualCommandAt > 1200

@@ -191,11 +191,17 @@ function registerModpacks(ipcMain, ctx) {
       const tracked = new Set();
       for (const entry of manifest) {
         const folder = destFolders[entry.kind] || 'plugins';
-        const filePath = path.join(ctx.currentServerPath, folder, entry.fileName);
-        if (!fs.existsSync(filePath)) continue;
-        tracked.add(`${folder.replace(/\\/g, '/')}/${entry.fileName}`);
+        // SECURITY: entry.fileName comes from a hand-editable manifest on disk. Only accept a
+        // plain basename (no path separators) and resolve it through safeTarget, so a crafted
+        // entry can neither escape the server folder nor step out of the plugins/mods subfolder
+        // into another part of the server. Must resolve to a real file.
+        const fileName = String(entry.fileName || '');
+        if (!fileName || fileName !== path.basename(fileName)) continue;
+        const filePath = safeTarget(ctx.currentServerPath, path.join(folder, fileName));
+        if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) continue;
+        tracked.add(`${folder.replace(/\\/g, '/')}/${fileName}`);
         const stat = fs.statSync(filePath);
-        files.push({ path: `${folder.replace(/\\/g, '/')}/${entry.fileName}`, hashes: fileHashes(filePath), downloads: [entry.sourceUrl], fileSize: stat.size, env: { client: 'optional', server: 'required' } });
+        files.push({ path: `${folder.replace(/\\/g, '/')}/${fileName}`, hashes: fileHashes(filePath), downloads: [entry.sourceUrl], fileSize: stat.size, env: { client: 'optional', server: 'required' } });
       }
       if (!files.length) return { ok: false, error: 'None of the previously installed plugins/mods still exist on disk.' };
       // Warn about jars that are NOT tracked (manually copied) — they will be left out of the pack,

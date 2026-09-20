@@ -69,6 +69,43 @@ const BIOME_COLORS={
   the_end:'#C9C29A',end_highlands:'#C2BB92',end_midlands:'#B8B189',small_end_islands:'#A8A17C',end_barrens:'#9C9577',
   the_void:'#0A0F14',dripstone_caves:'#8A7355',lush_caves:'#4E8A5A',deep_dark:'#1E3A4A',
 };
+// Brightness tint by surface height for a subtle relief (0..~320 → ~0.72..1.25).
+function shadeHex(hex,h){
+  const f=0.72+Math.max(0,Math.min(1,(Number(h)-60)/140))*0.53;
+  const n=parseInt(String(hex).slice(1),16);
+  const r=Math.max(0,Math.min(255,Math.round(((n>>16)&255)*f)));
+  const g=Math.max(0,Math.min(255,Math.round(((n>>8)&255)*f)));
+  const b=Math.max(0,Math.min(255,Math.round((n&255)*f)));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+// Blend toward a target colour (used to tint water cells toward ocean blue).
+function mixHex(a,b,t){
+  const na=parseInt(String(a).slice(1),16),nb=parseInt(String(b).slice(1),16);
+  const r=Math.round(((na>>16)&255)*(1-t)+((nb>>16)&255)*t);
+  const g=Math.round(((na>>8)&255)*(1-t)+((nb>>8)&255)*t);
+  const bl=Math.round((na&255)*(1-t)+(nb&255)*t);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+bl).toString(16).slice(1);
+}
+// Colors depend only on a chunk's own data (biome + 4x4 heights + water), NOT the camera, so we
+// compute them ONCE per chunk and reuse across every frame/pan. Before this, biomeColor/shadeHex/
+// mixHex (all string parsing) ran for every on-screen cell on every draw — the main source of pan lag.
+const wmColorCache=new Map();
+function wmChunkColors(ck,cx,cz){
+  const hit=wmColorCache.get(ck); if(hit)return hit;
+  const rec=wm.biomes.get(ck);
+  let out;
+  if(rec&&rec[2]!==undefined){
+    const base=biomeColor(rec[2]);
+    if(rec[3]){
+      out=new Array(16);
+      for(let i=0;i<16;i++){let c=shadeHex(base,rec[3][i]);if(rec[4]&&rec[4][i])c=mixHex(c,'#2E5A8A',0.6);out[i]=c}
+    } else out=[rec[2]?base:'#20262E'];
+  } else if(rec){ out=['#20262E']; }
+  else { out=null; } // not loaded — caller uses seed wash
+  wmColorCache.set(ck,out);
+  if(wmColorCache.size>4000)wmColorCache.delete(wmColorCache.keys().next().value);
+  return out;
+}
 function biomeColor(id){
   if(!id)return '#3A4250';
   const k=String(id).replace(/^minecraft:/,'');
@@ -124,7 +161,9 @@ function wmScheduleBiomes(){
     if(!r||!r.ok)return;
     wm.biomeTruncated=!!r.truncated;
     let added=0;
-    for(const[cx,cz,b]of r.biomes){wm.biomes.set(cx+','+cz,b);added++}
+    // Each row is [cx, cz, biome, heights?, water?] — store the whole record so the renderer can
+    // draw real 4x4 relief + water when present.
+    for(const row of r.biomes){if(row&&row.length>=2){wm.biomes.set(row[0]+','+row[1],row);added++}}
     if(added||wm.biomeTruncated)wmDraw();
   },220);
 }
@@ -139,7 +178,7 @@ async function wmPrefetchBiomes(ccx,ccz,half){
   if(seq!==wm.biomeReqSeq)return;
   wm.biomeLoading=false;
   if(!r||!r.ok)return;
-  for(const[cx,cz,b]of r.biomes)wm.biomes.set(cx+','+cz,b);
+  for(const row of r.biomes)if(row&&row.length>=2)wm.biomes.set(row[0]+','+row[1],row);
   wmDraw();
 }
 const WM_COLORS=['#FF3B5C','#00E5FF','#FFD23F','#00E5A0','#C792EA','#FF8C42'];
@@ -170,7 +209,7 @@ async function wmLoad(){
   const f=wm.players[0]?wm.players[0].pos:wm.level.spawn;
   wm.cam={x:f.x,z:f.z};if(wm.zoom<0.1)wm.zoom=0.25;
   // A1: a reload must not keep stale biome colours from a previous world/session.
-  wm.biomes.clear();wm.lastBiomeRect='';wm.biomeTooWide=false;wm.biomeTruncated=false;
+  wm.biomes.clear();wmColorCache.clear();wm.lastBiomeRect='';wm.biomeTooWide=false;wm.biomeTruncated=false;
   wmLoadChunks(wm.dim);
   wmRenderList();wmDraw();
   // C: at the default zoom the viewport spans tens of thousands of chunks, so the normal
@@ -255,8 +294,12 @@ function wmDraw(){
   // without data fall back to the seed-coloured approximation. Only explored chunks render
   // when a chunk mask is present.
   if(wm.layers.terrain){
-    const cellPx=Math.max(8,Math.round(16*wm.zoom));
-    const stepW=cellPx/wm.zoom;
+    const chunkPx=16*wm.zoom;
+    // Close enough to spend pixels on the real 4x4 per-chunk heightmap (relief + water); when
+    // zoomed out a single flat cell per chunk is faster and looks the same.
+    const detailed=chunkPx>=24;
+    const stepW=detailed?4:16;
+    const cellPx=Math.max(detailed?3:8,Math.round(stepW*wm.zoom));
     const x0=Math.floor((wm.cam.x-W/2/wm.zoom)/stepW)*stepW;
     const x1=wm.cam.x+W/2/wm.zoom;
     const z0=Math.floor((wm.cam.z-H/2/wm.zoom)/stepW)*stepW;
@@ -265,15 +308,17 @@ function wmDraw(){
       const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
       if(wm.explored.size && !wm.explored.has(cx+','+cz))continue;
       const[sx,sy]=toS(wx,wz);
-      const ck=cx+','+cz;
-      if(wm.biomes.has(ck)){
-        const bio=wm.biomes.get(ck);
-        // Known chunk: real biome colour, or a neutral slate when the chunk had no biome data
-        // (proto-chunk / no section) — so "checked, none" is visibly different from "not loaded".
-        ctx.fillStyle=bio?biomeColor(bio):'#20262E';
+      const cols=wmChunkColors(cx+','+cz,cx,cz);
+      let col;
+      if(cols){
+        if(cols.length===16){
+          const lx=((wx%16)+16)%16, lz=((wz%16)+16)%16;
+          col=cols[Math.floor(lz/4)*4+Math.floor(lx/4)];
+        } else col=cols[0];
       } else {
-        ctx.fillStyle=getTerrainColor(wx,wz,wm.seedBig,wm.dim);
+        col=getTerrainColor(wx,wz,wm.seedBig,wm.dim);
       }
+      ctx.fillStyle=col;
       ctx.fillRect(sx,sy,cellPx,cellPx);
     }
   }

@@ -110,12 +110,65 @@ async function togglePlayerWhitelist(p,add){const bad=playerNameError(p.name);if
 async function togglePlayerBan(p,ban){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerBanToggle({uuid:p.uuid,name:p.name,ban});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(ban?'toast.banned':'toast.unbanned',{n:p.name}))}
 function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; }
 function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; m.classList.add('closing'); setTimeout(()=>{ m.hidden=true; m.classList.remove('closing'); }, 140);}
+// ============ PLAYER INSPECTOR (3-tab rework) ============
+// Overview (always read-only) · Live actions (console commands while the server runs) ·
+// Saved data (edit the .dat — server must be stopped). Separating these keeps reading, live
+// admin and risky file edits apart, so a read never sits next to a destructive checkbox.
+let pdActiveTab='overview';
+function pdSetTab(tab){
+  pdActiveTab=tab;
+  $$('.inspect-tab').forEach(b=>{const on=b.dataset.pdTab===tab;b.classList.toggle('active',on);b.setAttribute('aria-selected',on?'true':'false')});
+  $$('.inspect-panel').forEach(p=>p.classList.toggle('active',p.id==='pdPanel'+tab.charAt(0).toUpperCase()+tab.slice(1)));
+}
+function pdIsOnline(name,uuid){
+  if(!state.running)return false;
+  const live=(state.live?.players||[]).map(p=>typeof p==='string'?{name:p}:p);
+  const n=String(name||'').toLowerCase();
+  return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid===uuid));
+}
+function renderPdReadout(d,isOnline){
+  const el=$('#pdReadout');if(!el)return;
+  const gm=['Survival','Creative','Adventure','Spectator'][d.gameType??0]||'—';
+  const rows=[
+    [t('pd.stateLabel'),isOnline?t('pd.stateOnline'):t('pd.stateOffline'),isOnline?'ok':'dim'],
+    [t('pd.dimension'),d.dimension||t('ply.unknownDim'),'dim'],
+    [t('pd.health'),d.health??'—',''],
+    [t('pd.food'),d.food??'—',''],
+    [t('pd.saturation'),d.saturation??'—',''],
+    [t('pd.xp'),d.xpLevel??0,''],
+    [t('pd.totalXp'),d.xpTotal??0,''],
+    [t('pd.gamemode'),gm,''],
+  ];
+  el.innerHTML=rows.map(([k,v,c])=>`<div class="pd-ro"><span>${esc(k)}</span><b class="${c}">${esc(String(v))}</b></div>`).join('');
+}
+async function pdLiveAction(action){
+  const name=selectedPlayer?.name;if(!name)return;
+  if(!state.running)return toast(t('pd.needServer'),'error');
+  const send=cmd=>{try{command(cmd)}catch(e){toast(e?.message||String(e),'error')}};
+  if(action==='gamemode'){send(`gamemode ${$('#liveGameType').value} ${name}`)}
+  else if(action==='xp'){const n=Number($('#liveXp').value);if(!Number.isFinite(n)||n<0)return toast(t('pd.badNumber'),'error');send(`xp set ${name} ${Math.floor(n)}`)}
+  else if(action==='give'){const id=String($('#liveGiveId').value||'').trim();if(!/^[a-z0-9_:.]+$/i.test(id))return toast(t('pd.badItem'),'error');const c=Math.max(1,Math.min(6400,Math.floor(Number($('#liveGiveCount').value)||1)));send(`give ${name} ${id} ${c}`)}
+  else if(action==='heal'){send(`effect give ${name} minecraft:instant_health 1 10 true`)}
+  else if(action==='feed'){send(`effect give ${name} minecraft:saturation 1 10 true`)}
+  else if(action==='clear'){if(await confirmDialog({title:t('pd.clearInvBtn'),body:t('pd.confirmClear',{n:name}),ok:t('pd.clearInvBtn'),danger:true}))send(`clear ${name}`)}
+  else if(action==='kick'){if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))send(`kick ${name}`)}
+}
+$$('.inspect-tab').forEach(b=>b.onclick=()=>pdSetTab(b.dataset.pdTab));
+$('#pdPanelLive')?.addEventListener('click',e=>{const b=e.target.closest('[data-live-cmd]');if(b&&!b.disabled)pdLiveAction(b.dataset.liveCmd)});
+
 async function openPlayerInspector(uuid,name){
   selectedPlayer={uuid:uuid||null,name};
   openPlayerInspectModal();
+  pdSetTab('overview');
+  const isOnline=pdIsOnline(name,uuid);
+  const stEl=$('#inspectState');
+  if(stEl){stEl.textContent=isOnline?t('pd.stateOnline'):t('pd.stateOffline');stEl.className='inspect-badge '+(isOnline?'online':'offline')}
+  // Live tab needs a running server; offline edit needs it stopped. Gate both clearly.
+  $$('#pdPanelLive [data-live-cmd]').forEach(b=>b.disabled=!state.running);
   const saveBtn=$('#savePlayerData');
-  if(state.running){ if(saveBtn){ saveBtn.disabled=true; saveBtn.title=t('ply.stopBeforeEdit'); } }
-  else { if(saveBtn){ saveBtn.disabled=false; saveBtn.title=''; } }
+  const offHint=$('#pdOfflineHint');
+  if(saveBtn){saveBtn.disabled=state.running;saveBtn.title=state.running?t('ply.stopBeforeEdit'):''}
+  if(offHint)offHint.textContent=state.running?t('pd.stopToEdit'):'';
   $('#playerDataForm').hidden=true;$('#playerDataEmpty').hidden=false;$('#playerDataError').textContent=t('ply.loadingData');
   if(!uuid){ const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.textContent=t('ply.uuidUnknown'); uuidEl.hidden=false; uuidEl.title=t('ply.uuidNone'); uuidEl.onclick=null; } $('#playerDataError').textContent=t('ply.noUuidLong',{n:name});return}
   let r;
@@ -130,6 +183,7 @@ async function openPlayerInspector(uuid,name){
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
   $('#inspectAvatar').src=`https://mc-heads.net/avatar/${encodeURIComponent(uuid)}/44`;
   $('#inspectName').textContent=name;$('#inspectDim').textContent=d.dimension||t('ply.unknownDim');
+  renderPdReadout(d,isOnline);
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.title=`${uuid} — ${t('ply.copyUuidHint')}`; uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
   $('#pdHealth').value=d.health??'';$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation??'';$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};

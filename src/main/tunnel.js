@@ -161,6 +161,9 @@ async function ensurePlayitService(ctx, provider) {
     ctx.send('tunnel:status', tunnelSnapshot(ctx));
     return { ok: false, error: (start.stderr || start.error || 'Could not start the Playit service.').trim() };
   }
+  // Remember that WE started it, so we only ever stop a service we own (never one the user runs
+  // themselves for other things).
+  ctx.tunnelStartedByApp = true;
   ctx.tunnelService = 'running';
   ctx.tunnelStatus = 'running';
   ctx.appendLog('Playit service started. Create/see your tunnel on the playit.gg dashboard, then paste the address into the box.', 'system');
@@ -184,14 +187,33 @@ function refreshTunnel(ctx) {
   return tunnelSnapshot(ctx);
 }
 
-// Best-effort stop of the background service (used on server stop / app quit).
+// Stop the background service. SECURITY/SAFETY: only runs `playit stop` if the APP started the
+// service — never kills a Playit service the user runs themselves (it may serve other things).
+// Called on server stop and on app quit.
 function stopTunnel(ctx) {
-  const bin = findPlayitBinary();
-  if (bin) { try { runPlayit(bin, ['stop'], 10000); } catch {} }
+  if (ctx.tunnelStartedByApp) {
+    const bin = findPlayitBinary();
+    if (bin) { try { runPlayit(bin, ['stop'], 10000); } catch {} }
+  }
+  ctx.tunnelStartedByApp = false;
   ctx.tunnelStatus = 'stopped';
   ctx.tunnelService = 'stopped';
   ctx.send('tunnel:status', tunnelSnapshot(ctx));
   return { ok: true };
+}
+
+// AUTO-TUNNEL: when the user enabled it, start the Playit service as soon as the server is running
+// (and no tunnel is already up). Called by server-lifecycle after the server reaches 'running'.
+// Respects the security model: only acts when the setting is on, and only while the server runs.
+async function autoStartTunnel(ctx) {
+  let on = false;
+  try { on = !!require('./settings.js').loadSettings().autoTunnel; } catch {}
+  const decide = reason => { try { ctx.appendLog(`Auto-tunnel: skipped (${reason}).`, 'system'); } catch {} return { ok: false, skipped: reason }; };
+  if (!on) return decide('disabled in Settings');
+  if (!ctx.serverProcess || ctx.serverStatus !== 'running') return decide(`server not running (status=${ctx.serverStatus})`);
+  if (ctx.tunnelStatus === 'running' || ctx.tunnelStatus === 'starting' || ctx.tunnelStatus === 'installing') return { ok: true, skipped: 'already' };
+  ctx.appendLog('Auto-tunnel: starting the Playit service (enabled in Settings).', 'system');
+  return ensurePlayitService(ctx, 'playit');
 }
 
 function registerTunnel(ipcMain, ctx) {
@@ -215,6 +237,16 @@ function registerTunnel(ipcMain, ctx) {
     if (!isSafePlayitUrl(url)) return { ok: false, error: 'Refused to open an untrusted link.' };
     try { await shell.openExternal(url); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || 'Could not open the link.' }; }
   });
+  // Persist the user's public address (pasted once, shown every session). Stored in settings.
+  ipcMain.handle('tunnel:set-address', async (_, addr) => {
+    try {
+      const { loadSettings, saveSettings } = require('./settings.js');
+      const s = loadSettings();
+      s.tunnelAddress = String(addr || '').trim().slice(0, 200);
+      saveSettings(s);
+      return { ok: true, address: s.tunnelAddress };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not save the address.' }; }
+  });
 }
 
-module.exports = { registerTunnel, ensurePlayitService, stopTunnel, refreshTunnel, isSafePlayitUrl, isValidProvider, resolveTargetPort, findPlayitBinary, tunnelSnapshot, parseServiceStatus, pickPlayitAsset, installPlayitAgent, PROVIDERS };
+module.exports = { registerTunnel, ensurePlayitService, stopTunnel, autoStartTunnel, refreshTunnel, isSafePlayitUrl, isValidProvider, resolveTargetPort, findPlayitBinary, tunnelSnapshot, parseServiceStatus, pickPlayitAsset, installPlayitAgent, PROVIDERS };

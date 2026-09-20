@@ -3,11 +3,85 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0] — 2026-09-20
+
+First stable release. This milestone is deliberately about **polish and automation**, not new
+surface area — the feature set from 0.9.0 is now rounded off, hardened and made hands-off.
+
+### Added — Real terrain on the World Map
+- **The World Map now draws real terrain relief, not a seed-noise guess.** Each chunk's own
+  `Heightmaps` (already parsed for biomes — no extra disk read) is unpacked and downsampled to a
+  4×4 grid per chunk, so hills and ridges shade the biome colour and water reads as water. The
+  seed-based wash is now only a placeholder for chunks that have not loaded yet.
+- Detail kicks in when zoomed in (chunk ≥ 24px); farther out it stays one flat cell per chunk for
+  speed. New pure helpers `unpackHeightmap` / `downsampleHeights` are unit-tested.
+- **Known limitation, shown in the tab.** A short notice on the World Map explains that panning,
+  zooming and biome loading are CPU-heavy and can briefly lower a running server's TPS — so users
+  know to pan in small steps and close the tab when done.
+
+### Changed — Performance tab rework
+- **The Performance tab is now glanceable for first-time users.** The four KPI cards show
+  only a label, one big number, a status badge and a quiet bar — the per-card explainer
+  lines ("Target 20.00 • higher is better", "Server's Java process", …) are gone; the
+  explanations live behind the `?` tooltips. Chart headers are down to "Tick" and
+  "CPU & RAM" with dot-only legends (no more "38 samples • 1s interval" or launcher-RAM
+  footnotes), and empty states say one line with a Start action.
+- **One offline banner instead of four empty widgets.** While the server is stopped a
+  single strip ("Server is off — start it to see live numbers.") with a Start button
+  explains the dashes; the numbers dim so `—` reads as resting, not broken. The banner
+  reuses the main Start button, so there is still exactly one start path.
+- **Diagnostics collapsed into "Details & tools".** The capability panel (full vs partial
+  telemetry, Players / Get Spark actions) now sits inside a closed-by-default disclosure
+  instead of a full paragraph + checklist + buttons competing with the numbers.
+- Copy shortened across all 7 locales; no IPC, metric or chart logic changed (all element
+  IDs preserved).
+
+### Added — Auto-tunnel
+- **The tunnel can now start and stop with the server.** A new **"Keep it on automatically"**
+  toggle — right inside the Overview tunnel box, and mirrored in Launcher settings — starts the
+  Playit service whenever the server runs and stops it when the server stops. No more remembering
+  to press "Set up Playit" each session: turn the server on and your public address is live.
+- **Safety first.** The app only stops a Playit service it started itself — never one you run for
+  other purposes. Auto-tunnel does nothing unless you enable it, and only acts while the server is
+  actually running.
+
+### Changed
+- **Player inspector rebuilt into 3 tabs.** Reading, live admin and risky file edits no longer sit
+  side by side. **Overview** is read-only (stats, equipment, inventory, ender chest). **Live
+  actions** run as server commands and work **while the server is running** (gamemode, XP, give
+  item, heal, feed, clear inventory, kick) — the player must be online. **Saved data (edit)** is the
+  old `.dat` editor, disabled while the server runs (with a hint to use Live actions instead).
+  Destructive live actions confirm first.
+- **Your public address is remembered.** The address you paste is now saved in settings (not just
+  the browser session), so it is shown again every time you open the app.
+- **Easier for first-timers.** The tunnel controls and the 4-step guide live in the Overview card
+  where you actually share the server, instead of being buried in Launcher settings.
+- **Less cluttered Overview.** The long port-forwarding note and the firewall button now sit behind
+  an **Advanced** disclosure, and the tunnel's step-by-step guide sits behind a **How?** toggle — so
+  the panel reads cleanly at a glance while everything is still one click away. The performance
+  chart shows a plain "start the server" placeholder when the server is stopped instead of an empty
+  plot.
+
+### Fixed
+- **Modpack export validated manifest paths.** A hand-edited `observerlauncher-manifest.json`
+  entry could point outside the plugins/mods folder; export now accepts a plain basename only and
+  resolves it through the same path-safety check the rest of the app uses.
+- **Tunnel status pill could stay stuck on "OFF".** The pill element carried a `data-i18n`
+  attribute, so the locale refresh overwrote the live status text back to "OFF". The element is now
+  owned by the status updater only.
+
+---
+
 ## [0.9.0] — 2026-09-19
 
 Play your server over the internet without port forwarding, plus a round of polish: the
 i18n debt is closed, MCP marketplace search reaches full source parity, the metrics sampler
 is hardened, and the console can be exported.
+
+> **Direction from 0.9.0 onward: stability over new features.** The feature set is now broad
+> enough. Future releases (0.9.x and 1.0[Major Update]) will **prioritise polish, hardening and bug fixes** to
+> keep the app stable and predictable, rather than adding new capabilities. New features are
+> considered only when they remove a real, recurring pain point — not for their own sake.
 
 ### Added — Public tunnel (Playit.gg)
 - **Share your server to the internet without port forwarding.** A new panel on the Overview

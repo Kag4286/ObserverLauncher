@@ -199,6 +199,42 @@ function unpackPalette(longs, bits, count) {
   }
   return out;
 }
+// HEIGHTMAP: chunk NBT carries `Heightmaps.MOTION_BLOCKING` (highest block incl. water) and
+// `Heightmaps.OCEAN_FLOOR` (highest solid block under water) as 9-bit packed long arrays, 256 cells
+// (z*16+x). Pure so it can be unit-tested without a real world. Returns 256 numbers (0..511).
+function unpackHeightmap(longs, bits = 9, count = 256) {
+  if (!Array.isArray(longs) || !longs.length) return null;
+  const vals = unpackPalette(longs, bits, count);
+  if (vals.length < count) return null;
+  return vals;
+}
+// Downsample the 16x16 (256) heightmap to a RES x RES grid by taking the MAX height in each block
+// of (16/RES) cells — max keeps ridgelines readable instead of averaging them flat.
+// Returns { heights:[RES*RES], water:[RES*RES] } (z-major, same order as the source grid).
+function downsampleHeights(motion, ocean, RES = 4) {
+  if (!motion || !ocean) return null;
+  const step = 16 / RES;
+  const heights = new Array(RES * RES).fill(0);
+  const water = new Array(RES * RES).fill(false);
+  for (let oz = 0; oz < RES; oz++) {
+    for (let ox = 0; ox < RES; ox++) {
+      let maxH = 0, wet = 0, total = 0;
+      for (let dz = 0; dz < step; dz++) {
+        for (let dx = 0; dx < step; dx++) {
+          const x = ox * step + dx, z = oz * step + dz;
+          const i = z * 16 + x;
+          const h = motion[i] | 0;
+          if (h > maxH) maxH = h;
+          if (motion[i] > ocean[i]) wet++;
+          total++;
+        }
+      }
+      heights[oz * RES + ox] = maxH;
+      water[oz * RES + ox] = wet * 2 >= total; // majority-water cell
+    }
+  }
+  return { heights, water };
+}
 function sectionBiome(sec) {
   const b = sec && sec.biomes;
   if (!b || !Array.isArray(b.palette) || !b.palette.length) return null;
@@ -258,17 +294,27 @@ async function readBiomes(root, levelName, dim, rect) {
           const cx = rx * 32 + (i % 32), cz = rz * 32 + Math.floor(i / 32);
           if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
           const ck = cx + ',' + cz;
-          if (entry.chunks.has(ck)) { const b = entry.chunks.get(ck); if (b) out.push([cx, cz, b]); continue; }
+          if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) out.push(rec.h ? [cx, cz, rec.b, rec.h, rec.w] : [cx, cz, rec.b]); continue; }
           const nbtData = await readChunkNbt(fp, v >>> 8);
-          let biome = null;
+          let biome = null, relief = null;
           if (nbtData) {
             const secs = (nbtData.sections || []).slice().sort((a, b) => (a.Y | 0) - (b.Y | 0));
             for (const sec of secs.reverse()) { const b = sectionBiome(sec); if (b) { biome = b; break; } }
+            // Real heightmap (no extra I/O — already parsed). Gives the renderer actual terrain
+            // relief + water instead of the seed-noise approximation.
+            const hm = nbtData.Heightmaps;
+            if (hm) {
+              const motion = unpackHeightmap(hm.MOTION_BLOCKING);
+              const ocean = unpackHeightmap(hm.OCEAN_FLOOR);
+              relief = downsampleHeights(motion, ocean, 4);
+            }
           }
-          entry.chunks.set(ck, biome);
+          const rec = relief ? { b: biome, h: relief.heights, w: relief.water } : { b: biome };
+          entry.chunks.set(ck, rec);
           // Push null-biome chunks too (as [cx,cz,null]) so the renderer can tell "checked, no
-          // biome data" apart from "not fetched yet" and shade it differently.
-          out.push([cx, cz, biome]);
+          // biome data" apart from "not fetched yet" and shade it differently. h/w (when present)
+          // carry the real 4x4 heightmap + water mask.
+          out.push(relief ? [cx, cz, biome, relief.heights, relief.water] : [cx, cz, biome]);
         }
       }
     }
@@ -293,4 +339,4 @@ function writeWaypoints(root, list) {
   } catch (e) { return { ok: false, error: e.code || 'writeError' }; }
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes };
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, unpackHeightmap, downsampleHeights };

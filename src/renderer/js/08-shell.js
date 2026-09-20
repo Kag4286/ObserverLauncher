@@ -111,6 +111,9 @@ $('#saveRamOverview').onclick=async()=>{
   const r=await window.observer.saveSettings(next);state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
 };
 $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value;applyLocale();const next={...getSettings(),locale:currentLocale};const r=await window.observer.saveSettings(next);state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();renderJvmPreview();if(!$('#newServerModal').hidden)nswRender();if(!$('#installModal').hidden){imRenderCompat();imRenderWarns()}};
+// Performance tab: offline banner CTA reuses the main Start button so there is
+// exactly one start path (same guards, same toasts, no duplicated logic).
+$('#perfStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
 // Properties tab (search/filter/save) moved to 10-properties.js.
 $('#createBackup').onclick=async()=>{if(!await confirmDialog({title:t('wld.backupsT'),body:t('toast.confirmBackup'),ok:t('wld.create')}))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)};
 // Marketplace state moved to 11-market.js.
@@ -141,7 +144,7 @@ function applyLiveToUI(live){
 window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const key=(v.players||[]).slice().sort().join(',');if(key!==lastLivePlayersKey){lastLivePlayersKey=key;try{renderPlayers()}catch{}}
 });window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}]; try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{$('#overviewCpu').textContent=v.running?`${v.cpu||0}%`:'—';}catch{} try{$('#perfCpu').textContent=v.running?`${v.cpu||0}%`:'—';}catch{} try{$('#playerCount').textContent=v.running?String((v.players||[]).length):'—';}catch{} try{$('#tps').textContent=displayTps?.toFixed?.(2)??'—';}catch{} try{$('#perfTps').textContent=displayTps?.toFixed?.(2)??'—';}catch{}
-  const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—';const hint=$('#perfMsptHint');if(hint)hint.textContent=displayMspt!=null?'Target: under 50 ms':(v.running?'Needs Paper 1.20.2+ (/tick query) — not reported by this server':'Target: under 50 ms')}
+  const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—'}
   // overview color coding
   const tpsClass=displayTps==null?'':displayTps>=19?'ok':displayTps>=17?'warn':'bad';
   const cpuClass=v.cpu==null||!v.running?'':v.cpu<60?'ok':v.cpu<85?'warn':'bad';
@@ -198,7 +201,8 @@ async function loadConnectInfo(){
 
 $('#tunnelStart').onclick=async()=>{if(!await confirmDialog({title:t('tun.start'),body:t('tun.confirm'),ok:t('tun.start'),danger:true}))return;const r=await window.observer.tunnelStart('playit');if(!r.ok)return toast(r.error,'error');toast(t('tun.started'),'success')};
 $('#tunnelDashboard').onclick=()=>window.observer.tunnelOpenUrl('https://playit.gg/account/tunnels');
-const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||'';tunnelManual.addEventListener('change',()=>localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim()))}
+$('#autoTunnelQuick')?.addEventListener('change',async()=>{const next={...getSettings(),autoTunnel:$('#autoTunnelQuick').checked};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return}state={...state,settings:next,java:r.java};if($('#autoTunnelInput'))$('#autoTunnelInput').checked=next.autoTunnel;toast(next.autoTunnel?t('tun.autoOnToast'):t('tun.autoOffToast'),'success')});
+const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim());window.observer.saveManualTunnel(tunnelManual.value.trim())})}
 async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();applyTunnelStatus(s)}catch{}}
 function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelStart'),msg=$('#tunnelMsg');if(!pill)return;
   const st=s?.status||'stopped';pill.textContent=st==='running'?t('tun.live'):st==='installing'?t('tun.installing'):st==='starting'?t('tun.starting'):st==='error'?t('tun.error'):t('tun.off');pill.className='tunnel-pill '+st;

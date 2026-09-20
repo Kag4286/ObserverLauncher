@@ -137,6 +137,27 @@
 /* Header: avatar + (name-row / dimension / uuid) + Apply button. Every flex child can shrink
    (min-width:0) so a long player name or a narrow window never pushes the badge or button into
    the text. The name row wraps instead of overlapping. */
+.inspect-tabs{display:flex;gap:6px;margin:14px 0 2px;border-bottom:1px solid var(--border);padding-bottom:0}
+.inspect-tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--text-muted);font:600 12.5px var(--font-ui);padding:9px 14px;cursor:pointer;transition:color .12s,border-color .12s}
+.inspect-tab:hover{color:var(--text)}
+.inspect-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.inspect-panel{display:none;flex-direction:column;gap:16px;padding-top:16px}
+.inspect-panel.active{display:flex}
+.inspect-readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pd-ro{display:flex;flex-direction:column;gap:3px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;min-width:0}
+.pd-ro>span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
+.pd-ro>b{font:600 14px var(--font-ui);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pd-ro>b.ok{color:var(--success)} .pd-ro>b.dim{color:var(--text-muted)}
+.pd-live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.pd-live-cell{display:flex;align-items:flex-end;gap:10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.pd-live-cell label{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.pd-live-cell label span{font:600 10px var(--font-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim)}
+.pd-live-cell input,.pd-live-cell select{width:100%;min-width:0;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 9px;color:var(--text);font:500 12.5px var(--font-ui)}
+.pd-live-cell.actions{flex-wrap:wrap;align-items:center}
+.pd-live-cell.actions .btn{flex:0 0 auto}
+.pd-offline-actions{display:flex;align-items:center;gap:12px;margin-top:6px}
+.inspect-badge.online{color:var(--success);background:var(--success-weak,rgba(0,229,160,.12));border-color:rgba(0,229,160,.3)}
+.inspect-badge.offline{color:var(--warning);background:var(--warning-weak);border-color:rgba(255,210,63,.25)}
 .inspect-header{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:var(--panel-raised);border:1px solid var(--border);border-radius:var(--r);animation:sectionIn .3s var(--ease) .05s both}
 .inspect-avatar{width:48px;height:48px;border-radius:var(--r);border:1px solid var(--border);background:var(--field);image-rendering:pixelated;flex-shrink:0}
 .inspect-title{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
