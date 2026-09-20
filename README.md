@@ -35,7 +35,7 @@ It is a **local** tool: it runs the server on your machine, has no account syste
 
 Every tab shares one look — a header strip over a single surface — so the app feels like one instrument, not a pile of screens.
 
-**Overview** — server identity, live status, TPS/RAM at a glance, quick actions and how friends can connect.
+**Overview** — server identity, live status, quick actions and how friends can connect; a **Server stats** panel with live numbers and RAM allocation.
 
 ![ObserverLauncher Overview tab](docs/screenshot-overview.png)
 
@@ -97,13 +97,13 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-1.1.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-1.1.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-1.1.1-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-1.1.1.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe` (a normal NSIS installer — you can choose the install location; it sets up auto-update).
-- **Linux:** `chmod +x ObserverLauncher-1.1.0.AppImage` then run it. No installation, no root.
+- **Linux:** `chmod +x ObserverLauncher-1.1.1.AppImage` then run it. No installation, no root.
 
 ### Option B — Run from source
 
@@ -127,7 +127,7 @@ The launcher checks GitHub Releases on startup and shows a notification when a n
 3. **Create a server** — the wizard asks for software (e.g. *Paper*) and Minecraft version, then downloads it. Spigot compiles from source and takes several minutes; the Console shows progress.
 4. **Check the setup checklist.** The Overview hero lists problems only: missing folder, missing jar, missing Java, or unaccepted EULA. When everything is green, the list disappears.
 5. **Accept the EULA.** Enable **Accept EULA automatically** in Settings, or edit `eula.txt` yourself.
-6. **Set memory.** In the stats row, set **Allocate RAM** (min/max GB) and click **Apply**. Roughly half your system RAM is a good start — leave room for the OS.
+6. **Set memory.** In the **Server stats** panel at the bottom of Overview, set **Allocate RAM** (min/max GB) and click **Apply**. Roughly half your system RAM is a good start — leave room for the OS.
 7. **Press Start.** The status moves through *Starting → Running*. The first launch creates `server.properties` and the world folders — an initial `Failed to load properties` error is expected and harmless.
 8. **Invite friends.** The *How friends can join* panel shows the address to share. Same Wi-Fi: use the local address as-is. Elsewhere: either forward the port on your router, or click **Share to internet** — the app can install and run the [Playit.gg](https://playit.gg) agent and give your server a public address with no router setup.
 
@@ -180,7 +180,7 @@ Everything else — plugins, players, backups, the world map — is optional.
 - **Explored-chunk overlay** scanned from region files; half-generated chunks are filtered out.
 - **Waypoints** you can add, name, jump to and delete, and **jump to coordinates** by typing `X Z`.
 - **Export the current view as PNG.**
-- A short note in the tab explains that the map is CPU-heavy and can briefly affect a running server's TPS.
+- A short, plain-language note in the tab warns that the map is heavy and can slow the app down.
 
 ### Console
 - Real terminal view with timestamps, per-level colouring (info / warn / error / command) and **segmented filters**.
@@ -208,7 +208,7 @@ Everything else — plugins, players, backups, the world map — is optional.
 
 ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (40+ tools).
 
-**Enable it:** Settings → **MCP / AI** → *Enable MCP server*. The launcher starts a **local-only** server (127.0.0.1, random port, a fresh token every launch) and writes its connection info to `mcp-bridge.json` in the launcher's data folder. The app must stay open while the client is used.
+**Enable it:** Settings → **Advanced** → **MCP / AI** → *Enable MCP server*. The launcher starts a **local-only** server (127.0.0.1, random port, a fresh token every launch) and writes its connection info to `mcp-bridge.json` in the launcher's data folder. The app must stay open while the client is used.
 
 **Connect a client:** click **Copy MCP config** and paste it into your client's MCP settings. The exact JSON (with real paths filled in) goes on your clipboard. The launcher runs the bridge with its OWN binary (`ELECTRON_RUN_AS_NODE=1`), so **you don't need Node.js installed**.
 
@@ -342,7 +342,7 @@ All requests go directly from your machine to the official sources.
 - **Velocity proxies don't tick a world**, so their TPS/MSPT panel shows N/A by design.
 - **Auto-update requires the packaged installer/AppImage** (not a portable `.exe` or `.deb`).
 - **Port forwarding is still on you by default.** The launcher cannot configure your router. The optional **Share to internet** feature (Playit.gg) avoids the router entirely, but it links the machine to a Playit account.
-- **The World Map is CPU-heavy.** Panning, zooming and biome loading can stutter the app and briefly lower a running server's TPS; a note in the tab says so.
+- **The World Map is heavy on your computer.** Panning and zooming can slow the app and briefly affect a running server; a note in the tab explains it in plain words.
 
 ### Linux notes
 
@@ -377,7 +377,7 @@ The app is a clean three-layer split.
 │  creates ctx, registers feature modules:                      │
 │   context · server-lifecycle · backups · players ·            │
 │   marketplace · modpacks · wizard · settings-handlers ·       │
-│   content-handlers · tunnel · app-lifecycle                   │
+│   content-handlers · tunnel · scheduler · app-lifecycle       │
 │                                                               │
 │  Pure/stateless helpers (testable without Electron):          │
 │   java · server-files · settings · fs-utils · http ·          │

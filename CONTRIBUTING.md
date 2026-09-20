@@ -25,7 +25,7 @@ The app is plain Electron — **no bundler, no build step for development**. The
   `src/main/`:
   - Feature modules (stateful, take `ipcMain` + `ctx`): `context.js`, `server-lifecycle.js`,
     `backups.js`, `players.js`, `marketplace.js`, `modpacks.js`, `wizard.js`, `settings-handlers.js`,
-    `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`.
+    `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`, `tunnel.js`.
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
     `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`.
@@ -113,9 +113,9 @@ add a regression test with a synthesized NBT fixture (see
    that every key referenced from `index.html` **and** from `t('…')`/`tf('…')` literals in
    `src/renderer/js/*.js` actually exists in `en`. (Dynamic/concatenated keys are skipped.)
 
-Not every string in the app goes through `data-i18n` yet. Extending coverage (adding
-`data-i18n` / `data-i18n-placeholder` / `data-i18n-title` attributes to more elements, and the
-matching keys) is a welcome contribution on its own.
+The UI is now **fully translated** — the i18n test enforces that every `data-i18n*` attribute and
+every `t('…')` literal has a key in all 7 locales (no missing keys). When you add new UI text, add
+the key to `en.js` first, then translate the other six — the test fails until all seven have it.
 
 ## Reporting bugs
 

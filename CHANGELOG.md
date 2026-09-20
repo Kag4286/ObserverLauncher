@@ -3,6 +3,21 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.1] — 2026-09-20
+
+A small follow-up to 1.1.0: documentation brought in line with the new interface, and a fresh
+set of screenshots.
+
+### Changed
+- **README and CONTRIBUTING updated to match the 1.1.0 UI** — the Overview description, the
+  Allocate-RAM location, the World Map wording and the MCP settings path (now under **Advanced**)
+  were stale. The module lists in both docs now include the modules they were missing
+  (`tunnel.js`, `scheduler.js`), and the i18n note reflects that all 7 locales are complete.
+- **Screenshots replaced** to show the current interface.
+
+### Notes
+- No code changes — documentation only. `npm test` (26 files) and the E2E suite remain green.
+
 ## [1.1.0] — 2026-09-20
 
 A stability **and usability** release. No new features — the goal was to make 1.0.0 rock-solid
