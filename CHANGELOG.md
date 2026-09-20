@@ -15,6 +15,10 @@ surface area — the feature set from 0.9.0 is now rounded off, hardened and mad
   seed-based wash is now only a placeholder for chunks that have not loaded yet.
 - Detail kicks in when zoomed in (chunk ≥ 24px); farther out it stays one flat cell per chunk for
   speed. New pure helpers `unpackHeightmap` / `downsampleHeights` are unit-tested.
+- **Performance: colours are cached per chunk.** Terrain colours depend only on a chunk's own data
+  (biome + heightmap), not the camera, so they are computed once per chunk and reused while panning
+  and zooming — the biggest source of map stutter is gone. The per-chunk cache is cleared when the
+  world or dimension changes.
 - **Known limitation, shown in the tab.** A short notice on the World Map explains that panning,
   zooming and biome loading are CPU-heavy and can briefly lower a running server's TPS — so users
   know to pan in small steps and close the tab when done.
@@ -79,7 +83,7 @@ i18n debt is closed, MCP marketplace search reaches full source parity, the metr
 is hardened, and the console can be exported.
 
 > **Direction from 0.9.0 onward: stability over new features.** The feature set is now broad
-> enough. Future releases (0.9.x and 1.0[Major Update]) will **prioritise polish, hardening and bug fixes** to
+> enough. Future releases (0.9.x and 1.0) will **prioritise polish, hardening and bug fixes** to
 > keep the app stable and predictable, rather than adding new capabilities. New features are
 > considered only when they remove a real, recurring pain point — not for their own sake.
 
@@ -102,7 +106,6 @@ is hardened, and the console can be exported.
 - New `src/main/tunnel.js` + `tests/tunnel.test.js` (address/claim parsing, provider validation).
 
 ### Added
-- **Export the console log to a `.txt` file.** A new **Export** button in the Console header.
 - **Four new MCP tools** (44 total): `get_schedule` / `set_schedule` (read/set the server
   start-stop schedule), `list_waypoints` (World Map waypoints) and `kick_player` (kick an online
   player). Risk tiers follow the existing model (read free, write asks).
