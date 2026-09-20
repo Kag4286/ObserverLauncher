@@ -45,11 +45,30 @@
 
 /* One surface: header strip + hairline-divided areas */
 .flat-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+/* SETTINGS sub-tabs (1.1.0): Basic vs Advanced. End users were overwhelmed by seeing
+   every path/MCP/JVM control at once. A segmented switch + sliding glider (same pattern
+   as the old Overview seg) keeps everyday settings front and centre. */
+.seg-switch{position:relative;display:inline-flex;gap:2px;padding:4px;margin:14px 18px 0;border:1px solid var(--border);border-radius:999px;background:var(--field)}
+.seg-switch-btn{position:relative;z-index:1;background:none;border:0;cursor:pointer;padding:7px 22px;border-radius:999px;font:600 12.5px var(--font-ui);color:var(--text-dim);transition:color .18s var(--ease-out)}
+.seg-switch-btn:hover{color:var(--text-muted)}
+.seg-switch-btn.active{color:var(--accent-ink)}
+.seg-switch-glider{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:0;border-radius:999px;background:var(--accent);box-shadow:0 0 14px var(--accent-weak);transition:left .26s var(--ease-spring),width .26s var(--ease-spring)}
+.set-pane[hidden]{display:none}
+@media (prefers-reduced-motion: reduce){.seg-switch-glider{transition:none}}
 /* Settings tab: single vertical column (no more staggered 2-col grid), each section numbered
    for a clear reading order. Scoped to #settings so the Content tab's grid is untouched. */
 #settings .flat-grid2{grid-template-columns:1fr;counter-reset:setgrp}
 #settings .flat-grid2 > .flat-cell{counter-increment:setgrp}
+/* Collapsed <details> sections (Schedule, Updates) don't show a number, so they
+   must not advance the counter either — otherwise the next visible section jumps
+   (e.g. Reliability 04 -> MCP 07). */
+#settings .flat-grid2 > details.flat-cell{counter-increment:none}
 #settings .flat-cell .sec-head h3::before{content:counter(setgrp,decimal-leading-zero);font:700 10px var(--font-mono);letter-spacing:.12em;color:var(--accent-dim);margin-right:9px}
+/* Group headers inside Settings (1.1.0): Setup / Personal / Automation / Advanced.
+   Full-width sticky-free labels that break the long single column into scannable
+   clusters — the tab was 'a mixed pot' of 8 equal sections before. */
+#settings .flat-grid2 > .set-group{grid-column:1/-1;padding:16px 18px 6px;font:700 10px var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);background:var(--panel)}
+#settings .flat-grid2 > .set-group:first-child{padding-top:12px}
 /* Settings: de-emphasise the section subtitle so the numbered h3 leads the eye. */
 #settings .flat-cell .sec-head small{color:var(--text-dim);font-weight:500;opacity:.85}
 /* Settings tab: keep the header (and its Apply button) pinned while scrolling. A sticky child
@@ -163,7 +182,17 @@
 .set-chevron{margin-left:auto;color:var(--text-dim);transition:transform .15s var(--ease)}
 details[open].set-advanced .set-chevron{transform:rotate(90deg)}
 .set-adv-body{padding-top:12px;margin-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
-.rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 26px}
+/* Reliability: was 2 columns, but the auto-backup block (chips + custom + retention)
+   is wide and wrapped badly in a half-width column ('Keep auto-backups' broke over 2
+   lines, the hint over 3). One full-width column per setting reads cleanly. */
+.rel-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.rel-grid > div + div{padding-top:14px;border-top:1px solid var(--border)}
+/* Retention row: label + a NARROW number box + hint, not a stretched full-width input. */
+#backupRetentionRow{gap:10px;flex-wrap:wrap}
+#backupRetentionRow label{font:600 12.5px var(--font-ui);color:var(--text);white-space:nowrap}
+#backupRetentionRow input{flex:0 0 72px;width:72px;text-align:center;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 6px;font:600 13px var(--font-mono);color:var(--text);outline:0}
+#backupRetentionRow input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+#backupRetentionRow .hint{flex:1 1 160px;min-width:0}
 
 /* ---------- SERVER SETTINGS hero — flattened to match ---------- */
 #properties .settings-hero{padding:14px 18px;background:var(--panel-raised);border:1px solid var(--border);border-bottom:0;border-radius:var(--r) var(--r) 0 0}

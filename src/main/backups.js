@@ -24,7 +24,7 @@ function resolveBackupFile(ctx, name) {
   return backup;
 }
 
-async function createBackupInternal(ctx) {
+async function createBackupInternal(ctx, opts = {}) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
   // Snapshot the root once — the renderer can change ctx.currentServerPath (settings:save)
   // while this async runs, which would otherwise mix two folders in one backup.
@@ -38,13 +38,30 @@ async function createBackupInternal(ctx) {
     const dir = safeTarget(root, 'observerlauncher-backups');
     fs.mkdirSync(dir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const out = path.join(dir, `world-backup-${stamp}.zip`);
+    // Auto backups get their own prefix so retention can prune ONLY them — a manual backup is a
+    // deliberate user action and must never be deleted by the rotation.
+    const prefix = opts.auto ? 'world-backup-auto-' : 'world-backup-';
+    const out = path.join(dir, `${prefix}${stamp}.zip`);
     const r = await platform.createBackup({ serverPath: root, worlds: info.worlds, destZip: out });
     return r.ok ? { ok: true, files: serverFiles(root), name: path.basename(out) } : { ok: false, error: r.error };
   } finally {
     try { if (ctx.serverProcess && ctx.serverProcess.stdin.writable) ctx.serverProcess.stdin.write('save-on\r\n'); } catch {}
     ctx.backupInProgress = false;
   }
+}
+
+// Keep the newest `keep` auto-backups, delete older ones. ISO timestamps sort lexically, so a
+// plain name sort is chronological. Never touches manual backups. Best-effort (never throws).
+function pruneBackups(ctx, keep) {
+  keep = Math.max(1, Number(keep) || 10);
+  try {
+    const dir = safeTarget(ctx.currentServerPath, 'observerlauncher-backups');
+    if (!dir || !fs.existsSync(dir)) return;
+    const autos = fs.readdirSync(dir).filter(n => /^world-backup-auto-.*\.zip$/i.test(n)).sort();
+    for (let i = 0; i < autos.length - keep; i++) {
+      try { fs.unlinkSync(path.join(dir, autos[i])); } catch {}
+    }
+  } catch {}
 }
 
 function startAutoBackupWatcher(ctx) {
@@ -55,8 +72,12 @@ function startAutoBackupWatcher(ctx) {
     const minutes = Number(settings.autoBackupMinutes) || 0;
     if (minutes <= 0 || !ctx.currentServerPath) return;
     if (Date.now() - ctx.lastAutoBackupAt < minutes * 60 * 1000) return;
-    const result = await createBackupInternal(ctx);
-    if (result.ok) { ctx.lastAutoBackupAt = Date.now(); ctx.appendLog(`Auto-backup: ${result.name}`, 'system'); }
+    const result = await createBackupInternal(ctx, { auto: true });
+    if (result.ok) {
+      ctx.lastAutoBackupAt = Date.now();
+      ctx.appendLog(`Auto-backup: ${result.name}`, 'system');
+      pruneBackups(ctx, settings.backupRetention);
+    }
   }, 60 * 1000);
 }
 
@@ -82,4 +103,4 @@ function registerBackups(ipcMain, ctx) {
   });
 }
 
-module.exports = { createBackupInternal, startAutoBackupWatcher, registerBackups, resolveBackupFile };
+module.exports = { createBackupInternal, startAutoBackupWatcher, registerBackups, resolveBackupFile, pruneBackups };

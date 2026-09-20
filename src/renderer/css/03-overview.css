@@ -54,6 +54,33 @@
 /* Legacy hooks kept for JS compat (welcomeCard toggle). */
 .welcome-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
 @media(max-width:1100px){.hero .welcome-actions{margin-left:0}.srv-stats{flex-wrap:wrap;gap:14px 0}.srv-stats>div{flex:1 1 22%;min-width:0;padding:0 12px}.srv-stats>div:first-child{padding-left:0}.stat-ram{margin-left:0;border-left:0;padding-left:12px}}
+/* First-run declutter: before a folder is chosen, only the hero CTA shows. */
+#overview:not(.has-server) .ov-stats-panel,
+#overview:not(.has-server) .chart-panel,
+#overview:not(.has-server) #connectPanel,
+#overview:not(.has-server) #javaWarnBanner{display:none}
+/* SERVER STATS panel (1.1.0): two clear halves — 'Live now' readouts on top,
+   memory allocation as its own labelled box below, so read-only numbers never
+   blur into the editable RAM inputs. */
+.ov-stats-panel{padding:0}
+.ov-stats-live{padding:16px 18px 14px}
+.ov-stats-cap{margin:0 0 12px;font:700 10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.ov-stats-panel .srv-stats{flex-wrap:wrap;gap:14px 0;margin:0}
+.ov-stats-panel .srv-stats>div{padding:0 22px;min-width:96px}
+.ov-stats-panel .srv-stats>div:first-child{padding-left:0}
+.ov-ram-box{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;border-top:1px solid var(--border);background:var(--field)}
+.ov-ram-info{display:flex;flex-direction:column;gap:3px;min-width:180px}
+.ov-ram-info b{font:700 11px var(--font-mono);letter-spacing:.1em;color:var(--text)}
+.ov-ram-info small{font:500 11px var(--font-ui);color:var(--text-dim)}
+.ov-ram-controls{display:flex;align-items:center;gap:8px;margin-left:auto}
+.ov-ram-controls input{width:64px;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 6px;color:var(--text);font:600 14px var(--font-mono);font-variant-numeric:tabular-nums;text-align:center;outline:0}
+.ov-ram-controls input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.ov-ram-controls input::-webkit-outer-spin-button,.ov-ram-controls input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ov-ram-controls .ram-allocate-sep{color:var(--text-dim)}
+@media(max-width:1100px){.ov-stats-panel .srv-stats>div{flex:1 1 22%;min-width:0;padding:0 12px}.ov-stats-panel .srv-stats>div:first-child{padding-left:0}}
+/* Overview is ONE vertical flow now (no Home/Advanced sub-tabs). Panels stack
+   with a gap; the hero and the java banner supply their own spacing. */
+#overview > .activity, #overview > .ov-stats-panel, #overview > .chart-panel{margin-top:12px}
 .overview-grid{display:grid;grid-template-columns:1.7fr .9fr;gap:12px;margin-top:12px}
 .chart-panel canvas, .large-chart canvas{width:100%;height:140px;display:block;margin-top:10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r)}
 .chart-legend{display:flex;gap:12px;margin-top:8px;font:500 10px var(--font-mono);color:var(--text-muted)}
@@ -70,7 +97,12 @@
 .connect-grid.tuner{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .connect-channel{padding:10px 14px;background:var(--panel);min-width:0} .connect-channel+.connect-channel{border-left:1px solid var(--border)}
 .connect-channel-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font:600 12px var(--font-ui);color:var(--text)}
-.channel-tag{font:700 9px var(--font-mono);letter-spacing:.1em;background:var(--accent);color:var(--accent-ink);padding:3px 7px;border-radius:999px;flex-shrink:0}
+/* UX (1.1.0): the old 'CH.01 / CH.02' radio-channel badges read as jargon to a
+   Minecraft user. Replaced with a small status dot that carries the same
+   'two distinct channels' cue without the fake label. */
+.connect-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.connect-dot.dot-lan{background:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.connect-dot.dot-wan{background:var(--success);box-shadow:0 0 0 3px var(--success-weak)}
 .connect-freq{display:flex;gap:10px;align-items:center;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:10px 12px;margin-top:8px;min-width:0}
 .connect-freq:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
 .connect-freq-icon{width:20px;height:20px;flex-shrink:0;color:var(--accent);stroke:currentColor;fill:none;stroke-width:1.6;display:block}
@@ -94,6 +126,15 @@
 .chart-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:13px;color:var(--text-dim);background:var(--panel);border-radius:var(--r);pointer-events:none}
 .chart-empty-overlay[hidden]{display:none}
 .wm-perf-note{font-size:11.5px;line-height:1.5;color:var(--warning);border-left:3px solid var(--warning);background:var(--field);border-radius:var(--r-sm);padding:8px 12px;margin:0 0 12px}
+/* Collapsible tunnel box (1.1.0): was fully expanded and dominated the Home view.
+   Now it's a <details> — the head row is the toggle, body hidden until opened. */
+.tunnel-box>summary{list-style:none;cursor:pointer}
+.tunnel-box>summary::-webkit-details-marker{display:none}
+.tunnel-box:not([open]) .tunnel-head{margin-bottom:0}
+.tunnel-box>summary:hover b{color:var(--accent)}
+.tunnel-chevron{margin-left:4px;color:var(--text-dim);transition:transform .15s var(--ease)}
+.tunnel-box[open] .tunnel-chevron{transform:rotate(90deg)}
+.tunnel-body{padding-top:2px}
 .tunnel-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .tunnel-head b{font:600 12.5px var(--font-ui);color:var(--text)}
 .tunnel-pill{margin-left:auto;font:700 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-dim);background:var(--field)}

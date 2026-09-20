@@ -52,6 +52,7 @@ function createContext() {
     tunnelAddress: null,
     tunnelClaimUrl: null,
     tunnelStartedByApp: false,
+    tunnelRefreshing: false,
     // MCP integration (src/mcp/server.js): HTTP server + token, null until started.
     mcpServer: null,
     mcpToken: null,

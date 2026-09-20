@@ -3,6 +3,73 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.0] — 2026-09-20
+
+A stability **and usability** release. No new features — the goal was to make 1.0.0 rock-solid
+(fewer freezes, clearer errors, safer defaults, a self-maintaining backup folder) **and** to make
+the interface far calmer for a first-time user. Guided by a hardening pass against a comparable
+project (CalaKuad1/Minecraft-Local-Server-GUI).
+
+### Changed — UI/UX overhaul (beginner-first, less clutter)
+- **Sidebar regrouped.** The ten flat nav items are now three labelled clusters — **Server**
+  (Overview/Console/Players/Performance), **Content & world**, **Configuration** — so the eye
+  scans a few groups instead of a wall of buttons.
+- **Overview decluttered.** The hero is now just the server name, status and Choose/Create. A
+  fresh install (no folder chosen yet) shows only that. The five stat tiles moved into their own
+  **Server stats** panel, split into a read-only **Stats** half (players/TPS/CPU/RAM) and a
+  separate bordered **ALLOCATE RAM** box. The redundant in-page performance chart was removed
+  (the Performance tab already covers it), and the Playit tunnel box is now a collapsed row.
+- **No more radio jargon.** Removed the decorative "CH.01/CH.02" badges, the meaningless (and
+  wrong) "01/08" tab counter, the duplicated all-caps kickers above every tab title, and
+  overlapping decorative labels — the UI now says what it does in plain words.
+- **Launcher settings split into Basic / Advanced.** A segmented switch keeps everyday settings
+  (server folder, Java, preferences, reliability) on **Basic**; power controls (tunnel path,
+  schedule, updates, MCP/AI, JVM arguments) live on **Advanced**. Sections are grouped
+  (Setup / Personal / Automation) and the internet-tunnel settings moved out from under Java
+  runtime, where they never belonged.
+- **World Map warning rewritten for non-technical users** — it no longer talks about "CPU" or
+  "TPS"; it just says drawing the map is heavy, the app may feel slow, and to pan in small steps.
+- Copy across all 7 locales updated to match (now 756 keys).
+
+### Fixed
+- **The app no longer freezes every 15 seconds while the tunnel is polled.** The tunnel status
+  check ran the Playit agent with a *blocking* `spawnSync` (up to an 8s timeout) on a 15s timer —
+  which stalled the entire Electron main process (every IPC call, file watcher and repaint waited
+  on it) whenever the agent was slow or its service pipe was stuck. It now runs asynchronously with
+  a hard kill-timeout, and overlapping polls are coalesced. The UI stays responsive even if the
+  Playit service hangs.
+- **Java errors are now readable.** When Java was missing or the path was wrong, the Settings UI
+  showed the raw `spawn java ENOENT` / `EACCES` message. These are now mapped to plain, actionable
+  text that names the cause and the fix (e.g. "No Java found at … — install Java or point the path
+  at a real java executable.").
+- **Removed a console log that spammed every 15 seconds** while the Playit agent was not installed.
+
+### Added
+- **Automatic backup rotation.** Auto-backups used to accumulate forever and could slowly fill the
+  disk. A new **"Keep auto-backups"** field (Launcher settings → Reliability, default 10) keeps the
+  newest N automatic snapshots and deletes older ones. **Manual backups are never touched** — only
+  snapshots the app created on a schedule are pruned, so a backup you made on purpose is always
+  safe. (Settings migration v2 → v3 adds the field automatically.)
+- **Extra hardening on the local MCP server.** Requests carrying a browser `Origin` header, or a
+  `Host` that is not a loopback address, are now rejected before authentication — defence in depth
+  against localhost CSRF / DNS-rebinding. The real Node client never sends either, so nothing
+  changes for legitimate use.
+
+### Fixed (UI)
+- **The Basic/Advanced switch in Settings now highlights on first open.** The Settings tab is
+  hidden at startup, so the sliding pill measured 0px and only appeared after a click. It now
+  re-measures as soon as the tab becomes visible.
+- **Auto-backup settings no longer look cramped.** Reliability was a 2-column grid that squeezed
+  the backup controls; it is now a single full-width column with a clean separator.
+
+### Notes
+- No IPC channels, element IDs or metric logic were changed — only layout, copy and the two small
+  measurement fixes above. Existing settings keep working (auto-migrated). All 26 unit-test files
+  and the 4 Playwright E2E tests pass.
+- Verified by unit/integration tests and on-screen checks; the backup rotation and the asynchronous
+  tunnel refresh have not yet been exercised against a live Playit agent / real large world on this
+  machine.
+
 ## [1.0.0] — 2026-09-20
 
 First stable release. This milestone is deliberately about **polish and automation**, not new

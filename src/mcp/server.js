@@ -104,6 +104,15 @@ function startMcpServer(ctx) {
     try { ctx.send('mcp:client', { connected: true }); } catch {}
   };
   const server = http.createServer((req, res) => {
+    // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
+    // Origin header and connects by IP. A browser page on any site can still POST to 127.0.0.1
+    // (localhost CSRF / DNS-rebinding): the token already blocks it, but rejecting browser-shaped
+    // requests up front removes the attack surface entirely. Non-IP Host values are rebinding.
+    if (req.headers['origin']) { res.writeHead(403); return res.end('forbidden'); }
+    const host = String(req.headers['host'] || '').split(':')[0];
+    if (host && host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]' && host !== '::1') {
+      res.writeHead(403); return res.end('forbidden');
+    }
     const auth = req.headers['authorization'] || '';
     // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
     // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.

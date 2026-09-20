@@ -6,7 +6,12 @@
 .rail-head{padding:16px 14px;border-bottom:1.5px solid var(--border);display:flex;gap:10px;align-items:center;background:linear-gradient(180deg, var(--panel-raised), var(--panel))}
 .brand{display:flex;gap:12px;align-items:center} .brand-mark{width:32px;height:32px;background:var(--panel-raised);border:1px solid var(--border);display:grid;place-items:center;overflow:hidden;border-radius:var(--r-sm);flex-shrink:0}
 .brand-mark img{width:100%;height:100%;object-fit:cover;display:block} .brand b{font-size:16px;letter-spacing:.02em;line-height:1} .brand small{display:block;font:600 9px var(--font-mono);letter-spacing:.14em;color:var(--text-dim);margin-top:3px}
-.rail-nav{padding:10px 8px;display:grid;gap:4px;flex:1;overflow:auto}
+.rail-nav{padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:auto}
+/* UX (1.1.0): the 10 flat nav items are grouped into 3 labelled clusters so a new
+   user scans SERVER / CONTENT / CONFIG instead of a wall of 10 equal buttons. */
+.rail-nav .nav-group{display:grid;gap:3px}
+.rail-nav .nav-group + .nav-group{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.rail-nav .nav-group-label{margin:2px 0 4px;padding:0 12px;font:700 9px var(--font-mono);letter-spacing:.16em;color:var(--text-dim);text-transform:uppercase;opacity:.65}
 .rail-nav .nav-item{width:100%;display:flex;align-items:center;gap:12px;padding:12px 12px;border:1px solid transparent;background:transparent;color:var(--text-muted);font:600 14px var(--font-ui);cursor:pointer;border-radius:var(--r-sm);text-align:left;transition:all .12s var(--ease)}
 .rail-nav .nav-item:hover{background:var(--panel-raised);color:var(--text);border-color:var(--border)}
 .rail-nav .nav-item.active{background:var(--panel-raised);border-color:var(--border-strong);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
@@ -14,7 +19,7 @@
 .rail-nav .nav-item:hover .nav-icon{opacity:.8}
 .rail-nav .nav-item.active .nav-icon{opacity:1;filter:drop-shadow(0 0 6px rgba(255,255,255,.45))}
 .rail-nav .nav-item.active .nav-icon{opacity:1}
-.rail-foot{padding:10px 12px;border-top:1.5px solid var(--border);font:500 10px var(--font-mono);color:var(--text-dim);display:flex;justify-content:space-between}
+.rail-foot{padding:10px 12px;border-top:1.5px solid var(--border);font:500 10px var(--font-mono);color:var(--text-dim);display:flex;justify-content:flex-end}
 /* BUGFIX: with titleBarStyle:'hidden' (Windows) there was no -webkit-app-region drag strip anywhere,
 so the window could not be moved by dragging at all. The top command bar is now the drag handle. */
 .command-bar{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1.5px solid var(--border);background:rgba(15,20,26,.9);backdrop-filter:blur(8px);position:sticky;top:0;z-index:2;-webkit-app-region:drag;user-select:none}
@@ -89,7 +94,11 @@ is active (renderer adds .wco-app to <html>), reserve its width on the right sid
 .tab-head-icon{width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;border-radius:var(--r);background:var(--field);border:1px solid var(--border)}
 .tab-head-icon img{width:26px;height:26px;display:block}
 .tab-head-text{min-width:0}
-.tab-head-text .eyebrow{display:block;margin-bottom:3px}
+/* UX (1.1.0): the decorative all-caps kicker above each tab title (ROSTER,
+   CONTENT BAY, CARTOGRAPHY, CONTROL DECK …) duplicated the real <h2> title and
+   read as radio jargon. Hidden so every tab header is icon + title + subtitle.
+   HTML/i18n untouched (reversible); the app-level topbar kicker stays. */
+.tab-head-text .eyebrow{display:none}
 .tab-head-text h2{font-size:var(--fs-tab);line-height:1.15}
 .tab-head-text .sub{margin:4px 0 0;color:var(--text-muted);font:500 var(--fs-sub) var(--font-ui);line-height:1.4}
 .tab-head-actions{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;flex-shrink:0}

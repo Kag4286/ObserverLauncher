@@ -5,8 +5,9 @@
 const migrations = [
   // v1 -> v2: add version field and ensure new defaults for 0.10
   (s) => ({ version: 2, ...s, version: 2 }),
-  // v2 -> v3: example future migration placeholder
-  // (s) => ({ ...s, version: 3, newFeatureFlag: false }),
+  // v2 -> v3 (1.1.0): auto-backup retention — how many auto snapshots to keep on disk.
+  // Manual backups are never pruned; only world-backup-auto-*.zip files are.
+  (s) => ({ ...s, version: 3, backupRetention: s.backupRetention ?? 10 }),
 ];
 
 function migrate(settings) {

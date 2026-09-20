@@ -120,6 +120,24 @@ function runPlayit(bin, args, timeoutMs = 15000) {
   } catch (e) { return { ok: false, error: e?.message || 'Could not run the Playit agent.' }; }
 }
 
+// BUGFIX (1.1.0): non-blocking variant for the 15s UI poll. spawnSync here would freeze the WHOLE
+// Electron main process for up to the 8s timeout — every IPC handler, file watcher and window
+// repaint waits on it. Async spawn + a hard kill keeps the UI responsive even if `playit status`
+// hangs (e.g. the service pipe is stuck).
+function runPlayitAsync(bin, args, timeoutMs = 8000) {
+  return new Promise(resolve => {
+    let out = '', err = '', settled = false, child;
+    const finish = res => { if (!settled) { settled = true; clearTimeout(timer); resolve(res); } };
+    const timer = setTimeout(() => { try { child?.kill(); } catch {} finish({ ok: false, error: 'Playit status timed out.' }); }, timeoutMs);
+    try { child = spawn(bin, args, { windowsHide: true }); }
+    catch (e) { return finish({ ok: false, error: e?.message || 'Could not run the Playit agent.' }); }
+    child.stdout?.on('data', d => { out += d; });
+    child.stderr?.on('data', d => { err += d; });
+    child.on('error', e => finish({ ok: false, error: e?.message || 'Could not run the Playit agent.' }));
+    child.on('close', code => finish({ ok: code === 0, status: code, stdout: out, stderr: err }));
+  });
+}
+
 // Parse `playit status` output for whether the background service is running.
 function parseServiceStatus(text) {
   const m = String(text || '').match(/Phase:\s*(\w+)/i);
@@ -173,18 +191,25 @@ async function ensurePlayitService(ctx, provider) {
 
 // Ask the real service for its state and sync ctx (so the UI pill reflects reality even when the
 // user started the agent themselves, outside the app).
-function refreshTunnel(ctx) {
-  const bin = findPlayitBinary();
-  if (!bin) {
-    ctx.tunnelService = 'not-installed'; ctx.tunnelStatus = 'stopped';
-    try { ctx.appendLog('Tunnel: Playit agent not found (no playitPath in settings and not on PATH).', 'system'); } catch {}
+async function refreshTunnel(ctx) {
+  // Coalesce overlapping polls: a hung agent can make one call outlive the 15s interval.
+  if (ctx.tunnelRefreshing) return tunnelSnapshot(ctx);
+  ctx.tunnelRefreshing = true;
+  try {
+    const bin = findPlayitBinary();
+    if (!bin) {
+      ctx.tunnelService = 'not-installed'; ctx.tunnelStatus = 'stopped';
+      // No log here: this runs every 15s and would spam the console (removed once already).
+      return tunnelSnapshot(ctx);
+    }
+    const st = await runPlayitAsync(bin, ['status'], 8000);
+    const phase = st.ok ? parseServiceStatus(st.stdout) : null;
+    if (phase === 'running') { ctx.tunnelService = 'running'; ctx.tunnelStatus = 'running'; }
+    else { ctx.tunnelService = phase || 'stopped'; ctx.tunnelStatus = 'stopped'; }
     return tunnelSnapshot(ctx);
+  } finally {
+    ctx.tunnelRefreshing = false;
   }
-  const st = runPlayit(bin, ['status'], 8000);
-  const phase = st.ok ? parseServiceStatus(st.stdout) : null;
-  if (phase === 'running') { ctx.tunnelService = 'running'; ctx.tunnelStatus = 'running'; }
-  else { ctx.tunnelService = phase || 'stopped'; ctx.tunnelStatus = 'stopped'; }
-  return tunnelSnapshot(ctx);
 }
 
 // Stop the background service. SECURITY/SAFETY: only runs `playit stop` if the APP started the
@@ -228,10 +253,10 @@ function registerTunnel(ipcMain, ctx) {
     try { return stopTunnel(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not stop the tunnel.' }; }
   });
   ipcMain.handle('tunnel:get', async () => {
-    try { return refreshTunnel(ctx); } catch { return tunnelSnapshot(ctx); }
+    try { return await refreshTunnel(ctx); } catch { return tunnelSnapshot(ctx); }
   });
   ipcMain.handle('tunnel:refresh', async () => {
-    try { return refreshTunnel(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not read the Playit status.' }; }
+    try { return await refreshTunnel(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not read the Playit status.' }; }
   });
   ipcMain.handle('tunnel:open-url', async (_, url) => {
     if (!isSafePlayitUrl(url)) return { ok: false, error: 'Refused to open an untrusted link.' };

@@ -5,18 +5,27 @@
   <aside class="rail">
     <div class="rail-head"><div class="brand"><span class="brand-mark"><img src="./assets/icons/observer.png" alt="Observer"></span><div><b>OBSERVER LAUNCHER</b></div></div></div>
     <nav id="nav" class="rail-nav" role="navigation" aria-label="Main">
-      <button class="nav-item active" data-tab="overview" aria-current="page"><img class="nav-icon" src="./assets/icons/ui/grid.svg" alt=""> <span data-i18n="nav.overview">Overview</span></button>
-      <button class="nav-item" data-tab="console" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/terminal.svg" alt=""> <span data-i18n="nav.console">Console</span></button>
-      <button class="nav-item" data-tab="players" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/person.svg" alt=""> <span data-i18n="nav.players">Players</span></button>
-      <button class="nav-item" data-tab="performance" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/terminal.svg" alt=""> <span data-i18n="nav.performance">Performance</span></button>
-      <button class="nav-item" data-tab="content" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/hook.svg" alt=""> <span data-i18n="nav.content">Content</span></button>
-      <button class="nav-item" data-tab="marketplace" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/funnel.svg" alt=""> <span data-i18n="nav.marketplace">Marketplace</span></button>
-      <button class="nav-item" data-tab="worlds" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/shield.svg" alt=""> <span data-i18n="nav.worlds">Worlds & backups</span></button>
-      <button class="nav-item" data-tab="worldmap" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/folder.svg" alt=""> <span data-i18n="nav.worldmap">World Map</span></button>
-      <button class="nav-item" data-tab="properties" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/book.svg" alt=""> <span data-i18n="nav.properties">Server properties</span></button>
-      <button class="nav-item" data-tab="settings" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/cube.svg" alt=""> <span data-i18n="nav.settings">Launcher Setting</span></button>
+      <div class="nav-group">
+        <p class="nav-group-label" data-i18n="nav.grpServer">Server</p>
+        <button class="nav-item active" data-tab="overview" aria-current="page"><img class="nav-icon" src="./assets/icons/ui/grid.svg" alt=""> <span data-i18n="nav.overview">Overview</span></button>
+        <button class="nav-item" data-tab="console" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/terminal.svg" alt=""> <span data-i18n="nav.console">Console</span></button>
+        <button class="nav-item" data-tab="players" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/person.svg" alt=""> <span data-i18n="nav.players">Players</span></button>
+        <button class="nav-item" data-tab="performance" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/gauge.svg" alt=""> <span data-i18n="nav.performance">Performance</span></button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label" data-i18n="nav.grpContent">Content &amp; world</p>
+        <button class="nav-item" data-tab="content" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/hook.svg" alt=""> <span data-i18n="nav.content">Content</span></button>
+        <button class="nav-item" data-tab="marketplace" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/funnel.svg" alt=""> <span data-i18n="nav.marketplace">Marketplace</span></button>
+        <button class="nav-item" data-tab="worlds" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/shield.svg" alt=""> <span data-i18n="nav.worlds">Worlds & backups</span></button>
+        <button class="nav-item" data-tab="worldmap" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/folder.svg" alt=""> <span data-i18n="nav.worldmap">World Map</span></button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label" data-i18n="nav.grpConfig">Configuration</p>
+        <button class="nav-item" data-tab="properties" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/book.svg" alt=""> <span data-i18n="nav.properties">Server properties</span></button>
+        <button class="nav-item" data-tab="settings" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/sliders.svg" alt=""> <span data-i18n="nav.settings">Launcher Settings</span></button>
+      </div>
     </nav>
-    <div class="rail-foot"><span id="channelIndex">01 / 08</span></div>
+    <div class="rail-foot"></div>
     <span class="channel-indicator" id="channelIndicator" aria-hidden="true" hidden></span>
   </aside>
   <div class="workspace">
@@ -37,32 +46,22 @@
           <div class="welcome-actions"><button class="btn secondary" id="chooseFolder" data-i18n="ov.choose">Choose folder</button><button class="btn primary" id="welcomeCreateBtn" data-i18n="ov.create">Create new server</button></div>
         </div>
         <ul class="hero-steps" id="setupSteps" aria-label="Setup checklist" hidden></ul>
-        <div class="hero-bottom">
-        <dl class="srv-stats">
-          <div title="Live player list when running"><dt data-i18n="ov.players">PLAYERS ONLINE</dt><dd id="playerCount">—</dd></div>
-          <div><dt>TPS</dt><dd id="tps">—</dd></div>
-          <div title="Java process usage"><dt data-i18n="ov.cpu">SERVER CPU</dt><dd id="overviewCpu">—</dd></div>
-          <div title="Actually used right now"><dt data-i18n="ov.ram">SERVER RAM</dt><dd id="serverRam">—</dd></div>
-          <div class="stat-ram" title="Restart the server to apply a new allocation"><dt data-i18n="ov.limit">ALLOCATE RAM (GB)</dt><dd><input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn secondary" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button></dd></div>
-        </dl>
-        </div>
       </div>
       <div class="proxy-notice ed-conflict" id="javaWarnBanner" hidden style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <span id="javaWarnText" style="flex:1;min-width:200px"></span>
         <button class="btn sm primary" id="javaFixBtn" data-i18n="ov.fixJava">Install Java now</button>
       </div>
-      <div class="overview-grid"><article class="panel glass chart-panel"><div class="panel-head"><div><h3 data-i18n="ov.perfTitle">Server performance</h3><p data-i18n="ov.perfSub">TPS, MSPT, CPU and RAM telemetry</p></div><button class="text-btn" data-tab-jump="performance" data-i18n="ov.perfOpen">Open performance →</button></div><div class="chart-wrap"><canvas id="miniChart" width="800" height="250"></canvas><div class="chart-empty-overlay" id="miniChartEmpty"><span data-i18n="ov.chartEmpty">Start the server to see live TPS, CPU and RAM here.</span></div></div><div class="chart-legend"><span><i class="legend-tps"></i> TPS</span><span><i class="legend-cpu"></i> CPU</span><span><i class="legend-ram"></i> RAM</span></div></article>
-      <article class="panel glass activity"><div class="panel-head"><div><h3 data-i18n="ov.quickTitle">Quick actions</h3><p data-i18n="ov.quickSub">Common server tasks</p></div></div><div class="quick-strip"><button class="quick" data-command="say Server maintenance tools are ready."><span data-i18n="ov.broadcast">Broadcast message</span></button><button class="quick" data-open="plugins"><span data-i18n="ov.managePlugins">Manage plugins / mods</span></button><button class="quick" data-open="world"><span data-i18n="ov.openWorld">Open world folder</span></button><button class="quick" data-tab-jump="properties"><span data-i18n="ov.editProps">Edit server properties</span></button></div></article></div>
+      <article class="panel glass activity"><div class="panel-head"><div><h3 data-i18n="ov.quickTitle">Quick actions</h3><p data-i18n="ov.quickSub">Common server tasks</p></div></div><div class="quick-strip"><button class="quick" data-command="say Server maintenance tools are ready."><span data-i18n="ov.broadcast">Broadcast message</span></button><button class="quick" data-open="plugins"><span data-i18n="ov.managePlugins">Manage plugins / mods</span></button><button class="quick" data-open="world"><span data-i18n="ov.openWorld">Open world folder</span></button><button class="quick" data-tab-jump="properties"><span data-i18n="ov.editProps">Edit server properties</span></button></div></article>
       <article class="panel glass connect-panel" id="connectPanel">
         <div class="panel-head"><div><h3 data-i18n="conn.title">How friends can join</h3><p data-i18n="conn.sub">Share one of these addresses so others can connect.</p></div><button class="text-btn" id="refreshConnectInfo" data-i18n="conn.refresh">Refresh</button></div>
         <div class="connect-grid tuner">
           <div class="connect-channel">
-            <div class="connect-channel-head"><span class="channel-tag">CH.01</span><span data-i18n="conn.local">Same WiFi / network</span></div>
+            <div class="connect-channel-head"><span class="connect-dot dot-lan" aria-hidden="true"></span><span data-i18n="conn.local">Same WiFi / network</span></div>
             <div class="connect-freq"><svg class="connect-freq-icon" viewBox="0 0 24 24"><path d="M2 8.5a16 16 0 0 1 20 0"/><path d="M5.5 12.5a11 11 0 0 1 13 0"/><path d="M9 16.5a6 6 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1"/></svg><input id="connectLocal" readonly value="—"></div>
             <div class="connect-channel-actions"><button class="btn secondary" data-copy="#connectLocal" data-i18n="conn.copy">Copy</button></div>
           </div>
           <div class="connect-channel">
-            <div class="connect-channel-head"><span class="channel-tag">CH.02</span><span data-i18n="conn.public">Over the internet</span></div>
+            <div class="connect-channel-head"><span class="connect-dot dot-wan" aria-hidden="true"></span><span data-i18n="conn.public">Over the internet</span></div>
             <div class="connect-freq"><svg class="connect-freq-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><input id="connectPublic" readonly value="—" data-i18n-placeholder="conn.publicPh" placeholder="Click Check to look up"></div>
             <div class="connect-channel-actions"><button class="btn secondary" id="checkPublicIp" data-i18n="conn.check">Check</button><button class="btn secondary" data-copy="#connectPublic" data-i18n="conn.copy">Copy</button></div>
           </div>
@@ -72,8 +71,9 @@
           <p class="text-muted" data-i18n="conn.note">Friends on your WiFi can use the "Same WiFi" address as-is. For friends elsewhere, you can either forward this port on your router, or use the tunnel below. The button only opens Windows Firewall, it does not touch your router.</p>
           <button class="btn secondary" id="allowFirewall" data-i18n="conn.firewall">Allow this port through Windows Firewall</button>
         </details>
-        <div class="tunnel-box" id="tunnelBox">
-          <div class="tunnel-head"><b data-i18n="tun.title">Play over the internet — no port forwarding</b><span class="tunnel-pill" id="tunnelPill">OFF</span></div>
+        <details class="tunnel-box" id="tunnelBox">
+          <summary class="tunnel-head"><b data-i18n="tun.title">Play over the internet — no port forwarding</b><span class="tunnel-pill" id="tunnelPill">OFF</span><span class="tunnel-chevron">▸</span></summary>
+          <div class="tunnel-body">
           <p class="text-muted" data-i18n="tun.subShort">Give your server a public address with Playit.gg — anyone with it can join.</p>
           <div class="tunnel-actions"><button class="btn primary sm" id="tunnelStart" data-i18n="tun.start">Set up Playit</button><button class="btn secondary sm" id="tunnelDashboard" data-i18n="tun.dashboard">Open Playit dashboard</button><details class="tunnel-help"><summary data-i18n="tun.how">How?</summary>
             <ol class="tunnel-steps">
@@ -88,6 +88,24 @@
           <div class="tunnel-manual">
             <label class="text-muted" data-i18n="tun.manualLabel">Paste your Playit public address here (create it on the dashboard):</label>
             <div class="tunnel-addr"><input id="tunnelManual" placeholder="name.tun.ply.gg" spellcheck="false"><button class="btn secondary sm" data-copy="#tunnelManual" data-i18n="conn.copy">Copy</button></div>
+          </div>
+          </div>
+        </details>
+      </article>
+      <article class="panel glass ov-stats-panel">
+        <div class="ov-stats-live">
+          <p class="ov-stats-cap" data-i18n="ov.liveNow">Live now</p>
+          <dl class="srv-stats">
+            <div title="Live player list when running"><dt data-i18n="ov.players">PLAYERS ONLINE</dt><dd id="playerCount">—</dd></div>
+            <div><dt>TPS</dt><dd id="tps">—</dd></div>
+            <div title="Java process usage"><dt data-i18n="ov.cpu">SERVER CPU</dt><dd id="overviewCpu">—</dd></div>
+            <div title="Actually used right now"><dt data-i18n="ov.ram">SERVER RAM</dt><dd id="serverRam">—</dd></div>
+          </dl>
+        </div>
+        <div class="ov-ram-box">
+          <div class="ov-ram-info"><b data-i18n="ov.limit">ALLOCATE RAM (GB)</b><small data-i18n="ov.limitHint">Restart the server to apply a new allocation</small></div>
+          <div class="ov-ram-controls">
+            <input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn primary sm" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button>
           </div>
         </div>
       </article>
@@ -316,7 +334,13 @@
           <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" data-i18n="set.sub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
           <button class="btn primary" id="saveSettings" data-i18n="set.apply">Apply settings</button>
         </header>
-        <div class="flat-grid2">
+        <div class="seg-switch" id="settingsSeg" role="tablist" aria-label="Settings sections">
+          <button type="button" class="seg-switch-btn active" data-set-view="basic" role="tab" aria-selected="true" data-i18n="set.tabBasic">Basic</button>
+          <button type="button" class="seg-switch-btn" data-set-view="advanced" role="tab" aria-selected="false" data-i18n="set.tabAdvanced">Advanced</button>
+          <span class="seg-switch-glider" aria-hidden="true"></span>
+        </div>
+        <div class="flat-grid2 set-pane" data-set-pane="basic">
+          <div class="set-group" data-i18n="set.grpSetup">Setup</div>
           <!-- Server folder -->
           <section class="flat-cell flat-span2">
             <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.folderT">Server folder</h3><small data-i18n="set.folderD">the one directory this launcher manages</small></div>
@@ -329,21 +353,21 @@
             <div class="sec-head"><img src="./assets/icons/ui/gem.svg" alt=""><h3 data-i18n="set.javaT">Java runtime</h3><small data-i18n="set.javaD">detection &amp; one-click install</small></div>
             <div id="javaNotice" class="java-notice"></div>
             <label class="set-field"><span data-i18n="set.javaPath">Executable path</span><input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false"></label>
-            <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
-            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
             <button type="button" class="btn primary wide" id="javaAutoInstall" hidden data-i18n="set.autoInstallJava">Install Java automatically (no admin rights needed)</button>
             <div id="javaProgress" class="set-progress" hidden><div class="set-progress-track"><div class="set-progress-fill" id="javaProgressFill"></div></div><div class="set-progress-label" id="javaProgressLabel">Starting download…</div></div>
           </section>
+          <div class="set-group" data-i18n="set.grpPersonal">Personal</div>
           <!-- Preferences -->
-          <section class="flat-cell">
+          <section class="flat-cell flat-span2">
             <div class="sec-head"><img src="./assets/icons/ui/person.svg" alt=""><h3 data-i18n="set.prefT">Preferences</h3><small data-i18n="set.prefD">personal, per-PC</small></div>
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.language">Language</b><small data-i18n="set.languageSub">Interface language — applies immediately.</small></div><select id="languageSelect" class="launcher-select"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
             <hr class="set-hr">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.guide">Welcome guide</b><small data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</small></div><button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button></div>
           </section>
+          <div class="set-group" data-i18n="set.grpAutomation">Automation</div>
           <!-- Reliability -->
           <section class="flat-cell flat-span2">
-            <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="set.relT">Reliability</h3><small data-i18n="set.relD">auto-restart on crash • scheduled backups</small></div>
+            <div class="sec-head"><img src="./assets/icons/ui/shield.svg" alt=""><h3 data-i18n="set.relT">Reliability</h3><small data-i18n="set.relD">auto-restart on crash • scheduled backups</small></div>
             <div class="rel-grid">
               <div>
                 <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoRestart">Auto-restart on crash</b><small data-i18n="set.autoRestartSub">Restarts when the server exits with an error — for unattended hosting.</small></div><label class="switch"><input type="checkbox" id="autoRestartInput"><span class="slider"></span></label></div>
@@ -353,12 +377,22 @@
                 <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoBackup">Auto-backup</b><small data-i18n-html="set.autoBackupSub">ZIP snapshots of world folders on a schedule (<code>save-off</code> safe).</small></div></div>
                 <div class="backup-chip-row set-chips"><button type="button" class="filter-chip" data-backup-mins="0" data-i18n="set.chipOff">Off</button><button type="button" class="filter-chip" data-backup-mins="15" data-i18n="set.chip15">15m</button><button type="button" class="filter-chip" data-backup-mins="30" data-i18n="set.chip30">30m</button><button type="button" class="filter-chip" data-backup-mins="60" data-i18n="set.chip1h">1h</button><button type="button" class="filter-chip" id="backupCustomChip" data-backup-mins="custom" data-i18n="set.chipCustom">Custom</button><input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden></div>
                 <div class="input-row backup-custom-row" id="backupCustomRow" hidden><input id="autoBackupCustomInput" type="number" min="1" placeholder="Minutes — e.g. 45"><span class="hint" data-i18n="set.customHint">Custom interval in minutes</span></div>
+                <div class="input-row" id="backupRetentionRow"><label for="backupRetentionInput" data-i18n="set.retention">Keep auto-backups</label><input id="backupRetentionInput" type="number" min="1" max="100" value="10"><span class="hint" data-i18n="set.retentionHint">newest on disk · manual backups are never deleted</span></div>
               </div>
             </div>
           </section>
-          <!-- Schedule -->
+        </div>
+        <div class="flat-grid2 set-pane" data-set-pane="advanced" hidden>
+          <!-- Internet tunnel (path/host settings are for power users) -->
           <section class="flat-cell flat-span2">
-            <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="sch.title">Schedule</h3><small data-i18n="sch.sub">Start and stop the server automatically at set times</small></div>
+            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.tunnelT">Internet tunnel</h3><small data-i18n="set.tunnelD">share your server online with Playit</small></div>
+            <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
+            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
+          </section>
+          <!-- Schedule (collapsed — set-and-forget) -->
+          <details class="flat-cell flat-span2 set-advanced">
+            <summary><img src="./assets/icons/ui/clock.svg" alt=""><h3 data-i18n="sch.title">Schedule</h3><small data-i18n="sch.sub">Start and stop the server automatically at set times</small><span class="set-chevron">▸</span></summary>
+            <div class="set-adv-body">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="sch.enable">Enable scheduler</b><small data-i18n="sch.enableSub">Uses this PC's local clock. If the computer is asleep at the scheduled time, the action is skipped.</small></div><label class="switch"><input type="checkbox" id="scheduleEnabledInput"><span class="slider"></span></label></div>
             <div id="scheduleFields" class="restart-grid" hidden>
               <label><span data-i18n="sch.startT">Start at</span><input id="scheduleStartInput" type="time"><small data-i18n="sch.startSub">Leave empty to disable auto-start</small></label>
@@ -369,15 +403,18 @@
               <button type="button" class="filter-chip" data-day="1" data-i18n="sch.day1">Mon</button><button type="button" class="filter-chip" data-day="2" data-i18n="sch.day2">Tue</button><button type="button" class="filter-chip" data-day="3" data-i18n="sch.day3">Wed</button><button type="button" class="filter-chip" data-day="4" data-i18n="sch.day4">Thu</button><button type="button" class="filter-chip" data-day="5" data-i18n="sch.day5">Fri</button><button type="button" class="filter-chip" data-day="6" data-i18n="sch.day6">Sat</button><button type="button" class="filter-chip" data-day="0" data-i18n="sch.day0">Sun</button>
             </div>
             <div id="scheduleNext" class="field-hint" hidden></div>
-          </section>
-          <!-- Updates -->
-          <section class="flat-cell flat-span2">
-            <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>
-            <div class="set-row-input">
-              <button type="button" class="btn secondary" id="checkUpdateBtn" data-i18n="upd.check">Check for updates</button>
-              <span id="updateStatus" class="field-hint"></span>
             </div>
-          </section>
+          </details>
+          <!-- Updates (collapsed — set-and-forget) -->
+          <details class="flat-cell flat-span2 set-advanced">
+            <summary><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small><span class="set-chevron">▸</span></summary>
+            <div class="set-adv-body">
+              <div class="set-row-input">
+                <button type="button" class="btn secondary" id="checkUpdateBtn" data-i18n="upd.check">Check for updates</button>
+                <span id="updateStatus" class="field-hint"></span>
+              </div>
+            </div>
+          </details>
           <!-- MCP / AI -->
           <section class="flat-cell flat-span2 mcp-section">
             <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="mcp.title">MCP / AI integration</h3><small data-i18n="mcp.sub">Let an MCP client read and control your server</small><span class="mcp-pill" id="mcpPill" data-i18n="mcp.stopped">Stopped</span></div>

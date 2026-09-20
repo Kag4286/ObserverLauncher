@@ -6,7 +6,17 @@ function parseJavaVersion(output) { const m = output.match(/version\s+"([^"]+)"/
 // anyone who happens to have an old/32-bit Java on PATH. `java -version` prints "64-Bit Server VM" (or
 // "32-Bit ...") on its own output, so this is detected for free from the same call, no extra process.
 function parseJavaArch(output) { if (/64-Bit/i.test(output)) return '64-bit'; if (/32-Bit/i.test(output)) return '32-bit'; return 'unknown'; }
-function detectJava(javaPath = 'java') { return new Promise(resolve => execFile(javaPath, ['-version'], { windowsHide: true }, (error, stdout, stderr) => { if (error) return resolve({ ok: false, message: error.message }); const combined = stderr + stdout; resolve({ ok: true, version: parseJavaVersion(combined), arch: parseJavaArch(combined), path: javaPath }); })); }
+// ERROR SURFACING (1.1.0): execFile's raw message is "spawn java ENOENT" / "EACCES" — meaningless to
+// a beginner. Map the common failures to something actionable before it reaches the UI (which shows
+// it inside set.javaBad). Mirrors the download-module philosophy: name the cause + the fix.
+function javaErrorMessage(javaPath, error) {
+  const code = error?.code;
+  if (code === 'ENOENT') return `No Java found at "${javaPath}". Install Java (Settings → Install Java automatically) or point the path at a real java executable.`;
+  if (code === 'EACCES') return `Java at "${javaPath}" is not executable — check the file's permissions, or choose another Java path.`;
+  if (error?.killed) return `"${javaPath} -version" timed out — the path may point at a program that is not Java.`;
+  return `Could not run "${javaPath} -version": ${error?.message || 'unknown error'}.`;
+}
+function detectJava(javaPath = 'java') { return new Promise(resolve => execFile(javaPath, ['-version'], { windowsHide: true }, (error, stdout, stderr) => { if (error) return resolve({ ok: false, message: javaErrorMessage(javaPath, error) }); const combined = stderr + stdout; resolve({ ok: true, version: parseJavaVersion(combined), arch: parseJavaArch(combined), path: javaPath }); })); }
 // SYNC: Minecraft switched from 1.x to calendar versioning (26.x). Both schemes must map to a
 // minimum Java version or validation silently skips (the old regex only knew 1.x, so a Java 17
 // install passed the pre-start check for a 26.x jar and crashed later with an obscure JVM error).
