@@ -10,6 +10,29 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [1.3.5] — 2026-09-21
+
+Closes the main dead ends in the MCP diagnostics workflow, from a detailed community issue.
+
+### Added — MCP diagnostics
+- **`read_server_log`** — tails the server log file (`logs/latest.log` by default) with a bounded
+  line count and byte cap, so an AI can see what happened on a PREVIOUS run after a restart (the
+  in-memory console buffer is lost on restart). Deliberately NOT added to the editor allowlist —
+  it is a read-only tail confined to `logs/`, so a 500 MB log can't blow the context window.
+- **`list_crash_reports`** — lists every crash-report (name, mtime, size), newest first.
+- **`explain_crash` now takes an optional `name`** — read an older crash instead of only the newest.
+- **`get_metrics_history`** — a time series of sampled metrics (tps, mspt, cpu, ram, players) so an
+  AI can answer 'is memory climbing?' / 'when did TPS drop?'. Backed by a 1800-sample ring buffer
+  (~30 min) in the main process, downsampled to a bounded count.
+
+### Changed — MCP player tools
+- **`ban_player` accepts an `ip`** — ban/unban an IP (`ban-ip` / `banned-ips.json`), not only a name.
+- **`op_player` accepts a `level` (1–4)** — create lower-privilege moderators, not just full op.
+
+### Notes
+- Tool count 55 -> 58. `npm test` (28 files) and E2E remain green; new asserts cover the log tail
+  and crash-report helpers. Helper: `isSafeIp` validates any IP that reaches a console command.
+
 ## [1.3.0] — 2026-09-21
 
 A polish + personality release. No new server features — the goal was to make the interface feel

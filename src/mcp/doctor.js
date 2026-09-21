@@ -83,6 +83,55 @@ function latestCrashReport(root) {
   const withTime = files.map(f => { let m = 0; try { m = fs.statSync(path.join(dir, f)).mtimeMs; } catch {} return { f, m }; }).sort((a, b) => b.m - a.m);
   return { file: path.join(dir, withTime[0].f), name: withTime[0].f, mtime: withTime[0].m };
 }
+// List ALL crash reports (newest first) with name/mtime/size so an AI can pick an older one.
+function listCrashReports(root) {
+  if (!root) return [];
+  const dir = path.join(root, 'crash-reports');
+  let files;
+  try { files = fs.readdirSync(dir).filter(f => /crash-.*\.txt$/i.test(f)); } catch { return []; }
+  return files.map(f => {
+    let m = 0, size = 0;
+    try { const st = fs.statSync(path.join(dir, f)); m = st.mtimeMs; size = st.size; } catch {}
+    return { name: f, mtime: m, size };
+  }).sort((a, b) => b.mtime - a.mtime);
+}
+// Resolve ONE crash report by name (basename only, inside crash-reports/). Returns the path or null.
+function resolveCrashReport(root, name) {
+  if (!root || !name) return null;
+  if (String(name) !== path.basename(String(name))) return null;
+  if (!/crash-.*\.txt$/i.test(name)) return null;
+  const p = path.join(root, 'crash-reports', name);
+  try { return fs.statSync(p).isFile() ? p : null; } catch { return null; }
+}
+// Tail the SERVER log (logs/latest.log by default) without loading the whole file. Logs can be
+// hundreds of MB, so we read only the last `maxBytes` and split into the last N lines. Path is
+// confined to <root>/logs/ — this is read-only tail, NOT the general editor allowlist.
+function tailLogFile(root, opts = {}) {
+  if (!root) return { ok: false, error: 'No server folder.' };
+  const maxLines = Math.min(Math.max(1, Number(opts.lines) || 200), 2000);
+  const maxBytes = Math.min(Math.max(64 * 1024, Number(opts.maxBytes) || 512 * 1024), 4 * 1024 * 1024);
+  const rel = String(opts.file || 'latest.log');
+  if (rel !== path.basename(rel)) return { ok: false, error: 'Invalid log file name.' };
+  const target = path.join(root, 'logs', rel);
+  let st;
+  try { st = fs.statSync(target); } catch { return { ok: false, error: `Log file not found: logs/${rel}` }; }
+  if (!st.isFile()) return { ok: false, error: `Not a file: logs/${rel}` };
+  const start = Math.max(0, st.size - maxBytes);
+  let chunk = '';
+  try {
+    const fd = fs.openSync(target, 'r');
+    try {
+      const len = st.size - start;
+      const buf = Buffer.alloc(len);
+      fs.readSync(fd, buf, 0, len, start);
+      chunk = buf.toString('utf8');
+    } finally { fs.closeSync(fd); }
+  } catch (e) { return { ok: false, error: e?.message || 'Could not read the log.' }; }
+  const rawLines = chunk.split(/\r?\n/);
+  if (start > 0) rawLines.shift(); // drop the partial first line when we started mid-file
+  const lines = rawLines.filter(l => l.length).slice(-maxLines);
+  return { ok: true, file: `logs/${rel}`, size: st.size, truncatedFrom: start > 0, lines, count: lines.length };
+}
 
 // ---- server.properties validation ----
 // Pure: takes the parsed properties object, returns check entries. `worldDirs` = existing top-level
@@ -163,6 +212,9 @@ module.exports = {
   analyzeConsoleLines,
   summarizeCrashText,
   latestCrashReport,
+  listCrashReports,
+  resolveCrashReport,
+  tailLogFile,
   validateProperties,
   checkPortFree,
   diagnoseFromData,

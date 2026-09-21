@@ -97,8 +97,22 @@ function isSafeUuid(uuid) {
   return typeof uuid === 'string' && /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/.test(uuid.trim());
 }
 
+// SECURITY: IP bans interpolate the address into a console command (`ban-ip ${ip}`). Accept only
+// a plain IPv4/IPv6 (hex, dots, colons) with no spaces/newlines that could smuggle a second command.
+function isSafeIp(ip) {
+  if (typeof ip !== 'string') return false;
+  const s = ip.trim();
+  if (!s || s.length > 45) return false;
+  // IPv4: 4 dotted octets.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) return s.split('.').every(o => Number(o) >= 0 && Number(o) <= 255);
+  // IPv6: hex groups + colons (allow ::). No newlines/spaces (already excluded by the class).
+  if (/^[0-9a-fA-F:]+$/.test(s) && s.includes(':')) return true;
+  return false;
+}
+
 module.exports = {
   isValidPort,
+  isSafeIp,
   isSafePlayerName,
   isSafeReason,
   isSafeConsoleCommand,

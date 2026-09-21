@@ -80,6 +80,16 @@ check('safe_restart is destroy', riskOf('safe_restart') === 'destroy');
 check('install_from_market has source param', 'source' in (getTool('install_from_market').inputSchema.properties || {}));
 check('read_many_files requires paths', (getTool('read_many_files').inputSchema.required || []).includes('paths'));
 
+// --- 1.3.5 diagnostic tools ---
+check('tool exists: list_crash_reports', !!getTool('list_crash_reports'));
+check('list_crash_reports is read', getTool('list_crash_reports')?.risk === 'read');
+check('tool exists: read_server_log', !!getTool('read_server_log'));
+check('read_server_log is read', getTool('read_server_log')?.risk === 'read');
+check('tool exists: get_metrics_history', !!getTool('get_metrics_history'));
+check('get_metrics_history is read', getTool('get_metrics_history')?.risk === 'read');
+check('ban_player has ip param', 'ip' in (getTool('ban_player').inputSchema.properties || {}));
+check('op_player has level param', 'level' in (getTool('op_player').inputSchema.properties || {}));
+
 // --- STATIC_TOOLS drift guard (this class of bug shipped 3 times) ---
 // bridge.js offline list must name the SAME tools as the live registry. Parse the source instead of
 // require()-ing bridge.js (which attaches a stdin listener and would hang the test runner).

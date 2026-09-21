@@ -69,7 +69,36 @@ async function metricsTick(ctx, st) {
   if (Number.isFinite(cpuTotal)) ctx.previousCpu = { total: cpuTotal, at: now };
   if (memory > 20) st.lastMetrics.serverMemory = memory;
   if (Number.isFinite(cpu)) st.lastMetrics.cpu = Math.round(cpu);
+  pushHistory(ctx, { t: now, tps: ctx.live?.tps ?? null, mspt: ctx.live?.mspt ?? null, cpu: Number.isFinite(cpu) ? Math.round(cpu) : null, ram: memory > 20 ? Math.round(memory) : (st.lastMetrics.serverMemory || null), players: (ctx.live?.players || []).length });
   ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: memory > 20 ? memory : st.lastMetrics.serverMemory, cpu: Math.round(cpu), running: true, timestamp: now, ...ctx.live });
+}
+// Ring buffer of samples, capped at ~1800 (30 min at 1 sample/s). Oldest dropped first.
+const METRICS_HISTORY_CAP = 1800;
+function pushHistory(ctx, sample) {
+  if (!Array.isArray(ctx.metricsHistory)) ctx.metricsHistory = [];
+  ctx.metricsHistory.push(sample);
+  if (ctx.metricsHistory.length > METRICS_HISTORY_CAP) ctx.metricsHistory.splice(0, ctx.metricsHistory.length - METRICS_HISTORY_CAP);
+}
+// Pure: filter history to the last `minutes`, downsample to at most `maxSamples` so a big window
+// doesn't blow the AI context window. Returns {samples, count, sourceCount, from, to, spanMinutes}.
+function queryHistory(history, opts = {}) {
+  const minutes = Math.max(1, Number(opts.minutes) || 30);
+  const maxSamples = Math.min(Math.max(1, Number(opts.maxSamples) || 500), 1000);
+  const list = Array.isArray(history) ? history : [];
+  if (!list.length) return { samples: [], count: 0, sourceCount: 0, spanMinutes: 0 };
+  const now = Date.now();
+  const cutoff = now - minutes * 60 * 1000;
+  let win = list.filter(s => s && s.t >= cutoff);
+  if (!win.length) win = [list[list.length - 1]];
+  let samples = win;
+  if (win.length > maxSamples) {
+    const step = win.length / maxSamples;
+    samples = [];
+    for (let i = 0; i < maxSamples; i++) samples.push(win[Math.floor(i * step)]);
+    if (samples[samples.length - 1] !== win[win.length - 1]) samples.push(win[win.length - 1]);
+  }
+  const from = samples[0]?.t || now, to = samples[samples.length - 1]?.t || now;
+  return { samples, count: samples.length, sourceCount: win.length, from, to, spanMinutes: Math.round((to - from) / 60000) };
 }
 
 function startMetrics(ctx) {
@@ -92,4 +121,4 @@ function startMetrics(ctx) {
   }, 1000);
 }
 
-module.exports = { parseMetricValue, startMetrics, metricsTick };
+module.exports = { parseMetricValue, startMetrics, metricsTick, pushHistory, queryHistory, METRICS_HISTORY_CAP };

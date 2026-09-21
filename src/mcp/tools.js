@@ -310,7 +310,7 @@ async function tExportModpack(ctx, a) {
 async function tSavePlayerData(ctx, a) { return ok(await savePlayer(ctx, { uuid: a.uuid, changes: a.changes || {}, clearInventory: !!a.clearInventory })); }
 const { readPlayer, whitelistToggle, banToggle, opToggle, savePlayer } = require('../main/players.js');
 async function tReadPlayer(ctx, a) { return ok(await readPlayer(ctx, a.uuid, a.name)); }
-async function tOpPlayer(ctx, a) { needPath(ctx); return ok(await opToggle(ctx, { uuid: a.uuid || null, name: a.name, op: a.on !== false })); }
+async function tOpPlayer(ctx, a) { needPath(ctx); return ok(await opToggle(ctx, { uuid: a.uuid || null, name: a.name, op: a.on !== false, level: a.level })); }
 async function tWhitelistPlayer(ctx, a) { needPath(ctx); return ok(await whitelistToggle(ctx, { uuid: a.uuid || null, name: a.name, add: a.add !== false })); }
 async function tBanPlayer(ctx, a) { needPath(ctx); return ok(await banToggle(ctx, { uuid: a.uuid || null, name: a.name, ban: a.ban !== false, reason: a.reason })); }
 
@@ -436,13 +436,32 @@ async function tAnalyzeConsole(ctx, a) {
   const analysis = doctor.analyzeConsoleLines(buf);
   return { ok: true, result: { scanned: buf.length, errors: analysis.errors, warns: analysis.warns, issues: analysis.issues } };
 }
-async function tExplainCrash(ctx) {
+async function tExplainCrash(ctx, a) {
   const root = needPath(ctx);
-  const latest = doctor.latestCrashReport(root);
-  if (!latest) return { ok: true, result: { found: false, message: 'No crash reports found in crash-reports/.' } };
+  // Default = newest. A `name` (from list_crash_reports) lets the AI read an OLDER crash.
+  let pick = null;
+  if (a && a.name) {
+    const p = doctor.resolveCrashReport(root, a.name);
+    if (!p) return { ok: false, error: 'Crash report not found: ' + a.name };
+    let mtime = 0; try { mtime = fs.statSync(p).mtimeMs; } catch {}
+    pick = { file: p, name: a.name, mtime };
+  } else {
+    pick = doctor.latestCrashReport(root);
+  }
+  if (!pick) return { ok: true, result: { found: false, message: 'No crash reports found in crash-reports/.' } };
   let text = '';
-  try { text = fs.readFileSync(latest.file, 'utf8'); } catch (e) { return { ok: false, error: 'Could not read the crash report: ' + (e.code || e.message) }; }
-  return { ok: true, result: { found: true, file: latest.name, mtime: latest.mtime, ...doctor.summarizeCrashText(text) } };
+  try { text = fs.readFileSync(pick.file, 'utf8'); } catch (e) { return { ok: false, error: 'Could not read the crash report: ' + (e.code || e.message) }; }
+  return { ok: true, result: { found: true, file: pick.name, mtime: pick.mtime, ...doctor.summarizeCrashText(text) } };
+}
+async function tListCrashReports(ctx) {
+  const root = needPath(ctx);
+  const reports = doctor.listCrashReports(root);
+  return { ok: true, result: { count: reports.length, reports } };
+}
+async function tReadServerLog(ctx, a) {
+  const root = needPath(ctx);
+  const r = doctor.tailLogFile(root, { file: a.file, lines: a.lines, maxBytes: a.maxBytes });
+  return r.ok ? { ok: true, result: r } : { ok: false, error: r.error };
 }
 async function tCheckPerformance(ctx) {
   const live = ctx.live || {};
@@ -453,6 +472,14 @@ async function tCheckPerformance(ctx) {
   if (tps != null) { if (tps < 15) push('error', `TPS ${tps} - the server is struggling.`, 'Reduce view-distance, remove heavy plugins, or allocate more RAM.'); else if (tps < 19) push('warn', `TPS ${tps} - mild lag.`, 'Consider lowering view-distance or plugin load.'); else push('ok', `TPS ${tps} - healthy.`); }
   if (mspt != null) { if (mspt > 50) push('error', `MSPT ${mspt}ms - above the 50ms tick budget.`, 'The main thread cannot keep up; reduce load.'); else if (mspt > 40) push('warn', `MSPT ${mspt}ms - close to the 50ms budget.`); else push('ok', `MSPT ${mspt}ms - healthy.`); }
   return { ok: true, result: { running: ctx.serverStatus === 'running', tps, mspt, players, notes } };
+}
+async function tGetMetricsHistory(ctx, a) {
+  const { queryHistory } = require('../main/server-metrics.js');
+  const minutes = Math.min(Math.max(1, Number(a?.minutes) || 30), 180);
+  const maxSamples = Math.min(Math.max(1, Number(a?.max_samples) || 500), 1000);
+  const hist = ctx.metricsHistory || [];
+  const q = queryHistory(hist, { minutes, maxSamples });
+  return { ok: true, result: { minutes, ...q } };
 }
 async function tValidateConfig(ctx) {
   const root = needPath(ctx);
@@ -539,8 +566,11 @@ const TOOLS = [
   { name: 'list_market_versions', risk: 'read', description: 'Versions of a Modrinth project.', inputSchema: S({ id: STR('project id/slug') }, ['id']), handler: tListMarketVersions },
   { name: 'diagnose_server', risk: 'read', description: 'Full server health check: folder, jar, Java version/arch, EULA, port, world, backups, recent crash. Returns per-check level (ok/warn/error) + fixes.', inputSchema: S(), handler: tDiagnoseServer },
   { name: 'analyze_console', risk: 'read', description: 'Scan the console buffer for errors/warnings (OOM, port-busy, exceptions, lag), grouped and ranked.', inputSchema: S({ lines: { type: 'number', description: 'lines to scan (default 500, max 2000)' } }), handler: tAnalyzeConsole },
-  { name: 'explain_crash', risk: 'read', description: 'Summarise the newest crash-report (description, version, cause chain).', inputSchema: S(), handler: tExplainCrash },
-  { name: 'check_performance', risk: 'read', description: 'TPS/MSPT/players with threshold warnings (does the server keep up?).', inputSchema: S(), handler: tCheckPerformance },
+  { name: 'explain_crash', risk: 'read', description: 'Summarise a crash-report (default: newest; pass name to read an older one from list_crash_reports).', inputSchema: S({ name: STR('crash report file name (optional, default newest)') }), handler: tExplainCrash },
+  { name: 'list_crash_reports', risk: 'read', description: 'List all crash-reports (name, mtime, size), newest first.', inputSchema: S(), handler: tListCrashReports },
+  { name: 'read_server_log', risk: 'read', description: 'Tail the server log file (logs/latest.log by default) - last N lines, bounded size, survives restarts. Use this to see what happened on a previous run.', inputSchema: S({ file: STR('log file name inside logs/ (default latest.log)'), lines: { type: 'number', description: 'max lines to return (default 200, max 2000)' }, maxBytes: { type: 'number', description: 'max bytes read from the end (default 512KB, max 4MB)' } }), handler: tReadServerLog },
+  { name: 'check_performance', risk: 'read', description: 'TPS/MSPT/players snapshot with threshold warnings (does the server keep up?).', inputSchema: S(), handler: tCheckPerformance },
+  { name: 'get_metrics_history', risk: 'read', description: 'Time series of sampled metrics (tps, mspt, cpu, ram, players) so you can tell if memory is climbing or when TPS dropped. Downsampled to a bounded count.', inputSchema: S({ minutes: { type: 'number', description: 'window in minutes (default 30, max 180)' }, max_samples: { type: 'number', description: 'max samples returned (default 500, max 1000)' } }), handler: tGetMetricsHistory },
   { name: 'validate_config', risk: 'read', description: 'Validate server.properties: port, level-name exists, view-distance, simulation-distance, max-players.', inputSchema: S(), handler: tValidateConfig },
   { name: 'check_port', risk: 'read', description: 'Check whether the server port is free (bind test).', inputSchema: S({ port: { type: 'number', description: 'port to test (default: server-port)' } }), handler: tCheckPort },
   { name: 'read_many_files', risk: 'read', description: 'Read up to 5 text files in one call (batch, cheaper than 5 read_file calls).', inputSchema: S({ paths: { type: 'array', items: { type: 'string' }, description: 'relative file paths (max 5)' } }, ['paths']), handler: tReadManyFiles },
@@ -567,9 +597,9 @@ const TOOLS = [
   { name: 'prepare_and_start', risk: 'write', description: 'Diagnose first (refuse on hard errors) -> create a safety backup -> start the server.', inputSchema: S(), handler: tPrepareAndStart },
   { name: 'safe_restart', risk: 'destroy', description: 'Back up, gracefully stop (waits up to 30s), then start again. Stops a running server - always requires confirmation (same class as stop_server).', inputSchema: S(), handler: tSafeRestart },
   { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat (health/food/xp/gamemode). Server must be stopped; a backup is written first.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object', description: 'health, food, saturation, xpLevel, xpTotal, gameType' }, clearInventory: { type: 'boolean', description: 'also clear inventory + equipment' } }, ['uuid']), handler: tSavePlayerData },
-  { name: 'op_player', risk: 'write', description: 'Grant or revoke operator.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' } }, ['name']), handler: tOpPlayer },
+  { name: 'op_player', risk: 'write', description: 'Grant or revoke operator. level 1-4 (4 = full op, default 4).', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' }, level: { type: 'number', description: 'operator level 1-4 (default 4)' } }, ['name']), handler: tOpPlayer },
   { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },
-  { name: 'ban_player', risk: 'write', description: 'Ban or unban a player.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)') }, ['name']), handler: tBanPlayer },
+  { name: 'ban_player', risk: 'write', description: 'Ban or unban a player, or ban/unban an IP with ip.', inputSchema: S({ name: STR('player name (or any label when using ip)'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)'), ip: STR('ban by IP instead of name (optional)') }, ['name']), handler: tBanPlayer },
   { name: 'stop_server', risk: 'destroy', description: 'Gracefully stop the server.', inputSchema: S(), handler: tStopServer },
   { name: 'force_stop_server', risk: 'destroy', description: 'Kill the server process tree.', inputSchema: S(), handler: tForceStopServer },
   { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name') }, ['name']), handler: tDeleteContent },

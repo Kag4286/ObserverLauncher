@@ -25,6 +25,9 @@ function createContext() {
     previousCpu: null,
     monitoredPid: null,
     live: { tps: null, mspt: null, players: [] },
+    // Ring buffer of sampled metrics (server-metrics.js pushes here). Cap ~1800 = 30 min @1s.
+    // Lets the MCP get_metrics_history tool answer 'is memory climbing / when did TPS drop'.
+    metricsHistory: [],
     currentSoftware: null,
     autoPollTimer: null,
     suppressStatusUntil: 0,

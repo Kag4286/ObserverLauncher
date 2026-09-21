@@ -70,5 +70,28 @@ ck('diagnose 32-bit + high RAM -> warn', bit32.checks.some(c => c.id === 'java-a
 const crashWarn = doctor.diagnoseFromData({ serverPath: '/s', hasJar: true, jar: 'paper.jar', java: { ok: true, version: '21', arch: '64-bit' }, lastCrash: 'crash-2024.txt' });
 ck('diagnose recent crash -> warn', crashWarn.checks.some(c => c.id === 'crash' && c.level === 'warn'));
 
+// ---- tailLogFile / listCrashReports / resolveCrashReport (need a real temp tree) ----
+const fs2 = require('fs'), os2 = require('os'), path2 = require('path');
+const root2 = fs2.mkdtempSync(path2.join(os2.tmpdir(), 'ob-doc-'));
+fs2.mkdirSync(path2.join(root2, 'logs'), { recursive: true });
+fs2.mkdirSync(path2.join(root2, 'crash-reports'), { recursive: true });
+fs2.writeFileSync(path2.join(root2, 'logs', 'latest.log'), Array.from({ length: 500 }, (_, i) => 'line ' + i).join('\n'));
+const tail = doctor.tailLogFile(root2, { lines: 10 });
+ck('tailLogFile ok', tail.ok === true);
+ck('tailLogFile returns 10 lines', tail.lines.length === 10);
+ck('tailLogFile last line is newest', tail.lines[9] === 'line 499');
+ck('tailLogFile missing file -> error', doctor.tailLogFile(root2, { file: 'nope.log' }).ok === false);
+ck('tailLogFile rejects path traversal', doctor.tailLogFile(root2, { file: '../../secret' }).ok === false);
+// crash reports
+fs2.writeFileSync(path2.join(root2, 'crash-reports', 'crash-2024-01-01_10.00.00-server.txt'), 'Description: old crash');
+fs2.writeFileSync(path2.join(root2, 'crash-reports', 'crash-2024-02-01_10.00.00-server.txt'), 'Description: new crash');
+const crashList = doctor.listCrashReports(root2);
+ck('listCrashReports finds 2', crashList.length === 2);
+ck('listCrashReports has size', crashList.every(r => typeof r.size === 'number' && r.size > 0));
+ck('resolveCrashReport finds by name', !!doctor.resolveCrashReport(root2, 'crash-2024-01-01_10.00.00-server.txt'));
+ck('resolveCrashReport rejects traversal', doctor.resolveCrashReport(root2, '../../x.txt') === null);
+ck('resolveCrashReport rejects non-crash name', doctor.resolveCrashReport(root2, 'notacrash.txt') === null);
+fs2.rmSync(root2, { recursive: true, force: true });
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

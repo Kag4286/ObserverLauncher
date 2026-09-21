@@ -9,7 +9,7 @@ const nbt = require('prismarine-nbt');
 const { serverFiles, readPlayerData } = require('./server-files.js');
 const { readJsonList, writeJsonList, safeTarget } = require('./fs-utils.js');
 const { marketplaceError } = require('./http.js');
-const { isSafePlayerName, isSafeReason, isSafeUuid } = require('./validate.js');
+const { isSafePlayerName, isSafeReason, isSafeUuid, isSafeIp } = require('./validate.js');
 
 // WARNING FIX: serverProcess can exit between the `if (ctx.serverProcess)` check and the write,
 // and a pipe that just closed makes stdin.write throw — which rejected the IPC and left the UI
@@ -58,13 +58,24 @@ async function whitelistToggle(ctx, { uuid, name, add }) {
   }
   return { ok: true, files: serverFiles(ctx.currentServerPath) };
 }
-async function banToggle(ctx, { uuid, name, ban, reason }) {
+async function banToggle(ctx, { uuid, name, ban, reason, ip }) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-  const bad = checkPlayerInput({ name, reason, uuid });
+  const byIp = !!(ip && String(ip).trim());
+  // SECURITY: an IP is interpolated into `ban-ip ${ip}` — validate it (name path is validated too).
+  if (byIp && !isSafeIp(String(ip).trim())) return { ok: false, error: 'Invalid IP address.' };
+  // IP ban: name is just a label (often blank), so only validate the reason + the IP (done above).
+  const bad = byIp ? (isSafeReason(reason) ? null : 'Invalid reason — must be under 200 characters with no line breaks.') : checkPlayerInput({ name, reason, uuid });
   if (bad) return { ok: false, error: bad };
   if (ctx.serverProcess) {
-    const cmd = ban ? `ban ${name} ${reason || ''}`.trim() : `pardon ${name}`;
+    let cmd;
+    if (byIp) cmd = ban ? `ban-ip ${String(ip).trim()}${reason ? ' ' + reason : ''}` : `pardon-ip ${String(ip).trim()}`;
+    else cmd = ban ? `ban ${name} ${reason || ''}`.trim() : `pardon ${name}`;
     if (!writeCmd(ctx, cmd)) return { ok: false, error: 'The server just stopped — could not send the command.' };
+  } else if (byIp) {
+    // Offline IP ban: edit banned-ips.json directly (same shape the server writes).
+    let list = readJsonList(ctx.currentServerPath, 'banned-ips.json').filter(x => x.ip !== String(ip).trim());
+    if (ban) list.push({ ip: String(ip).trim(), created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
+    writeJsonList(ctx.currentServerPath, 'banned-ips.json', list);
   } else {
     let list = readJsonList(ctx.currentServerPath, 'banned-players.json').filter(x => x.uuid !== uuid);
     if (ban) list.push({ uuid, name, created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });

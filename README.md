@@ -97,13 +97,13 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-1.3.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-1.3.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-1.3.5-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-1.3.5.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe` (a normal NSIS installer — you can choose the install location; it sets up auto-update).
-- **Linux:** `chmod +x ObserverLauncher-1.3.0.AppImage` then run it. No installation, no root.
+- **Linux:** `chmod +x ObserverLauncher-1.3.5.AppImage` then run it. No installation, no root.
 
 ### Option B — Run from source
 
@@ -210,7 +210,7 @@ Everything else — plugins, players, backups, the world map — is optional.
 
 ## MCP / AI integration
 
-ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (**55 tools**).
+ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (**58 tools**).
 
 **Server Doctor.** The AI can run a full health check (`doctor_report` / `diagnose_server`), scan the console for errors (`analyze_console`), summarise the newest crash report (`explain_crash`), check TPS/MSPT (`check_performance`), validate `server.properties`, test the port, and run safe composite workflows (`prepare_and_start`, `safe_restart` — diagnose → backup → start). Every write/destroy action is recorded to an audit log the AI can read back (`read_audit_log`).
 
