@@ -87,7 +87,9 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
 const ACTIVE_DOWNLOADS = new Set();
 
 async function download(url, destination, onProgress, externalSignal, opts) {
-  const maxBytes = (opts && Number(opts.maxBytes)) || 0; // 0 = no cap
+  // Default cap 2 GB — generous for any Minecraft server jar/modpack but stops a runaway/hostile
+  // download from filling the disk. Callers may override with opts.maxBytes.
+  const maxBytes = (opts && Number(opts.maxBytes)) || 2 * 1024 * 1024 * 1024;
   const attempts = 4;
   const stallMs = 30000;
   const backoff = [1000, 3000, 6000];

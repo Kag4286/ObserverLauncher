@@ -106,7 +106,11 @@ function isSafeIp(ip) {
   // IPv4: 4 dotted octets.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) return s.split('.').every(o => Number(o) >= 0 && Number(o) <= 255);
   // IPv6: hex groups + colons (allow ::). No newlines/spaces (already excluded by the class).
-  if (/^[0-9a-fA-F:]+$/.test(s) && s.includes(':')) return true;
+  if (/^[0-9a-fA-F:]+$/.test(s) && s.includes(':')) {
+    if (!/[0-9a-fA-F]/.test(s)) return false;              // reject ':::' (only colons)
+    if ((s.match(/::/g) || []).length > 1) return false;   // at most one '::'
+    return true;
+  }
   return false;
 }
 

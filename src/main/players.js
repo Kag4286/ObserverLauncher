@@ -83,16 +83,20 @@ async function banToggle(ctx, { uuid, name, ban, reason, ip }) {
   }
   return { ok: true, files: serverFiles(ctx.currentServerPath) };
 }
-async function opToggle(ctx, { uuid, name, op }) {
+async function opToggle(ctx, { uuid, name, op, level }) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
   const bad = checkPlayerInput({ name, uuid });
   if (bad) return { ok: false, error: bad };
+  // Permission level 1-4 (4 = full op). Default 4 for backward compatibility.
+  const lvl = (level === undefined || level === null) ? 4 : Number(level);
+  if (op && (!Number.isInteger(lvl) || lvl < 1 || lvl > 4)) return { ok: false, error: 'Operator level must be 1-4.' };
   if (ctx.serverProcess) {
+    // NOTE: vanilla `/op <name>` always grants level 4 — the server has no level argument online.
     const cmd = op ? `op ${name}` : `deop ${name}`;
     if (!writeCmd(ctx, cmd)) return { ok: false, error: 'The server just stopped — could not send the command.' };
   } else {
     let list = readJsonList(ctx.currentServerPath, 'ops.json').filter(x => x.uuid !== uuid);
-    if (op) list.push({ uuid, name, level: 4, bypassesPlayerLimit: false });
+    if (op) list.push({ uuid, name, level: lvl, bypassesPlayerLimit: false });
     writeJsonList(ctx.currentServerPath, 'ops.json', list);
   }
   return { ok: true, files: serverFiles(ctx.currentServerPath) };
