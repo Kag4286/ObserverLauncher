@@ -97,13 +97,13 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-1.3.5-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-1.3.5.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-1.4.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-1.4.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe` (a normal NSIS installer — you can choose the install location; it sets up auto-update).
-- **Linux:** `chmod +x ObserverLauncher-1.3.5.AppImage` then run it. No installation, no root.
+- **Linux:** `chmod +x ObserverLauncher-1.4.0.AppImage` then run it. No installation, no root.
 
 ### Option B — Run from source
 
@@ -183,6 +183,7 @@ Everything else — plugins, players, backups, the world map — is optional.
 - **Waypoints** you can add, name, jump to and delete, and **jump to coordinates** by typing `X Z`.
 - **Export the current view as PNG.**
 - A short, plain-language note in the tab warns that the map is heavy and can slow the app down.
+- **Modded servers:** custom biomes are drawn with approximate (but stable, distinct) colours, and if the world adds dimensions outside vanilla, a note names them — the map can't draw those custom dimensions yet, so it says so instead of showing the wrong data.
 
 ### Console
 - Real terminal view with timestamps, a **per-line level badge** (CMD / INF / WRN / ERR), per-level colouring and **segmented filters**.
@@ -412,7 +413,9 @@ npm test          # unit tests (plain Node, no framework)
 npm run test:e2e  # Playwright end-to-end (real Electron app)
 ```
 
-The unit suite covers boot state, editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace/poll suppression, world map (incl. heightmap helpers), player equipment (old and new NBT layouts), download resume, explored-chunk filtering, the scheduler, modpack compatibility, and MCP (tool registry, HTTP server, stdio bridge). E2E boots the real app and asserts every tab renders and the language switch works.
+The unit suite covers boot state, editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace/poll suppression, world map (incl. heightmap helpers and modded-dimension detection), player equipment (old and new NBT layouts), download resume, explored-chunk filtering, the scheduler, modpack compatibility, and MCP (tool registry, HTTP server, stdio bridge).
+
+E2E boots the real app and drives real flows: a full tab + modal tour that must stay free of renderer errors, the Settings sub-tab glider, language switching, motion-level persistence across a reload, and — against a throwaway fixture server folder — the Content list, the file-browser/editor round-trip and the Properties editor. The suite runs offline (boot skips the network version fetch and the real Java probe under `OBSERVER_E2E=1`).
 
 ### Build
 

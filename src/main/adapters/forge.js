@@ -18,7 +18,8 @@ async function install({ software, version, javaInfo, serverPath, onProgress }) 
   if (!targetVersion) throw new Error(`Could not resolve the newest ${software === 'neoforge' ? 'NeoForge' : 'Forge'} release.`);
   const name = `${software === 'neoforge' ? 'neoforge' : 'forge'}-${targetVersion}-installer.jar`;
   const url = `${mavenBase}/${encodeURIComponent(targetVersion)}/${encodeURIComponent(name)}`;
-  await download(url, path.join(serverPath, name), onProgress);
+  // Forge/NeoForge installer jars are small (a few MB); cap at 256 MB.
+  await download(url, path.join(serverPath, name), onProgress, null, { maxBytes: 256 * 1024 * 1024 });
   await new Promise((resolve, reject) => execFile(javaInfo.path, ['-jar', name, '--installServer'], { cwd: serverPath, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(stdout)));
   return { name: software === 'neoforge' ? 'NeoForge server' : 'Forge server', version: targetVersion };
 }

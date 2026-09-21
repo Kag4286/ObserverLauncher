@@ -118,6 +118,19 @@ function wmChunkColors(ck,cx,cz){
   if(wmColorCache.size>4000)wmColorCache.delete(wmColorCache.keys().next().value);
   return out;
 }
+// MODDED SUPPORT: a biome id we don't recognise (usually added by a mod) still gets a colour,
+// derived from a hash of its name so it is stable across sessions/frames and distinct per biome.
+// Without this every custom biome collapsed to the same grey.
+function hashBiomeColor(k){
+  let h=0;const s=String(k||'');
+  for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
+  const hue=h%360,sat=0.34,lig=0.52;
+  const c=(1-Math.abs(2*lig-1))*sat,x=c*(1-Math.abs((hue/60)%2-1)),m=lig-c/2;
+  let r=0,g=0,b=0;
+  if(hue<60){r=c;g=x}else if(hue<120){r=x;g=c}else if(hue<180){g=c;b=x}else if(hue<240){g=x;b=c}else if(hue<300){r=x;b=c}else{r=c;b=x}
+  const to=n=>Math.round((n+m)*255).toString(16).padStart(2,'0');
+  return '#'+to(r)+to(g)+to(b);
+}
 function biomeColor(id){
   if(!id)return '#3A4250';
   const k=String(id).replace(/^minecraft:/,'');
@@ -135,7 +148,7 @@ function biomeColor(id){
   if(/cave|dripstone|deep_dark/.test(k))return '#5A5548';
   if(/nether|crimson|warped|basalt|soul/.test(k))return '#7A3B33';
   if(/end/.test(k))return '#C2BB92';
-  return '#4A5442';
+  return hashBiomeColor(k);
 }
 // Max chunks we ask the backend to parse in one go. Beyond this we skip the fetch and keep
 // the seed wash, so panning at a far zoom-out can't tie up the main process (~3s of parsing).
@@ -214,6 +227,19 @@ async function wmLoad(){
   wm.waypoints=(r&&r.waypoints)||[];
   if(!wm.level){wmShow('none');if(r.error)toast(`World Map: ${r.error}`,'error');return}
   wmShow('app');
+  // MODDED HONESTY: custom biomes get approximate colours and custom dimensions can't be drawn.
+  // Show a short note (JS-owned text — NOT data-i18n, or applyLocale would clobber it) when the
+  // server looks modded OR the world declares dimensions outside the minecraft: namespace.
+  (function(){
+    const note=$('#wmModdedNote'); if(!note)return;
+    const jar=String((typeof state!=='undefined'&&state.files&&state.files.jar)||'');
+    const modded=/forge|neoforge|fabric|quilt/i.test(jar);
+    const custom=(r.dimensions||[]).filter(d=>!d.startsWith('minecraft:'));
+    if(!modded&&!custom.length){note.hidden=true;note.textContent='';return}
+    let msg=t('wm.moddedNote');
+    if(custom.length)msg+=' '+t('wm.moddedDims',{list:custom.join(', ')});
+    note.textContent=msg;note.hidden=false;
+  })();
   try { wm.seedBig=BigInt(wm.level.seed); } catch { wm.seedBig=0n }
   $('#wmSeed').textContent=wm.level.seed;
   $('#wmSeed').title=wm.level.levelName+' · '+wm.level.version.name;

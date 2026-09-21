@@ -248,7 +248,8 @@ async function tInstallFromMarket(ctx, a) {
   const { download } = require('../main/http.js');
   const { recordManifestEntry } = require('../main/fs-utils.js');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  await download(dl.url, dest);
+  // A single plugin/mod jar from the market; cap at 512 MB (mirrors the GUI install path).
+  await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
   try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, installedAt: new Date().toISOString() }); } catch {}
   return { ok: true, result: { name: dl.filename, files: serverFiles(root) } };
 }

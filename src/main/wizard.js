@@ -139,7 +139,9 @@ function registerWizard(ipcMain, ctx) {
       const resolver = RESOLVERS[software] || RESOLVERS.purpur;
       const { url, name, version: resolvedVersion, sha256 } = await resolver(targetVersion);
       const dest = path.join(ctx.currentServerPath, name);
-      await download(url, dest, onProgress, signal);
+      // Server software jars (vanilla/paper/purpur/leaf/fabric) are tens of MB; 1 GB is a generous
+      // ceiling that still stops a hostile/redirected URL from filling the disk.
+      await download(url, dest, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
       if (sha256) {
         try {
           const got = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');

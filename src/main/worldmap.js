@@ -306,12 +306,16 @@ async function readBiomes(root, levelName, dim, rect) {
         const key = fp;
         let entry = biomeRegionCache.get(key);
         if (!entry || entry.mtime !== stat.mtimeMs) {
-          entry = { mtime: stat.mtimeMs, chunks: new Map() };
+          entry = { mtime: stat.mtimeMs, chunks: new Map(), header: null };
           biomeRegionCache.set(key, entry);
           if (biomeRegionCache.size > 64) { const k0 = biomeRegionCache.keys().next().value; biomeRegionCache.delete(k0); }
         }
-        let header = null;
-        try { header = Buffer.alloc(4096); const fd = fs.openSync(fp, 'r'); fs.readSync(fd, header, 0, 4096, 0); fs.closeSync(fd); } catch { continue; }
+        // PERF: the 4 KB region header is read once per region and cached with the entry, so
+        // repeated pans over the same region don't re-open + re-read it on every readBiomes call.
+        if (!entry.header) {
+          try { const h = Buffer.alloc(4096); const fd = fs.openSync(fp, 'r'); fs.readSync(fd, h, 0, 4096, 0); fs.closeSync(fd); entry.header = h; } catch { continue; }
+        }
+        const header = entry.header;
         for (let i = 0; i < 1024 && out.length < CAP; i++) {
           const v = header.readUInt32BE(i * 4);
           if (v === 0) continue;
@@ -367,4 +371,22 @@ function writeWaypoints(root, list) {
   } catch (e) { return { ok: false, error: e.code || 'writeError' }; }
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, unpackHeightmap, downsampleHeights, biomeGridFromSection };
+// MODDED SUPPORT: list the dimension folders under <world>/dimensions/<namespace>/<path>.
+// Vanilla dims live under the minecraft: namespace (overworld/the_nether/the_end); anything else
+// is added by a mod. Used only to WARN the user (the map cannot render custom dimensions yet) —
+// it never changes what is drawn. Returns ['namespace:path', ...].
+function listDimensions(root, levelName) {
+  const base = path.join(root, String(levelName || 'world').replace(/[\\/]/g, '') || 'world');
+  const dir = path.join(base, 'dimensions');
+  const out = [];
+  let nsDirs = [];
+  try { nsDirs = fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory()); } catch { return out; }
+  for (const ns of nsDirs) {
+    let dims = [];
+    try { dims = fs.readdirSync(path.join(dir, ns.name), { withFileTypes: true }).filter(d => d.isDirectory()); } catch { continue; }
+    for (const d of dims) out.push(`${ns.name}:${d.name}`);
+  }
+  return out;
+}
+
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions };

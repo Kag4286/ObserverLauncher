@@ -88,7 +88,8 @@ async function installPlayitAgent(ctx) {
     fs.mkdirSync(dir, { recursive: true });
     const exeName = process.platform === 'win32' ? 'playit.exe' : 'playit';
     const dest = path.join(dir, exeName);
-    await download(asset.browser_download_url, dest, (received, total) => ctx.send('tunnel:progress', { received, total }));
+    // The Playit agent binary is a few MB; cap at 256 MB.
+    await download(asset.browser_download_url, dest, (received, total) => ctx.send('tunnel:progress', { received, total }), null, { maxBytes: 256 * 1024 * 1024 });
     if (!fs.existsSync(dest) || fs.statSync(dest).size === 0) throw new Error('The Playit agent download was empty.');
     if (process.platform !== 'win32') { try { fs.chmodSync(dest, 0o755); } catch {} }
     const { loadSettings, saveSettings } = require('./settings.js');

@@ -142,7 +142,8 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
       const f = installable[i];
       onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.name, received: 0, fileTotal: f.size });
       fs.mkdirSync(path.dirname(f.dest), { recursive: true });
-      await download(f.url, f.dest, (received, total) => onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.name, received, fileTotal: total || f.size }));
+      // Individual files inside a modpack (mods/configs): 512 MB each is plenty.
+      await download(f.url, f.dest, (received, total) => onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.name, received, fileTotal: total || f.size }), null, { maxBytes: 512 * 1024 * 1024 });
       installed++;
     }
     const overridesDir = path.join(extractDir, 'overrides');
@@ -195,7 +196,8 @@ function registerModpacks(ipcMain, ctx) {
       const file = target?.files?.find(f => /\.mrpack$/i.test(f.filename));
       if (!file) throw new Error('No .mrpack file was found for this modpack.');
       tempMrpack = path.join(app.getPath('temp'), `observerlauncher-market-modpack-${Date.now()}.mrpack`);
-      await download(file.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: file.filename, received, total }));
+      // The .mrpack package itself can be large; cap at 1 GB.
+      await download(file.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: file.filename, received, total }), null, { maxBytes: 1024 * 1024 * 1024 });
       return await importMrpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info), 'market');
     } catch (error) { return marketplaceError(error); }
     finally { try { if (tempMrpack) fs.rmSync(tempMrpack, { force: true }); } catch {} }

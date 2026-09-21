@@ -18,5 +18,9 @@ contextBridge.exposeInMainWorld('observer', {
   onUpdateError: cb => ipcRenderer.on('app:update-error', (_, d) => cb(d)),
   onMcpConfirmRequest: cb => ipcRenderer.on('mcp:confirm-request', (_, d) => cb(d)),
   onMcpClient: cb => ipcRenderer.on('mcp:client', (_, d) => cb(d)),
-  respondMcpConfirm: payload => ipcRenderer.send('mcp:confirm-response', payload)
+  respondMcpConfirm: payload => ipcRenderer.send('mcp:confirm-response', payload),
+  // E2E hook: true only under `npm run test:e2e` (env OBSERVER_E2E=1, set by the Playwright
+  // helper). The renderer uses it to skip network work during boot so the E2E run stays
+  // deterministic and offline. Never true for a normal user launch.
+  isE2E: process.env.OBSERVER_E2E === '1'
 });

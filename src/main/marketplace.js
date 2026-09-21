@@ -143,7 +143,8 @@ function registerMarketplace(ipcMain, ctx) {
       const { isSafeDownloadUrl } = require('./validate.js');
       if (!isSafeDownloadUrl(url)) return { ok: false, error: 'Refused: the download URL is not on an allowlisted public host.' };
       const dest = path.join(destDir, path.basename(filename));
-      await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }));
+      // A single plugin/mod jar is normally well under 100 MB; cap at 512 MB.
+      await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }), null, { maxBytes: 512 * 1024 * 1024 });
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
     } catch (error) { return marketplaceError(error); }

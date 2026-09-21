@@ -126,6 +126,7 @@ function registerContent(ipcMain, ctx) {
         level: await worldmap.readLevel(ctx.currentServerPath, lvlName),
         players: await worldmap.readPlayers(ctx.currentServerPath, lvlName),
         waypoints: worldmap.readWaypoints(ctx.currentServerPath),
+        dimensions: worldmap.listDimensions(ctx.currentServerPath, lvlName),
         levelName: lvlName
       };
     } catch (error) {

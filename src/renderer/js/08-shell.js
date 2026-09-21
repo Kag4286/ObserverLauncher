@@ -378,7 +378,7 @@ if(!initial.java?.ok||!initial.files?.jar&&!initial.files?.launchScript){setTime
 // cover the server-path text in the command bar. Detect the Window Controls Overlay and flag it so
 // CSS can reserve its width (.wco-app rules in style.css).
 try{const wco=navigator.windowControlsOverlay;if(wco){const sync=()=>document.documentElement.classList.toggle('wco-app',!!wco.visible);sync();wco.addEventListener('geometrychange',sync);}}catch{}
-bootStep(85,'boot.market');const v=await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
+bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
 
 // ===== AUTO-UPDATE UI =====
 const updateBtn=$('#checkUpdateBtn');

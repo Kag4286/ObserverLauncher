@@ -215,7 +215,8 @@ async function autoInstallJava(ctx) {
       const osName = javaRuntimeOs(), ext = javaRuntimeExt(osName), binName = javaBinName(osName);
       const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${osName}/${arch}/jre/hotspot/normal/eclipse`;
       zipPath = path.join(app.getPath('temp'), `observerlauncher-jre-${Date.now()}.${ext}`);
-      await download(url, zipPath, (received, total) => ctx.send('java:progress', { received, total }));
+      // A JDK/JRE archive is typically 40-200 MB; cap at 512 MB.
+      await download(url, zipPath, (received, total) => ctx.send('java:progress', { received, total }), null, { maxBytes: 512 * 1024 * 1024 });
       const targetDir = path.join(app.getPath('userData'), `jre${major}`);
       // BUGFIX (a bad install could wipe a working Java): extract into a staging folder first; only
       // swap it in after the java binary is confirmed present, so a failure leaves the previous install

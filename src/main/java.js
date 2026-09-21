@@ -16,7 +16,13 @@ function javaErrorMessage(javaPath, error) {
   if (error?.killed) return `"${javaPath} -version" timed out — the path may point at a program that is not Java.`;
   return `Could not run "${javaPath} -version": ${error?.message || 'unknown error'}.`;
 }
-function detectJava(javaPath = 'java') { return new Promise(resolve => execFile(javaPath, ['-version'], { windowsHide: true }, (error, stdout, stderr) => { if (error) return resolve({ ok: false, message: javaErrorMessage(javaPath, error) }); const combined = stderr + stdout; resolve({ ok: true, version: parseJavaVersion(combined), arch: parseJavaArch(combined), path: javaPath }); })); }
+function detectJava(javaPath = 'java') {
+  // E2E: under `npm run test:e2e` (OBSERVER_E2E=1) skip the real `java -version` spawn so the
+  // run is deterministic on any CI runner regardless of an installed JDK. Returns the same
+  // shape as the real probe (a modern Java) so the boot/refreshUI path stays exercised.
+  if (process.env.OBSERVER_E2E === '1') return Promise.resolve({ ok: true, version: 21, arch: 'x64', path: javaPath, e2eStub: true });
+  return new Promise(resolve => execFile(javaPath, ['-version'], { windowsHide: true }, (error, stdout, stderr) => { if (error) return resolve({ ok: false, message: javaErrorMessage(javaPath, error) }); const combined = stderr + stdout; resolve({ ok: true, version: parseJavaVersion(combined), arch: parseJavaArch(combined), path: javaPath }); }));
+}
 // SYNC: Minecraft switched from 1.x to calendar versioning (26.x). Both schemes must map to a
 // minimum Java version or validation silently skips (the old regex only knew 1.x, so a Java 17
 // install passed the pre-start check for a 26.x jar and crashed later with an obscure JVM error).

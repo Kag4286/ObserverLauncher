@@ -102,6 +102,19 @@ fs.writeFileSync(path.join(root, 'usercache.json'), JSON.stringify([{ uuid: uuid
   ck('biome grid: plains at [1]', multi && multi[1] === 'minecraft:plains');
   ck('biome grid: plains at [15]', multi && multi[15] === 'minecraft:plains');
 
+  // --- listDimensions (1.4.0): modded-dimension detection ---
+  const dimRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-wmdim-'));
+  const wd = path.join(dimRoot, 'world', 'dimensions');
+  fs.mkdirSync(path.join(wd, 'minecraft', 'overworld'), { recursive: true });
+  fs.mkdirSync(path.join(wd, 'twilightforest', 'twilight_forest'), { recursive: true });
+  fs.mkdirSync(path.join(wd, 'aether', 'the_aether'), { recursive: true });
+  const dims = wm.listDimensions(dimRoot, 'world').sort();
+  ck('listDimensions finds vanilla overworld', dims.includes('minecraft:overworld'));
+  ck('listDimensions finds mod dims', dims.includes('twilightforest:twilight_forest') && dims.includes('aether:the_aether'));
+  ck('listDimensions total 3', dims.length === 3);
+  ck('listDimensions empty when no dimensions dir', wm.listDimensions(dimRoot, 'nope').length === 0);
+  fs.rmSync(dimRoot, { recursive: true, force: true });
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

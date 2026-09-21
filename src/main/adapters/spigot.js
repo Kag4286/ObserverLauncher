@@ -12,7 +12,8 @@ const BUILDTOOLS_URL = 'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSucc
 // spawn + stdout/exit wiring, since that's where the shared buildProcess state already lives.
 async function fetchBuildTools(serverPath, onProgress) {
   const jarPath = path.join(serverPath, 'BuildTools.jar');
-  await download(BUILDTOOLS_URL, jarPath, onProgress);
+  // BuildTools.jar is small (a few MB); cap at 256 MB.
+  await download(BUILDTOOLS_URL, jarPath, onProgress, null, { maxBytes: 256 * 1024 * 1024 });
   return jarPath;
 }
 function spawnArgs(targetVersion) { return ['-jar', 'BuildTools.jar', '--rev', targetVersion, '--output-dir', '.']; }

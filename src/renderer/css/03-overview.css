@@ -131,6 +131,8 @@
 .chart-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:13px;color:var(--text-dim);background:var(--panel);border-radius:var(--r);pointer-events:none}
 .chart-empty-overlay[hidden]{display:none}
 .wm-perf-note{font-size:11.5px;line-height:1.5;color:var(--warning);border-left:3px solid var(--warning);background:var(--field);border-radius:var(--r-sm);padding:8px 12px;margin:0 0 12px}
+.wm-modded-note{font-size:11.5px;line-height:1.5;color:var(--text-dim);border-left:3px solid var(--accent);background:var(--field);border-radius:var(--r-sm);padding:8px 12px;margin:0 0 12px}
+.wm-modded-note[hidden]{display:none}
 /* Collapsible tunnel box (1.1.0): was fully expanded and dominated the Home view.
    Now it's a <details> — the head row is the toggle, body hidden until opened. */
 .tunnel-box>summary{list-style:none;cursor:pointer}

@@ -10,6 +10,56 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [1.4.0] — 2026-09-21
+
+A hardening + tooling release. No new server features — the goal is a sharper safety net and a
+cleaner codebase: real end-to-end coverage of the UI, per-download size caps, a stricter i18n test,
+duplicate-locale-key cleanup, and honest World Map behaviour on modded servers.
+
+### Added — E2E coverage (tests/e2e/)
+- **Interaction suite** (`interaction.spec.js`, new): the E2E suite grew from 4 smoke tests to 11.
+  It now drives real flows and asserts the renderer stays error-free — the class of bug unit tests
+  cannot see (boot-order ReferenceErrors, JS-measured elements inside hidden tabs, JS-owned text
+  clobbered by `applyLocale`).
+- **Renderer-error capture** in `helpers.js`: every `pageerror` / `console.error` is collected and
+  asserted empty after a full tab + modal tour.
+- **Fixture server** (`makeFixtureServer()`): a throwaway server folder (server.properties, plugins,
+  world, logs) so Content / file-browser / editor / Properties flows run offline and deterministically.
+- **E2E hook** (`OBSERVER_E2E=1`, read in `preload.js` -> `observer.isE2E`, `java.js`, `08-shell.js`):
+  boot skips the Modrinth version fetch and the real `java -version` spawn, so the suite is offline
+  and CI-runner-independent. (Previously the env var was set by the helper but read nowhere.)
+- CI: `playwright.config.js` retries once on CI only; `test.yml` Node 20 -> 22 (matches release.yml).
+
+### Changed — World Map on modded servers (honest degradation)
+- **Custom biome colours.** `biomeColor()` no longer falls back to one grey for every biome it does
+  not recognise (usually mod-added); unknown ids get a stable hash-derived colour, so each custom
+  biome is distinct and consistent across sessions. Named vanilla families (ocean/forest/…) still
+  use the curated palette.
+- **Custom-dimension awareness.** New backend `listDimensions(root, levelName)` scans
+  `<world>/dimensions/<namespace>/<path>`; `worldmap:load` returns the list. The map cannot draw
+  modded dimensions yet, so the tab now shows a one-line note naming them instead of silently
+  showing the wrong (overworld) data.
+- **Modded banner.** When the server jar looks modded (forge/neoforge/fabric/quilt) or the world
+  declares non-`minecraft:` dimensions, a short note appears above the map. JS-owned text (no
+  `data-i18n`), so `applyLocale()` cannot clobber it.
+
+### Changed — download size caps
+- `download()` already had a 2 GB default cap; every caller now passes an explicit per-purpose
+  `maxBytes`: server jars 1 GB, modpack packages 1 GB, JDK/JRE archives 512 MB, market files and
+  modpack members 512 MB, Forge/Spigot/BuildTools installers and the Playit agent 256 MB. A
+  hostile or redirected URL can no longer fill the disk on a path where 2 GB was far too generous.
+
+### Changed — i18n test
+- The i18n test now also resolves the one **finite** dynamic-key family: `t('nav.' + tab)` is checked
+  against every `data-tab` declared in the HTML (10 candidates), instead of staying blind to it.
+- Removed **66 redundant duplicate locale keys** (33 each in pt-BR and zh-CN) — byte-identical blocks
+  that the runtime object silently deduped. `i18n.test.js` now reports "no duplicate keys in any
+  locale".
+
+### Notes
+- `npm test` (28 files) and `npm run test:e2e` (11 tests) both green. Version NOT bumped yet.
+- Screenshots in README are still from before the 1.1.0 UI overhaul (tracked separately).
+
 ## [1.3.5] — 2026-09-21
 
 Closes the main dead ends in the MCP diagnostics workflow, from a detailed community issue.

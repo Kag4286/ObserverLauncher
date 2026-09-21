@@ -27,13 +27,27 @@ console.log('data-i18n used in HTML:', used.length, '| missing keys:', missing.l
 const jsDir = path.join(__dirname, '../src/renderer/js');
 const jsFiles = fs.readdirSync(jsDir).filter(f => f.endsWith('.js'));
 const jsKeys = new Set();
+let jsAll = '';
 for (const file of jsFiles) {
   const src = fs.readFileSync(path.join(jsDir, file), 'utf8');
+  jsAll += src + '\n';
   // Lookahead (?=[,)]) rejects concatenated/prefix keys like t('mkt.' + kind + 'Type').
   for (const m of src.matchAll(/\btf?\(\s*(['"])([\w.]+)\1\s*(?=[,)])/g)) jsKeys.add(m[2]);
 }
 const jsMissing = [...jsKeys].filter(k => !(k in window.LOCALES.en));
 console.log('t() keys used in JS:', jsKeys.size, '| missing keys:', jsMissing.length ? jsMissing.join(',') : 'none');
+
+// --- DYNAMIC keys with a finite, resolvable suffix set ---
+// The scan above skips concatenated keys because they are open-ended. But some are NOT:
+// applyLocale() (00-core.js) does `t('nav.' + activeNav.dataset.tab)` and every tab value is
+// declared in the HTML as data-tab="...". So we enumerate the real candidate keys here instead
+// of staying blind to them (the exact blind spot that let `wld.openFolder` ship missing once).
+const dynMissing = [];
+const tabVals = [...new Set([...html.matchAll(/data-tab="([\w-]+)"/g)].map(m => m[1]))];
+if (/\bt\(\s*['"]nav\.\s*['"]\s*\+/.test(jsAll)) {
+  for (const tab of tabVals) if (!(`nav.${tab}` in window.LOCALES.en)) dynMissing.push(`nav.${tab}`);
+}
+console.log('dynamic keys (nav.<tab>):', tabVals.length, 'candidates | missing keys:', dynMissing.length ? dynMissing.join(',') : 'none');
 
 // --- SOURCE-LEVEL duplicate-key detection (runtime objects silently dedupe, so the checks
 // above can't see a repeated key in the file). Parse each locale file's raw text for 'key':
@@ -67,5 +81,5 @@ for (const c of Object.keys(window.LOCALES)) {
 console.log(extraFail ? `extra keys in ${extraFail} locale(s)` : 'no extra keys in any locale');
 
 // The missing-lists + duplicate/extra checks are the assertions.
-const fail = missing.length + jsMissing.length + dupFail + extraFail;
+const fail = missing.length + jsMissing.length + dynMissing.length + dupFail + extraFail;
 process.exit(fail ? 1 : 0);
