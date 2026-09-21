@@ -50,6 +50,11 @@ check('start allowed if lastFired was another day', shouldFire('start', sched('0
 check('days incl Wednesday fires', shouldFire('start', sched('08:00', '', [3]), at(8, 0, 5), {}, 'stopped'));
 check('days excl Wednesday skipped', !shouldFire('start', sched('08:00', '', [1, 2]), at(8, 0, 5), {}, 'stopped'));
 check('empty days = every day', shouldFire('start', sched('08:00', '', []), at(8, 0, 5), {}, 'stopped'));
+// REGRESSION (1.3.0): an MCP set_schedule used to store day NAMES; shouldFire compared against
+// getDay() numbers, so those schedules never fired. shouldFire now accepts both forms.
+check('string day name incl Wednesday fires', shouldFire('start', sched('08:00', '', ['wed']), at(8, 0, 5), {}, 'stopped'));
+check('string day name excl Wednesday skipped', !shouldFire('start', sched('08:00', '', ['mon', 'tue']), at(8, 0, 5), {}, 'stopped'));
+check('mixed number+name days both understood', shouldFire('start', sched('08:00', '', ['mon', 3, 'fri']), at(8, 0, 5), {}, 'stopped'));
 
 // --- shouldFire: state guards ---
 check('start skipped when running', !shouldFire('start', sched('08:00', ''), at(8, 0, 5), {}, 'running'));

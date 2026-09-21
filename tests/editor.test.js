@@ -23,13 +23,23 @@ ck('open text ok', o1.ok && o1.content.includes('motd=hello') && !o1.readOnly);
 ck('open returns slash path', o1.rel === 'server.properties');
 const o2 = ed.openFile(root, 'config/essentials/config.yml');
 ck('open nested ok', o2.ok && o2.rel === 'config/essentials/config.yml');
+// 1.3.0: openFile/saveFile now enforce the extension allowlist FIRST (the IPC editor path used
+// to skip it, letting .jar/.dat be read or overwritten as text). So a disallowed extension is
+// refused with 'notAllowed' before any binary sniff / size / traversal check runs.
 const o3 = ed.openFile(root, 'plugins/plugin.jar');
-ck('binary jar rejected', !o3.ok && o3.error === 'binary');
+ck('jar rejected (not allowlisted)', !o3.ok && o3.error === 'notAllowed');
 const o4 = ed.openFile(root, 'world/level.dat');
-ck('binary dat rejected', !o4.ok && o4.error === 'binary');
-const o5 = ed.openFile(root, 'huge.log');
+ck('dat rejected (not allowlisted)', !o4.ok && o4.error === 'notAllowed');
+// size cap: use an ALLOWLISTED extension (.txt) so we actually reach the size check.
+fs.writeFileSync(path.join(root, 'huge.txt'), 'x'.repeat(9 * 1024 * 1024));
+const o5 = ed.openFile(root, 'huge.txt');
 ck('>8MB refused', !o5.ok && o5.error === 'tooBig' && o5.size > ed.MAX_VIEW);
-const o6 = ed.openFile(root, '../../etc/passwd');
+// binary sniff on an allowlisted extension: a .txt with null bytes is refused as binary.
+fs.writeFileSync(path.join(root, 'bin.txt'), Buffer.from([0x68, 0x69, 0, 0, 1]));
+const o5b = ed.openFile(root, 'bin.txt');
+ck('null-byte txt refused as binary', !o5b.ok && o5b.error === 'binary');
+// traversal: path is allowlisted (.yml) so it reaches safeTarget, which rejects it.
+const o6 = ed.openFile(root, '../../etc/passwd.yml');
 ck('traversal rejected', !o6.ok && o6.error === 'notFound');
 const o7 = ed.openFile(root, 'nope.yml');
 ck('missing -> notFound', !o7.ok && o7.error === 'notFound');
@@ -38,6 +48,9 @@ ck('missing -> notFound', !o7.ok && o7.error === 'notFound');
 const s1 = ed.saveFile(root, 'server.properties', 'motd=edited\n', o1.mtime, false);
 ck('save ok + new mtime', s1.ok && s1.mtime > o1.mtime);
 ck('atomic write applied', fs.readFileSync(path.join(root, 'server.properties'), 'utf8') === 'motd=edited\n');
+// 1.3.0: saveFile also rejects disallowed extensions before writing.
+const sBad = ed.saveFile(root, 'plugins/plugin.jar', 'not a jar', o1.mtime, true);
+ck('save disallowed ext rejected', !sBad.ok && sBad.error === 'notAllowed');
 const s2 = ed.saveFile(root, 'server.properties', 'motd=other\n', o1.mtime, false);
 ck('stale mtime -> conflict', !s2.ok && s2.conflict && !!s2.mtime);
 const s3 = ed.saveFile(root, 'server.properties', 'motd=forced\n', o1.mtime, true);

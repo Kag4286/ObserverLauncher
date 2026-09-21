@@ -266,8 +266,16 @@ function registerTunnel(ipcMain, ctx) {
   ipcMain.handle('tunnel:set-address', async (_, addr) => {
     try {
       const { loadSettings, saveSettings } = require('./settings.js');
+      // SECURITY: this string is echoed back into the UI and copied to friends. Only accept a plain
+      // host or host:port (playit addresses look like NAME.tun.ply.gg / NAME.playit.gg), never markup
+      // or a javascript:/data: URL. An empty value clears it.
+      const raw = String(addr || '').trim();
       const s = loadSettings();
-      s.tunnelAddress = String(addr || '').trim().slice(0, 200);
+      if (raw === '') { s.tunnelAddress = ''; saveSettings(s); return { ok: true, address: '' }; }
+      if (raw.length > 200 || !/^[A-Za-z0-9][A-Za-z0-9.-]*(:\d{1,5})?$/.test(raw)) {
+        return { ok: false, error: 'Enter a plain address like NAME.tun.ply.gg (no links or symbols).' };
+      }
+      s.tunnelAddress = raw;
       saveSettings(s);
       return { ok: true, address: s.tunnelAddress };
     } catch (e) { return { ok: false, error: e?.message || 'Could not save the address.' }; }

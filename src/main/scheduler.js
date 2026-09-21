@@ -42,8 +42,12 @@ function shouldFire(action, schedule, now, lastFired, status, opts = {}) {
   const timeStr = action === 'start' ? schedule.startTime : schedule.stopTime;
   const t = parseTime(timeStr);
   if (!t) return false; // empty/invalid time = this action is off
-  // Weekday gate: empty days array = every day.
-  const days = Array.isArray(schedule.days) ? schedule.days : [];
+  // Weekday gate: empty days array = every day. Accept BOTH numbers (0=Sun..6=Sat, what the GUI
+  // stores) and short names ('mon'..'sun', what a hand-written/older config or an MCP caller might
+  // supply) so a schedule can never silently never-fire because of a type mismatch.
+  const NAME_TO_NUM = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const rawDays = Array.isArray(schedule.days) ? schedule.days : [];
+  const days = rawDays.map(d => typeof d === 'string' ? NAME_TO_NUM[d.toLowerCase().slice(0, 3)] : Number(d)).filter(n => Number.isInteger(n));
   if (days.length && !days.includes(now.getDay())) return false;
   // State gate: only start a stopped server, only stop a running one. Mid-start/mid-stop
   // is deliberately left alone (do not fight a transition already in progress).

@@ -18,7 +18,14 @@ function resolveSafe(root, rel) {
   return safeTarget(root, rel);
 }
 
+function extAllowed(rel) {
+  return ALLOWED.includes(String(require('path').extname(String(rel || ''))).toLowerCase());
+}
 function openFile(root, rel) {
+  // SECURITY: only allowlisted text extensions are readable/editable. The MCP write/edit path
+  // already enforced this; the IPC editor path did not, so a .jar/.dat could be read or overwritten
+  // as text. Enforce here so BOTH callers share one rule.
+  if (!extAllowed(rel)) return { ok: false, error: 'notAllowed' };
   const target = resolveSafe(root, rel);
   if (!target) return { ok: false, error: 'notFound' };
   let stat;
@@ -39,6 +46,7 @@ function openFile(root, rel) {
 }
 
 function saveFile(root, rel, content, baseMtime, force) {
+  if (!extAllowed(rel)) return { ok: false, error: 'notAllowed' };
   const target = resolveSafe(root, rel);
   if (!target) return { ok: false, error: 'notFound' };
   const body = String(content ?? '');
@@ -85,4 +93,4 @@ function listFiles(root) {
   return { ok: true, files: out, capped: out.length >= LIST_CAP };
 }
 
-module.exports = { openFile, saveFile, listFiles, ALLOWED, MAX_VIEW, MAX_EDIT };
+module.exports = { openFile, saveFile, listFiles, ALLOWED, MAX_VIEW, MAX_EDIT, extAllowed };

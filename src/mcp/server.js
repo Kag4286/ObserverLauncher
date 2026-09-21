@@ -218,7 +218,9 @@ function startMcpServer(ctx) {
       fs.mkdirSync(path.dirname(bridgeConfigPath()), { recursive: true });
       let appVersion = 'dev';
       try { appVersion = require('electron').app.getVersion(); } catch {}
-      fs.writeFileSync(bridgeConfigPath(), JSON.stringify({ port, token, pid: process.pid, script: bridgeScriptPath(), appVersion }, null, 2));
+      // SECURITY: this file holds the MCP token. Write it 0o600 (owner-only) so another user on a
+      // shared machine cannot read the token and talk to the loopback server.
+      fs.writeFileSync(bridgeConfigPath(), JSON.stringify({ port, token, pid: process.pid, script: bridgeScriptPath(), appVersion }, null, 2), { mode: 0o600 });
     } catch (e) { try { ctx.appendLog(`MCP: could not write bridge config — ${e?.message || e}`, 'error'); } catch {} }
     try { ctx.appendLog(`MCP server listening on 127.0.0.1:${port} (${TOOLS.length} tools).`, 'system'); } catch {}
   });

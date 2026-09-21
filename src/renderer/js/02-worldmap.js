@@ -507,7 +507,6 @@ window.observer.onEditorExternal(r=>{
 // icons:update — a placeholder icon just got its real pixels; bump the cache-buster and
 // re-render whatever icon grid is on screen (the player inspector).
 window.observer.onIconsUpdate(()=>{
-  iconVer=Date.now();
   if(!$('#playerInspectModal').hidden&&lastInspectData){
     renderEquipment(lastInspectData.armor,lastInspectData.offhand);
     renderItemGrid('#inventoryList',lastInspectData.inventory);

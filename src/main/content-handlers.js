@@ -53,6 +53,12 @@ function registerContent(ipcMain, ctx) {
     const folders = { plugin: 'plugins', mod: 'mods', datapack: path.join(levelName, 'datapacks') };
     const folder = folders[kind];
     if (!folder) return { ok: false, error: 'Unknown content type.' };
+    // SECURITY: fileName arrives from the renderer (or an MCP delete_content call). Require a plain
+    // basename — `../../server.properties` stays inside the server root so safeTarget alone would
+    // allow it, letting a crafted name delete files OUTSIDE plugins/mods/datapacks.
+    if (typeof fileName !== 'string' || !fileName || path.basename(fileName) !== fileName) {
+      return { ok: false, error: 'Invalid file name.' };
+    }
     const target = safeTarget(ctx.currentServerPath, path.join(folder, fileName));
     if (!target || !fs.existsSync(target)) return { ok: false, error: 'File not found.' };
     try {

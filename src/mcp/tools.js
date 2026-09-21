@@ -211,7 +211,9 @@ const SETTABLE = {
   autoBackupMinutes: v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1440,
   locale: v => typeof v === 'string' && v.length <= 10,
   jvmArgs: v => typeof v === 'string' && v.length <= 2000 && !/["'<>|]/.test(v),
-  playitPath: v => typeof v === 'string' && v.length <= 500,
+  // SECURITY: playitPath is NOT settable over MCP. tunnel:start spawns whatever binary that path
+  // points at, so letting an AI set it (then start the tunnel) would be a one-approval RCE. The
+  // user sets it in the GUI only.
   // MCP safety toggles (1.2.0): an AI may flip these only if the user allows the write tier.
   mcpReadOnly: v => typeof v === 'boolean',
   mcpAutoAllowWrite: v => typeof v === 'boolean',
@@ -262,7 +264,12 @@ async function tInstallLocalJar(ctx, a) {
   if (!/\.jar$/i.test(src)) return { ok: false, error: 'Only .jar files can be installed.' };
   if (st.size > 100 * 1024 * 1024) return { ok: false, error: 'File too large (max 100 MB).' };
   const kind = a.kind || 'plugin';
-  const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : kind === 'mod' ? 'mods' : 'plugins';
+  // WARNING FIX: forge/fabric/neoforge are MOD loaders and belong in mods/, not plugins/. The
+  // marketplace install path already mapped them correctly; this tool did not, so a mod jar
+  // installed via MCP landed in plugins/ and never loaded.
+  const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks')
+    : (kind === 'mod' || kind === 'forge' || kind === 'fabric' || kind === 'neoforge') ? 'mods'
+    : 'plugins';
   const dest = safeTarget(root, path.join(folder, path.basename(src)));
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -369,6 +376,7 @@ async function tSetSchedule(ctx, a) {
   const { parseTime } = require('../main/scheduler.js');
   const { saveSettings } = require('../main/settings.js');
   const VALID_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const DAY_NUM = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const s = loadSettings();
   if (a.enabled !== undefined) {
     if (typeof a.enabled !== 'boolean') return { ok: false, error: 'enabled must be a boolean.' };
@@ -386,7 +394,10 @@ async function tSetSchedule(ctx, a) {
     if (!Array.isArray(a.days) || a.days.some(d => !VALID_DAYS.includes(String(d).toLowerCase()))) {
       return { ok: false, error: 'days must be an array of ' + VALID_DAYS.join('/') + ' (empty = every day).' };
     }
-    s.scheduleDays = a.days.map(d => String(d).toLowerCase());
+    // CRITICAL FIX: store NUMBERS (0=Sun..6=Sat), matching what the GUI saves and what
+    // scheduler.shouldFire() compares against now.getDay(). Storing names here made every
+    // MCP-created schedule silently never fire.
+    s.scheduleDays = a.days.map(d => DAY_NUM[String(d).toLowerCase().slice(0, 3)]).filter(n => Number.isInteger(n));
   }
   saveSettings(s);
   return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };

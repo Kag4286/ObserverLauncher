@@ -11,6 +11,17 @@ const { readJsonList, writeJsonList, safeTarget } = require('./fs-utils.js');
 const { marketplaceError } = require('./http.js');
 const { isSafePlayerName, isSafeReason, isSafeUuid } = require('./validate.js');
 
+// WARNING FIX: serverProcess can exit between the `if (ctx.serverProcess)` check and the write,
+// and a pipe that just closed makes stdin.write throw — which rejected the IPC and left the UI
+// with no toast. Returns false instead so the caller can surface a clear message.
+function writeCmd(ctx, cmd) {
+  try {
+    if (!ctx.serverProcess || !ctx.serverProcess.stdin || !ctx.serverProcess.stdin.writable) return false;
+    ctx.serverProcess.stdin.write(cmd + '\r\n');
+    ctx.appendLog(`> ${cmd}`, 'command');
+    return true;
+  } catch { return false; }
+}
 function checkPlayerInput({ name, reason, uuid }) {
   // SECURITY (console injection): names are interpolated into stdin commands
   // (`whitelist add ${name}`, `ban ${name} ...`). A name like `Notch\nstop`
@@ -39,8 +50,7 @@ async function whitelistToggle(ctx, { uuid, name, add }) {
   const bad = checkPlayerInput({ name, uuid });
   if (bad) return { ok: false, error: bad };
   if (ctx.serverProcess) {
-    ctx.serverProcess.stdin.write(`whitelist ${add ? 'add' : 'remove'} ${name}\r\n`);
-    ctx.appendLog(`> whitelist ${add ? 'add' : 'remove'} ${name}`, 'command');
+    if (!writeCmd(ctx, `whitelist ${add ? 'add' : 'remove'} ${name}`)) return { ok: false, error: 'The server just stopped — could not send the command.' };
   } else {
     let list = readJsonList(ctx.currentServerPath, 'whitelist.json').filter(x => x.uuid !== uuid);
     if (add) list.push({ uuid, name });
@@ -54,8 +64,7 @@ async function banToggle(ctx, { uuid, name, ban, reason }) {
   if (bad) return { ok: false, error: bad };
   if (ctx.serverProcess) {
     const cmd = ban ? `ban ${name} ${reason || ''}`.trim() : `pardon ${name}`;
-    ctx.serverProcess.stdin.write(cmd + '\r\n');
-    ctx.appendLog(`> ${cmd}`, 'command');
+    if (!writeCmd(ctx, cmd)) return { ok: false, error: 'The server just stopped — could not send the command.' };
   } else {
     let list = readJsonList(ctx.currentServerPath, 'banned-players.json').filter(x => x.uuid !== uuid);
     if (ban) list.push({ uuid, name, created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
@@ -69,8 +78,7 @@ async function opToggle(ctx, { uuid, name, op }) {
   if (bad) return { ok: false, error: bad };
   if (ctx.serverProcess) {
     const cmd = op ? `op ${name}` : `deop ${name}`;
-    ctx.serverProcess.stdin.write(cmd + '\r\n');
-    ctx.appendLog(`> ${cmd}`, 'command');
+    if (!writeCmd(ctx, cmd)) return { ok: false, error: 'The server just stopped — could not send the command.' };
   } else {
     let list = readJsonList(ctx.currentServerPath, 'ops.json').filter(x => x.uuid !== uuid);
     if (op) list.push({ uuid, name, level: 4, bypassesPlayerLimit: false });

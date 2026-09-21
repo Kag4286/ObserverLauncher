@@ -137,6 +137,11 @@ function registerMarketplace(ipcMain, ctx) {
       const destDir = safeTarget(ctx.currentServerPath, destFolders[kind]);
       fs.mkdirSync(destDir, { recursive: true });
       const { url, filename } = await resolveMarketDownload(item);
+      // SECURITY (SSRF): the download URL comes from a remote registry API. Validate it is a public
+      // http(s) host BEFORE fetching (same guard modpacks + the MCP install path already use), so a
+      // crafted API entry pointing at file://, localhost or a private range can never be fetched.
+      const { isSafeDownloadUrl } = require('./validate.js');
+      if (!isSafeDownloadUrl(url)) return { ok: false, error: 'Refused: the download URL is not on an allowlisted public host.' };
       const dest = path.join(destDir, path.basename(filename));
       await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }));
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, installedAt: new Date().toISOString() });

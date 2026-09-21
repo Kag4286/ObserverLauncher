@@ -212,33 +212,6 @@ async function imInstallDeps(){
   else{imSetBusy(false);$('#imProgressSection').hidden=true;toast(t('im.depsDone',{n:done}),'success')}
 }
 $('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
-// Install every REQUIRED dependency that is not already present, one after another (the market
-// install IPC is one-file-at-a-time). Each dep is fetched by its project id + the current MC
-// version. Failures are collected and reported, never silently swallowed. The main item is NOT
-// reinstalled here — this only fills the missing deps.
-async function imInstallDeps(){
-  const deps=(installState.deps||[]).filter(d=>d.type==='required'&&!imDepInstalled(d));
-  if(!deps.length)return;
-  const conf=await confirmDialog({title:t('im.installDepsTitle'),body:t('im.installDepsConfirm',{n:deps.length}),ok:t('im.install')});
-  if(!conf)return;
-  const mc=imDetectServer().mc||'';
-  imSetBusy(true,t('im.depsInstalling'));
-  $('#imBar').style.width='0%';$('#imBar').classList.remove('ok','bad');
-  let done=0;const failed=[];
-  for(const d of deps){
-    try{
-      const r=await window.observer.marketInstall({id:d.projectId,kind:installState.item.kind,version:mc||undefined,title:d.title||d.slug});
-      if(r.ok)done++;else failed.push(d.title||d.slug||d.projectId);
-    }catch{failed.push(d.title||d.slug||d.projectId)}
-    $('#imBar').style.width=Math.round((done+failed.length)/deps.length*100)+'%';
-    $('#imBarLabel').textContent=t('im.depsProgress',{a:done+failed.length,b:deps.length});
-  }
-  installState.busy=false;
-  imRenderDeps();
-  if(failed.length){imSetError(t('im.depsPartial',{ok:done,fail:failed.length}));toast(t('im.depsPartial',{ok:done,fail:failed.length}),'error')}
-  else{imSetBusy(false);$('#imProgressSection').hidden=true;toast(t('im.depsDone',{n:done}),'success')}
-}
-$('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
 function openInstallModal(item){
   installState={item,detail:null,versionId:null,busy:false,done:false};
   const card=$('#installModal .im');if(card)card.classList.remove('installing','success');

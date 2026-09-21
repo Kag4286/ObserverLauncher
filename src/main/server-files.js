@@ -94,7 +94,18 @@ function buildPropertiesContent(root, props) {
   let original = ''; try { original = fs.readFileSync(path.join(root, 'server.properties'), 'utf8'); } catch {}
   const eol = original.includes('\r\n') ? '\r\n' : '\n';
   const lines = original.length ? original.split(/\r?\n/) : [];
-  const remaining = new Map(Object.entries(props));
+  // SECURITY: server.properties is line-based, so a key or value containing a newline would inject
+  // extra config lines, and a __proto__/constructor key is a prototype-pollution vector. Drop any
+  // such entry here (the one choke point shared by the IPC grid AND the MCP set_property tool).
+  const safeProps = {};
+  for (const [k, v] of Object.entries(props || {})) {
+    const key = String(k), val = String(v == null ? '' : v);
+    if (!/^[A-Za-z0-9._-]+$/.test(key)) continue;
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    if (/[\r\n]/.test(val)) continue;
+    safeProps[key] = val;
+  }
+  const remaining = new Map(Object.entries(safeProps));
   const outLines = lines.map(line => {
     const i = line.indexOf('=');
     if (i > 0 && !line.startsWith('#') && remaining.has(line.slice(0, i))) {
