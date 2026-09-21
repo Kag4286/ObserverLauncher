@@ -54,7 +54,12 @@ $p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue;if(-not $p){ exi
 }
 
 async function createBackup({ serverPath, worlds, destZip }) {
-  const paths = worlds.map(w => psQuote(require('path').join(serverPath, w))).join(',');
+  // PARITY with Linux: world names come from disk scanning but are still validated — a name
+  // starting with `-` would be parsed as a CLI flag, `/` or `..` would archive outside serverPath.
+  const { isSafeWorldName } = require('../validate.js');
+  const safeWorlds = Array.isArray(worlds) ? worlds.filter(isSafeWorldName) : [];
+  if (!safeWorlds.length) return { ok: false, error: 'No valid world folders to back up.' };
+  const paths = safeWorlds.map(w => psQuote(require('path').join(serverPath, w))).join(',');
   const r = await runPowerShell(`Compress-Archive -LiteralPath @(${paths}) -DestinationPath ${psQuote(destZip)} -Force`, 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }
@@ -86,10 +91,23 @@ module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreB
 // Cross-platform archive helpers used by the Java installer and .mrpack import/export.
 // Windows side wraps PowerShell's Expand-Archive / Compress-Archive (unchanged behaviour).
 async function extractArchive(archivePath, destDir) {
+  // PARITY with Linux: list entries first and refuse the archive on the first unsafe path. .NET's
+  // Expand-Archive already blocks traversal itself, but this makes the two platforms behave the
+  // same and fails with a clear message instead of a partial extract.
+  const { isSafeArchiveEntry } = require('../validate.js');
+  try {
+    const list = await runPowerShell(`Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::OpenRead(${psQuote(archivePath)}).Entries | ForEach-Object { $_.FullName }`, 30000);
+    const entries = (list.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const bad = entries.find(e => !isSafeArchiveEntry(e));
+    if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
+  } catch {}
   const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(archivePath)} -DestinationPath ${psQuote(destDir)} -Force`, 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive.' };
 }
 async function createArchive(srcPath, destArchive) {
-  const r = await runPowerShell(`Compress-Archive -Path ${psQuote(srcPath)} -DestinationPath ${psQuote(destArchive)} -Force`, 300000);
+  // PARITY with Linux: archive the CONTENTS of srcPath, not the folder itself. Linux runs the tool
+  // with cwd=srcPath and `.`; on Windows we append \* so a .mrpack has files at its root (Modrinth
+  // format), not wrapped in a folder named after the staging dir.
+  const r = await runPowerShell(`Compress-Archive -Path ${psQuote(srcPath + '\\*')} -DestinationPath ${psQuote(destArchive)} -Force`, 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not create the archive.' };
 }

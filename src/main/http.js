@@ -20,9 +20,11 @@ async function json(url) {
 // One resumable download attempt. `partPath` is a STABLE path (not per-attempt) so bytes that
 // already arrived survive a retry: we send `Range: bytes=<have>-` and append from there. Servers
 // that don't support ranges reply 200 (full body) instead of 206 — then we restart that file.
-async function downloadAttempt(url, partPath, onProgress, stallMs, externalSignal) {
+async function downloadAttempt(url, partPath, onProgress, stallMs, externalSignal, maxBytes) {
   let have = 0;
   try { have = fs.statSync(partPath).size; } catch { have = 0; }
+  // Disk-fill guard: a resumed part that is already past the cap is refused up front.
+  if (maxBytes && have > maxBytes) throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
   const controller = new AbortController();
   // Cancellation: if an external signal aborts (user pressed Cancel), abort our controller too.
   let cancelled = false;
@@ -57,14 +59,16 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
           const { done, value } = await reader.read();
           if (done) break;
           bump(); // progress → reset the stall watchdog
-          fs.writeSync(fileHandle, value);
           received += value.length;
+          if (maxBytes && received > maxBytes) throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
+          fs.writeSync(fileHandle, value);
           if (onProgress) onProgress(received, total);
         }
       } else {
         const buffer = Buffer.from(await r.arrayBuffer());
-        fs.writeSync(fileHandle, buffer);
         received += buffer.length;
+        if (maxBytes && received > maxBytes) throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
+        fs.writeSync(fileHandle, buffer);
         if (onProgress) onProgress(received, total || received);
       }
     } finally { fs.closeSync(fileHandle); }
@@ -77,31 +81,43 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
   } finally { clearTimeout(stallTimer); if (externalSignal) try { externalSignal.removeEventListener('abort', onExternalAbort); } catch {} }
 }
 
-async function download(url, destination, onProgress, externalSignal) {
+// Concurrent-download guard: two downloads targeting the SAME destination would race on the same
+// `<dest>.part` file (interleaved writes → corrupt file, and one rename yanks it out from under
+// the other). Refuse a second in-flight download to the same destination.
+const ACTIVE_DOWNLOADS = new Set();
+
+async function download(url, destination, onProgress, externalSignal, opts) {
+  const maxBytes = (opts && Number(opts.maxBytes)) || 0; // 0 = no cap
   const attempts = 4;
   const stallMs = 30000;
   const backoff = [1000, 3000, 6000];
   const partPath = `${destination}.part`;
+  const key = partPath;
+  if (ACTIVE_DOWNLOADS.has(key)) throw new Error('A download to this file is already in progress.');
+  ACTIVE_DOWNLOADS.add(key);
   let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      await downloadAttempt(url, partPath, onProgress, stallMs, externalSignal);
-      // Success — move the finished part into place.
-      try { fs.rmSync(destination, { force: true }); } catch {}
-      fs.renameSync(partPath, destination);
-      return fs.statSync(destination).size;
-    } catch (error) {
-      lastError = error;
-      // Cancellation is not retryable — stop immediately.
-      if (externalSignal && externalSignal.aborted) throw error;
-      if (attempt < attempts) {
-        // Keep the partial and let the next attempt resume — do NOT reset progress to 0.
-        await new Promise(r => setTimeout(r, backoff[attempt - 1] || 6000));
+  try {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await downloadAttempt(url, partPath, onProgress, stallMs, externalSignal, maxBytes);
+        // Success — move the finished part into place.
+        try { fs.rmSync(destination, { force: true }); } catch {}
+        fs.renameSync(partPath, destination);
+        return fs.statSync(destination).size;
+      } catch (error) {
+        lastError = error;
+        // A size-cap violation and a cancel are NOT retryable — do not loop on them.
+        if (/exceeds the .* MB limit/.test(error?.message || '')) { try { fs.rmSync(partPath, { force: true }); } catch {} throw error; }
+        if (externalSignal && externalSignal.aborted) throw error;
+        if (attempt < attempts) {
+          // Keep the partial and let the next attempt resume — do NOT reset progress to 0.
+          await new Promise(r => setTimeout(r, backoff[attempt - 1] || 6000));
+        }
       }
     }
-  }
-  // All attempts failed — leave the .part file so a future retry can still resume it.
-  throw lastError;
+    // All attempts failed — leave the .part file so a future retry can still resume it.
+    throw lastError;
+  } finally { ACTIVE_DOWNLOADS.delete(key); }
 }
 function marketplaceError(error) { return { ok: false, error: error?.message || 'Marketplace request failed. Check your connection.' }; }
 function psQuote(value) { return `'${String(value).replace(/'/g, "''")}'`; }
