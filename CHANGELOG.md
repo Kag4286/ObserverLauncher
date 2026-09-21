@@ -63,11 +63,48 @@ like a live instrument (motion, console, sparklines) while staying calm and begi
 - **Micro-interactions**: magnetic primary button (≤3px cursor pull) and a cursor spotlight on tab
   headers. Both are pointer-only and fully disabled under `prefers-reduced-motion`.
 
+### Security (post-release audit)
+- **MCP schedules never fired.** `set_schedule` stored weekday NAMES (`['mon'..]`) but the scheduler
+  compared against `getDay()` NUMBERS, so every AI-created schedule was silently dead. Both sides now
+  use numbers (names are still accepted and normalised). +3 regression tests.
+- **`content:delete` path traversal.** `fileName` was unchecked, so `../../server.properties`
+  resolved inside the server root (passing `safeTarget`) and deleted files outside plugins/mods.
+  Now requires a plain basename.
+- **Marketplace install SSRF.** `market:install` downloaded the resolved URL without
+  `isSafeDownloadUrl` (modpack + MCP install already checked). Added the guard.
+- **`playitPath` RCE via MCP.** `set_setting` allowed setting the Playit binary path, which
+  `tunnel:start` then spawns. Removed it from the MCP-settable list (GUI-only now).
+- **Editor extension allowlist.** The IPC editor path skipped the `ALLOWED` extension check (MCP
+  enforced it), so `.jar`/`.dat` could be read or overwritten as text. Both now share one rule.
+- **`server.properties` injection.** `buildPropertiesContent` (the choke point for the GUI grid AND
+  MCP `set_property`) drops keys with newlines/`__proto__` and values containing newlines.
+- **Bridge config file mode.** `mcp-bridge.json` (holds the MCP token) is written `0o600`.
+- **Tunnel address validation.** `tunnel:set-address` now accepts only a plain host/host:port.
+
+### Fixed
+- **Download hardening** — `download()` gained a max-size cap (disk-fill guard) and an in-flight
+  lock so two downloads to the same file can't race on the same `.part`.
+- **Windows/Linux archive parity** — Windows `createBackup` now validates world names like Linux;
+  `extractArchive` pre-checks for zip-slip; `createArchive` archives the folder CONTENTS so a
+  `.mrpack` has the same layout on both platforms.
+- **Console stdin guards** — whitelist/ban/op writes check `stdin.writable` and never throw when the
+  server just exited (which used to reject the IPC with no toast).
+- **De-duplicated locale keys** (`eyebrow.perf` ×4, `im.preparing` ×2).
+
+### Changed
+- **Electron 37 → 44** (37 was end-of-life). `npm audit` now reports 0 vulnerabilities. Verified on
+  the packaged Windows build.
+- **De-duplicated `.mrpack` export** — the IPC and MCP exporters now share `buildMrpackEntries` +
+  `dependenciesFor`, so they can never drift.
+- **New test: `mcp-confirm.test.js`** — the write/destroy confirmation gate had none. The
+  metrics-tick test's always-true assertion was replaced with real miss/reset checks.
+
 ### Notes
-- `npm test` (27 files) and the E2E suite remain green. i18n is 761 keys × 7 locales.
+- `npm test` (28 files) and the E2E suite remain green, on Electron 44. i18n is 787 keys × 7 locales.
 - New `docs/motion.md`. Reduced-motion guards added for every new pattern.
-- Not eyeballed in the running app by the developer (no screen capture) — verify visually on your
-  machine; Electron does not hot-reload.
+- The packaged **Windows** build was smoke-tested by hand; the **Linux** AppImage is still not
+  verified on real hardware (unchanged standing limitation).
+- Electron does not hot-reload — restart the app to see UI changes.
 
 ## [1.2.0] — 2026-09-20
 
