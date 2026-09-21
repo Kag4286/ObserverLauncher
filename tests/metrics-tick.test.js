@@ -3,6 +3,17 @@
 // writes to ctx.previousCpu (CPU% jitter). metricsTick is now a pure, awaitable unit so we can
 // drive it deterministically. Also covers the idle-push throttle (server stopped => ~1 push / 5s).
 const assert = require('assert');
+// Mock the platform layer so getProcessMetrics is deterministic (the real one probes the OS and
+// would make the miss/reset assertions timing-dependent).
+const Module = require('module');
+const origLoad = Module._load;
+let metricsResult = null; // what the mocked getProcessMetrics returns for the next call
+Module._load = function (request, parent, isMain) {
+  if (request === './platform' || request.endsWith('/platform') || request.endsWith('platform/index.js')) {
+    return { getProcessMetrics: async () => metricsResult, findJavaDescendant: async () => null };
+  }
+  return origLoad.apply(this, arguments);
+};
 const { metricsTick } = require('../src/main/server-metrics.js');
 
 let passed = 0;
@@ -52,12 +63,27 @@ const freshSt = () => ({ consecutiveMisses: 0, lastMetrics: { serverMemory: 0, c
     ok('running: push has running:true', ctx._sent[0].data.running === true);
   }
 
-  // --- consecutiveMisses resets when a real read comes back (previousCpu only advances on a read) ---
+  // --- consecutiveMisses: a failed read increments it; a good read resets it ---
   {
     const ctx = makeCtx({ serverProcess: { pid: 7 }, monitoredPid: 7 });
     const st = freshSt();
+    metricsResult = null; // getProcessMetrics returns nothing -> miss
     await metricsTick(ctx, st);
-    ok('miss: consecutiveMisses incremented (or metrics unavailable)', st.consecutiveMisses >= 0);
+    ok('miss: consecutiveMisses incremented', st.consecutiveMisses === 1);
+    await metricsTick(ctx, st);
+    ok('miss: consecutiveMisses increments again', st.consecutiveMisses === 2);
+    // 3 misses in a row -> monitoredPid dropped so the sampler re-hunts the java descendant
+    await metricsTick(ctx, st);
+    ok('miss: 3rd miss drops monitoredPid', st.consecutiveMisses === 3 && ctx.monitoredPid === null);
+  }
+  {
+    const ctx = makeCtx({ serverProcess: { pid: 8 }, monitoredPid: 8 });
+    const st = freshSt();
+    st.consecutiveMisses = 2; // pretend we had misses
+    metricsResult = { memoryMB: 512, cpuTime: 10.5 }; // a good read
+    await metricsTick(ctx, st);
+    ok('good read resets consecutiveMisses', st.consecutiveMisses === 0);
+    ok('good read pushes serverMemory', st.lastMetrics.serverMemory === 512);
   }
 
   console.log(`\n${passed} passed, 0 failed`);
