@@ -3,6 +3,13 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+> **Two-track release notes (commitment, from 1.3.0 onward).** This file is the *developer*
+> changelog: it documents modules, functions, flags and root causes. It is NOT what users read.
+> Every GitHub Release ALSO gets a separate, plain-English summary written for non-technical users —
+> what they can now do, what got better, what to watch out for, with no jargon. The two are kept in
+> sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
+> without its user-facing summary.
+
 ## [1.3.0] — 2026-09-21
 
 A polish + personality release. No new server features — the goal was to make the interface feel
