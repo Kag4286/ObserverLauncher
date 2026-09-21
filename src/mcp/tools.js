@@ -289,29 +289,14 @@ async function tExportModpack(ctx, a) {
   const root = needPath(ctx);
   const manifest = readJsonList(root, 'observerlauncher-manifest.json');
   if (!manifest.length) return { ok: false, error: 'Nothing to export (no Marketplace-installed content).' };
-  const { fileHashes } = require('../main/fs-utils.js');
   const platform = require('../main/platform');
+  // Shared helpers so this never drifts from the IPC modpack:export path.
+  const { buildMrpackEntries, dependenciesFor } = require('../main/modpacks.js');
   const levelName = serverFiles(root).properties['level-name'] || 'world';
   const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', datapack: path.join(levelName, 'datapacks'), mod: 'mods' };
-  const files = [];
-  for (const entry of manifest) {
-    const folder = destFolders[entry.kind] || 'plugins';
-    // SECURITY: entry.fileName comes from a hand-editable manifest on disk. Only accept a plain
-    // basename (no path separators) and resolve through safeTarget, so a crafted entry can neither
-    // escape the server folder nor step into another subfolder. Mirrors the IPC modpack:export guard.
-    const fileName = String(entry.fileName || '');
-    if (!fileName || fileName !== path.basename(fileName)) continue;
-    const fp = safeTarget(root, path.join(folder, fileName));
-    if (!fp || !fs.existsSync(fp) || !fs.statSync(fp).isFile()) continue;
-    const st = fs.statSync(fp);
-    files.push({ path: folder.replace(/\\/g, '/') + '/' + fileName, hashes: fileHashes(fp), downloads: [entry.sourceUrl], fileSize: st.size, env: { client: 'optional', server: 'required' } });
-  }
+  const files = buildMrpackEntries(root, manifest, destFolders);
   if (!files.length) return { ok: false, error: 'None of the tracked files still exist on disk.' };
-  const { detectServerCompat } = require('../main/modpacks.js');
-  const sc = detectServerCompat(serverFiles(root));
-  const dependencies = {}; if (sc.mc) dependencies.minecraft = sc.mc;
-  const loaderKey = { neoforge: 'neoforge', forge: 'forge', fabric: 'fabric-loader', quilt: 'quilt-loader' }[sc.loader];
-  if (loaderKey) dependencies[loaderKey] = 'latest';
+  const dependencies = dependenciesFor(serverFiles(root));
   const stagingDir = path.join(require('electron').app.getPath('temp'), 'ob-mcp-export-' + Date.now());
   fs.mkdirSync(path.join(stagingDir, 'overrides'), { recursive: true });
   const index = { formatVersion: 1, game: 'minecraft', versionId: 'mcp-' + Date.now(), name: path.basename(root), summary: 'Exported via MCP - ' + files.length + ' item(s).', files, dependencies };

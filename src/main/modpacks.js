@@ -63,6 +63,36 @@ function mrpackCompat(deps, server) {
   return { mc, loader, warnings };
 }
 
+// Shared with the MCP export_modpack tool so the two exports can't drift. Pure-ish (reads the
+// server folder) but no Electron dialog — the caller does the user-facing warnings.
+function buildMrpackEntries(root, manifest, destFolders) {
+  const { fileHashes, safeTarget } = require('./fs-utils.js');
+  const out = [];
+  for (const entry of manifest) {
+    const folder = destFolders[entry.kind] || 'plugins';
+    // SECURITY: entry.fileName comes from a hand-editable manifest on disk. Only accept a plain
+    // basename and resolve through safeTarget, so a crafted entry can neither escape the server
+    // folder nor step into another subfolder.
+    const fileName = String(entry.fileName || '');
+    if (!fileName || fileName !== path.basename(fileName)) continue;
+    const fp = safeTarget(root, path.join(folder, fileName));
+    if (!fp || !fs.existsSync(fp) || !fs.statSync(fp).isFile()) continue;
+    const st = fs.statSync(fp);
+    out.push({ path: `${folder.replace(/\\/g, '/')}/${fileName}`, hashes: fileHashes(fp), downloads: [entry.sourceUrl], fileSize: st.size, env: { client: 'optional', server: 'required' } });
+  }
+  return out;
+}
+// Real Modrinth dependencies (MC version + loader) from the detected server, so other launchers
+// know what to build. Paper-like servers get only `minecraft`.
+function dependenciesFor(serverInfo) {
+  const sc = detectServerCompat(serverInfo);
+  const dependencies = {};
+  if (sc.mc) dependencies.minecraft = sc.mc;
+  const loaderKey = { neoforge: 'neoforge', forge: 'forge', fabric: 'fabric-loader', quilt: 'quilt-loader' }[sc.loader];
+  if (loaderKey) dependencies[loaderKey] = 'latest';
+  return dependencies;
+}
+
 async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
   let tempZip, extractDir;
   try {
@@ -188,21 +218,9 @@ function registerModpacks(ipcMain, ctx) {
       const levelName = server.properties['level-name'] || 'world';
       const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', datapack: path.join(levelName, 'datapacks'), mod: 'mods' };
       const files = [];
-      const tracked = new Set();
-      for (const entry of manifest) {
-        const folder = destFolders[entry.kind] || 'plugins';
-        // SECURITY: entry.fileName comes from a hand-editable manifest on disk. Only accept a
-        // plain basename (no path separators) and resolve it through safeTarget, so a crafted
-        // entry can neither escape the server folder nor step out of the plugins/mods subfolder
-        // into another part of the server. Must resolve to a real file.
-        const fileName = String(entry.fileName || '');
-        if (!fileName || fileName !== path.basename(fileName)) continue;
-        const filePath = safeTarget(ctx.currentServerPath, path.join(folder, fileName));
-        if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) continue;
-        tracked.add(`${folder.replace(/\\/g, '/')}/${fileName}`);
-        const stat = fs.statSync(filePath);
-        files.push({ path: `${folder.replace(/\\/g, '/')}/${fileName}`, hashes: fileHashes(filePath), downloads: [entry.sourceUrl], fileSize: stat.size, env: { client: 'optional', server: 'required' } });
-      }
+      // Shared with the MCP export_modpack tool so the two can never drift.
+      files.push(...buildMrpackEntries(ctx.currentServerPath, manifest, destFolders));
+      const tracked = new Set(files.map(f => f.path));
       if (!files.length) return { ok: false, error: 'None of the previously installed plugins/mods still exist on disk.' };
       // Warn about jars that are NOT tracked (manually copied) — they will be left out of the pack,
       // which can surprise the user when a friend imports it and something is missing.
@@ -223,11 +241,7 @@ function registerModpacks(ipcMain, ctx) {
       // Write real dependencies (MC version + loader) so other launchers know what to build.
       // Paper-like servers get only `minecraft` (Modrinth has no "paper" loader key; paper packs
       // are usually distributed as plugin lists, not loader packs).
-      const sc = detectServerCompat(server);
-      const dependencies = {};
-      if (sc.mc) dependencies.minecraft = sc.mc;
-      const loaderDepKey = { neoforge: 'neoforge', forge: 'forge', fabric: 'fabric-loader', quilt: 'quilt-loader' }[sc.loader];
-      if (loaderDepKey) dependencies[loaderDepKey] = 'latest';
+      const dependencies = dependenciesFor(server);
       const index = { formatVersion: 1, game: 'minecraft', versionId: `${folderName}-${Date.now()}`, name: folderName, summary: `Exported from ObserverLauncher — ${files.length} item(s).`, files, dependencies };
       const saveDialog = await dialog.showSaveDialog(ctx.win, { title: 'Export modpack', defaultPath: `${folderName}.mrpack`, filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }] });
       if (saveDialog.canceled || !saveDialog.filePath) return { ok: false, cancelled: true };
@@ -243,4 +257,4 @@ function registerModpacks(ipcMain, ctx) {
   });
 }
 
-module.exports = { importMrpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar };
+module.exports = { importMrpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor };
