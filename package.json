@@ -25,7 +25,6 @@
   },
   "build": {
     "appId": "dev.observerlauncher.minecraftservercontrol",
-    "electronDist": "node_modules/electron/dist",
     "productName": "ObserverLauncher",
     "files": [
       "src/**/*",
