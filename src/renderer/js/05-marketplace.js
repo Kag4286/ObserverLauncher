@@ -93,6 +93,45 @@ function imRenderWarns(){
   el.innerHTML=warns.map(w=>`<li>${w}</li>`).join('');
   $('#imWarnSection').hidden=!warns.length;
 }
+// DEPENDENCIES (1.3.0): a Modrinth version's required deps (and incompatible flags). Shows a name
+// if we fetched metadata, an 'installed' tick if a plugin/mod file matches the dep slug, and a
+// one-click 'install all required' that chains marketInstall for each. Optional deps are listed
+// but never auto-installed.
+function imDepInstalled(dep){
+  const lists=[...(state.files?.plugins||[]),...(state.files?.mods||[]),...(state.files?.datapacks||[])];
+  const slug=String(dep.slug||'').toLowerCase();
+  if(!slug) return false;
+  return lists.some(f=>String(f).toLowerCase().includes(slug.replace(/[^a-z0-9]/g,''))||String(f).toLowerCase().includes(slug));
+}
+function imRenderDeps(){
+  const sec=$('#imDepsSection'),list=$('#imDeps'),btn=$('#imInstallDeps');
+  if(!sec)return;
+  const chosen=imChosenVersion();
+  const deps=(chosen?.dependencies||[]).filter(d=>d.type==='required'||d.type==='incompatible');
+  if(!deps.length){sec.hidden=true;return}
+  installState.deps=deps;
+  sec.hidden=false;
+  list.innerHTML=deps.map((d,i)=>{
+    const name=d.title||d.slug||(d.projectId?('project '+String(d.projectId).slice(0,8)):t('im.depUnknown'));
+    const bad=d.type==='incompatible';
+    const done=!bad&&imDepInstalled(d);
+    return `<li class="im-dep${bad?' bad':''}${done?' done':''}">${d.icon?`<img src="${esc(d.icon)}" alt="">`:''}<span class="im-dep-name">${esc(name)}</span><span class="im-dep-tag">${bad?esc(t('im.depIncompat')):done?esc(t('im.depInstalled')):esc(t('im.depRequired'))}</span></li>`;
+  }).join('');
+  const need=deps.filter(d=>d.type==='required'&&!imDepInstalled(d)).length;
+  btn.hidden=need===0;
+  btn.textContent=t('im.installDeps',{n:need});
+}
+// SOURCE LINKS: project page + source (if Modrinth gave one). Both go through the allowlisted
+// market:open-external IPC; the URL is never navigated in-app.
+function imRenderLinks(){
+  const el=$('#imLinks');if(!el)return;
+  const d=installState.detail||{};
+  const links=[];
+  if(d.projectUrl)links.push({url:d.projectUrl,label:t('im.viewProject')});
+  if(d.sourceUrl)links.push({url:d.sourceUrl,label:t('im.viewSource')});
+  el.innerHTML=links.map(l=>`<button type="button" class="text-btn im-link" data-im-link="${esc(l.url)}">${esc(l.label)} ↗</button>`).join('');
+  el.querySelectorAll('[data-im-link]').forEach(b=>b.onclick=()=>window.observer.marketOpenExternal(b.dataset.imLink));
+}
 function imSetBusy(busy,phase,label){
   installState.busy=busy;
   const card=$('#installModal .im');
@@ -109,7 +148,7 @@ function imRenderVersionPicker(){
   if(!vs||!vs.length){sec.hidden=true;return}
   sec.hidden=false;
   sel.innerHTML=vs.map((v,i)=>`<option value="${esc(v.id)}">${esc(v.number)} — ${new Date(v.date).toLocaleDateString()} · ${imFmtBytes(v.size)} · ${(v.gameVersions||[]).slice(-1)[0]||'?'}</option>`).join('');
-  sel.onchange=()=>{installState.versionId=sel.value;imRenderCompat();imRenderWarns()};
+  sel.onchange=()=>{installState.versionId=sel.value;imRenderCompat();imRenderWarns();imRenderDeps()};
 }
 function imSetDone(r){
   installState.done=true;installState.busy=false;
@@ -146,6 +185,60 @@ async function startInstall(){
     else imSetError(r.error||t('mkt.installFailed'));
   }catch(e){imSetError(e?.message||t('mkt.installFailed'))}
 }
+// Install every REQUIRED dependency that is not already present, one after another (the market
+// install IPC is one-file-at-a-time). Each dep is fetched by its project id + the current MC
+// version. Failures are collected and reported, never silently swallowed. The main item is NOT
+// reinstalled here — this only fills the missing deps.
+async function imInstallDeps(){
+  const deps=(installState.deps||[]).filter(d=>d.type==='required'&&!imDepInstalled(d));
+  if(!deps.length)return;
+  const conf=await confirmDialog({title:t('im.installDepsTitle'),body:t('im.installDepsConfirm',{n:deps.length}),ok:t('im.install')});
+  if(!conf)return;
+  const mc=imDetectServer().mc||'';
+  imSetBusy(true,t('im.depsInstalling'));
+  $('#imBar').style.width='0%';$('#imBar').classList.remove('ok','bad');
+  let done=0;const failed=[];
+  for(const d of deps){
+    try{
+      const r=await window.observer.marketInstall({id:d.projectId,kind:installState.item.kind,version:mc||undefined,title:d.title||d.slug});
+      if(r.ok)done++;else failed.push(d.title||d.slug||d.projectId);
+    }catch{failed.push(d.title||d.slug||d.projectId)}
+    $('#imBar').style.width=Math.round((done+failed.length)/deps.length*100)+'%';
+    $('#imBarLabel').textContent=t('im.depsProgress',{a:done+failed.length,b:deps.length});
+  }
+  installState.busy=false;
+  imRenderDeps();
+  if(failed.length){imSetError(t('im.depsPartial',{ok:done,fail:failed.length}));toast(t('im.depsPartial',{ok:done,fail:failed.length}),'error')}
+  else{imSetBusy(false);$('#imProgressSection').hidden=true;toast(t('im.depsDone',{n:done}),'success')}
+}
+$('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
+// Install every REQUIRED dependency that is not already present, one after another (the market
+// install IPC is one-file-at-a-time). Each dep is fetched by its project id + the current MC
+// version. Failures are collected and reported, never silently swallowed. The main item is NOT
+// reinstalled here — this only fills the missing deps.
+async function imInstallDeps(){
+  const deps=(installState.deps||[]).filter(d=>d.type==='required'&&!imDepInstalled(d));
+  if(!deps.length)return;
+  const conf=await confirmDialog({title:t('im.installDepsTitle'),body:t('im.installDepsConfirm',{n:deps.length}),ok:t('im.install')});
+  if(!conf)return;
+  const mc=imDetectServer().mc||'';
+  imSetBusy(true,t('im.depsInstalling'));
+  $('#imBar').style.width='0%';$('#imBar').classList.remove('ok','bad');
+  let done=0;const failed=[];
+  for(const d of deps){
+    try{
+      const r=await window.observer.marketInstall({id:d.projectId,kind:installState.item.kind,version:mc||undefined,title:d.title||d.slug});
+      if(r.ok)done++;else failed.push(d.title||d.slug||d.projectId);
+    }catch{failed.push(d.title||d.slug||d.projectId)}
+    $('#imBar').style.width=Math.round((done+failed.length)/deps.length*100)+'%';
+    $('#imBarLabel').textContent=t('im.depsProgress',{a:done+failed.length,b:deps.length});
+  }
+  installState.busy=false;
+  imRenderDeps();
+  if(failed.length){imSetError(t('im.depsPartial',{ok:done,fail:failed.length}));toast(t('im.depsPartial',{ok:done,fail:failed.length}),'error')}
+  else{imSetBusy(false);$('#imProgressSection').hidden=true;toast(t('im.depsDone',{n:done}),'success')}
+}
+$('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
 function openInstallModal(item){
   installState={item,detail:null,versionId:null,busy:false,done:false};
   const card=$('#installModal .im');if(card)card.classList.remove('installing','success');
@@ -163,13 +256,17 @@ function openInstallModal(item){
   $('#imCancel').hidden=false;$('#imCancel').disabled=false;$('#imClose').disabled=false;
   $('#imCompat').innerHTML=`<span class="nsw2-chiploading">${t('mkt.checkingCompat')}</span>`;
   $('#imWarns').innerHTML='';
+  const ds=$('#imDepsSection');if(ds)ds.hidden=true;
+  const dl=$('#imDeps');if(dl)dl.innerHTML='';
+  const dlk=$('#imLinks');if(dlk)dlk.innerHTML='';
+  const dib=$('#imInstallDeps');if(dib)dib.hidden=true;
   window.observer.marketDetail(item).then(d=>{
     if(installState.item!==item)return; // modal was reopened for another item meanwhile
     if(!d||!d.ok){$('#imCompat').innerHTML=`<span class="im-badge bad">${t('mkt.couldNotLoad',{m:esc(d?.error||'unknown')})}</span>`;const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.installAnyway');return}
     installState.detail=d;
     imRenderVersionPicker();
     installState.versionId=installState.detail.versions?.[0]?.id||null;
-    imRenderCompat();imRenderWarns();
+    imRenderCompat();imRenderWarns();imRenderDeps();imRenderLinks();
     const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.install');
   });
 }

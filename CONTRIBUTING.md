@@ -38,14 +38,18 @@ The app is plain Electron — **no bundler, no build step for development**. The
   Each of these modules is a plain `require()`-able file with no dependency on a running window, so
   it can be unit-tested in isolation.
 
-- **MCP** (`src/mcp/`) — optional local-only AI integration. `tools.js` is the tool registry (name, risk tier, schema, handler): read tools run freely, write tools ask in-app, destructive always ask. `server.js` is a loopback HTTP server (127.0.0.1, random port, fresh token) started when enabled; `bridge.js` is a dependency-free stdio MCP server a client launches that forwards calls to the app (runs on the app's own binary via `ELECTRON_RUN_AS_NODE=1`, no system Node needed); `confirm.js` bridges write/destroy calls to the in-app dialog. Handlers reuse the same backend functions the IPC layer uses.
+- **MCP** (`src/mcp/`) — optional local-only AI integration. `tools.js` is the tool registry (name, risk tier, schema, handler): read tools run freely, write tools ask in-app, destructive always ask. `server.js` is a loopback HTTP server (127.0.0.1, random port, fresh token) started when enabled; `bridge.js` is a dependency-free stdio MCP server a client launches that forwards calls to the app (runs on the app's own binary via `ELECTRON_RUN_AS_NODE=1`, no system Node needed); `confirm.js` bridges write/destroy calls to the in-app dialog. `doctor.js` holds the Server-Doctor diagnostics — pure, testable helpers (console-log analysis, crash summarising, `server.properties` validation, the composite health check) with no Electron dependency. Handlers reuse the same backend functions the IPC layer uses.
 
 - **Preload** (`src/preload.js`) — the **only** bridge between main and renderer. It exposes
   `window.observer.*` over `contextBridge`. `contextIsolation` is on and `nodeIntegration` is off,
   so the renderer never touches Node APIs directly.
 
 - **Renderer** (`src/renderer/`) — the UI. `index.html` is the shell and loads, **in numeric order**:
-  - `css/` — styles split by area (`01-tokens.css` … `09-pulse.css`).
+  - `css/` — styles split by area (`01-tokens.css` … `09-pulse.css`). Motion lives in
+    `08-motion.css` (tokens, stagger, modal fade) and `09-pulse.css` (ambience, boot, lite-mode);
+    see `docs/motion.md` for the approved animation patterns and the rules every new animation must
+    follow (use tokens, short durations, `prefers-reduced-motion` guard, never animate the console
+    or map canvas).
   - `locales/` — one file per language; `meta.js` loads **first** (it defines `window.LOCALES` and
     `LOCALES_META`).
   - `js/` — per-tab logic (`00-core.js` … `12-wizard.js`), loaded as classic scripts. There is no

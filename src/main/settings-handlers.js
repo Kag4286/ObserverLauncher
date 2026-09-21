@@ -89,6 +89,9 @@ function registerSettings(ipcMain, ctx) {
     if (merged.memoryMin !== undefined) { const m = clampMem(merged.memoryMin); if (m !== null) merged.memoryMin = m; }
     if (merged.memoryMax !== undefined) { const m = clampMem(merged.memoryMax); if (m !== null) merged.memoryMax = m; }
     if (Number(merged.memoryMax) < Number(merged.memoryMin)) merged.memoryMax = merged.memoryMin;
+    // Animation level: 'full' (default, rich motion) or 'lite' (weak PCs — kills ambience/boot/
+    // proximity/spotlight/stagger). Persisted so it survives restarts.
+    if (!['full', 'lite'].includes(merged.motionLevel)) merged.motionLevel = 'full';
     // SECURITY: serverPath becomes the root for EVERY file operation (backup, editor save,
     // player data, content delete). It arrives from the renderer, so refuse anything that is
     // not an existing directory instead of trusting it verbatim.

@@ -20,8 +20,15 @@
   /* MOTION (redesign P0): one ease, three durations. Slide distance stays
      small (10px) — direction cue, not decoration. */
   --ease-out:cubic-bezier(.2,.7,.3,1);
-  --dur-instant:0ms; --dur-fast:120ms; --dur-tab:170ms; --dur-modal:210ms;
+  --ease-standard:var(--ease-out);
+  /* EMPHASIZED: a hair of overshoot for modal/popover entrances only — never for
+     content that re-renders, or the page feels bouncy. */
+  --ease-emphasized:cubic-bezier(.34,1.4,.64,1);
+  --dur-instant:0ms; --dur-fast:120ms; --dur-tab:170ms; --dur-modal:210ms; --dur-slow:320ms;
+  --dur-micro:90ms; /* hover / press only */
   --slide-x:10px;
+  /* Stagger step for list reveals (players/content/market rows). Small = calm. */
+  --stagger:28ms;
   /* DENSITY: instrument rows, not cards. */
   --row-h:34px; --gap:10px; --pad-panel:14px;
   /* SPACING SCALE (Phase 1 foundation): every padding/gap must use one of these,

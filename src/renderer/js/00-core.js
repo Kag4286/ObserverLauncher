@@ -100,6 +100,42 @@ $('#cfOk')?.addEventListener('click',()=>closeConfirm(true));
 $('#cfCancel')?.addEventListener('click',()=>closeConfirm(false));
 $('#confirmModal')?.addEventListener('click',e=>{if(e.target.id==='confirmModal')closeConfirm(false)});
 document.addEventListener('keydown',e=>{const m=$('#confirmModal');if(!m||m.hidden)return;if(e.key==='Escape')closeConfirm(false);else if(e.key==='Enter')closeConfirm(true)});
+// MOTION (1.3.0): tween a number element toward a new value instead of snapping. Restrained:
+// short duration, no spring, and totally skipped under prefers-reduced-motion. Keeps the last
+// tween per element so rapid updates never fight each other.
+const _tweens=new WeakMap();
+const _rm=matchMedia('(prefers-reduced-motion: reduce)');
+function tweenNumber(el,to,fmt){
+  if(!el) return;
+  const target=Number(to); if(!Number.isFinite(target)) return;
+  fmt=fmt||(v=>String(Math.round(v)));
+  if(_rm.matches){ el.textContent=fmt(target); return; }
+  const prev=_tweens.get(el);
+  if(prev) cancelAnimationFrame(prev.raf);
+  const from=(prev&&Number.isFinite(prev.value))?prev.value:(Number(String(el.textContent).replace(/[^\d.-]/g,''))||0);
+  if(from===target){ el.textContent=fmt(target); _tweens.set(el,{value:target,raf:0}); return; }
+  const t0=performance.now(),dur=Math.min(360,Math.max(140,Math.abs(target-from)*8));
+  // Needle settle: a tiny back-ease so the number overshoots ~4% and settles — reads as a gauge
+  // coming to rest, not a jump. Only when the change is small (big jumps go straight).
+  const small=Math.abs(target-from)<=6;
+  const step=now=>{
+    const k=Math.min(1,(now-t0)/dur);
+    const e=small ? (k<1 ? 1-Math.pow(1-k,3)*(1+0.9*Math.sin(k*Math.PI)) : 1) : 1-Math.pow(1-k,3);
+    const v=from+(target-from)*e; el.textContent=fmt(v);
+    if(k<1){ const st=_tweens.get(el)||{}; st.raf=requestAnimationFrame(step); st.value=v; _tweens.set(el,st); }
+    else _tweens.set(el,{value:target,raf:0});
+  };
+  _tweens.set(el,{value:from,raf:requestAnimationFrame(step)});
+}
+// MOTION LEVEL (1.3.0): 'full' (default, rich) or 'lite' (weak PCs). Lite adds .motion-lite on
+// <html>; CSS there disables ambience/boot/proximity/spotlight/stagger. Called from refreshUI on
+// every settings load, so it also applies live when the user changes it (no restart needed).
+function applyMotionLevel(level){
+  const lite = level==='lite';
+  document.documentElement.classList.toggle('motion-lite', lite);
+  if(lite){ const b=document.querySelector('#bootSeq'); if(b) b.remove(); }
+  const cv=document.querySelector('#ovSpark'); if(cv && !lite){ /* redraw happens on next metrics tick */ }
+}
 function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;const ctx=canvas.getContext('2d');const r=canvas.getBoundingClientRect();if(!r.width||!r.height) return;const d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);const w=r.width,h=r.height,p=expanded?30:13;const cs=getComputedStyle(document.documentElement);const cAccent=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';const cWarn=cs.getPropertyValue('--chart-cpu').trim()||'#d6a24a';const cSuccess=cs.getPropertyValue('--chart-ram').trim()||'#2fd0a0';const cDanger=cs.getPropertyValue('--danger').trim()||'#e5566a';const cMuted=cs.getPropertyValue('--text-dim').trim()||'#5c6470';const cFont=cs.getPropertyValue('--font-ui').trim()||'Space Grotesk, sans-serif';ctx.clearRect(0,0,w,h);
   if(mode==='tick'){
     // Danger band: bottom 25% of the chart (roughly under ~15 TPS / over ~25ms MSPT) tinted red,

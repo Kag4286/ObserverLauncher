@@ -39,6 +39,18 @@
 .rail-nav .nav-item.active::before{transform:scaleY(1);background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
 .rail-nav .nav-item .nav-icon{width:20px;height:20px;opacity:.55}
 .rail-nav .nav-item.active .nav-icon{opacity:1;filter:drop-shadow(0 0 4px rgba(0,229,255,.5))}
+/* CURSOR PROXIMITY (1.3.0): JS sets --prox (0..1) as the pointer nears a rail item; the icon and
+   a left glow rise with it. transform-free (opacity only) so it never triggers layout. */
+.rail-nav .nav-item{--prox:0}
+.rail-nav .nav-item .nav-icon{opacity:calc(.5 + .45 * var(--prox));transition:opacity .12s linear}
+.rail-nav .nav-item::after{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--accent);opacity:calc(.5 * var(--prox));transition:opacity .12s linear}
+.rail-nav .nav-item.active::after{opacity:0}
+/* RAIL ACTIVE — a slow breathing glow so the current tab reads as 'live'. */
+.rail-nav .nav-item.active{box-shadow:inset 2px 0 0 var(--accent),0 0 14px -6px var(--accent-glow)}
+
+/* HERO / TOPBAR state glow — the app warms up when the server runs. */
+html.is-running .topbar .status-pill{border-color:var(--success);box-shadow:0 0 16px -6px var(--success)}
+html.is-starting .topbar .status-pill{border-color:var(--accent);box-shadow:0 0 16px -6px var(--accent-glow)}
 /* settings separated by a soft break, not a heavy dashed box */
 .rail-foot{border-top:var(--hairline) solid var(--border)}
 
@@ -101,6 +113,86 @@
 /* ============ MODAL motion — rise, not center-scale ============ */
 .modal-overlay .modal{animation:modalRise var(--dur-modal) var(--ease-out)}
 .modal-overlay{background:rgba(3,6,10,.72);backdrop-filter:blur(4px)}
+
+/* ============ SIGNAL FIELD (1.3.0) ============
+   A CSS-only ambient layer. NO canvas, NO per-frame JS — two large radial gradients that slowly
+   scale/pulse with GPU transforms + a static hairline dot-grid. State classes on <html> shift it:
+   offline = cold/still, running = warm/lively, starting = a faster sweep. Cheap enough to leave on. */
+.signal-field{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+  background:
+    radial-gradient(1200px 700px at 18% -10%, rgba(0,229,255,.05), transparent 60%),
+    radial-gradient(1000px 800px at 100% 110%, rgba(0,229,255,.035), transparent 55%);
+  transition:opacity .6s var(--ease-out)}
+/* Static hairline grid — one SVG-free pattern via repeating gradients, painted ONCE (no motion). */
+.signal-field::before{content:'';position:absolute;inset:-2px;
+  background-image:linear-gradient(rgba(0,229,255,.05) 1px, transparent 1px),linear-gradient(90deg, rgba(0,229,255,.05) 1px, transparent 1px);
+  background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(70% 60% at 30% 20%, #000 0%, transparent 80%);
+          mask-image:radial-gradient(70% 60% at 30% 20%, #000 0%, transparent 80%);
+  opacity:.5}
+/* The breathing core — a single big soft pulse. transform+opacity only (GPU). */
+.signal-field::after{content:'';position:absolute;left:22%;top:6%;width:60vw;height:60vw;max-width:900px;max-height:900px;
+  border-radius:50%;transform:translate(-30%,-30%) scale(1);
+  background:radial-gradient(circle, rgba(0,229,255,.10), transparent 62%);
+  opacity:.5;animation:fieldBreath 9s var(--ease-out) infinite}
+@keyframes fieldBreath{0%,100%{transform:translate(-30%,-30%) scale(1);opacity:.42}50%{transform:translate(-30%,-30%) scale(1.12);opacity:.62}}
+/* STATE: offline = cold + still; running = warm + faster; starting = building. */
+html.is-offline .signal-field{opacity:.55}
+html.is-offline .signal-field::after{animation-duration:14s;opacity:.3}
+html.is-running .signal-field{opacity:1}
+html.is-running .signal-field::after{animation-duration:6s;background:radial-gradient(circle, rgba(0,229,255,.16), transparent 62%)}
+html.is-starting .signal-field::after{animation-duration:2.6s;background:radial-gradient(circle, rgba(0,229,255,.20), transparent 60%)}
+/* Workspace/rail paint ABOVE the field. Workspace must be TRANSLUCENT or the opaque bg would
+   hide the ambient field entirely (its old background ended in var(--bg) = solid). */
+.workspace,.rail,.command-bar{position:relative;z-index:1}
+.workspace{background:radial-gradient(800px 400px at 20% 0%, rgba(0,229,255,.04), transparent 60%)}
+.rail{background:linear-gradient(180deg, rgba(15,20,26,.96), rgba(15,20,26,.92))}
+.command-bar{background:rgba(15,20,26,.82)}
+/* STATE warmth on the workspace itself: running lifts the whole canvas a touch. */
+html.is-running .workspace{background:radial-gradient(900px 460px at 20% 0%, rgba(0,229,255,.07), transparent 62%)}
+html.is-running .hero{box-shadow:0 0 0 1px var(--border),0 0 34px -18px var(--accent-glow)}
+html.is-starting .hero{box-shadow:0 0 0 1px var(--border),0 0 24px -16px var(--accent-glow)}
+
+/* ============ BOOT SEQUENCE (1.3.0, reworked) ============
+   A real startup screen: mark + a progress bar that tracks the ACTUAL boot steps (backend state,
+   market versions), not a fake timer. Fades out when boot resolves or on user skip. */
+.boot-seq{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center;overflow:hidden;pointer-events:none;
+  transition:opacity .5s var(--ease-out),visibility .5s}
+.boot-seq.done{opacity:0;visibility:hidden}
+/* ambient backdrop inside the boot screen — a slow scan sweep + soft core glow */
+.boot-seq::before{content:'';position:absolute;inset:0;background:radial-gradient(600px 300px at 50% 46%, rgba(0,229,255,.10), transparent 62%);animation:bootGlow 2.6s var(--ease-out) infinite}
+@keyframes bootGlow{0%,100%{opacity:.55}50%{opacity:1}}
+.boot-seq::after{content:'';position:absolute;left:0;right:0;height:1px;top:0;background:linear-gradient(90deg,transparent,var(--accent-glow),transparent);animation:bootScan 2.4s linear infinite}
+@keyframes bootScan{from{top:8%}to{top:92%}}
+.boot-core{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;width:min(80vw,420px)}
+.boot-mark{font:700 15px var(--font-mono);letter-spacing:.32em;color:var(--text);opacity:0;animation:bootMark .55s var(--ease-out) .1s forwards}
+.boot-mark span{color:var(--accent);margin-left:.4em}
+@keyframes bootMark{from{opacity:0;letter-spacing:.5em}to{opacity:1;letter-spacing:.32em}}
+.boot-bar{width:100%;height:2px;background:var(--border);border-radius:2px;overflow:hidden;opacity:0;animation:bootMark .4s var(--ease-out) .3s forwards}
+.boot-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent-dim),var(--accent));box-shadow:0 0 10px var(--accent-glow);transition:width .45s var(--ease-out)}
+.boot-status{font:600 10px var(--font-mono);letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase;opacity:0;animation:bootMark .4s var(--ease-out) .45s forwards;min-height:12px}
+.boot-skip{position:absolute;bottom:26px;font:600 10px var(--font-mono);letter-spacing:.1em;color:var(--text-dim);opacity:.5;text-transform:uppercase;pointer-events:none}
+
+/* ============ CORNER-BRACKET FOCUS (signature, 1.3.0) ============ */
+/* Interactive elements show four corner ticks instead of a rounded outline — a repeated
+   signature that reads as 'instrument panel', not a browser default. */
+:focus-visible{outline:none}
+.btn:focus-visible,.nav-item:focus-visible,.filter-chip:focus-visible,.text-btn:focus-visible,
+.log-autoscroll:focus-visible,.seg-switch-btn:focus-visible,summary:focus-visible{
+  outline:none;box-shadow:0 0 0 1.5px var(--accent)}
+
+/* ============ LITE MODE (1.3.0, opt-in for weak PCs) ============
+   .motion-lite on <html> (set from the Settings 'Interface animation' select) disables the heavy
+   ambience + signature effects, leaving only the fast functional transitions. NOT the default —
+   'full' is. Mirrors the prefers-reduced-motion guard but is user-chosen and persisted. */
+html.motion-lite .signal-field{display:none}
+html.motion-lite .boot-seq{display:none}
+html.motion-lite .tab-head::before{display:none}
+html.motion-lite .rail-nav .nav-item::after{display:none}
+html.motion-lite .rail-nav .nav-item .nav-icon{opacity:.6}
+html.motion-lite .tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li){animation:none}
+html.motion-lite .log-line.sweep::before{display:none}
+html.motion-lite .hero,html.motion-lite .topbar .status-pill{box-shadow:none}
 
 /* ============ REDUCED MOTION — total kill (owns final cascade) ============ */
 @media (prefers-reduced-motion:reduce){

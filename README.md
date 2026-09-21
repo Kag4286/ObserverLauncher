@@ -97,13 +97,13 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-1.2.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-1.2.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-1.3.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-1.3.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe` (a normal NSIS installer — you can choose the install location; it sets up auto-update).
-- **Linux:** `chmod +x ObserverLauncher-1.2.0.AppImage` then run it. No installation, no root.
+- **Linux:** `chmod +x ObserverLauncher-1.3.0.AppImage` then run it. No installation, no root.
 
 ### Option B — Run from source
 
@@ -160,6 +160,8 @@ Everything else — plugins, players, backups, the world map — is optional.
 - Search **Modrinth, Hangar and SpigotMC** in one box.
 - Shows **compatibility before you install** (game version, loader, server-side support) against the detected server.
 - **Explicit version picker** with per-file download progress.
+- **Dependency awareness** (Modrinth): required dependencies are listed with a name and an *installed* tick, incompatibilities are flagged, and a one-click **Install N required dependencies** fills the gaps. Optional deps are shown but never auto-installed.
+- **Open project page / View source** buttons launch the mod's homepage or source repo in your browser (https-only, allowlisted hosts).
 - **Import and export** standard Modrinth `.mrpack` files. Import checks the pack's declared MC version and loader and warns on a mismatch (never blocked — "Install anyway" is available). Export writes real dependencies so other launchers know what to build.
 
 ### Config editor
@@ -183,7 +185,9 @@ Everything else — plugins, players, backups, the world map — is optional.
 - A short, plain-language note in the tab warns that the map is heavy and can slow the app down.
 
 ### Console
-- Real terminal view with timestamps, per-level colouring (info / warn / error / command) and **segmented filters**.
+- Real terminal view with timestamps, a **per-line level badge** (CMD / INF / WRN / ERR), per-level colouring and **segmented filters**.
+- **Search box** to filter the log live (client-side, debounced) on top of the level filters.
+- **Auto-scroll toggle** — pin to the newest line or read history without being yanked down; scrolling away by hand turns it off.
 - **Command history** (↑/↓), a recent-commands row, and **export the log to a `.txt` file**.
 - Auto-poll noise (`list`, `tps`, `tick query`) is filtered out so the log stays readable.
 
@@ -206,13 +210,15 @@ Everything else — plugins, players, backups, the world map — is optional.
 
 ## MCP / AI integration
 
-ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (40+ tools).
+ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (**55 tools**).
+
+**Server Doctor.** The AI can run a full health check (`doctor_report` / `diagnose_server`), scan the console for errors (`analyze_console`), summarise the newest crash report (`explain_crash`), check TPS/MSPT (`check_performance`), validate `server.properties`, test the port, and run safe composite workflows (`prepare_and_start`, `safe_restart` — diagnose → backup → start). Every write/destroy action is recorded to an audit log the AI can read back (`read_audit_log`).
 
 **Enable it:** Settings → **Advanced** → **MCP / AI** → *Enable MCP server*. The launcher starts a **local-only** server (127.0.0.1, random port, a fresh token every launch) and writes its connection info to `mcp-bridge.json` in the launcher's data folder. The app must stay open while the client is used.
 
 **Connect a client:** click **Copy MCP config** and paste it into your client's MCP settings. The exact JSON (with real paths filled in) goes on your clipboard. The launcher runs the bridge with its OWN binary (`ELECTRON_RUN_AS_NODE=1`), so **you don't need Node.js installed**.
 
-**Permissions.** Tools are tiered: **read** run freely; **write** (install, edit files, send a command) ask for confirmation first — skippable with *Auto-allow write tools*; **destructive** (stop, delete, restore) always ask and can never be auto-approved.
+**Permissions.** Tools are tiered: **read** run freely; **write** (install, edit files, send a command) ask for confirmation first — skippable with *Auto-allow write tools*; **destructive** (stop, delete, restore, and `safe_restart`) always ask and can never be auto-approved. A **Read-only mode** setting blocks every write/destructive tool up front, so an AI can inspect the server with zero risk. A per-tool **rate limit** (60/min) prevents a runaway loop, and every write/destructive call is written to an **audit log**.
 
 > Nothing is exposed beyond `127.0.0.1`, and the token changes every launch.
 

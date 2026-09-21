@@ -13,10 +13,66 @@
 /* List refresh: opacity only — no translate cascade, no stagger. */
 .fade-swap{animation:fadeSwap var(--dur-fast) var(--ease-out)}
 @keyframes fadeSwap{from{opacity:.25}to{opacity:1}}
+/* STAGGER REVEAL (1.3.0): when a tab becomes active, its dense rows rise in a short
+   cascade so a full list feels like it 'arrives' instead of popping. Capped at 8 rows
+   (a long list must not take a second to appear) and uses nth-child delays, no JS.
+   Curated selectors only — never the console (2000 lines) or the map canvas. */
+@keyframes rowIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* NOTE: content lists render <li data-name> with NO class, and worlds use .worlds-list li — the
+   old .content-row/.world-row selectors matched nothing. This is the corrected set. */
+.tab.active .player-row,
+.tab.active .market-item,
+.tab.active .backup-row,
+.tab.active .file-list li[data-name],
+.tab.active .worlds-list li{animation:rowIn var(--dur-slow) var(--ease-out) both}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(1){animation-delay:0ms}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(2){animation-delay:calc(var(--stagger) * 1)}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(3){animation-delay:calc(var(--stagger) * 2)}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(4){animation-delay:calc(var(--stagger) * 3)}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(5){animation-delay:calc(var(--stagger) * 4)}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(6){animation-delay:calc(var(--stagger) * 5)}
+.tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li):nth-child(n+7){animation-delay:calc(var(--stagger) * 6)}
+/* Modal entrance uses the emphasized ease (a hair of settle) — content that opens once. */
+.modal-rise{animation:modalRise var(--dur-modal) var(--ease-emphasized)}
+/* Press feedback, unified for every interactive surface. */
+.btn:active,.nav-item:active,.filter-chip:active,.seg-switch-btn:active,.row-action:active{transform:scale(.985)}
+/* Magnetic primary button: transform is set by JS (3px max); a soft transition makes the return
+   smooth without lagging the follow. */
+.btn.primary.magnet{transition:transform .18s var(--ease-out),background var(--dur-micro),border-color var(--dur-micro),box-shadow var(--dur-micro)}
+/* Cursor spotlight on the tab header — one subtle radial that follows the pointer (JS sets
+   --mx/--my). Sits above the header background, below its text, and never blocks clicks. */
+.tab-head::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity var(--dur-fast) var(--ease-out);background:radial-gradient(220px 120px at var(--mx,50%) var(--my,50%), rgba(0,229,255,.10), transparent 70%)}
+.tab-head:hover::before{opacity:1}
+@media (prefers-reduced-motion:reduce){
+  .tab-head::before{display:none}
+}
 /* Legacy simple fade (wizard steps). New code: use tab/modal/fade-swap. */
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 /* Hover lifts are banned: interactive rows may only shift border/text color.
    (Enforced by review, not by CSS — this file documents the rule.) */
+/* ============ UNIVERSAL MODAL FADE (1.3.0) ============
+   Every overlay is toggled with the `hidden` attribute (display:none), which normally makes it
+   vanish instantly. Discrete display/overlay transitions + @starting-style give EVERY modal a
+   fade-in AND fade-out with ZERO call-site changes: setting hidden=false fades in from the
+   @starting-style state; setting hidden=true fades out before display flips to none.
+   Chromium 138 (Electron 37) supports this fully. */
+.modal-overlay{
+  opacity:1;
+  transition:opacity var(--dur-modal) var(--ease-out),
+             display var(--dur-modal) allow-discrete,
+             overlay var(--dur-modal) allow-discrete;
+}
+.modal-overlay[hidden]{opacity:0}
+@starting-style{
+  .modal-overlay:not([hidden]){opacity:0}
+}
+/* The sheet itself rises + settles (complements the overlay fade). */
+.modal-overlay .modal{transition:transform var(--dur-modal) var(--ease-emphasized),opacity var(--dur-modal) var(--ease-out)}
+.modal-overlay[hidden] .modal{transform:translateY(8px) scale(.985);opacity:0}
+@starting-style{
+  .modal-overlay:not([hidden]) .modal{transform:translateY(10px) scale(.99);opacity:0}
+}
+
 /* Reduced motion: everything instant, including status-dot pulses. */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:var(--dur-instant)!important;animation-iteration-count:1!important;transition-duration:var(--dur-instant)!important;scroll-behavior:auto!important}

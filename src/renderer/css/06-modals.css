@@ -187,12 +187,22 @@ details[open].set-advanced .set-chevron{transform:rotate(90deg)}
    lines, the hint over 3). One full-width column per setting reads cleanly. */
 .rel-grid{display:grid;grid-template-columns:1fr;gap:14px}
 .rel-grid > div + div{padding-top:14px;border-top:1px solid var(--border)}
-/* Retention row: label + a NARROW number box + hint, not a stretched full-width input. */
-#backupRetentionRow{gap:10px;flex-wrap:wrap}
-#backupRetentionRow label{font:600 12.5px var(--font-ui);color:var(--text);white-space:nowrap}
-#backupRetentionRow input{flex:0 0 72px;width:72px;text-align:center;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 6px;font:600 13px var(--font-mono);color:var(--text);outline:0}
-#backupRetentionRow input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-#backupRetentionRow .hint{flex:1 1 160px;min-width:0}
+/* ---------- AUTO-BACKUP (redesigned 1.3.0) ---------- */
+/* Was a loose stack of chips + a bare number row that wrapped badly and read like a form dump.
+   Now each control is its own labelled row: a fixed-width label column keeps everything aligned,
+   and the interval chips are grouped on one clean line. */
+.auto-backup{display:flex;flex-direction:column;gap:12px}
+.auto-backup .set-toggle{padding:0}
+.ab-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ab-label{flex:0 0 84px;font:700 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.ab-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0}
+.ab-chip{padding:6px 14px;font-size:12px;border-radius:var(--r);background:var(--field);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;transition:background var(--dur-micro) var(--ease-standard),border-color var(--dur-micro),color var(--dur-micro)}
+.ab-chip:hover{border-color:var(--border-strong);color:var(--text)}
+.ab-chip.active{background:var(--accent-weak);border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.ab-custom .ab-label{color:var(--accent)}
+.ab-row input[type="number"]{flex:0 0 84px;width:84px;text-align:center;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 6px;font:600 14px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text);outline:0}
+.ab-row input[type="number"]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.ab-hint{flex:1 1 160px;min-width:0;font:500 11px var(--font-ui);color:var(--text-muted)}
 
 /* ---------- SERVER SETTINGS hero — flattened to match ---------- */
 #properties .settings-hero{padding:14px 18px;background:var(--panel-raised);border:1px solid var(--border);border-bottom:0;border-radius:var(--r) var(--r) 0 0}
@@ -337,7 +347,8 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 @keyframes imCellIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes imPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}
 @keyframes imPulse{0%,100%{box-shadow:0 0 0 0 var(--accent-weak)}50%{box-shadow:0 0 0 5px rgba(0,229,255,0)}}
-#installModal .im{animation:imIn .26s var(--ease) both}
+/* Container enter comes from the universal overlay fade (08-motion.css); keep only the inner
+   section stagger so the dialog still 'assembles'. */
 #installModal .im-section{animation:imSectionIn .3s var(--ease) both}
 #installModal .im-section:nth-of-type(2){animation-delay:.05s}
 #installModal .im-section:nth-of-type(3){animation-delay:.09s}
@@ -390,8 +401,9 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 
 /* ============ IN-APP CONFIRM DIALOG (0.7.0) ============ */
 /* Replaces native confirm() — matches the black/cyan design system. */
-.confirm-modal{width:min(440px,100%);padding:0;animation:cfIn .16s var(--ease)}
-@keyframes cfIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+/* Enter/exit motion now comes from the universal .modal-overlay fade + rise (08-motion.css); the
+   old cfIn enter animation is removed so it doesn't fight the discrete transition. */
+.confirm-modal{width:min(440px,100%);padding:0}
 .confirm-head{display:flex;gap:12px;align-items:center;padding:16px 18px 0}
 .confirm-ico{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);color:var(--accent);font:700 16px var(--font-mono)}
 .confirm-ico.danger{background:var(--danger-weak);border-color:rgba(255,59,92,.3);color:var(--danger)}

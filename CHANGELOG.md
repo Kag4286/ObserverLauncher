@@ -3,6 +3,72 @@
 All notable changes to ObserverLauncher are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0] — 2026-09-21
+
+A polish + personality release. No new server features — the goal was to make the interface feel
+like a live instrument (motion, console, sparklines) while staying calm and beginner-friendly.
+
+### Added — Console (the tab people live in)
+- **Log search box** — client-side substring filter over every rendered line, debounced, with a
+  clear button. Works together with the existing level chips.
+- **Per-line level badges** (CMD / INF / WRN / ERR) so severity scans down the column at a glance.
+- **Auto-scroll toggle** — pin to the newest line or read history without being yanked down;
+  scrolling away by hand turns it off automatically.
+
+### Added — Signature motion, ambience & personality ("the launcher comes alive")
+- **Signal Field** — a CSS-only ambient background layer that breathes with the poll cycle and
+  shifts mood with server state (offline = cold/still, running = warm/lively, starting = building).
+  No canvas, no per-frame JS — GPU transforms only, so it stays cheap.
+- **State choreography** — `<html>` carries `is-offline`/`is-starting`/`is-running`; the status pill,
+  hero, workspace and ambient field all warm up / cool down together.
+- **Boot sequence (reworked)** — a real startup screen: brand mark + a progress bar that tracks
+  the ACTUAL boot milestones (backend state → market versions → ready), not a fixed timer. The bar
+  eases toward each milestone AND slowly creeps forward between them, so it never looks frozen
+  while a network call is in flight; it only reaches 100% when boot truly finishes. A slow scan
+  line + core glow give it life. Click/key to skip, a 4s safety timeout guarantees it never hangs,
+  `pointer-events:none` so it never blocks clicks, removed under reduced motion / Lite.
+- **Auto-backup redesigned** (Settings > Reliability). The interval chips and the retention row
+  were a loose stack that wrapped badly. Now each control is its own labelled row (INTERVAL /
+  KEEP) with a fixed label column, aligned number boxes and a clear hint — easier to read and use.
+- **Cursor proximity** — rail items brighten as the pointer nears them (`--prox`, rAF-throttled),
+  plus a breathing glow on the active item.
+- **Corner-bracket focus** — a consistent signature focus ring across interactive elements.
+- **Console stream sweep** — a new log line carries a brief left→right highlight (gated to small
+  batches so a startup flood does not strobe); colour follows the line level.
+- **Needle-settle numbers** — small value changes overshoot ~4% and settle, like a gauge.
+- **Marketplace: dependencies + source links.** The install modal (Modrinth only) now shows a
+  **DEPENDENCIES** section: each required dep with a name, an *installed* tick (matched against
+  plugins/mods on disk), and a red *incompatible* flag. One button installs every missing required
+  dependency in sequence (with confirm + progress). Optional deps are listed but never auto-installed.
+  Also adds **Open project page** / **View source** buttons — opened in the system browser through an
+  allowlisted `market:open-external` IPC (https to modrinth/hangar/spigot/github/gitlab/bitbucket/
+  curseforge only; file:// and arbitrary hosts are rejected). The install modal's sections now rise
+  in a short cascade on open.
+- **Interface animation setting** (Settings > Preferences, default **Full**) — a *Lite* option that
+  turns off the ambience, boot sequence, cursor proximity/spotlight and list stagger for weaker
+  PCs. Full stays the default; Lite is opt-in and persists.
+- **Content / world lists now actually animate.** The first stagger pass targeted
+  `.content-row`/`.world-row` classes that never existed — content rows are `<li data-name>` and
+  worlds are `.worlds-list li`, so those lists were static. Selectors corrected.
+
+### Added — Signature motion (first pass)
+- **Motion foundation**: tokenised durations/eases (`--dur-micro/fast/tab/modal/slow`,
+  `--ease-emphasized`, `--stagger`) plus `docs/motion.md` — a one-page contract for every future
+  animation.
+- **Value tweening** (`tweenNumber` in `00-core.js`): live readouts (CPU %, players) count toward
+  their new value instead of snapping.
+- **List stagger reveal**: dense rows rise in a short cascade when a tab opens (capped at 7 rows).
+- **Modal** uses the emphasized ease for a hair of settle; press feedback unified across all buttons.
+- **Sparkline** in the Overview Server-stats panel: a tiny live TPS · CPU trace.
+- **Micro-interactions**: magnetic primary button (≤3px cursor pull) and a cursor spotlight on tab
+  headers. Both are pointer-only and fully disabled under `prefers-reduced-motion`.
+
+### Notes
+- `npm test` (27 files) and the E2E suite remain green. i18n is 761 keys × 7 locales.
+- New `docs/motion.md`. Reduced-motion guards added for every new pattern.
+- Not eyeballed in the running app by the developer (no screen capture) — verify visually on your
+  machine; Electron does not hot-reload.
+
 ## [1.2.0] — 2026-09-20
 
 A hardening **and** World Map detail release. No new user-facing features — the focus was a deep

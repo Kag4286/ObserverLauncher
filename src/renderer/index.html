@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"><link rel="stylesheet" href="css/09-pulse.css"></head>
 <body>
+<!-- BOOT SEQUENCE (1.3.0): a ~1.1s 'signal acquisition' on launch — hairline draws, rail items
+     slide in, one ping, gone. Click anywhere to skip. Never blocks interaction after it ends. -->
+<div id="bootSeq" class="boot-seq" aria-hidden="true">
+  <div class="boot-core">
+    <div class="boot-mark">OBSERVER<span>LAUNCHER</span></div>
+    <div class="boot-bar"><i id="bootBarFill"></i></div>
+    <div class="boot-status" id="bootStatus" data-i18n="boot.init">Starting…</div>
+  </div>
+  <div class="boot-skip" id="bootSkip" data-i18n="boot.skip">Click to skip</div>
+</div>
+<!-- SIGNAL FIELD: a CSS-only ambient layer that 'breathes' with the poll cycle and shifts with
+     server state (offline = cold/still, running = warm/lively). pointer-events:none. -->
+<div class="signal-field" id="signalField" aria-hidden="true"></div>
 <div class="app-shell">
   <aside class="rail">
     <div class="rail-head"><div class="brand"><span class="brand-mark"><img src="./assets/icons/observer.png" alt="Observer"></span><div><b>OBSERVER LAUNCHER</b></div></div></div>
@@ -100,6 +113,7 @@
             <div><dt>TPS</dt><dd id="tps">—</dd></div>
             <div title="Java process usage"><dt data-i18n="ov.cpu">SERVER CPU</dt><dd id="overviewCpu">—</dd></div>
             <div title="Actually used right now"><dt data-i18n="ov.ram">SERVER RAM</dt><dd id="serverRam">—</dd></div>
+            <div class="ov-spark-cell"><dt>TPS · CPU</dt><dd><canvas id="ovSpark" class="ov-spark" width="240" height="40" aria-hidden="true"></canvas></dd></div>
           </dl>
         </div>
         <div class="ov-ram-box">
@@ -111,7 +125,7 @@
       </article>
     </section>
     
-    <section id="console" class="tab"><div class="console-layout"><article class="panel glass terminal"><div class="terminal-head"><div class="terminal-title"><span class="live-dot" id="consoleLiveDot"></span><div><h3 data-i18n="con.title">Server console</h3><p data-i18n="con.sub">Live output — auto-scrolls when you're at the bottom</p></div></div><div class="terminal-actions"><span class="live-label" id="consoleLiveLabel">Offline</span><button class="text-btn" id="exportConsole" data-i18n="con.export">Export</button><button class="text-btn" id="clearConsole" data-i18n="con.clear">Clear</button></div></div>      <div class="log-toolbar"><div class="log-filters" role="group" aria-label="Log filters"><button class="filter-chip active" data-log-filter="all" aria-pressed="true" data-i18n="con.filterAll">All</button><button class="filter-chip" data-log-filter="warn" aria-pressed="false" data-i18n="con.filterWarn">Warnings</button><button class="filter-chip" data-log-filter="error" aria-pressed="false" data-i18n="con.filterError">Errors</button><button class="filter-chip" data-log-filter="command" aria-pressed="false" data-i18n="con.filterCmd">Commands</button></div><span class="log-hint" data-i18n="con.tip">Tip: press ↑ / ↓ for history • Ctrl+L clear</span></div><div class="log-wrap"><div id="logOutput" class="log-output" role="log" aria-live="polite" aria-atomic="false" tabindex="0" aria-label="Server console output"><div class="log-empty" id="logEmpty"><b data-i18n="con.empty">No output yet</b><span data-i18n="con.emptySub">Start the server to see logs. You can also try the shortcuts on the right →</span></div></div><button class="log-jump" id="logJump" hidden aria-label="Jump to latest output">↓ New output</button></div><form id="commandForm" class="command-row" aria-label="Send console command"><span class="prompt" aria-hidden="true">›</span><input id="commandInput" autocomplete="off" placeholder="Type a command and hit Enter — e.g. list, say Hello" data-i18n-placeholder="con.placeholder" aria-label="Console command input"><button class="btn primary" data-i18n="con.send" aria-label="Send command">Send</button></form></article><aside class="panel glass command-help"><div class="help-head"><h3 data-i18n="con.shortcuts">Quick commands</h3><p data-i18n="con.asideSub">Click to send — no typing needed</p></div><div class="command-group"><p class="command-group-label" data-i18n="con.diagnostics">Diagnostics</p><div class="help-cards"><button data-command="list"><b>list</b><span data-i18n="con.listDesc">Who's online</span></button><button data-command="tps"><b>tps</b><span data-i18n="con.tpsDesc">Tick health</span></button><button data-command="spark healthreport"><b>spark</b><span data-i18n="con.sparkDesc">Health report</span></button></div></div><div class="command-group" id="recentCommandsGroup" hidden><p class="command-group-label">Recent</p><div id="recentCommands" class="recent-commands"></div></div><p class="help-note" data-i18n="con.note">Commands go to your local server only. Nothing leaves this PC.</p></aside></div></section>
+    <section id="console" class="tab"><div class="console-layout"><article class="panel glass terminal"><div class="terminal-head"><div class="terminal-title"><span class="live-dot" id="consoleLiveDot"></span><div><h3 data-i18n="con.title">Server console</h3><p data-i18n="con.sub">Live output — auto-scrolls when you're at the bottom</p></div></div><div class="terminal-actions"><span class="live-label" id="consoleLiveLabel">Offline</span><button class="text-btn" id="exportConsole" data-i18n="con.export">Export</button><button class="text-btn" id="clearConsole" data-i18n="con.clear">Clear</button></div></div>      <div class="log-toolbar"><div class="log-search"><input id="logSearch" type="search" autocomplete="off" data-i18n-placeholder="con.searchPh" placeholder="Search logs…" aria-label="Search logs"><button type="button" class="text-btn log-search-clear" id="logSearchClear" hidden aria-label="Clear search">×</button></div><div class="log-filters" role="group" aria-label="Log filters"><button class="filter-chip active" data-log-filter="all" aria-pressed="true" data-i18n="con.filterAll">All</button><button class="filter-chip" data-log-filter="warn" aria-pressed="false" data-i18n="con.filterWarn">Warnings</button><button class="filter-chip" data-log-filter="error" aria-pressed="false" data-i18n="con.filterError">Errors</button><button class="filter-chip" data-log-filter="command" aria-pressed="false" data-i18n="con.filterCmd">Commands</button></div><span class="log-hint" data-i18n="con.tip">Tip: press ↑ / ↓ for history • Ctrl+L clear</span></div><div class="log-wrap"><div id="logOutput" class="log-output" role="log" aria-live="polite" aria-atomic="false" tabindex="0" aria-label="Server console output"><div class="log-empty" id="logEmpty"><b data-i18n="con.empty">No output yet</b><span data-i18n="con.emptySub">Start the server to see logs. You can also try the shortcuts on the right →</span></div></div><button class="log-jump" id="logJump" hidden aria-label="Jump to latest output">↓ New output</button></div><form id="commandForm" class="command-row" aria-label="Send console command"><span class="prompt" aria-hidden="true">›</span><input id="commandInput" autocomplete="off" placeholder="Type a command and hit Enter — e.g. list, say Hello" data-i18n-placeholder="con.placeholder" aria-label="Console command input"><button class="btn primary" data-i18n="con.send" aria-label="Send command">Send</button></form></article><aside class="panel glass command-help"><div class="help-head"><h3 data-i18n="con.shortcuts">Quick commands</h3><p data-i18n="con.asideSub">Click to send — no typing needed</p></div><div class="command-group"><p class="command-group-label" data-i18n="con.diagnostics">Diagnostics</p><div class="help-cards"><button data-command="list"><b>list</b><span data-i18n="con.listDesc">Who's online</span></button><button data-command="tps"><b>tps</b><span data-i18n="con.tpsDesc">Tick health</span></button><button data-command="spark healthreport"><b>spark</b><span data-i18n="con.sparkDesc">Health report</span></button></div></div><div class="command-group" id="recentCommandsGroup" hidden><p class="command-group-label">Recent</p><div id="recentCommands" class="recent-commands"></div></div><p class="help-note" data-i18n="con.note">Commands go to your local server only. Nothing leaves this PC.</p></aside></div></section>
     <section id="players" class="tab">
       <div id="playersProxyNotice" class="proxy-notice" hidden data-i18n-html="ply.proxyNotice">This server is a <b>proxy (Velocity)</b> — players connect to the backend servers behind it, not to this proxy directly. Player/whitelist/ban management isn't available here.</div>
       <header class="tab-head">
@@ -362,6 +376,8 @@
             <div class="sec-head"><img src="./assets/icons/ui/person.svg" alt=""><h3 data-i18n="set.prefT">Preferences</h3><small data-i18n="set.prefD">personal, per-PC</small></div>
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.language">Language</b><small data-i18n="set.languageSub">Interface language — applies immediately.</small></div><select id="languageSelect" class="launcher-select"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
             <hr class="set-hr">
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.motion">Interface animation</b><small data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</small></div><select id="motionLevelSelect" class="launcher-select"><option value="full" data-i18n="set.motionFull">Full (default)</option><option value="lite" data-i18n="set.motionLite">Lite (less motion)</option></select></div>
+            <hr class="set-hr">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.guide">Welcome guide</b><small data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</small></div><button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button></div>
           </section>
           <div class="set-group" data-i18n="set.grpAutomation">Automation</div>
@@ -373,11 +389,22 @@
                 <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoRestart">Auto-restart on crash</b><small data-i18n="set.autoRestartSub">Restarts when the server exits with an error — for unattended hosting.</small></div><label class="switch"><input type="checkbox" id="autoRestartInput"><span class="slider"></span></label></div>
                 <div id="autoRestartFields" class="restart-grid" hidden><label>Max restarts in a row<input id="autoRestartMaxAttemptsInput" type="number" min="1" max="20" value="3"><small data-i18n="set.maxRestartsSub">1–20 · resets after a successful start</small></label><label>Delay before restart (s)<input id="autoRestartDelaySecondsInput" type="number" min="1" max="300" value="5"><small data-i18n="set.restartDelaySub">Wait between attempts</small></label></div>
               </div>
-              <div>
+              <div class="auto-backup">
                 <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoBackup">Auto-backup</b><small data-i18n-html="set.autoBackupSub">ZIP snapshots of world folders on a schedule (<code>save-off</code> safe).</small></div></div>
-                <div class="backup-chip-row set-chips"><button type="button" class="filter-chip" data-backup-mins="0" data-i18n="set.chipOff">Off</button><button type="button" class="filter-chip" data-backup-mins="15" data-i18n="set.chip15">15m</button><button type="button" class="filter-chip" data-backup-mins="30" data-i18n="set.chip30">30m</button><button type="button" class="filter-chip" data-backup-mins="60" data-i18n="set.chip1h">1h</button><button type="button" class="filter-chip" id="backupCustomChip" data-backup-mins="custom" data-i18n="set.chipCustom">Custom</button><input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden></div>
-                <div class="input-row backup-custom-row" id="backupCustomRow" hidden><input id="autoBackupCustomInput" type="number" min="1" placeholder="Minutes — e.g. 45"><span class="hint" data-i18n="set.customHint">Custom interval in minutes</span></div>
-                <div class="input-row" id="backupRetentionRow"><label for="backupRetentionInput" data-i18n="set.retention">Keep auto-backups</label><input id="backupRetentionInput" type="number" min="1" max="100" value="10"><span class="hint" data-i18n="set.retentionHint">newest on disk · manual backups are never deleted</span></div>
+                <div class="ab-row">
+                  <span class="ab-label" data-i18n="set.bkInterval">Interval</span>
+                  <div class="backup-chip-row ab-chips"><button type="button" class="filter-chip ab-chip" data-backup-mins="0" data-i18n="set.chipOff">Off</button><button type="button" class="filter-chip ab-chip" data-backup-mins="15" data-i18n="set.chip15">15m</button><button type="button" class="filter-chip ab-chip" data-backup-mins="30" data-i18n="set.chip30">30m</button><button type="button" class="filter-chip ab-chip" data-backup-mins="60" data-i18n="set.chip1h">1h</button><button type="button" class="filter-chip ab-chip" id="backupCustomChip" data-backup-mins="custom" data-i18n="set.chipCustom">Custom</button><input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden></div>
+                </div>
+                <div class="ab-row ab-custom" id="backupCustomRow" hidden>
+                  <span class="ab-label" data-i18n="set.bkEvery">Every</span>
+                  <input id="autoBackupCustomInput" type="number" min="1" placeholder="45">
+                  <span class="ab-hint" data-i18n="set.bkMin">minutes</span>
+                </div>
+                <div class="ab-row" id="backupRetentionRow">
+                  <span class="ab-label" data-i18n="set.retention">Keep</span>
+                  <input id="backupRetentionInput" type="number" min="1" max="100" value="10">
+                  <span class="ab-hint" data-i18n="set.retentionHint">newest on disk · manual backups are never deleted</span>
+                </div>
               </div>
             </div>
           </section>
@@ -615,10 +642,16 @@
         <p class="eyebrow" data-i18n="im.version">VERSION</p>
         <select id="imVersion" class="launcher-select" aria-label="Version"></select>
       </div>
+      <div class="im-section" id="imDepsSection" hidden>
+        <p class="eyebrow" data-i18n="im.depsT">DEPENDENCIES</p>
+        <ul class="im-deps" id="imDeps"></ul>
+        <button type="button" class="btn primary sm" id="imInstallDeps" hidden></button>
+      </div>
       <div class="im-section" id="imWarnSection">
         <p class="eyebrow" data-i18n="im.before">BEFORE YOU INSTALL</p>
         <ul class="im-warns" id="imWarns"></ul>
       </div>
+      <div class="im-links" id="imLinks"></div>
       <div class="im-section" id="imProgressSection" hidden>
         <p class="eyebrow" id="imPhase">DOWNLOADING</p>
         <div class="set-progress-track"><div class="set-progress-fill" id="imBar"></div></div>

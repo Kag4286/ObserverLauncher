@@ -1,23 +1,48 @@
 // js/08-shell.js — split from app.js (lines 1127-1704); classic script, load in numeric order.
 // app shell: console logs, tabs/nav, all DOM wiring, wizard, boot.
 function logLevel(line){if(line.type==='error')return'error';if(line.type==='command')return'command';if(line.type==='system')return'system';const t=line.text||'';if(/\]:\s*\[?WARN/i.test(t)||/\/WARN\]/i.test(t)||/^WARNING:/i.test(t.trim()))return'warn';if(/\/ERROR\]/i.test(t)||/\/SEVERE\]/i.test(t))return'error';return'info'}
-let logFilter='all',logPaused=false;
+let logFilter='all',logPaused=false,logQuery='',logAutoScroll=true;
 let logQueue=[], logFlushScheduled=false;
+// Level badge (CMD/INF/WRN/ERR) + two independent gates: the filter chips (level) and the search
+// box (substring). A line is visible only if it passes BOTH. Kept as one predicate so re-filtering
+// existing lines uses the exact same rule as new ones.
+const LOG_BADGE={error:'ERR',warn:'WRN',command:'CMD',system:'SYS',info:'INF'};
+function logVisible(level,text){
+  if(logFilter!=='all'&&level!==logFilter) return false;
+  if(logQuery && !String(text||'').toLowerCase().includes(logQuery)) return false;
+  return true;
+}
+// Re-evaluate every line already in the DOM (used when the filter or the search changes).
+function reapplyLogFilter(){
+  const o=$('#logOutput'); if(!o) return;
+  let anyVisible=false;
+  for(const d of o.querySelectorAll('.log-line')){
+    const vis=logVisible(d.dataset.level, d.dataset.text||'');
+    d.hidden=!vis; if(vis) anyVisible=true;
+  }
+  const empty=$('#logEmpty'); if(empty) empty.hidden=anyVisible;
+}
 function flushLogs(){
   const o=$('#logOutput'); if(!o || !logQueue.length){ logFlushScheduled=false; return; }
   const wasAtBottom=o.scrollHeight - o.scrollTop - o.clientHeight < 40;
+  // Sweep animation only when a few lines land at once (live play). A server startup flushes
+  // hundreds of lines — sweeping them all would be a strobe. `sweep` gates the ::before keyframe.
+  const sweep=logQueue.length<=3;
   const frag=document.createDocumentFragment();
   let added=0, lastVisible=null;
   while(logQueue.length && added<80){
     const line=logQueue.shift();
     const d=document.createElement('div'), level=logLevel(line);
-    d.className=`log-line ${line.type||''}`; d.dataset.level=level;
-    d.innerHTML=`<span class="time">${esc(line.time)}</span> ${esc(line.text)}`;
-    if(logFilter!=='all'&&level!==logFilter) d.hidden=true; else lastVisible=d;
+    d.className=`log-line ${line.type||''}${sweep?' sweep':''}`; d.dataset.level=level;
+    d.dataset.text=String(line.text||'').slice(0,2000); // search index (trimmed to keep the DOM lean)
+    d.innerHTML=`<span class="lvl">${LOG_BADGE[level]||'INF'}</span><span class="time">${esc(line.time)}</span> ${esc(line.text)}`;
+    if(!logVisible(level,line.text)) d.hidden=true; else lastVisible=d;
     frag.appendChild(d); added++;
   }
   o.classList.add('has-content'); o.appendChild(frag);
   const empty=$('#logEmpty'); if(empty) empty.hidden=true;
+  // If a search/filter is active, a freshly-added line may be hidden — keep the hint honest.
+  if(logQuery||logFilter!=='all') updateLogHint();
   while(o.children.length>2000) o.removeChild(o.firstChild);
   if(wasAtBottom && !logPaused) o.scrollTop=o.scrollHeight;
   else if(lastVisible && !lastVisible.hidden){ const j=$('#logJump'); if(j) j.hidden=false; }
@@ -48,6 +73,9 @@ function switchTab(tab){
   }
   if(tab==='marketplace'&&!$('#marketResults').innerHTML)$('#marketSearch').click();
   if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); metricChart($('#miniChart'));}catch{}})}); }
+  // Sparkline was 0-sized while Overview was hidden — redraw on reveal (same class of bug as
+  // the hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
+  if(tab==='overview')requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));
   if(tab==='players')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
   if(tab==='content')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
@@ -69,21 +97,41 @@ $('#nav')?.addEventListener('keydown', e=>{
   else if(e.key==='End'){ e.preventDefault(); items[items.length-1]?.focus(); }
 });
 $$('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));$$('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));$$('[data-command]').forEach(b=>b.onclick=()=>{pushCmdHistory(b.dataset.command);command(b.dataset.command)});$$('[data-open]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.open));$$('[data-import]').forEach(b=>b.onclick=async()=>{const r=await window.observer.importContent(b.dataset.import);if(r.ok){state.files=r.files;refreshUI();toast(t('toast.importedRestart'))}else if(!r.cancelled)toast(r.error)});
-$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#welcomeCreateBtn')?.addEventListener('click', async()=>{ const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'}); if(folder) openNewServerWizard(); });$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
+$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#welcomeCreateBtn')?.addEventListener('click', async()=>{ const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'}); if(folder) openNewServerWizard(); });$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true;const s=$('#logSearch');if(s){s.value='';const sc=$('#logSearchClear');if(sc)sc.hidden=true}logQuery='';updateLogHint()};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
+function updateLogHint(){
+  const countVisible=$$('#logOutput .log-line:not([hidden])').length;
+  const hint=$('.log-hint');
+  if(hint) hint.textContent = (logQuery||logFilter!=='all') ? t('con.matches',{n:countVisible}) : t('con.tip');
+}
 $$('.log-filters .filter-chip').forEach(chip=>chip.onclick=()=>{
   logFilter=chip.dataset.logFilter;
   $$('.log-filters .filter-chip').forEach(c=>{ const on=c===chip; c.classList.toggle('active',on); c.setAttribute('aria-pressed', on?'true':'false'); });
-  $$('#logOutput .log-line').forEach(el=>{el.hidden=logFilter!=='all'&&el.dataset.level!==logFilter});
-  const countVisible=$$('#logOutput .log-line:not([hidden])').length;
-  const hint=$('.log-hint'); if(hint) hint.textContent=countVisible?`${countVisible} · ${t('con.tip')}`:`${t('con.filterAll')}: 0`;
+  reapplyLogFilter(); updateLogHint();
 });
+// Search box: client-side substring filter over every rendered line (data-text index). Debounced
+// so typing never thrashes the DOM. The clear × appears only when there is text.
+const logSearch=$('#logSearch'), logSearchClear=$('#logSearchClear');
+if(logSearch){
+  const onSearch=debounce(()=>{
+    logQuery=logSearch.value.trim().toLowerCase();
+    if(logSearchClear) logSearchClear.hidden=!logSearch.value;
+    reapplyLogFilter(); updateLogHint();
+  },140);
+  logSearch.addEventListener('input',onSearch);
+  logSearchClear?.addEventListener('click',()=>{ logSearch.value=''; logQuery=''; logSearchClear.hidden=true; reapplyLogFilter(); updateLogHint(); logSearch.focus(); });
+}
+// Auto-scroll toggle: ON pins to the newest line; OFF lets the user read history without being
+// yanked down. Scrolling away by hand turns it off automatically (that is what 'off' means).
+const logAutoBtn=$('#logAutoscroll');
+function setAutoScroll(on){ logAutoScroll=on; logPaused=!on; if(logAutoBtn){ logAutoBtn.classList.toggle('active',on); logAutoBtn.setAttribute('aria-pressed',on?'true':'false'); } if(on){ const o=$('#logOutput'); if(o) o.scrollTop=o.scrollHeight; const j=$('#logJump'); if(j) j.hidden=true; } }
+logAutoBtn?.addEventListener('click',()=>setAutoScroll(!logAutoScroll));
 document.addEventListener('keydown', e=>{
   const isConsole=document.getElementById('console')?.classList.contains('active');
   if(!isConsole) return;
   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='l'){ e.preventDefault(); $('#clearConsole')?.click(); }
   if(e.key==='/' && !e.ctrlKey && document.activeElement?.tagName!=='INPUT' && document.activeElement?.tagName!=='TEXTAREA'){ e.preventDefault(); $('#commandInput')?.focus(); }
 });
-const logOutputEl=$('#logOutput');if(logOutputEl)logOutputEl.addEventListener('scroll',()=>{const atBottom=logOutputEl.scrollHeight-logOutputEl.scrollTop-logOutputEl.clientHeight<40;logPaused=!atBottom;if(atBottom){const j=$('#logJump');if(j)j.hidden=true}});
+const logOutputEl=$('#logOutput');if(logOutputEl)logOutputEl.addEventListener('scroll',()=>{const atBottom=logOutputEl.scrollHeight-logOutputEl.scrollTop-logOutputEl.clientHeight<40;logPaused=!atBottom;if(atBottom){const j=$('#logJump');if(j)j.hidden=true}/* scrolled away by hand -> reflect it on the auto-scroll toggle */if(!atBottom&&logAutoScroll){logAutoScroll=false;const b=$('#logAutoscroll');if(b){b.classList.remove('active');b.setAttribute('aria-pressed','false')}}});
 const logJumpEl=$('#logJump');if(logJumpEl)logJumpEl.onclick=()=>{logOutputEl.scrollTop=logOutputEl.scrollHeight;logJumpEl.hidden=true;logPaused=false};
 const cmdInputEl=$('#commandInput');if(cmdInputEl)cmdInputEl.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){if(!cmdHistory.length)return;e.preventDefault();cmdHistoryIdx=Math.min(cmdHistory.length-1,cmdHistoryIdx+1);cmdInputEl.value=cmdHistory[cmdHistoryIdx]||''}else if(e.key==='ArrowDown'){e.preventDefault();cmdHistoryIdx=Math.max(-1,cmdHistoryIdx-1);cmdInputEl.value=cmdHistoryIdx===-1?'':cmdHistory[cmdHistoryIdx]}});
 $('#saveSettings').onclick=async()=>{
@@ -141,9 +189,26 @@ function applyLiveToUI(live){
     const msptEl=$('#perfMspt'); if(msptEl && msptEl.textContent==='—' && live?.mspt!=null) msptEl.textContent=msptText;
   }catch{}
 }
+// Sparkline (1.3.0): draw the last ~60 samples as a TPS line + a CPU line on a tiny canvas.
+// Reads the shared `samples` ring (defined in 00-core.js). Guards a hidden/0-size canvas (the
+// Overview may be display:none when this runs) — draw nothing rather than a broken axis.
+function drawOvSpark(){
+  const cv=$('#ovSpark'); if(!cv) return;
+  const r=cv.getBoundingClientRect(); if(!r.width||!r.height) return;
+  const d=devicePixelRatio||1;
+  if(cv.width!==Math.round(r.width*d)||cv.height!==Math.round(r.height*d)){cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d)}
+  const ctx=cv.getContext('2d'); ctx.setTransform(d,0,0,d,0,0);
+  const w=r.width,h=r.height; ctx.clearRect(0,0,w,h);
+  const cs=getComputedStyle(document.documentElement);
+  const cTps=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';
+  const cCpu=cs.getPropertyValue('--chart-cpu').trim()||'#ffd23f';
+  const data=samples.slice(-60); const n=data.length; if(!n) return;
+  const line=(key,color,max)=>{const pts=data.map((s,i)=>({i,v:s[key]})).filter(p=>p.v!=null);if(pts.length<2)return;ctx.beginPath();pts.forEach((p,j)=>{const x=(p.i/(n-1))*w, y=h-2-(Math.min(p.v,max)/max)*(h-4);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke()};
+  line('cpu',cCpu,100); line('tps',cTps,20);
+}
 window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const key=(v.players||[]).slice().sort().join(',');if(key!==lastLivePlayersKey){lastLivePlayersKey=key;try{renderPlayers()}catch{}}
-});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}]; try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{$('#overviewCpu').textContent=v.running?`${v.cpu||0}%`:'—';}catch{} try{$('#perfCpu').textContent=v.running?`${v.cpu||0}%`:'—';}catch{} try{$('#playerCount').textContent=v.running?String((v.players||[]).length):'—';}catch{} try{$('#tps').textContent=displayTps?.toFixed?.(2)??'—';}catch{} try{$('#perfTps').textContent=displayTps?.toFixed?.(2)??'—';}catch{}
+});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}]; try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} try{$('#tps').textContent=displayTps?.toFixed?.(2)??'—';}catch{} try{$('#perfTps').textContent=displayTps?.toFixed?.(2)??'—';}catch{}
   const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—'}
   // overview color coding
   const tpsClass=displayTps==null?'':displayTps>=19?'ok':displayTps>=17?'warn':'bad';
@@ -296,12 +361,15 @@ $('#newServerClose').onclick=()=>{if($('#nswNext').disabled)return toast(t('toas
 // download itself isn't cancellable, so closing then would just hide the progress from a job still
 // running, and its completion toast/tab-switch would fire later with no modal left to explain why.
 const modalBusy=overlay=>overlay.id==='newServerModal'&&$('#nswNext').disabled||overlay.id==='installModal'&&installState.busy;
-function closeOverlayAnimated(el){ el.classList.add('closing'); setTimeout(()=>{ el.hidden=true; el.classList.remove('closing'); }, 140); }
+// The overlay's fade-out is now driven by CSS discrete transitions on [hidden] (08-motion.css),
+// so we only flip the attribute — the browser keeps the element painted during the fade and then
+// sets display:none. No manual setTimeout timing to drift out of sync.
+function closeOverlayAnimated(el){ el.classList.add('closing'); el.hidden=true; setTimeout(()=>el.classList.remove('closing'),220); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=$$('.modal-overlay').find(m=>!m.hidden);if(open&&!modalBusy(open)){ if(open.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(open); }}});
 $$('.modal-overlay').forEach(overlay=>overlay.addEventListener('click',e=>{if(e.target===overlay&&!modalBusy(overlay)){ if(overlay.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(overlay); }}));
 
 (async()=>{const langSel=$('#languageSelect');if(langSel&&window.LOCALES_META)langSel.innerHTML=window.LOCALES_META.map(l=>`<option value="${esc(l.code)}">${esc(l.name)}</option>`).join('');
-let initial;try{initial=await window.observer.getState()}catch(e){toast(`Could not load launcher state: ${e?.message||e}`,'error');return}state={...state,...initial};addLogsBatch(initial.logs||[]);refreshUI();loadConnectInfo();if(!state.settings?.onboarded)showOnboarding();
+let initial;try{initial=await window.observer.getState()}catch(e){toast(`Could not load launcher state: ${e?.message||e}`,'error');return}state={...state,...initial};addLogsBatch(initial.logs||[]);refreshUI();loadConnectInfo();bootStep(65,'boot.state');if(!state.settings?.onboarded)showOnboarding();
 // BUGFIX (Start dead on launch): if this first snapshot raced backend init and
 // came back without Java/files, re-sync once the backend has settled instead
 // of leaving Start disabled until the next folder save.
@@ -310,7 +378,7 @@ if(!initial.java?.ok||!initial.files?.jar&&!initial.files?.launchScript){setTime
 // cover the server-path text in the command bar. Detect the Window Controls Overlay and flag it so
 // CSS can reserve its width (.wco-app rules in style.css).
 try{const wco=navigator.windowControlsOverlay;if(wco){const sync=()=>document.documentElement.classList.toggle('wco-app',!!wco.visible);sync();wco.addEventListener('geometrychange',sync);}}catch{}
-const v=await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator()})})();
+bootStep(85,'boot.market');const v=await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
 
 // ===== AUTO-UPDATE UI =====
 const updateBtn=$('#checkUpdateBtn');
@@ -340,7 +408,16 @@ function pulseTick(){if(!pulseTicks.length)return;pulseTicks.forEach(t=>t.classL
   pulseTicks[pulsePos%8].classList.add('done');pulsePos++}
 function pulseStart(){pulseStop();pulsePos=0;pulseTimer=setInterval(pulseTick,625)} // 8 ticks × 625ms ≈ 5s poll
 function pulseStop(){clearInterval(pulseTimer);pulseTimer=null;pulsePos=0;pulseTicks.forEach(t=>t.classList.remove('done'))}
-window.observer.onState(v=>{if(v.status==='running')pulseStart();else pulseStop()});
+// State choreography (1.3.0): the whole app shifts mood with the server. <html> carries one of
+// is-offline / is-starting / is-running; CSS (.signal-field, hero, pulse) reacts. This is the ONE
+// place the class changes, so every ambient layer stays in sync.
+window.observer.onState(v=>{
+  const root=document.documentElement;
+  root.classList.remove('is-offline','is-starting','is-running');
+  const st=v?.status||'stopped';
+  root.classList.add(st==='running'?'is-running':st==='stopped'?'is-offline':'is-starting');
+  if(st==='running')pulseStart();else pulseStop();
+});
 
 // MCP write/destroy confirmation: the main process forwards a pending tool call here; we show
 // an in-app dialog (same style as everything else) and send the user's answer back so the MCP
@@ -361,3 +438,103 @@ window.observer.onMcpConfirmRequest?.(req => {
     .then(allow=>window.observer.respondMcpConfirm({reqId:req.reqId,allow:!!allow}))
     .catch(()=>window.observer.respondMcpConfirm({reqId:req.reqId,allow:false}));
 });
+
+// ===== MICRO-INTERACTIONS (1.3.0) — magnetic primary buttons + cursor spotlight.
+// Both are restrained and reduced-motion aware; neither changes layout or meaning. =====
+(function microInteractions(){
+  if(_rm.matches) return; // no pointer-tracked motion when the user asked for less motion
+  // Magnetic: the PRIMARY action drifts up to 3px toward the cursor, springs back on leave.
+  // Delegated so it works for buttons created later (wizard, dialogs). Only .btn.primary — the
+  // single clear action on screen — so the effect stays meaningful instead of everywhere.
+  const MAX=3;
+  document.addEventListener('pointermove',e=>{
+    const b=e.target.closest?.('.btn.primary');
+    document.querySelectorAll('.btn.primary.magnet').forEach(el=>{ if(el!==b) el.style.transform=''; });
+    if(!b||b.disabled) return;
+    const r=b.getBoundingClientRect();
+    const dx=Math.max(-MAX,Math.min(MAX,(e.clientX-(r.left+r.width/2))/8));
+    const dy=Math.max(-MAX,Math.min(MAX,(e.clientY-(r.top+r.height/2))/8));
+    b.classList.add('magnet'); b.style.transform=`translate(${dx}px,${dy}px)`;
+  },{passive:true});
+  document.addEventListener('pointerleave',()=>{document.querySelectorAll('.btn.primary.magnet').forEach(el=>{el.style.transform='';el.classList.remove('magnet')})},true);
+  // Spotlight: a soft radial follow on the tab header only (one strip, not the whole app).
+  document.addEventListener('pointermove',e=>{
+    const h=e.target.closest?.('.tab-head');
+    if(!h) return;
+    const r=h.getBoundingClientRect();
+    h.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
+    h.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
+  },{passive:true});
+})();
+
+// ===== BOOT SEQUENCE (1.3.0) =====
+// Short 'signal acquisition' on launch. It NEVER blocks work: it fades itself out on a timer and
+// on the first real interaction, whichever comes first. State class is seeded here so the ambient
+// field starts cold before the first server:state event arrives.
+// BOOT (reworked 1.3.0): a real startup screen driven by ACTUAL progress. The main boot IIFE
+// (below) calls bootStep() at each milestone and bootFinish() when state is ready. A safety
+// timeout and click/key skip guarantee it never traps the user.
+let _bootDone=false,_bootSafety=null,_bootTarget=0,_bootShown=0,_bootRaf=0,_bootCreep=0;
+// Progress model: bootStep() sets a TARGET %. A rAF loop eases the visible width toward it, and a
+// slow 'creep' keeps it inching forward between milestones so the bar never looks frozen while a
+// network call (market versions) is in flight. bootFinish() snaps the creep off and goes to 100.
+function _bootPaint(){
+  const bar=$('#bootBarFill'); if(!bar) return;
+  const goal=_bootDone?100:_bootTarget;
+  _bootShown += (goal-_bootShown)*0.18;
+  if(!_bootDone) _bootShown += _bootCreep; // gentle auto-advance between real steps
+  if(_bootShown>99.4 && !_bootDone) _bootShown=99.4; // never 100% until actually done
+  bar.style.width=_bootShown.toFixed(2)+'%';
+  if(Math.abs(goal-_bootShown)>0.1 || (!_bootDone && _bootShown<99.4)) _bootRaf=requestAnimationFrame(_bootPaint);
+  else _bootRaf=0;
+}
+function _bootKick(){ if(!_bootRaf) _bootRaf=requestAnimationFrame(_bootPaint); }
+function bootStep(pct,statusKey){
+  if(_bootDone) return;
+  _bootTarget=Math.min(99,Math.max(_bootTarget,Number(pct)||0));
+  // Creep slows as we approach the target band so it never races ahead of real work.
+  _bootCreep=Math.max(0.02,(99-_bootTarget)/900);
+  const st=$('#bootStatus'); if(st&&statusKey) st.textContent=t(statusKey);
+  _bootKick();
+}
+function bootFinish(){
+  if(_bootDone) return; _bootDone=true; clearTimeout(_bootSafety);
+  const st=$('#bootStatus'); if(st) st.textContent=t('boot.ready');
+  _bootKick();
+  setTimeout(()=>{ const seq=$('#bootSeq'); if(seq){ seq.classList.add('done'); setTimeout(()=>seq.remove(),520); } },260);
+  document.removeEventListener('pointerdown',_bootSkip); document.removeEventListener('keydown',_bootSkip);
+}
+function _bootSkip(){ bootFinish(); }
+(function bootSequence(){
+  document.documentElement.classList.add('is-offline');
+  const seq=$('#bootSeq'); if(!seq) return;
+  if(_rm.matches){ seq.remove(); _bootDone=true; return; }
+  bootStep(12,'boot.init');
+  document.addEventListener('pointerdown',_bootSkip,{once:true});
+  document.addEventListener('keydown',_bootSkip,{once:true});
+  // Safety: never let the screen hang if a backend call stalls.
+  _bootSafety=setTimeout(bootFinish,4000);
+})();
+
+// Live-apply the 'Interface animation' setting the moment it changes (no need to hit Apply for
+// a purely visual preference). Persisted on the next settings save like every other field.
+$('#motionLevelSelect')?.addEventListener('change',e=>{ try{ applyMotionLevel(e.target.value); }catch{} });
+
+// ===== CURSOR PROXIMITY (1.3.0, signature) =====
+// Rail items brighten as the pointer approaches — an 'instrument feels responsive' cue. Uses a
+// rAF-throttled mousemove; cheap (a handful of items). Disabled under reduced motion.
+(function cursorProximity(){
+  const nav=$('#nav'); if(!nav||_rm.matches) return;
+  const items=$$('#nav .nav-item');
+  let raf=0,lastX=0,lastY=0;
+  const apply=()=>{ raf=0;
+    for(const it of items){
+      const r=it.getBoundingClientRect();
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      const d=Math.hypot(lastX-cx,lastY-cy);
+      const t=Math.max(0,1-d/220); // 0 beyond 220px, 1 on the item
+      it.style.setProperty('--prox',t.toFixed(3));
+    }
+  };
+  document.addEventListener('pointermove',e=>{ lastX=e.clientX; lastY=e.clientY; if(!raf) raf=requestAnimationFrame(apply); },{passive:true});
+})();

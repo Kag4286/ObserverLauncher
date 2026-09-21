@@ -106,9 +106,25 @@ function registerMarketplace(ipcMain, ctx) {
       const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
       const map = v => {
         const f = (v.files || []).find(x => x.primary) || (v.files || [])[0] || {};
-        return { id: v.id, number: v.version_number, name: v.name || v.version_number, date: v.date_published, gameVersions: v.game_versions || [], loaders: v.loaders || [], size: f.size || 0 };
+        return { id: v.id, number: v.version_number, name: v.name || v.version_number, date: v.date_published, gameVersions: v.game_versions || [], loaders: v.loaders || [], size: f.size || 0,
+          dependencies: (v.dependencies || []).filter(d => d && d.project_id).map(d => ({ projectId: d.project_id, versionId: d.version_id || null, type: d.dependency_type || 'required' })) };
       };
-      return { ok: true, title: proj.title, description: proj.description, body: String(proj.body || '').slice(0, 1500), icon: proj.icon_url || item.icon || '', author: item.author || (proj.owner || ''), env: item.env || null, loaders: item.loaders || null, versions: versions.map(map) };
+      const mapped = versions.map(map);
+      // DEPENDENCY METADATA: version.dependencies only carries project ids. Batch-fetch the titles so
+      // the modal can show a human name instead of a raw id. Best-effort — a failed lookup still
+      // returns the ids, the UI falls back to "project <id>".
+      const depIds = [...new Set(mapped.flatMap(v => v.dependencies.filter(d => d.type === 'required' || d.type === 'incompatible').map(d => d.projectId)))];
+      const depMeta = {};
+      if (depIds.length) {
+        try {
+          const arr = await json(`https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(JSON.stringify(depIds))}`);
+          for (const p of arr || []) depMeta[p.id] = { title: p.title, slug: p.slug, icon: p.icon_url || null };
+        } catch {}
+      }
+      for (const v of mapped) for (const d of v.dependencies) { const m = depMeta[d.projectId]; if (m) { d.title = m.title; d.slug = m.slug; d.icon = m.icon; } }
+      const sourceUrl = proj.source_url || proj.wiki_url || proj.issues_url || null;
+      const projectUrl = `https://modrinth.com/project/${encodeURIComponent(proj.slug || item.id)}`;
+      return { ok: true, title: proj.title, description: proj.description, body: String(proj.body || '').slice(0, 1500), icon: proj.icon_url || item.icon || '', author: item.author || (proj.owner || ''), env: item.env || null, loaders: item.loaders || null, versions: mapped, sourceUrl, projectUrl };
     } catch (error) { return { ok: false, error: marketplaceError(error).error }; }
   });
 
@@ -126,6 +142,20 @@ function registerMarketplace(ipcMain, ctx) {
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
     } catch (error) { return marketplaceError(error); }
+  });
+
+  // Open a project's homepage / source / issues link in the system browser. SECURITY: only allow
+  // https to a small set of trusted mod-registry / code hosts (a malicious item could otherwise
+  // pass file:// or an arbitrary site). Mirrors the allowlist approach used for Playit claim URLs.
+  ipcMain.handle('market:open-external', async (_, rawUrl) => {
+    const { shell } = require('electron');
+    let u;
+    try { u = new URL(String(rawUrl)); } catch { return { ok: false, error: 'Invalid link.' }; }
+    if (u.protocol !== 'https:') return { ok: false, error: 'Only https links can be opened.' };
+    const host = u.hostname.toLowerCase();
+    const allowed = ['modrinth.com', 'hangar.papermc.io', 'spigotmc.org', 'github.com', 'gitlab.com', 'bitbucket.org', 'curseforge.com'];
+    if (!allowed.some(h => host === h || host.endsWith('.' + h))) return { ok: false, error: 'This link is not on the allowlist.' };
+    try { await shell.openExternal(u.href); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || 'Could not open the link.' }; }
   });
 }
 

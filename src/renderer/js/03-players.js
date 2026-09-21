@@ -109,7 +109,9 @@ async function togglePlayerOp(p,on){const bad=playerNameError(p.name);if(bad)ret
 async function togglePlayerWhitelist(p,add){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerWhitelistToggle({uuid:p.uuid,name:p.name,add});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(add?'toast.addedWl':'toast.removedWl',{n:p.name}))}
 async function togglePlayerBan(p,ban){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerBanToggle({uuid:p.uuid,name:p.name,ban});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(ban?'toast.banned':'toast.unbanned',{n:p.name}))}
 function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; }
-function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; m.classList.add('closing'); setTimeout(()=>{ m.hidden=true; m.classList.remove('closing'); }, 140);}
+// Fade-out is handled by the universal .modal-overlay [hidden] transition (08-motion.css) — just
+// flip the attribute and drop the transient class after the fade finishes.
+function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
 // ============ PLAYER INSPECTOR (3-tab rework) ============
 // Overview (always read-only) · Live actions (console commands while the server runs) ·
 // Saved data (edit the .dat — server must be stopped). Separating these keeps reading, live

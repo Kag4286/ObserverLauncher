@@ -69,6 +69,11 @@
 .ov-stats-panel .srv-stats>div{padding:0 22px;min-width:96px}
 .ov-stats-panel .srv-stats>div:first-child{padding-left:0}
 .ov-ram-box{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;border-top:1px solid var(--border);background:var(--field)}
+/* Sparkline (1.3.0): a tiny live TPS/CPU trace in the stats panel — 'numbers are alive'.
+   Sits as the last stat cell; grows to fill remaining width but never below a readable size. */
+.ov-spark-cell{flex:1 1 200px;min-width:160px}
+.ov-spark{width:100%;height:34px;display:block;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:2px}
+@media(max-width:1100px){.ov-spark-cell{flex:1 1 100%}}
 .ov-ram-info{display:flex;flex-direction:column;gap:3px;min-width:180px}
 .ov-ram-info b{font:700 11px var(--font-mono);letter-spacing:.1em;color:var(--text)}
 .ov-ram-info small{font:500 11px var(--font-ui);color:var(--text-dim)}
@@ -171,7 +176,18 @@
 .live-label{font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-muted);padding:4px 9px;border:1px solid var(--border);border-radius:3px;background:var(--field)}
 .terminal-actions{display:flex;gap:8px;align-items:center}
 .log-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px 0;margin:0}
-.log-hint{font:500 10px var(--font-mono);color:var(--text-dim);white-space:nowrap}
+.log-hint{font:500 10px var(--font-mono);color:var(--text-dim);white-space:nowrap;margin-left:auto}
+/* Search box (1.3.0): substring filter over rendered log lines. Sits left of the level chips. */
+.log-search{position:relative;display:flex;align-items:center;flex:1 1 200px;max-width:340px;min-width:120px}
+.log-search input{width:100%;background:var(--field);border:1px solid var(--border);border-radius:3px;padding:6px 26px 6px 10px;color:var(--text);font:500 11.5px var(--font-ui);outline:0;transition:border-color var(--dur-micro) var(--ease-standard)}
+.log-search input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
+.log-search input::-webkit-search-cancel-button{display:none}
+.log-search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:15px;line-height:1;color:var(--text-dim);padding:0 4px}
+.log-search-clear:hover{color:var(--text)}
+/* Auto-scroll toggle: a small square button matching the chip height. */
+.log-autoscroll{border:1px solid var(--border);border-radius:3px;background:var(--panel-raised);color:var(--text-dim);font-size:13px;line-height:1;padding:5px 9px;cursor:pointer;transition:background var(--dur-micro),color var(--dur-micro),border-color var(--dur-micro)}
+.log-autoscroll:hover{border-color:var(--border-strong);color:var(--text)}
+.log-autoscroll.active{background:var(--accent-weak);border-color:var(--accent);color:var(--accent)}
 .log-filters{display:flex;gap:0;flex-shrink:0;border:1px solid var(--border);border-radius:3px;overflow:hidden}
 .log-filters .filter-chip{border:0;border-radius:0;padding:5px 12px;font:600 11px var(--font-ui);background:transparent;color:var(--text-dim);cursor:pointer;border-right:1px solid var(--border)}
 .log-filters .filter-chip:last-child{border-right:0}
@@ -189,7 +205,25 @@
 .log-line[data-level="system"]{color:var(--success);border-left-color:var(--success)}
 .log-line[data-level="info"]{color:var(--text-muted)}
 .log-line .time{color:var(--text-dim);opacity:.7;margin-right:8px;user-select:none;font-size:10px}
+/* Level badge (1.3.0): a fixed-width CMD/INF/WRN/ERR tag so the eye can scan severity down the
+   column. Monospace + tabular so the log text stays aligned across every line. */
+.log-line .lvl{display:inline-block;width:30px;margin-right:6px;font:700 9px var(--font-mono);letter-spacing:.04em;color:var(--text-dim);opacity:.75;user-select:none;vertical-align:baseline}
+.log-line[data-level="error"] .lvl{color:var(--danger);opacity:1}
+.log-line[data-level="warn"] .lvl{color:var(--warning);opacity:1}
+.log-line[data-level="command"] .lvl{color:var(--accent);opacity:1}
+.log-line[data-level="system"] .lvl{color:var(--success);opacity:1}
 @keyframes logLineIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+/* STREAM SWEEP (1.3.0): a new line carries a brief highlight that sweeps left→right, like a signal
+   landing in a receiver. A ::before overlay (NOT a filter — filter promotes a GPU layer and kills
+   subpixel text AA). One-shot per line; ends at opacity 0. */
+.log-line.sweep::before{content:'';position:absolute;left:0;top:0;bottom:0;width:100%;pointer-events:none;
+  background:linear-gradient(90deg, rgba(0,229,255,.16), transparent 60%);
+  transform:scaleX(0);transform-origin:left;opacity:0;
+  animation:logSweep .5s var(--ease-out) both}
+@keyframes logSweep{0%{transform:scaleX(0);opacity:1}60%{transform:scaleX(1);opacity:.5}100%{transform:scaleX(1);opacity:0}}
+.log-line.sweep[data-level="error"]::before{background:linear-gradient(90deg, rgba(255,59,92,.20), transparent 60%)}
+.log-line.sweep[data-level="warn"]::before{background:linear-gradient(90deg, rgba(255,210,63,.18), transparent 60%)}
+.log-line.sweep[data-level="command"]::before{background:linear-gradient(90deg, rgba(0,229,255,.22), transparent 60%)}
 .log-jump{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);border:1px solid var(--border-strong);background:var(--panel-raised);color:var(--text);border-radius:3px;padding:6px 12px;font:600 11px var(--font-ui);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 .command-row{display:flex;gap:8px;align-items:center;background:var(--field);border:1px solid var(--border-strong);border-radius:3px;padding:0 8px 0 10px;height:36px;flex-shrink:0;margin:0 14px 14px}
 .command-row .prompt{font:700 15px var(--font-mono);color:var(--accent)}
