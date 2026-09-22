@@ -8,6 +8,7 @@ const { serverFiles } = require('./server-files.js');
 const { readJsonList, fileHashes, safeTarget } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
 const platform = require('./platform');
+const cf = require('./curseforge.js');
 // ============ MODPACK COMPATIBILITY (0.8.0) ============
 // A .mrpack declares its target in modrinth.index.json's `dependencies`:
 //   { "minecraft": "1.20.1", "forge": "47.2.0" }  (or neoforge / fabric-loader / quilt-loader)
@@ -183,6 +184,108 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
   finally { try { if (tempZip) fs.rmSync(tempZip, { force: true }); if (extractDir) fs.rmSync(extractDir, { recursive: true, force: true }); } catch {} }
 }
 
+// Shared overrides copy (used by BOTH the .mrpack and CurseForge import paths). Lists every file
+// that would be clobbered before copying, and confirms with the user.
+async function copyOverridesWithConfirm(ctx, overridesDir) {
+  if (!fs.existsSync(overridesDir)) return;
+  const sensitiveSet = new Set(['server.properties', 'eula.txt']);
+  const clobbered = [];
+  const walkRel = (rel) => {
+    let entries; try { entries = fs.readdirSync(path.join(overridesDir, rel), { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) { walkRel(r); continue; }
+      if (fs.existsSync(path.join(ctx.currentServerPath, r))) clobbered.push(r);
+    }
+  };
+  walkRel('');
+  let proceed = true;
+  if (clobbered.length) {
+    const sensitiveHit = clobbered.filter(f => sensitiveSet.has(f));
+    const head = clobbered.slice(0, 8).join('\n');
+    const more = clobbered.length > 8 ? `\n…and ${clobbered.length - 8} more` : '';
+    const detail = head + more + (sensitiveHit.length ? '\n\n⚠ This includes server.properties/eula.txt you may have configured yourself.' : '');
+    const choice = await dialog.showMessageBox(ctx.win, {
+      type: 'warning', buttons: ['Cancel', 'Overwrite'], defaultId: 0, cancelId: 0,
+      title: 'Modpack will overwrite existing files',
+      message: `This modpack includes ${clobbered.length} file(s) that already exist in your server folder and would be replaced:`,
+      detail: detail + '\n\nOverwrite them?',
+    });
+    proceed = choice.response === 1;
+  }
+  if (proceed) fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });
+}
+
+// CurseForge modpack import: resolves each {projectID,fileID} through the CF API (needs the user's
+// key), downloads what is distributable, copies overrides, and RETURNS the list of mods whose
+// author blocked third-party downloads so the renderer can offer the manual fallback.
+async function importCfModpack(ctx, extractDir, index, onInfo) {
+  const headers = (() => { try { const k = String(require('./settings.js').loadSettings().curseforgeApiKey || '').trim(); return k ? { 'x-api-key': k } : null; } catch { return null; } })();
+  if (!headers) return { ok: false, error: 'Importing a CurseForge modpack needs your CurseForge API key. Add it in Settings, then try again.' };
+  const name = index.name || 'CurseForge modpack';
+  const lf = cf.cfLoaderFromManifest(index.loaders);
+  // COMPAT: same check/confirm the .mrpack path uses.
+  const loaderKey = { forge: 'forge', neoforge: 'neoforge', fabric: 'fabric-loader', quilt: 'quilt-loader' }[lf.loader];
+  const deps = {}; if (index.mc) deps.minecraft = index.mc; if (loaderKey) deps[loaderKey] = lf.version || 'latest';
+  const compat = mrpackCompat(deps, detectServerCompat(serverFiles(ctx.currentServerPath)));
+  if (compat.warnings.length) {
+    onInfo?.({ phase: 'compat', warnings: compat.warnings, mc: compat.mc, loader: compat.loader });
+    const lines = [];
+    if (compat.warnings.includes('mc')) lines.push(`• Minecraft: pack targets ${compat.mc.want}, this server is ${compat.mc.have}`);
+    if (compat.warnings.includes('loader')) lines.push(`• Loader: pack targets ${compat.loader.want}, this server is ${compat.loader.have}`);
+    const choice = await dialog.showMessageBox(ctx.win, { type: 'warning', buttons: ['Cancel', 'Install anyway'], defaultId: 0, cancelId: 0, title: 'Modpack may not be compatible', message: 'This modpack does not match your server:', detail: lines.join('\n') + '\n\nContinue anyway?' });
+    if (choice.response !== 1) return { ok: false, cancelled: true };
+  }
+  onInfo?.({ phase: 'extract', name: 'Resolving CurseForge files…', received: 0, total: 0 });
+  let resolved;
+  try { resolved = await cf.resolveCfFileIds(index.files.map(f => f.fileID), headers); }
+  catch (e) { return { ok: false, error: e?.message || 'Could not resolve the modpack files from CurseForge.' }; }
+  const { installable, blocked } = cf.partitionCfFiles(resolved);
+  const modsFolder = (lf.loader === 'forge' || lf.loader === 'neoforge' || lf.loader === 'fabric' || lf.loader === 'quilt') ? 'mods' : 'plugins';
+  const { isSafeDownloadUrl } = require('./validate.js');
+  let installed = 0;
+  for (let i = 0; i < installable.length; i++) {
+    const f = installable[i];
+    if (!isSafeDownloadUrl(f.url)) { blocked.push(f); continue; }
+    const dest = safeTarget(ctx.currentServerPath, path.join(modsFolder, path.basename(f.fileName || `cf-${f.fileID}.jar`)));
+    if (!dest) { blocked.push(f); continue; }
+    onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.fileName, received: 0, fileTotal: 0 });
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    await download(f.url, dest, (received, total) => onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.fileName, received, fileTotal: total }), null, { maxBytes: 512 * 1024 * 1024 });
+    try { recordManifestEntry(ctx.currentServerPath, { kind: modsFolder === 'mods' ? 'mod' : 'plugin', fileName: path.basename(dest), sourceUrl: f.url, source: 'curseforge', installedAt: new Date().toISOString() }); } catch {}
+    installed++;
+  }
+  await copyOverridesWithConfirm(ctx, path.join(extractDir, index.overrides || 'overrides'));
+  return { ok: true, installed, blocked, name, destFolder: modsFolder, files: serverFiles(ctx.currentServerPath) };
+}
+
+// Dispatcher: detect the pack format from the extracted archive and route to the right importer.
+async function importModpackFromPath(ctx, modpackPath, onInfo, source = 'local') {
+  let tempZip, extractDir;
+  try {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const stamp = Date.now();
+    tempZip = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}.zip`);
+    extractDir = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}`);
+    fs.copyFileSync(modpackPath, tempZip);
+    const r = await platform.extractArchive(tempZip, extractDir);
+    if (!r.ok) throw new Error(r.error || 'Could not extract the modpack archive.');
+    // Format detection: .mrpack carries modrinth.index.json; a CurseForge pack carries manifest.json.
+    const mrIndex = path.join(extractDir, 'modrinth.index.json');
+    const cfManifest = path.join(extractDir, 'manifest.json');
+    if (fs.existsSync(mrIndex)) return await importMrpackFromPath(ctx, modpackPath, onInfo, source);
+    if (fs.existsSync(cfManifest)) {
+      let parsed;
+      try { parsed = cf.parseCfManifest(JSON.parse(fs.readFileSync(cfManifest, 'utf8'))); }
+      catch { return { ok: false, error: 'The manifest.json is not valid JSON.' }; }
+      if (!parsed.ok) return { ok: false, error: 'This .zip is not a CurseForge modpack (manifestType is not minecraftModpack).' };
+      return await importCfModpack(ctx, extractDir, parsed, onInfo);
+    }
+    return { ok: false, error: 'Not a valid modpack: it has neither modrinth.index.json (.mrpack) nor manifest.json (CurseForge).' };
+  } catch (error) { return marketplaceError(error); }
+  finally { try { if (tempZip) fs.rmSync(tempZip, { force: true }); if (extractDir) fs.rmSync(extractDir, { recursive: true, force: true }); } catch {} }
+}
+
 function registerModpacks(ipcMain, ctx) {
   ipcMain.handle('modpack:install-from-market', async (_, { id, version, versionId }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
@@ -205,9 +308,17 @@ function registerModpacks(ipcMain, ctx) {
 
   ipcMain.handle('modpack:import', async () => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const picked = await dialog.showOpenDialog(ctx.win, { title: 'Import a modpack (.mrpack)', properties: ['openFile'], filters: [{ name: 'Modrinth modpack', extensions: ['mrpack', 'zip'] }] });
+    const picked = await dialog.showOpenDialog(ctx.win, { title: 'Import a modpack (.mrpack or CurseForge .zip)', properties: ['openFile'], filters: [{ name: 'Modpack', extensions: ['mrpack', 'zip'] }] });
     if (picked.canceled || !picked.filePaths[0]) return { ok: false, cancelled: true };
-    return importMrpackFromPath(ctx, picked.filePaths[0], undefined, 'local');
+    return importModpackFromPath(ctx, picked.filePaths[0], undefined, 'local');
+  });
+
+  // Verify user-dropped files against a blocked list from a CurseForge import (Prism-style).
+  ipcMain.handle('modpack:verify-blocked', async (_, { blocked, destFolder }) => {
+    try {
+      if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+      return { ok: true, ...cf.verifyBlockedFiles(ctx.currentServerPath, blocked || [], destFolder || 'mods') };
+    } catch (error) { return marketplaceError(error); }
   });
 
   ipcMain.handle('modpack:export', async () => {
@@ -259,4 +370,4 @@ function registerModpacks(ipcMain, ctx) {
   });
 }
 
-module.exports = { importMrpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor };
+module.exports = { importMrpackFromPath, importModpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor };

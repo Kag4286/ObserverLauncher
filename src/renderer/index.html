@@ -252,7 +252,7 @@
         <div class="market-quick"><span class="market-quick-label" data-i18n="mkt.popular">Popular</span><button class="quick-chip" data-quick="EssentialsX">EssentialsX</button><button class="quick-chip" data-quick="LuckPerms">LuckPerms</button><button class="quick-chip" data-quick="ViaVersion">ViaVersion</button><button class="quick-chip" data-quick="Spark">Spark</button><button class="quick-chip" data-quick="WorldEdit">WorldEdit</button><button class="quick-chip" data-quick="Vault">Vault</button></div>
       </div>
       <div class="market-toolbar">
-        <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button></div>
+        <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" hidden>CurseForge</button></div>
         <input type="hidden" id="marketSource" value="modrinth">
         <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="forge" data-i18n="mkt.forgeType">Forge / NeoForge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
         <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion"><option value="">All versions</option></select></label>
@@ -416,6 +416,12 @@
             <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.tunnelT">Internet tunnel</h3><small data-i18n="set.tunnelD">share your server online with Playit</small></div>
             <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
             <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
+          </section>
+          <!-- CurseForge (advanced): an API key the USER supplies; the app never bundles or shares one. -->
+          <section class="flat-cell flat-span2">
+            <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.cfT">CurseForge</h3><small data-i18n="set.cfD">search the CurseForge catalogue (optional)</small></div>
+            <label class="set-field"><span data-i18n="set.cfKey">CurseForge API key</span><div class="set-path-row"><input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off"><button type="button" class="btn secondary sm" id="cfKeyGet" data-i18n="set.cfKeyGet">Get a key</button></div></label>
+            <small class="field-hint" data-i18n="set.cfKeySub">Stored only on this PC and sent only to api.curseforge.com. The launcher does not bundle a key. Mods whose author blocks third-party downloads can't be auto-installed — open their page instead.</small>
           </section>
           <!-- Schedule (collapsed — set-and-forget) -->
           <details class="flat-cell flat-span2 set-advanced">
@@ -614,6 +620,15 @@
     </div>
   </div>
 </div>
+<div id="blockedModal" class="modal-overlay" hidden role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2 data-i18n="cfi.title">Some mods need a manual download</h2>
+    <p class="text-muted" data-i18n="cfi.sub">These mods could not be installed automatically because their author blocked third-party downloads. Open each page, download the file, put it in the server folder, then click Check.</p>
+    <ul id="blockedList" class="blocked-list"></ul>
+    <p id="blockedHint" class="field-hint"></p>
+    <div class="modal-actions"><button type="button" class="btn secondary" id="blockedClose" data-i18n="im.close">Close</button><button type="button" class="btn primary" id="blockedCheck" data-i18n="cfi.check">Check</button></div>
+  </div>
+</div>
 <div id="confirmModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="cfTitle" aria-describedby="cfBody">
   <div class="modal confirm-modal">
     <div class="confirm-head"><span class="confirm-ico" id="cfIco">?</span><h2 id="cfTitle">Confirm</h2></div>
@@ -666,4 +681,4 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>

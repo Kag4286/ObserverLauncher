@@ -10,6 +10,116 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [1.5.0] — 2026-09-22
+
+A hardening release. No new server features. It closes four weaknesses found in an external review:
+silent renderer load-order failures, an untested responsive layout, an MCP path rewrite that could
+mis-fire in a packaged build, and an unenforced motion contract.
+
+### Added — CurseForge as a fourth marketplace source
+- Search + install from CurseForge (which hosts many mods/modpacks that are not on Modrinth).
+  Because Overwolf's Terms of Service forbid sharing an API key, the app **never bundles one**: the
+  user pastes their own key in Settings and it is stored locally, sent only to api.curseforge.com,
+  and never logged. The CurseForge source only appears once a key is saved.
+- Honest handling of the author distribution toggle (since 10/2024 authors can block third-party
+  downloads): for those projects the API returns no download URL, so instead of a fake error the UI
+  shows a **no auto-install** badge and an **Open page** button (the manual import path already
+  exists). The app deliberately does NOT synthesize a CDN URL to bypass the toggle.
+- New pure module `src/main/curseforge.js` (classIdForKind, loaderIdFor, cfFileInstallable,
+  mapCfItem, pickCfFile); `searchMarket`/`resolveMarketDownload` gained a CurseForge branch reusing
+  the same guards (isSafeDownloadUrl, safeTarget, 512 MB cap, manifest). `isSafeDownloadUrl` now
+  allows `forgecdn.net`. `json()` accepts optional headers. New IPC `market:curseforge-status`.
+  MCP `search_marketplace`/`install_from_market` accept `curseforge`; blocked projects return
+  `blocked:true`. Tests: tests/curseforge.test.js (29 asserts). Tool count unchanged (60).
+
+### Fixed — MCP planner source allowlist + assemble warnings (external review)
+- **`normalizePlanItem` was missing `curseforge`** in its source allowlist, so a CurseForge item
+  passed to `plan_modpack`/`assemble_modpack` was silently coerced to Modrinth and resolved the
+  wrong project (or failed confusingly) — even though search/install already advertised 4 sources.
+  Added `'curseforge'`. Regression assert added (parses the allowlist from tools.js).
+- **`assemble_modpack` now returns per-item compatibility warnings.** It recomputes `itemCompat`
+  for each installed item, so the report carries warnings even if the caller never ran
+  `plan_modpack` first (that "show plan, then assemble" flow is prompt-driven, not enforced).
+  Added `withWarnings` count to the result.
+
+### Added — CurseForge version picker
+- The install modal now shows a **version list for CurseForge projects** too (was Modrinth-only).
+  `market:detail` gained a `curseforge` branch that fetches `/mods/{id}/files` and maps each file to
+  the SAME shape the version picker already uses (via new pure `mapCfFileToVersion`); files the
+  author blocked for third-party downloads are flagged and labelled. Needs the user's key.
+- `resolveMarketDownload` now honours an explicit `versionId` for CurseForge (picks that exact file
+  before falling back to the newest match). Limitations kept honest: CF files carry no loader list
+  and no per-version dependency graph, so those stay empty.
+- Tests: curseforge.test.js +9 asserts (mapCfFileToVersion) -> 68 total.
+
+### Added — CurseForge dependencies surfaced in the MCP planner
+- `plan_modpack` now lists a CurseForge item's declared dependencies as an informational field
+  (`entry.dependencies`, each `{ projectId, type, uncertain }`). They are **shown, never
+  auto-installed**: CurseForge publishes no official `relationType` value table, so required vs
+  optional cannot be told apart reliably. An `incompatible` dependency becomes a plan warning.
+- `curseforge.js` gained `cfDependencies(file)` (maps the widely-used 3=required/2=optional/
+  5=incompatible, marks everything else `uncertain:true`); `resolveMarketDownload` CF branch now
+  returns those deps. Modrinth deps (clear types + versionId) are still auto-followed depth 1-2;
+  the `versionId` guard means CF deps are not queued. Tests: +8 asserts.
+
+### Added — CurseForge modpack import (.zip with manifest.json) + blocked-mod fallback
+- The import dialog now accepts BOTH `.mrpack` and a CurseForge `.zip`. A dispatcher detects the
+  format from the extracted archive (`modrinth.index.json` vs `manifest.json`) and routes to the
+  right importer; the `.mrpack` path is unchanged.
+- CurseForge packs reference files by `{projectID, fileID}` with no URLs, so `importCfModpack`
+  resolves them through the CF API (needs the user's key), downloads what the author allows, copies
+  overrides, and records manifest entries. `resolveCfFileIds` batches the lookups (1000/call).
+- **Blocked-mod UX (Prism-style).** Mods whose author disabled third-party downloads cannot be
+  auto-installed, so they are returned as a `blocked[]` list. The renderer opens a dialog listing
+  each one with an **Open page** link; the user drops the files into the server folder and clicks
+  **Check**, which hashes what is on disk against the expected SHA1 (`verifyBlockedFiles`, new IPC
+  `modpack:verify-blocked`, preload `verifyBlockedMods`). The app never bypasses the author's choice.
+- `curseforge.js` gained pure helpers `parseCfManifest`, `cfLoaderFromManifest`, `partitionCfFiles`,
+  `verifyBlockedFiles`. `http.js` `json()` gained optional `method`/`body` for the CF POST. Tests:
+  curseforge.test.js grew to 51 asserts (manifest/loader/partition/verify).
+
+### Added — MCP modpack builder (plan + assemble)
+- Two new MCP tools let an AI build a whole modpack with ONE confirmation instead of one per file.
+  **`plan_modpack` (read)** resolves a list of candidate ids into an install plan: exact version,
+  target folder, per-item compatibility warnings against the detected server (MC/loader mismatch,
+  client-only), and required Modrinth dependencies (depth 1-2, capped). **`assemble_modpack`
+  (write)** installs the approved list in a single confirmed batch and returns a per-item report
+  (installed/failed). The AI supplies ids/source/version only; URLs and hashes are always resolved
+  by the app from the registry (never taken from the model). Tool count 58 -> 60.
+- NEW pure module `src/mcp/modpack-plan.js` (folderForKind, itemCompat, dedupeById, capPlan) so the
+  decision logic is unit-tested without network or Electron (tests/modpack-plan.test.js, 19 asserts).
+  `resolveMarketDownload` now also returns gameVersions/loaders/dependencies (non-breaking; existing
+  callers ignore them). bridge STATIC_TOOLS updated (drift guard passes).
+
+### Added — renderer boot self-check (fail loud)
+- **`js/13-bootcheck.js`** (new, loads LAST): asserts the small set of globals the boot path and each
+tab need (`javaMajorOf`, `applyLocale`, `switchTab`, `refreshUI`, `openEd`, `wmLoad`, …) actually
+exist after every script has evaluated. The renderer is classic scripts in load order with no
+bundler, so a helper used before its file loads throws a ReferenceError and the tab silently goes
+blank (shipped 3 times: `javaMajorOf`, `debounce`, `switchTab`). Now a missing global logs a console
+error AND shows a fixed banner, so a load-order regression is loud instead of a blank screen. Uses
+bare `typeof` probes (not `eval`) because the CSP is `script-src 'self'`.
+
+### Added — responsive E2E test
+- The E2E helper injects a style tag neutralising the 1100px breakpoint so nav clicks work on small
+CI screens; that left the real responsive layout untested. A new test removes the inject, sets a
+narrow viewport and asserts `.rail` hides below 1100px and shows at/above it, then restores the
+desktop layout. Suite is now 12 tests.
+
+### Changed — MCP bridge path rewrite
+- `bridgeScriptPath()` (src/mcp/server.js) now rewrites only the exact `app.asar` path SEGMENT
+instead of a plain `String.replace('app.asar', …)`, which could also rewrite an already-unpacked
+path (`app.asar.unpacked` -> `app.asar.unpacked.unpacked`) or an unrelated directory containing the
+substring.
+
+### Added — motion-token ratchet test
+- `tests/motion-tokens.test.js` (new) counts literal durations in `transition`/`animation` CSS and
+fails if the count rises above the 1.5.0 baseline (124). A hard rule would fail today (older rules
+still use literal ms/s); the ratchet stops the debt growing while allowing it to shrink.
+
+### Notes
+- `npm test` 29 files PASS, `npm run test:e2e` 12 tests PASS. Version not bumped yet.
+
 ## [1.4.0] — 2026-09-21
 
 A hardening + tooling release. No new server features — the goal is a sharper safety net and a

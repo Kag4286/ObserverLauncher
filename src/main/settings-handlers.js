@@ -92,6 +92,8 @@ function registerSettings(ipcMain, ctx) {
     // Animation level: 'full' (default, rich motion) or 'lite' (weak PCs — kills ambience/boot/
     // proximity/spotlight/stagger). Persisted so it survives restarts.
     if (!['full', 'lite'].includes(merged.motionLevel)) merged.motionLevel = 'full';
+    // CurseForge API key: trim + length-cap only. Never logged. Sent solely to api.curseforge.com.
+    if (merged.curseforgeApiKey !== undefined) merged.curseforgeApiKey = String(merged.curseforgeApiKey || '').trim().slice(0, 64);
     // Normalize scheduleDays to NUMBERS (0=Sun..6=Sat) — the shape scheduler.shouldFire() compares
     // against now.getDay(). Accepts names too, so a name-based value can never silently never-fire.
     if (merged.scheduleDays !== undefined) {

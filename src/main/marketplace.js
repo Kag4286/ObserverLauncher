@@ -6,6 +6,14 @@ const path = require('path');
 const { serverFiles } = require('./server-files.js');
 const { safeTarget, recordManifestEntry } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
+const cf = require('./curseforge.js');
+
+// CurseForge needs the user's own API key (ToS forbids sharing one). Returns the header object, or
+// null when no key is set — callers then treat CurseForge as unavailable rather than erroring.
+function cfHeaders() {
+  try { const { loadSettings } = require('./settings.js'); const key = String(loadSettings().curseforgeApiKey || '').trim(); return key ? { 'x-api-key': key } : null; }
+  catch { return null; }
+}
 
 // Pure marketplace search shared by the IPC handler (GUI) and the MCP search_marketplace tool, so
 // both support the same three sources and never drift. Caller is responsible for try/catch.
@@ -49,9 +57,23 @@ async function searchMarket(opts) {
     const rows = data.result || data.projects || [];
     return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, version })) };
   }
-  const page = Math.floor(skip / 20) + 1;
-  const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=20&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
-  return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: x.author?.username || 'Spigot author', description: x.tag || x.description || '', downloads: x.downloads || 0, version })) };
+  if (source === 'spigot') {
+    const page = Math.floor(skip / 20) + 1;
+    const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=20&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
+    return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: x.author?.username || 'Spigot author', description: x.tag || x.description || '', downloads: x.downloads || 0, version })) };
+  }
+  if (source === 'curseforge') {
+    const headers = cfHeaders();
+    if (!headers) { const e = new Error('CurseForge API key not set. Add your own key in Settings to search CurseForge.'); e.code = 'noKey'; throw e; }
+    const classId = cf.classIdForKind(kind);
+    const loaderId = cf.loaderIdFor(kind === 'fabric' ? 'fabric' : kind === 'forge' ? 'forge' : kind === 'neoforge' ? 'neoforge' : 'any');
+    const params = new URLSearchParams({ gameId: String(cf.CF_GAME_ID), classId: String(classId), searchFilter: query || '', sortField: sort === 'latest' ? '3' : '2', sortOrder: 'desc', index: String(skip), pageSize: '20' });
+    if (version) params.set('gameVersion', version);
+    if (loaderId) params.set('modLoaderType', String(loaderId));
+    const data = await json(`${cf.CF_BASE}/mods/search?${params.toString()}`, headers);
+    const rows = data.data || [];
+    return { ok: true, total: data.pagination?.totalCount ?? null, items: rows.map(x => ({ ...cf.mapCfItem(x), version })) };
+  }
 }
 
 // Pure-ish download resolver shared by the IPC handler AND the MCP install_from_market tool, so
@@ -67,7 +89,16 @@ async function resolveMarketDownload(item) {
     if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
     if (!target?.files?.[0]) throw new Error('No downloadable version was found.');
     const f = target.files.find(x => x.primary) || target.files[0];
-    return { url: f.url, filename: f.filename, source: 'modrinth' };
+    // Extra metadata (non-breaking: GUI/MCP install callers ignore it) so the MCP modpack planner
+    // can check compatibility and follow required dependencies WITHOUT re-fetching or duplicating
+    // the version-picking logic here.
+    return {
+      url: f.url, filename: f.filename, source: 'modrinth',
+      versionNumber: target.version_number || null,
+      gameVersions: target.game_versions || [],
+      loaders: target.loaders || [],
+      dependencies: (target.dependencies || []).filter(d => d && d.project_id).map(d => ({ projectId: d.project_id, versionId: d.version_id || null, type: d.dependency_type || 'required' })),
+    };
   }
   if (item.source === 'hangar') {
     const [owner, slug] = String(item.id).split('/');
@@ -80,6 +111,19 @@ async function resolveMarketDownload(item) {
   if (item.source === 'spigot') {
     const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
     return { url: `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`, filename: `${title}.jar`, source: 'spigot' };
+  }
+  if (item.source === 'curseforge') {
+    const headers = cfHeaders();
+    if (!headers) throw new Error('CurseForge API key not set.');
+    const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(item.id)}/files?pageSize=50`, headers);
+    const wanted = cf.loaderIdFor(kind === 'fabric' ? 'fabric' : kind === 'forge' ? 'forge' : 'neoforge');
+    // Honour an explicit versionId (the version picker) before falling back to the newest match.
+    let file = item.versionId ? (files.data || []).find(f => String(f.id) === String(item.versionId)) : null;
+    if (!file) file = cf.pickCfFile(files.data || [], item.version || '', wanted);
+    const inst = cf.cfFileInstallable(file);
+    if (!inst.ok) { const e = new Error('blocked'); e.code = 'blocked'; throw e; }
+    // dependencies: mapped best-effort (CF has no official relationType table — see cfDependencies).
+    return { url: inst.url, filename: file.fileName, source: 'curseforge', versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
   }
   throw new Error('Unsupported marketplace source.');
 }
@@ -99,8 +143,20 @@ function registerMarketplace(ipcMain, ctx) {
 
   ipcMain.handle('market:detail', async (_, item) => {
     try {
+      if (item && item.source === 'curseforge') {
+        // CurseForge DOES expose a per-file list, so the version picker works here too — with the
+        // same shape the Modrinth path returns. Needs the user's key. Files the author blocked for
+        // third-party downloads are marked `blocked` so the picker can disable them.
+        const headers = cfHeaders();
+        if (!headers) return { ok: true, title: item.title || '', description: item.description || '', icon: item.icon || '', author: item.author || '', env: null, loaders: null, versions: null, projectUrl: item.projectUrl || null };
+        const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(item.id)}/files?pageSize=50`, headers);
+        const versions = (files.data || []).map(cf.mapCfFileToVersion).filter(Boolean);
+        versions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        return { ok: true, title: item.title || '', description: item.description || '', icon: item.icon || '', author: item.author || '', env: null, loaders: null, versions, projectUrl: item.projectUrl || null };
+      }
       if (!item || item.source !== 'modrinth') {
-        return { ok: true, title: item?.title || '', description: item?.description || '', icon: item?.icon || '', author: item?.author || '', env: item?.env || null, loaders: item?.loaders || null, versions: null };
+        // Other sources (Hangar/Spigot) have no rich detail endpoint here; return the fields we have.
+        return { ok: true, title: item?.title || '', description: item?.description || '', icon: item?.icon || '', author: item?.author || '', env: item?.env || null, loaders: item?.loaders || null, versions: null, projectUrl: item?.projectUrl || null };
       }
       const proj = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}`);
       const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
@@ -147,7 +203,17 @@ function registerMarketplace(ipcMain, ctx) {
       await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }), null, { maxBytes: 512 * 1024 * 1024 });
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
-    } catch (error) { return marketplaceError(error); }
+    } catch (error) {
+      // A CurseForge project whose author disabled third-party distribution returns no download URL.
+      // Surface it distinctly so the UI can offer the manual fallback instead of a generic error.
+      if (error && error.code === 'blocked') return { ok: false, blocked: true, error: 'This CurseForge project does not allow third-party downloads. Open its page and install it manually.', projectUrl: item.projectUrl || null };
+      return marketplaceError(error);
+    }
+  });
+
+  // Whether a CurseForge API key is configured — the renderer shows/hides the CurseForge source.
+  ipcMain.handle('market:curseforge-status', async () => {
+    try { return { ok: true, hasKey: !!cfHeaders() }; } catch { return { ok: true, hasKey: false }; }
   });
 
   // Open a project's homepage / source / issues link in the system browser. SECURITY: only allow

@@ -28,7 +28,8 @@ The app is plain Electron — **no bundler, no build step for development**. The
     `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`, `tunnel.js`.
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
-    `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`.
+    `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
+    (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key).
   - `mcp/` — optional MCP/AI integration (see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang).
@@ -52,10 +53,14 @@ The app is plain Electron — **no bundler, no build step for development**. The
     or map canvas).
   - `locales/` — one file per language; `meta.js` loads **first** (it defines `window.LOCALES` and
     `LOCALES_META`).
-  - `js/` — per-tab logic (`00-core.js` … `12-wizard.js`), loaded as classic scripts. There is no
+  - `js/` — per-tab logic (`00-core.js` … `13-bootcheck.js`), loaded as classic scripts. There is no
     module system and no bundler, so **load order matters** — a file that uses something defined in a
     later file will throw at load time. Anything called during boot / `refreshUI()` must live in a
     file that loads *before* its caller (this has caused real regressions).
+    - `13-bootcheck.js` loads **last** and asserts the core globals exist after every script has
+      evaluated; if a load-order regression leaves one undefined it logs a console error and shows a
+      banner instead of a silent blank tab. When you add a helper that the boot path or a tab calls
+      during eval, add a probe for it here.
 
 ## Minecraft data formats change between versions
 

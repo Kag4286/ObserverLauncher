@@ -77,6 +77,9 @@ function isSafeDownloadUrl(url) {
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false;
   if (host === '::1') return false;
+  // CurseForge CDN (used for the download URLs its API returns) is a legitimate public host.
+  // (The API itself is api.curseforge.com; files live on forgecdn.net.)
+  if (host === 'forgecdn.net' || host.endsWith('.forgecdn.net')) return true;
   // IPv4 private / loopback / link-local / CGNAT
   const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (m) {

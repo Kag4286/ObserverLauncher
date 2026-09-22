@@ -14,8 +14,9 @@ const { requiredJavaForJar, javaMajor } = require('../main/java.js');
 const doctor = require('./doctor.js');
 const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
-const { importMrpackFromPath } = require('../main/modpacks.js');
+const { importMrpackFromPath, detectServerCompat } = require('../main/modpacks.js');
 const { searchMarket, resolveMarketDownload } = require('../main/marketplace.js');
+const { folderForKind, itemCompat, dedupeById, capPlan } = require('./modpack-plan.js');
 
 const ok = r => (r && typeof r === 'object' && 'ok' in r) ? r : { ok: true, result: r };
 const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server folder selected.'); return ctx.currentServerPath; };
@@ -233,12 +234,16 @@ async function tInstallFromMarket(ctx, a) {
   const id = String(a.id || '');
   if (!id) return { ok: false, error: 'id is required.' };
   const kind = ['forge', 'fabric', 'datapack', 'mod'].includes(a.kind) ? a.kind : 'plugin';
-  const source = ['modrinth', 'hangar', 'spigot'].includes(a.source) ? a.source : 'modrinth';
+  // curseforge works only when the USER set their own API key in the GUI (ToS forbids a bundled key).
+  const source = ['modrinth', 'hangar', 'spigot', 'curseforge'].includes(a.source) ? a.source : 'modrinth';
   // PARITY: use the SAME resolver the GUI market:install uses, so install now supports Modrinth,
   // Hangar and Spigot — not just Modrinth (search already offered all three).
   let dl;
   try { dl = await resolveMarketDownload({ id, kind, source, version: a.version || '', versionId: a.versionId, title: a.title }); }
-  catch (e) { return { ok: false, error: e?.message || 'No download found.' }; }
+  catch (e) {
+    if (e && e.code === 'blocked') return { ok: false, blocked: true, error: 'This CurseForge project does not allow third-party downloads. Install it manually from its page.' };
+    return { ok: false, error: e?.message || 'No download found.' };
+  }
   const { isSafeDownloadUrl } = require('../main/validate.js');
   if (!isSafeDownloadUrl(dl.url)) return { ok: false, error: 'Refused: download URL is not an allowlisted public host.' };
   const root = needPath(ctx);
@@ -307,6 +312,102 @@ async function tExportModpack(ctx, a) {
   try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
   if (!r.ok) return { ok: false, error: r.error || 'Archive failed.' };
   return { ok: true, result: { count: files.length, path: dest } };
+}
+
+// ============ MODPACK PLANNER / ASSEMBLER (1.5.0) ============
+// An AI can already install one item at a time, but a whole pack that way costs one GUI confirm per
+// file. These two tools split the job: plan_modpack (read) resolves candidates + compatibility +
+// dependencies into a plan the AI shows the user; assemble_modpack (write) installs the approved
+// plan in ONE confirmed batch. The AI supplies ids/source/version only - URLs and hashes are always
+// resolved here from the registry, never taken from the model.
+function normalizePlanItem(it) {
+  const source = ['modrinth', 'hangar', 'spigot', 'curseforge'].includes(it && it.source) ? it.source : 'modrinth';
+  const kind = ['forge', 'fabric', 'datapack', 'mod', 'neoforge', 'plugin'].includes(it && it.kind) ? it.kind : 'plugin';
+  return { source, kind, id: String((it && it.id) || ''), version: (it && it.version) || '', versionId: (it && it.versionId) || '', title: (it && it.title) || null, env: (it && it.env) || null };
+}
+async function tPlanModpack(ctx, a) {
+  const root = needPath(ctx);
+  const input = Array.isArray(a.items) ? a.items : [];
+  if (!input.length) return { ok: false, error: 'items is required: [{ id, source?, kind?, version?, versionId? }]. Find ids with search_marketplace first.' };
+  const max = Math.max(1, Math.min(100, Number(a.max) || 50));
+  const resolveDeps = a.resolveDeps !== false;
+  const props = serverFiles(root).properties || {};
+  const server = detectServerCompat(serverFiles(root));
+  const seed = dedupeById(input.map(normalizePlanItem).filter(it => it.id));
+  const { items: capped } = capPlan(seed, max);
+  const seen = new Set(capped.map(it => it.source + ':' + it.id));
+  const queue = [...capped];
+  const plan = [];
+  const problems = [];
+  let depth = 0;
+  while (queue.length && plan.length < max) {
+    const batch = queue.splice(0, queue.length);
+    depth++;
+    for (const it of batch) {
+      if (plan.length >= max) break;
+      let dl;
+      try { dl = await resolveMarketDownload(it); }
+      catch (e) { problems.push({ id: it.id, source: it.source, error: e?.message || 'Could not resolve a downloadable version.' }); continue; }
+      const compat = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server);
+      // CurseForge dependencies are listed (informational) but NOT auto-queued: CF publishes no
+      // official relationType table, so we cannot reliably tell required from optional. Incompatible
+      // ones become a warning. Modrinth deps (clear types) are followed below.
+      const deps = Array.isArray(dl.dependencies) ? dl.dependencies : [];
+      const cfDeps = deps.filter(d => d && (d.uncertain || !d.versionId) && d.projectId && it.source === 'curseforge');
+      const incompat = deps.filter(d => d && d.type === 'incompatible' && d.projectId);
+      if (incompat.length) compat.warnings.push('incompatible');
+      const entry = { id: it.id, source: it.source, kind: it.kind, title: it.title, version: dl.versionNumber || it.version || null, filename: dl.filename, folder: folderForKind(it.kind, props['level-name'] || 'world').replace(/\\/g, '/'), warnings: compat.warnings };
+      if (it.source === 'curseforge' && cfDeps.length) entry.dependencies = cfDeps.map(d => ({ projectId: d.projectId, type: d.type, uncertain: !!d.uncertain }));
+      plan.push(entry);
+      if (resolveDeps && depth <= 2 && Array.isArray(dl.dependencies)) {
+        for (const d of dl.dependencies) {
+          if (!d || d.type !== 'required' || !d.projectId) continue;
+          // Only Modrinth deps carry a versionId; CF deps are surfaced in `entry.dependencies` above.
+          if (!d.versionId) continue;
+          const key = 'modrinth:' + d.projectId;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          queue.push({ source: 'modrinth', kind: it.kind === 'datapack' ? 'datapack' : it.kind, id: String(d.projectId), version: it.version, versionId: d.versionId || '', title: null, env: null });
+        }
+      }
+    }
+  }
+  const warnCount = plan.filter(p => p.warnings.length).length;
+  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, planned: plan.length, withWarnings: warnCount, plan, problems, note: 'Show this plan to the user, then call assemble_modpack with the same items to install them in one confirmed batch.' } };
+}
+async function tAssembleModpack(ctx, a) {
+  const root = needPath(ctx);
+  const input = Array.isArray(a.items) ? a.items : [];
+  if (!input.length) return { ok: false, error: 'items is required.' };
+  const items = dedupeById(input.map(normalizePlanItem).filter(it => it.id)).slice(0, 100);
+  const levelName = (serverFiles(root).properties || {})['level-name'] || 'world';
+  const { isSafeDownloadUrl } = require('../main/validate.js');
+  const { download } = require('../main/http.js');
+  const { recordManifestEntry } = require('../main/fs-utils.js');
+  // Recompute compatibility per item so the REPORT itself carries warnings — assemble must not
+  // rely on the caller having run plan_modpack first (the "show plan, then assemble" flow is
+  // prompt-driven, not enforced). A failed compat check does not block the install; it is reported.
+  const server = detectServerCompat(serverFiles(root));
+  const results = [];
+  let installed = 0, failed = 0;
+  for (const it of items) {
+    try {
+      const dl = await resolveMarketDownload(it);
+      if (!isSafeDownloadUrl(dl.url)) { results.push({ id: it.id, ok: false, error: 'Download URL is not on an allowlisted public host.' }); failed++; continue; }
+      const dest = safeTarget(root, path.join(folderForKind(it.kind, levelName), path.basename(dl.filename)));
+      if (!dest) { results.push({ id: it.id, ok: false, error: 'Unsafe destination path.' }); failed++; continue; }
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
+      try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, installedAt: new Date().toISOString() }); } catch {}
+      const warnings = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server).warnings;
+      const row = { id: it.id, ok: true, name: dl.filename };
+      if (warnings.length) row.warnings = warnings;
+      results.push(row);
+      installed++;
+    } catch (e) { results.push({ id: it.id, ok: false, error: e?.message || 'Install failed.' }); failed++; }
+  }
+  const warned = results.filter(r => r.warnings && r.warnings.length).length;
+  return { ok: true, result: { requested: items.length, installed, failed, withWarnings: warned, results, files: serverFiles(root) } };
 }
 async function tSavePlayerData(ctx, a) { return ok(await savePlayer(ctx, { uuid: a.uuid, changes: a.changes || {}, clearInventory: !!a.clearInventory })); }
 const { readPlayer, whitelistToggle, banToggle, opToggle, savePlayer } = require('../main/players.js');
@@ -563,7 +664,7 @@ const TOOLS = [
   { name: 'list_backups', risk: 'read', description: 'Backup files with size + date.', inputSchema: S(), handler: tListBackups },
   { name: 'get_network_info', risk: 'read', description: 'LAN IPs and server port.', inputSchema: S(), handler: tGetNetworkInfo },
   { name: 'get_java_info', risk: 'read', description: 'Detected Java version/path/arch.', inputSchema: S(), handler: tGetJavaInfo },
-  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar or Spigot for plugins/mods/datapacks/modpacks.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot (default modrinth)'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
+  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar, Spigot or CurseForge for plugins/mods/datapacks/modpacks. CurseForge requires the user to have set an API key in Settings.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
   { name: 'list_market_versions', risk: 'read', description: 'Versions of a Modrinth project.', inputSchema: S({ id: STR('project id/slug') }, ['id']), handler: tListMarketVersions },
   { name: 'diagnose_server', risk: 'read', description: 'Full server health check: folder, jar, Java version/arch, EULA, port, world, backups, recent crash. Returns per-check level (ok/warn/error) + fixes.', inputSchema: S(), handler: tDiagnoseServer },
   { name: 'analyze_console', risk: 'read', description: 'Scan the console buffer for errors/warnings (OOM, port-busy, exceptions, lag), grouped and ranked.', inputSchema: S({ lines: { type: 'number', description: 'lines to scan (default 500, max 2000)' } }), handler: tAnalyzeConsole },
@@ -591,10 +692,12 @@ const TOOLS = [
   { name: 'set_setting', risk: 'write', description: 'Change one launcher setting (memoryMin/Max, autoRestart, autoEula, autoBackupMinutes, locale, jvmArgs). serverPath is NOT settable.', inputSchema: S({ key: STR('setting name'), value: { description: 'new value' } }, ['key', 'value']), handler: tSetSetting },
   { name: 'set_schedule', risk: 'write', description: 'Set the server schedule. Any of enabled (bool), startTime/stopTime (HH:MM 24h or ""), days (array of mon..sun, empty = every day).', inputSchema: S({ enabled: { type: 'boolean', description: 'true = scheduler on' }, startTime: STR('HH:MM (24h) or empty to disable'), stopTime: STR('HH:MM (24h) or empty to disable'), days: { type: 'array', items: { type: 'string' }, description: 'weekdays mon..sun (empty = every day)' } }), handler: tSetSchedule },
   { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name') }, ['name']), handler: tKickPlayer },
-  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack from Modrinth, Hangar or Spigot (same resolver as the GUI).', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack'), source: STR('modrinth|hangar|spigot (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)') }, ['id']), handler: tInstallFromMarket },
+  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack from Modrinth, Hangar, Spigot or CurseForge (same resolver as the GUI). CurseForge needs the user to have set an API key in Settings, and refuses projects whose author blocks third-party downloads.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)') }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
+  { name: 'plan_modpack', risk: 'read', description: 'Resolve candidate projects into an install plan: exact versions, per-item compatibility warnings against this server, and required Modrinth dependencies (depth 1-2, auto-followed). CurseForge items also list their declared dependencies (informational only - CF has no reliable required/optional table, so they are shown, never auto-installed). Read-only. Find ids with search_marketplace first, show the plan to the user, then assemble_modpack.', inputSchema: S({ items: { type: 'array', description: 'candidates: [{ id, source?, kind?, version?, versionId? }]', items: { type: 'object' } }, resolveDeps: { type: 'boolean', description: 'include required Modrinth dependencies (default true)' }, max: { type: 'number', description: 'max items in the plan (default 50)' } }, ['items']), handler: tPlanModpack },
+  { name: 'assemble_modpack', risk: 'write', description: 'Install a whole list of projects in one confirmed batch (from plan_modpack). Returns a per-item report (installed/failed). One confirmation for the entire batch.', inputSchema: S({ items: { type: 'array', description: 'items: [{ id, source?, kind?, version?, versionId?, title? }]', items: { type: 'object' } } }, ['items']), handler: tAssembleModpack },
   { name: 'prepare_and_start', risk: 'write', description: 'Diagnose first (refuse on hard errors) -> create a safety backup -> start the server.', inputSchema: S(), handler: tPrepareAndStart },
   { name: 'safe_restart', risk: 'destroy', description: 'Back up, gracefully stop (waits up to 30s), then start again. Stops a running server - always requires confirmation (same class as stop_server).', inputSchema: S(), handler: tSafeRestart },
   { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat (health/food/xp/gamemode). Server must be stopped; a backup is written first.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object', description: 'health, food, saturation, xpLevel, xpTotal, gameType' }, clearInventory: { type: 'boolean', description: 'also clear inventory + equipment' } }, ['uuid']), handler: tSavePlayerData },

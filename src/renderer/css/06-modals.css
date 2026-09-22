@@ -403,6 +403,10 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 /* Replaces native confirm() — matches the black/cyan design system. */
 /* Enter/exit motion now comes from the universal .modal-overlay fade + rise (08-motion.css); the
    old cfIn enter animation is removed so it doesn't fight the discrete transition. */
+.blocked-list{list-style:none;margin:12px 0;padding:0;max-height:min(46vh,420px);overflow:auto}
+.blocked-row{display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border)}
+.blocked-row .blocked-name{flex:1;min-width:0;font:600 12.5px var(--font-ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.blocked-row .blocked-tag{flex-shrink:0;font:500 10.5px var(--font-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
 .confirm-modal{width:min(440px,100%);padding:0}
 .confirm-head{display:flex;gap:12px;align-items:center;padding:16px 18px 0}
 .confirm-ico{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);color:var(--accent);font:700 16px var(--font-mono)}

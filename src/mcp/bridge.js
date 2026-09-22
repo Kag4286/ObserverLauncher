@@ -173,6 +173,8 @@ const STATIC_TOOLS = [
   ['install_local_jar', 'Copy a local .jar into plugins/mods.'],
   ['import_modpack_path', 'Import a .mrpack from a local path.'],
   ['export_modpack', 'Export current setup to a .mrpack at a path.'],
+  ['plan_modpack', 'Resolve candidates into an install plan with compatibility + dependencies.'],
+  ['assemble_modpack', 'Install a whole list of projects in one confirmed batch.'],
   ['prepare_and_start', 'Diagnose -> backup -> start the server.'],
   ['safe_restart', 'Back up, stop, then start again.'],
   ['save_player_data', 'Apply edits to a player .dat.'],

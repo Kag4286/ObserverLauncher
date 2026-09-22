@@ -40,9 +40,15 @@ function bridgeConfigPath() {
 // unpacked OUTSIDE app.asar (asarUnpack in package.json), so `node app.asar/bridge.js` would fail;
 // rewrite the asar segment to app.asar.unpacked. In dev it is just the source path.
 function bridgeScriptPath() {
-  let p = path.join(__dirname, 'bridge.js');
-  if (p.includes('app.asar')) p = p.replace('app.asar', 'app.asar.unpacked');
-  return p;
+  const p = path.join(__dirname, 'bridge.js');
+  // Only rewrite the `app.asar` path SEGMENT (a directory named exactly app.asar). A plain
+  // String.replace('app.asar', ...) would also rewrite an already-unpacked path
+  // (app.asar.unpacked -> app.asar.unpacked.unpacked) or an unrelated directory that happens to
+  // contain the substring. Split on the path separator and swap the exact segment.
+  const parts = p.split(path.sep);
+  const i = parts.indexOf('app.asar');
+  if (i !== -1) parts[i] = 'app.asar.unpacked';
+  return parts.join(path.sep);
 }
 
 // Ask the renderer to confirm a write/destroy tool. Resolves true/false. Times out to false

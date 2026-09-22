@@ -170,3 +170,30 @@ test('Properties tab edits server.properties and persists the change', async () 
   expect(check.ok).toBe(true);
   expect(check.content).toContain('motd=E2E Edited');
 });
+
+// --- 1.5.0: responsive breakpoint (the addStyleTag hack is bypassed on purpose here) ---
+// launchApp injects a style tag that neutralises the 1100px breakpoint so nav clicks work on small
+// CI screens. That leaves the REAL responsive layout untested. This test removes the injected hack,
+// sets a small viewport and asserts the production breakpoint actually applies (.rail hides below
+// 1100px, shows at/above it), then restores the desktop layout for the remaining tests.
+test('responsive breakpoint hides the rail on narrow screens and shows it on wide', async () => {
+  // Remove the injected breakpoint-neutraliser so the real CSS media query governs layout.
+  await win.evaluate(() => {
+    document.querySelectorAll('style').forEach(s => {
+      if (s.textContent && s.textContent.includes('max-width:1100px') && s.textContent.includes('.rail')) s.remove();
+    });
+  });
+
+  await win.setViewportSize({ width: 820, height: 720 });
+  await win.waitForTimeout(150);
+  const railHidden = await win.locator('.rail').evaluate(el => getComputedStyle(el).display === 'none');
+  expect(railHidden).toBe(true);
+
+  await win.setViewportSize({ width: 1280, height: 800 });
+  await win.waitForTimeout(150);
+  const railShown = await win.locator('.rail').evaluate(el => getComputedStyle(el).display !== 'none');
+  expect(railShown).toBe(true);
+
+  // Restore the neutraliser so later tests can still click rail nav items on any runner.
+  await win.addStyleTag({ content: '@media(max-width:1100px){.app-shell{grid-template-columns:260px 1fr}.rail{display:flex}}' });
+});

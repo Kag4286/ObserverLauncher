@@ -59,7 +59,7 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 ![ObserverLauncher Content tab](docs/screenshot-content.png)
 
-**Marketplace** — search Modrinth, Hangar and SpigotMC in one box and install straight into your server folder.
+**Marketplace** — search Modrinth, Hangar, SpigotMC and (with your own API key) CurseForge in one box, and install straight into your server folder.
 
 ![ObserverLauncher Marketplace tab](docs/screenshot-marketplace.png)
 
@@ -97,13 +97,13 @@ Every tab shares one look — a header strip over a single surface — so the ap
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-1.4.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-1.4.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-1.5.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-1.5.0.AppImage` |
 
 Grab the latest from the [Releases page](https://github.com/Kag4286/ObserverLauncher/releases/latest).
 
 - **Windows:** run the `.exe` (a normal NSIS installer — you can choose the install location; it sets up auto-update).
-- **Linux:** `chmod +x ObserverLauncher-1.4.0.AppImage` then run it. No installation, no root.
+- **Linux:** `chmod +x ObserverLauncher-1.5.0.AppImage` then run it. No installation, no root.
 
 ### Option B — Run from source
 
@@ -157,7 +157,7 @@ Everything else — plugins, players, backups, the world map — is optional.
 - Works on modern (1.21.5+ / 26.x) servers too, where armor and the off-hand item moved into the `equipment` NBT tag.
 
 ### Marketplace
-- Search **Modrinth, Hangar and SpigotMC** in one box.
+- Search **Modrinth, Hangar, SpigotMC and CurseForge** in one box. CurseForge is optional and needs your own free API key (Settings → Advanced); it is stored locally and sent only to CurseForge. Mods whose author blocks third-party downloads show an **Open page** button instead of Install — the app never bypasses that choice.
 - Shows **compatibility before you install** (game version, loader, server-side support) against the detected server.
 - **Explicit version picker** with per-file download progress.
 - **Dependency awareness** (Modrinth): required dependencies are listed with a name and an *installed* tick, incompatibilities are flagged, and a one-click **Install N required dependencies** fills the gaps. Optional deps are shown but never auto-installed.
@@ -211,7 +211,9 @@ Everything else — plugins, players, backups, the world map — is optional.
 
 ## MCP / AI integration
 
-ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (**58 tools**).
+ObserverLauncher can act as an **MCP server**, letting an MCP client read and control your server in natural language — status, console, files, plugins, modpacks, and more (**60 tools**).
+
+**Modpack builder.** The AI can search the marketplace, then `plan_modpack` turns candidate projects into an install plan (exact versions, per-item compatibility warnings against your server, required Modrinth dependencies). After you approve it, `assemble_modpack` installs the whole list in **one** confirmation and reports per item what installed and what failed. The AI only picks ids; versions, URLs and hashes are always resolved by the app from the registry.
 
 **Server Doctor.** The AI can run a full health check (`doctor_report` / `diagnose_server`), scan the console for errors (`analyze_console`), summarise the newest crash report (`explain_crash`), check TPS/MSPT (`check_performance`), validate `server.properties`, test the port, and run safe composite workflows (`prepare_and_start`, `safe_restart` — diagnose → backup → start). Every write/destroy action is recorded to an audit log the AI can read back (`read_audit_log`).
 
@@ -371,7 +373,7 @@ The app is a clean three-layer split.
 ┌─────────────────────────────────────────────────────────────┐
 │  RENDERER  (src/renderer/)  — UI only, no Node access       │
 │  index.html loads css/* → locales/* → js/* in NUMERIC order  │
-│  js/00-core … js/12-wizard (classic scripts, no bundler)     │
+│  js/00-core … js/13-bootcheck (classic scripts, no bundler)  │
 └───────────────────────────┬─────────────────────────────────┘
                             │  window.observer.*  (IPC)
 ┌───────────────────────────┴─────────────────────────────────┐
@@ -446,7 +448,7 @@ ObserverLauncher/
 │   │   └── platform/    # Windows/Linux process + metrics + firewall
 │   └── renderer/        # UI
 │       ├── index.html   # Shell (loads css/*, locales/*, js/* in order)
-│       ├── js/          # Frontend per tab (00-core … 12-wizard)
+│       ├── js/          # Frontend per tab (00-core … 13-bootcheck)
 │       ├── css/         # Styles per area (01-tokens … 09-pulse)
 │       └── locales/     # One file per language (meta.js first)
 ├── tests/               # Unit tests (node tests/run.js)

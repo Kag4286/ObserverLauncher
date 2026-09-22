@@ -90,6 +90,18 @@ check('get_metrics_history is read', getTool('get_metrics_history')?.risk === 'r
 check('ban_player has ip param', 'ip' in (getTool('ban_player').inputSchema.properties || {}));
 check('op_player has level param', 'level' in (getTool('op_player').inputSchema.properties || {}));
 
+// --- 1.5.0 modpack planner/assembler ---
+check('tool exists: plan_modpack', !!getTool('plan_modpack'));
+check('plan_modpack is read', getTool('plan_modpack')?.risk === 'read');
+check('plan_modpack requires items', (getTool('plan_modpack').inputSchema.required || []).includes('items'));
+// REGRESSION (review): normalizePlanItem must accept 'curseforge', else CF items are silently
+// coerced to Modrinth and resolve the wrong project. Parse the source allowlist from tools.js.
+const toolsSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'mcp', 'tools.js'), 'utf8');
+check('normalizePlanItem allows curseforge', /\['modrinth', 'hangar', 'spigot', 'curseforge'\]/.test(toolsSrc));
+check('tool exists: assemble_modpack', !!getTool('assemble_modpack'));
+check('assemble_modpack is write', getTool('assemble_modpack')?.risk === 'write');
+check('assemble_modpack requires items', (getTool('assemble_modpack').inputSchema.required || []).includes('items'));
+
 // --- STATIC_TOOLS drift guard (this class of bug shipped 3 times) ---
 // bridge.js offline list must name the SAME tools as the live registry. Parse the source instead of
 // require()-ing bridge.js (which attaches a stdin listener and would hang the test runner).

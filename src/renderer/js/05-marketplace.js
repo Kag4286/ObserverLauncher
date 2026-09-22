@@ -4,10 +4,10 @@
 // exact version picker, warnings and byte progress replace the old native confirm() prompts.
 // Card grid: icon + title/author + source/kind badges + clamped description + meta foot + Install.
 // The kind badge class carries the colour (plugin/mod/datapack), source badge shows the registry.
-function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel glass market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';return `<article class="panel glass market-item"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span></div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small><button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button></div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
+function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel glass market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';const blocked=!!x.blocked;const action=blocked?`<button class="btn secondary" data-market-open="${i}">${t('mkt.cfOpenPage')}</button>`:`<button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button>`;const badge=blocked?`<span class="mi-badge warn">${t('mkt.cfBlocked')}</span>`:'';return `<article class="panel glass market-item"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span>${badge}</div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small>${action}</div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
   const item=items[Number(b.dataset.marketInstall)];
   openInstallModal(item);
-})}
+});$$('[data-market-open]').forEach(b=>b.onclick=()=>{const item=items[Number(b.dataset.marketOpen)];if(item&&item.projectUrl)window.observer.marketOpenExternal(item.projectUrl)})}
 
 // ============ INSTALL CONFIRM MODAL ============
 // Full GUI confirmation for Marketplace installs: compatibility panel (game version / loader /
@@ -147,7 +147,7 @@ function imRenderVersionPicker(){
   const vs=installState.detail?.versions;
   if(!vs||!vs.length){sec.hidden=true;return}
   sec.hidden=false;
-  sel.innerHTML=vs.map((v,i)=>`<option value="${esc(v.id)}">${esc(v.number)} — ${new Date(v.date).toLocaleDateString()} · ${imFmtBytes(v.size)} · ${(v.gameVersions||[]).slice(-1)[0]||'?'}</option>`).join('');
+  sel.innerHTML=vs.map((v,i)=>`<option value="${esc(v.id)}">${esc(v.number)} — ${new Date(v.date).toLocaleDateString()} · ${imFmtBytes(v.size)} · ${(v.gameVersions||[]).slice(-1)[0]||'?'}${v.blocked?' · '+t('mkt.cfBlocked'):''}</option>`).join('');
   sel.onchange=()=>{installState.versionId=sel.value;imRenderCompat();imRenderWarns();imRenderDeps()};
 }
 function imSetDone(r){
@@ -182,6 +182,7 @@ async function startInstall(){
     if(item.kind==='modpack')r=await window.observer.installMarketModpack({id:item.id,version:item.version,versionId:versionId||undefined});
     else r=await window.observer.marketInstall({...item,versionId:versionId||undefined});
     if(r.ok){imSetDone(r);toast(t('toast.installed',{n:r.name||item.title}),'success')}
+    else if(r.blocked){imSetError(r.error||t('mkt.cfBlocked'));if(r.projectUrl)window.observer.marketOpenExternal(r.projectUrl)}
     else imSetError(r.error||t('mkt.installFailed'));
   }catch(e){imSetError(e?.message||t('mkt.installFailed'))}
 }

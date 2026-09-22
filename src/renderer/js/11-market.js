@@ -65,5 +65,29 @@ function renderMarketChips(){
   box.hidden=!chips.length;
   box.innerHTML=chips.length?chips.map(c=>`<span class="market-chip">${esc(c.label)}</span>`).join(''):'';
 }
-$('#importModpack').onclick=async()=>{const r=await window.observer.importModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('mkt.imported',{n:r.name,c:r.installed,s:r.skipped?t('mkt.importedSkipped',{k:r.skipped}):''}),'success')};
+$('#importModpack').onclick=async()=>{const r=await window.observer.importModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('mkt.imported',{n:r.name,c:r.installed,s:r.skipped?t('mkt.importedSkipped',{k:r.skipped}):''}),'success');if(r.blocked&&r.blocked.length)openBlockedDialog(r)};
+// --- Blocked mods dialog (CurseForge import; Prism-style manual fallback) ---
+// When a CF modpack includes mods whose author disabled third-party downloads, the API returns no
+// URL. We list them, link their page, and let the user drop the files into the server folder then
+// click Check — verifyBlockedMods hashes what is on disk against the expected SHA1.
+let blockedState={list:[],destFolder:'mods'};
+function openBlockedDialog(r){blockedState={list:r.blocked||[],destFolder:r.destFolder||'mods'};const m=$('#blockedModal');if(!m)return;m.hidden=false;renderBlockedList()}function renderBlockedList(){const box=$('#blockedList');if(!box)return;box.innerHTML=blockedState.list.map((b,i)=>`<li class="blocked-row" data-i="${i}"><span class="blocked-name">${esc(b.name||b.fileName||('project '+b.projectID))}</span><button type="button" class="text-btn" data-open="${i}">${esc(t('cfi.openPage'))} ↗</button><span class="blocked-tag">${esc(t('cfi.pending'))}</span></li>`).join('')||`<li class="empty"><span>${esc(t('cfi.done'))}</span></li>`;box.querySelectorAll('[data-open]').forEach(x=>x.onclick=()=>{const b=blockedState.list[Number(x.dataset.open)];if(b&&b.pageUrl)window.observer.marketOpenExternal(b.pageUrl);else if(b&&b.projectID)window.observer.marketOpenExternal('https://www.curseforge.com/minecraft/mc-mods/'+b.projectID)});$('#blockedHint').textContent=t('cfi.hint',{f:blockedState.destFolder})}async function checkBlocked(){const r=await window.observer.verifyBlockedMods({blocked:blockedState.list,destFolder:blockedState.destFolder});if(r&&r.ok){blockedState.list=r.missing||[];renderBlockedList();if(!blockedState.list.length)toast(t('cfi.done'),'success')}}$('#blockedCheck')&&($('#blockedCheck').onclick=checkBlocked);$('#blockedClose')&&($('#blockedClose').onclick=()=>{$('#blockedModal').hidden=true});
 $('#exportModpack').onclick=async()=>{const r=await window.observer.exportModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('mkt.exported',{c:r.count,p:r.path}),'success')};
+
+// --- CurseForge source (optional): only shown once the user has saved an API key ---
+// The app never bundles a key (CurseForge ToS forbids sharing). When the key is present the seg
+// appears; when a search hits a key-less/misconfigured state the backend returns a clear error.
+async function refreshCurseforgeSource(){
+  const seg=$('#marketCfSeg');if(!seg)return;
+  let hasKey=false;
+  try{const r=await window.observer.marketCurseforgeStatus();hasKey=!!(r&&r.hasKey)}catch{}
+  seg.hidden=!hasKey;
+  // If CF was the active source and the key just went away, fall back to Modrinth.
+  if(!hasKey&&$('#marketSource').value==='curseforge'){
+    $('#marketSource').value='modrinth';
+    $$('#marketSourceSeg .seg').forEach(x=>x.classList.toggle('active',x.dataset.source==='modrinth'));
+  }
+}
+refreshCurseforgeSource();
+// Re-check after settings are saved (the user may have just pasted a key).
+$('#saveSettings')?.addEventListener('click',()=>setTimeout(refreshCurseforgeSource,400));
