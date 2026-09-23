@@ -98,6 +98,36 @@ async function findJavaDescendant(rootPid) {
   return cands[0] || null;
 }
 
+// Process identity for orphan cleanup (v2.0.0). /proc/<pid>/stat field 22 is the
+// process start time in clock ticks since boot; /proc/stat btime is the boot time
+// in epoch seconds -> an absolute creation time, unique per process lifetime. Used
+// to detect PID REUSE before killing (tier-3 orphan must NEVER be killed). A zombie
+// (state 'Z') is already terminated -> reported as not alive. Returns
+// { alive, name, startTimeMs } or null if the pid is not running.
+function getProcessInfo(pid) {
+  const n = Number(pid);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  let stat;
+  try { stat = fs.readFileSync(`/proc/${n}/stat`, 'utf8'); } catch { return null; }
+  // comm (field 2) is wrapped in the FIRST '(' and LAST ')' and may contain spaces.
+  const open = stat.indexOf('(');
+  const close = stat.lastIndexOf(')');
+  if (open === -1 || close === -1) return null;
+  const comm = stat.slice(open + 1, close);
+  const rest = stat.slice(close + 2).trim().split(/\s+/);
+  if (rest[0] === 'Z') return null; // zombie = already exited, nothing to kill
+  // rest[0] = state (field 3) -> field N is rest[N - 3]; starttime is field 22.
+  const startTicks = Number(rest[19]);
+  let btimeSec = 0;
+  try {
+    const m = fs.readFileSync('/proc/stat', 'utf8').match(/^btime\s+(\d+)/m);
+    if (m) btimeSec = Number(m[1]);
+  } catch {}
+  const HZ = 100; // CLK_TCK is 100 on essentially every Linux; only used for PID-reuse detection.
+  const startTimeMs = Number.isFinite(startTicks) && btimeSec ? Math.round((btimeSec + startTicks / HZ) * 1000) : null;
+  return { alive: true, name: comm, startTimeMs };
+}
+
 async function getProcessMetrics(pid) {
   // Try /proc first
   try {
@@ -204,7 +234,7 @@ async function allowFirewall(port) {
   };
 }
 
-module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries, extractArchive, createArchive };
+module.exports = { findJavaDescendant, getProcessInfo, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries, extractArchive, createArchive };
 
 // Cross-platform archive helpers (Linux side). .zip -> unzip, .tar.gz/.tgz -> tar.
 async function extractArchive(archivePath, destDir) {

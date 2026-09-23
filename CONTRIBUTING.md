@@ -25,7 +25,8 @@ The app is plain Electron — **no bundler, no build step for development**. The
   `src/main/`:
   - Feature modules (stateful, take `ipcMain` + `ctx`): `context.js`, `server-lifecycle.js`,
     `backups.js`, `players.js`, `marketplace.js`, `modpacks.js`, `wizard.js`, `settings-handlers.js`,
-    `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`, `tunnel.js`.
+    `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`, `tunnel.js`, `orphan.js`,
+    `orphan-prompt.js`, `rcon.js`, `runtime-state.js`, `tunnel-manager.js`.
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
     `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
@@ -61,6 +62,34 @@ The app is plain Electron — **no bundler, no build step for development**. The
       evaluated; if a load-order regression leaves one undefined it logs a console error and shows a
       banner instead of a silent blank tab. When you add a helper that the boot path or a tab calls
       during eval, add a probe for it here.
+
+## Multi-instance model (v2.0.0)
+
+The app manages several servers at once. The design is what keeps that from becoming a tangle of
+globals, so read this before touching backend state.
+
+- **Settings are nested (schema v4).** The store is `{ global..., instances: [], activeInstanceId }`.
+  The per-instance keys are listed once in `PER_INSTANCE_KEYS` (`src/main/migrations.js`); the v3→v4
+  migration moves them into `instances[0]`. `loadSettings()` returns a FLAT view of the ACTIVE
+  instance (so old callers kept working), `loadSettingsStore()` returns the nested store, and
+  `loadSettingsFor(id)` / `saveSettingsFor(id, flat)` read and write a SPECIFIC instance. Use the
+  `*For(id)` variants in any code that targets an instance by id — plain `loadSettings()` always
+  means the active one.
+- **The instance id travels with the call chain.** `context.js` holds `ctx.instances` (a Map), an
+  `activeInstanceId`, and an `AsyncLocalStorage`-backed `ctx.inst()` / `ctx.runInInstance(id, fn)`.
+  Per-instance `ctx` fields are getter/setter accessors over `instState()`; call-sites keep plain
+  property syntax (`ctx.currentServerPath`) and the ALS routes each read/write to the right instance.
+  The `callTool` choke point (`src/mcp/server.js`) and every IPC handler (`src/main.js` wraps
+  `ipcMain.handle`) run inside `runInInstance`, so a switch mid-await cannot leak state across calls.
+- **Adding a per-instance field** means editing three places or the guard misses it: `freshInstState()`
+  and `INST_FIELDS` in `context.js`, plus the `MIGRATED` list in `tests/arch-ctx-accessors.test.js`.
+  The arch test fails if a per-instance field is left as a flat property on the `ctx` literal.
+- **Reusable timers loop over instances.** The metrics sampler, scheduler and auto-backup watcher run
+  one loop over `ctx.instances.keys()`, each tick wrapped in `ctx.runInInstance(id)` with
+  `loadSettingsFor(id)`. Follow that pattern for anything recurring.
+- **Gated events.** `context.js` `send()` drops `server:metrics`, `server:live`, `server:files` and
+  `server:log` unless `ctx.inst()` is the active instance; `server:state` and error log lines always
+  pass. New push channels default to ungated — add them to `GATED_CHANNELS` if they are per-instance.
 
 ## Minecraft data formats change between versions
 
@@ -103,7 +132,13 @@ add a regression test with a synthesized NBT fixture (see
   untrusted. Use the shared validators in `src/main/validate.js` and `safeTarget` in
   `src/main/fs-utils.js`. The renderer mirrors some checks for instant feedback, but the backend must
   re-validate as defense in depth.
-- **Run the tests** before opening a PR: `npm test`.
+- **Follow the motion contract.** New animation uses the duration/easing tokens (`var(--dur-*)`,
+  `var(--ease-*)`) from `01-tokens.css`, never literal `.2s`/`150ms`, and guards Lite mode and
+  `prefers-reduced-motion`. `tests/motion-tokens.test.js` is a ratchet: it fails if the count of
+  literal durations in CSS goes up. See `docs/motion.md`.
+- **Run the tests** before opening a PR: `npm test`. The suite includes architecture guards
+  (`tests/arch-*.test.js`) that check boot order, IPC channel parity, the atomic-write whitelist and
+  the per-instance accessors. `npm run test:e2e` runs the Playwright suite.
 - **Test on Windows** if you can — Windows and Linux are the currently supported platforms, and
   several code paths (`powershell.exe`, `cmd.exe`, `run.bat`) are Windows-specific.
 

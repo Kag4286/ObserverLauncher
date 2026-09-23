@@ -15,10 +15,13 @@ const fs = require('fs');
 const path = require('path');
 const { killTree } = require('./kill.js');
 const { download } = require('./http.js');
+const TM = require('./tunnel-manager.js');
 
 // Playit agent releases live on GitHub. We DON'T hardcode asset filenames (they change) — we ask the
 // GitHub API for the latest release and pick the matching asset. Pure so the selection is testable.
 const PLAYIT_REPO = 'playit-cloud/playit-agent';
+// ITEM 12: installer/archive suffixes. We must download a RUNNABLE binary, not an installer package.
+const PLAYIT_INSTALLER_EXT = /\.(msi|apk|deb|rpm|pkg|dmg|tar\.gz|tgz|zip)$/i;
 function pickPlayitAsset(assets, platform, arch) {
   if (!Array.isArray(assets)) return null;
   const a = (arch === 'arm64' || arch === 'aarch64') ? 'aarch64' : 'amd64';
@@ -28,9 +31,60 @@ function pickPlayitAsset(assets, platform, arch) {
   const archMatches = name => a === 'aarch64'
     ? (name.includes('aarch64') || name.includes('arm64'))
     : (name.includes('amd64') || name.includes('x86_64') || name.includes('x64'));
-  return assets.find(x => norm(x.name).includes(want) && archMatches(norm(x.name)))
-    || assets.find(x => norm(x.name).includes(want))
+  const matches = assets.filter(x => norm(x.name).includes(want));
+  // BUG FIX: GitHub lists `playit-windows-x86_64-signed.msi` BEFORE `playit-windows-x86_64.exe`, so
+  // the old plain .find() downloaded the MSI and saved it as playit.exe -> the agent would not run.
+  // Prefer a non-installer binary (exact arch, then any arch), and only fall back to a package.
+  return matches.find(x => !PLAYIT_INSTALLER_EXT.test(norm(x.name)) && archMatches(norm(x.name)))
+    || matches.find(x => !PLAYIT_INSTALLER_EXT.test(norm(x.name)))
+    || matches.find(x => archMatches(norm(x.name)))
+    || matches[0]
     || null;
+}
+
+// ITEM 12: pinned SHA-256 for the current release (v1.0.10), used ONLY as a fallback when the
+// GitHub API response carries no `asset.digest` (the digest is the primary source and never goes
+// stale). Captured from the release page's expanded_assets digests. Keep in sync on major bumps.
+const PLAYIT_PINNED_SHA256 = {
+  'playit-windows-x86_64.exe': '97ad38fcbd1c4fafcb84a99c0b1b1ba216f76ef5372ae2f6ef142652a1239ad4',
+  'playit-windows-x86_64-signed.msi': '18c022281fcfe578fb0d614ac6dc1d36cd6885b4a5439b97655768cd2a82bdc1',
+  'playit-cli-linux-amd64': '6fd54d147ae1d3232b22c1c1f4aa3d13cf16d889e840ca2d3f90b4f50a2e7301',
+  'playit-cli-linux-aarch64': 'b126b4164c03838598c8f33f209d76f6acf1c257d07900c0af2d461b9647099f',
+  'playit-cli-linux-armv7': '2e1140a838b42f00233065432ed36fbfe8af34e9aa22585bcb2e01fcdad282a6',
+  'playit-cli-linux-i686': 'e8e4bd663d0781e3d168be2a4e45d3642a38bc7946f507ba6116e8687b8a678f',
+  'playit-linux-amd64': '2df7d9f10227ab312b1ad341853db4e8a8243df5cfcdbae58713a4271711c339',
+  'playit-linux-armv7': '92ec60988b1246e07ac090c663128bd04bdc0d7ff388db520e1ff7bb4e5003e0',
+};
+// The expected sha256 hex for a release asset: GitHub's published digest wins; else the pinned hash.
+// null = we have nothing to verify against (install proceeds unverified, logged).
+function expectedSha256(asset) {
+  const d = String((asset && asset.digest) || '');
+  if (/^sha256:[0-9a-f]{64}$/i.test(d)) return d.slice(7).toLowerCase();
+  const pinned = PLAYIT_PINNED_SHA256[String((asset && asset.name) || '')];
+  return pinned ? pinned.toLowerCase() : null;
+}
+// Streaming sha256 of a file (no whole-file buffer, so a large asset cannot blow memory).
+function sha256File(file) {
+  const crypto = require('crypto');
+  const h = crypto.createHash('sha256');
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(1024 * 1024);
+    let n;
+    while ((n = fs.readSync(fd, buf, 0, buf.length, null)) > 0) h.update(buf.subarray(0, n));
+  } finally { fs.closeSync(fd); }
+  return h.digest('hex');
+}
+// ITEM 12 (Authenticode): best-effort, Windows-only. LOGS the signature status, never blocks -
+// the Playit agent may legitimately be unsigned, so a hard failure would break the install.
+async function checkAuthenticode(file) {
+  if (process.platform !== 'win32') return null;
+  try {
+    const { runPowerShell, psQuote } = require('./http.js');
+    const r = await runPowerShell(`(Get-AuthenticodeSignature -LiteralPath ${psQuote(file)}).Status`, 15000);
+    if (r && r.ok) return String(r.stdout || '').trim() || null;
+  } catch {}
+  return null;
 }
 
 // Only providers we explicitly support. Add 'pinggy' here when/if it ships.
@@ -91,14 +145,31 @@ async function installPlayitAgent(ctx) {
     // The Playit agent binary is a few MB; cap at 256 MB.
     await download(asset.browser_download_url, dest, (received, total) => ctx.send('tunnel:progress', { received, total }), null, { maxBytes: 256 * 1024 * 1024 });
     if (!fs.existsSync(dest) || fs.statSync(dest).size === 0) throw new Error('The Playit agent download was empty.');
+    // ITEM 12: verify before we ever run it. Primary = the digest GitHub publishes with the release
+    // (always current, never stale); fallback = pinned hash for known releases. No hash available ->
+    // proceed unverified (best-effort) but log it, so the gap is visible instead of silent.
+    const expected = expectedSha256(asset);
+    if (expected) {
+      const actual = sha256File(dest);
+      if (actual !== expected) {
+        try { fs.rmSync(dest, { force: true }); } catch {}
+        throw new Error('The Playit agent failed its SHA-256 check - the download was corrupt or tampered with. Not installing.');
+      }
+      ctx.appendLog('Playit agent SHA-256 verified.', 'system');
+    } else {
+      ctx.appendLog('Playit agent downloaded (no published hash to verify against).', 'system');
+    }
     if (process.platform !== 'win32') { try { fs.chmodSync(dest, 0o755); } catch {} }
+    // ITEM 12 (Authenticode): logged, never enforced (see checkAuthenticode).
+    const signature = await checkAuthenticode(dest).catch(() => null);
+    if (process.platform === 'win32') ctx.appendLog(`Playit agent signature: ${signature || 'unknown'}.`, 'system');
     const { loadSettings, saveSettings } = require('./settings.js');
     const s = loadSettings();
     // Never clobber a path the user already set (they may point at a system install whose service
     // is the one actually running).
     if (!s.playitPath || !fs.existsSync(s.playitPath)) { s.playitPath = dest; saveSettings(s); }
     ctx.appendLog(`Playit agent ready: ${dest}`, 'system');
-    return { ok: true, path: dest };
+    return { ok: true, path: dest, sha256: expected || null, signature: signature || null };
   } catch (error) {
     return { ok: false, error: error?.message || 'Could not download the Playit agent.' };
   }
@@ -217,13 +288,19 @@ async function refreshTunnel(ctx) {
 // service — never kills a Playit service the user runs themselves (it may serve other things).
 // Called on server stop and on app quit.
 function stopTunnel(ctx) {
-  if (ctx.tunnelStartedByApp) {
+  // M10: drop the calling instance from the daemon-user set. The daemon is GLOBAL — only stop it
+  // when NO instance still wants it AND the app started it (never kill a user-run daemon).
+  ctx.tunnelDaemonUsers = TM.removeUser(ctx.tunnelDaemonUsers, ctx.inst());
+  if (TM.shouldStopDaemon(ctx.tunnelDaemonUsers, ctx.tunnelStartedByApp)) {
     const bin = findPlayitBinary();
     if (bin) { try { runPlayit(bin, ['stop'], 10000); } catch {} }
+    ctx.tunnelStartedByApp = false;
+    ctx.tunnelStatus = 'stopped';
+    ctx.tunnelService = 'stopped';
+  } else if (ctx.tunnelDaemonUsers.size > 0) {
+    // Other instances still use the daemon — leave it up, just note it.
+    try { ctx.appendLog(`Tunnel daemon kept running (${ctx.tunnelDaemonUsers.size} other instance(s) still use it).`, 'system'); } catch {}
   }
-  ctx.tunnelStartedByApp = false;
-  ctx.tunnelStatus = 'stopped';
-  ctx.tunnelService = 'stopped';
   ctx.send('tunnel:status', tunnelSnapshot(ctx));
   return { ok: true };
 }
@@ -237,6 +314,10 @@ async function autoStartTunnel(ctx) {
   const decide = reason => { try { ctx.appendLog(`Auto-tunnel: skipped (${reason}).`, 'system'); } catch {} return { ok: false, skipped: reason }; };
   if (!on) return decide('disabled in Settings');
   if (!ctx.serverProcess || ctx.serverStatus !== 'running') return decide(`server not running (status=${ctx.serverStatus})`);
+  // M10: register THIS instance as a daemon user BEFORE starting, so the daemon is never torn down
+  // while any instance (this one included) still wants it.
+  const instId = ctx.inst();
+  ctx.tunnelDaemonUsers = TM.addUser(ctx.tunnelDaemonUsers, instId);
   if (ctx.tunnelStatus === 'running' || ctx.tunnelStatus === 'starting' || ctx.tunnelStatus === 'installing') return { ok: true, skipped: 'already' };
   ctx.appendLog('Auto-tunnel: starting the Playit service (enabled in Settings).', 'system');
   return ensurePlayitService(ctx, 'playit');
@@ -283,4 +364,4 @@ function registerTunnel(ipcMain, ctx) {
   });
 }
 
-module.exports = { registerTunnel, ensurePlayitService, stopTunnel, autoStartTunnel, refreshTunnel, isSafePlayitUrl, isValidProvider, resolveTargetPort, findPlayitBinary, tunnelSnapshot, parseServiceStatus, pickPlayitAsset, installPlayitAgent, PROVIDERS };
+module.exports = { registerTunnel, ensurePlayitService, stopTunnel, autoStartTunnel, refreshTunnel, isSafePlayitUrl, isValidProvider, resolveTargetPort, findPlayitBinary, tunnelSnapshot, parseServiceStatus, pickPlayitAsset, installPlayitAgent, PROVIDERS, expectedSha256, sha256File, PLAYIT_PINNED_SHA256 };

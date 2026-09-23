@@ -17,6 +17,14 @@
 <div class="app-shell">
   <aside class="rail">
     <div class="rail-head"><div class="brand"><span class="brand-mark"><img src="./assets/icons/observer.png" alt="Observer"></span><div><b>OBSERVER LAUNCHER</b></div></div></div>
+    <!-- v2.0.0 multi-instance: a list of instances above the nav. Items use .inst-item +
+         data-instance (NOT .nav-item/data-tab) so switchTab and its keyboard nav are untouched. -->
+    <div class="instance-list" id="instanceList" hidden>
+      <p class="instance-list-label" data-i18n="nav.instances">Instances</p>
+      <div class="instance-items" id="instanceItems" role="list"></div>
+      <button type="button" class="inst-add" id="addInstanceBtn"><span aria-hidden="true">+</span> <span data-i18n="nav.addInstance">Add instance</span></button>
+      <button type="button" class="inst-add inst-add-existing" id="addExistingBtn"><span aria-hidden="true">⌂</span> <span data-i18n="inst.addExisting">Add existing folder</span></button>
+    </div>
     <nav id="nav" class="rail-nav" role="navigation" aria-label="Main">
       <div class="nav-group">
         <p class="nav-group-label" data-i18n="nav.grpServer">Server</p>
@@ -44,6 +52,17 @@
   <div class="workspace">
   <header class="command-bar">
     <div class="command-bar-pulse"><div class="pulse-wave" id="pulseWave" aria-hidden="true"></div></div>
+    <!-- Compact instance switcher: only shown when the rail is hidden (<1100px), so the
+         active instance + quick switch stay reachable on narrow screens. Populated by
+         renderInstanceList() from the same state as the rail list. -->
+    <div class="inst-dd" id="instDropdown" hidden>
+      <button type="button" class="inst-dd-btn" id="instDdBtn" aria-haspopup="listbox" aria-expanded="false">
+        <span class="inst-dot st-stopped" id="instDdDot"></span>
+        <span class="inst-dd-name" id="instDdName">—</span>
+        <span class="inst-dd-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="inst-dd-menu" id="instDdMenu" role="listbox" hidden></div>
+    </div>
     <div class="command-bar-path" id="serverPath">No server selected</div>
   </header>
   <div class="channel-strip" hidden></div>
@@ -417,6 +436,13 @@
             <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
             <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
           </section>
+          <!-- Q2: Tunnel overview — every instance + its public address at a glance. Pure renderer:
+               reads state.instances (id/name/tunnelAddress/autoTunnel) + state.instanceStatus for
+               the dots. Hidden until there are 2+ instances so the single-server UI is unchanged. -->
+          <section class="flat-cell flat-span2" id="tunnelOverviewSection" hidden>
+            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="tun.ovT">Tunnel overview</h3><small data-i18n="tun.ovD">your public addresses, one row per server</small></div>
+            <div id="tunnelOverview" class="tun-ov"></div>
+          </section>
           <!-- CurseForge (advanced): an API key the USER supplies; the app never bundles or shares one. -->
           <section class="flat-cell flat-span2">
             <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.cfT">CurseForge</h3><small data-i18n="set.cfD">search the CurseForge catalogue (optional)</small></div>
@@ -534,10 +560,11 @@
       <aside class="nsw2-rail">
         <p class="eyebrow" data-i18n="nsw.eyebrow">NEW SERVER</p>
         <ol class="nsw2-steps">
-          <li class="nsw2-step active" data-dot="1"><i>01</i><div><b data-i18n="nsw.rail1">Software</b><small id="nswRailSub1">Vanilla</small></div></li>
-          <li class="nsw2-step" data-dot="2"><i>02</i><div><b data-i18n="nsw.rail2">Version</b><small id="nswRailSub2">Latest</small></div></li>
-          <li class="nsw2-step" data-dot="3"><i>03</i><div><b data-i18n="nsw.rail3">Memory</b><small id="nswRailSub3">4 GB</small></div></li>
-          <li class="nsw2-step" data-dot="4"><i>04</i><div><b data-i18n="nsw.rail4">Review</b><small>Create</small></div></li>
+          <li class="nsw2-step active" data-dot="1"><i>01</i><div><b data-i18n="nsw.railFolder">Folder</b><small id="nswRailFolderSub">—</small></div></li>
+          <li class="nsw2-step" data-dot="2"><i>02</i><div><b data-i18n="nsw.rail1">Software</b><small id="nswRailSub1">Vanilla</small></div></li>
+          <li class="nsw2-step" data-dot="3"><i>03</i><div><b data-i18n="nsw.rail2">Version</b><small id="nswRailSub2">Latest</small></div></li>
+          <li class="nsw2-step" data-dot="4"><i>04</i><div><b data-i18n="nsw.rail3">Memory</b><small id="nswRailSub3">4 GB</small></div></li>
+          <li class="nsw2-step" data-dot="5"><i>05</i><div><b data-i18n="nsw.rail4">Review</b><small>Create</small></div></li>
         </ol>
         <label class="set-check nsw2-tech"><input type="checkbox" id="nswShowTech"><span data-i18n="nsw.tech">Show technical details</span></label>
       </aside>
@@ -545,8 +572,18 @@
       <div class="nsw2-main">
         <p class="eyebrow nsw2-steplabel" id="nswStepLabel">STEP 1 OF 4</p>
 
-        <!-- STEP 1 · SOFTWARE -->
+        <!-- STEP 1 · FOLDER -->
         <div class="nsw-step active" data-step="1">
+          <h2 data-i18n="nsw.folderT">Where should the server live?</h2>
+          <p class="text-muted nsw2-lead" data-i18n="nsw.folderLead">Pick an empty folder (or create a new one). Each instance keeps its own folder, so servers never mix files.</p>
+          <div class="nsw-folder-pick">
+            <button type="button" class="btn secondary" id="nswChooseFolder" data-i18n="nsw.chooseFolder">Choose folder…</button>
+            <span class="nsw-folder-path" id="nswFolderPath">—</span>
+          </div>
+        </div>
+
+        <!-- STEP 2 · SOFTWARE -->
+        <div class="nsw-step" data-step="2">
           <h2 data-i18n="nsw.softwareT">What kind of server?</h2>
           <p class="text-muted nsw2-lead">Beginners: <b>Vanilla</b> (simplest) or <b>Paper</b> (plugins). The rest are for mods, proxies or big servers.</p>
           <div id="nswCards">
@@ -568,8 +605,8 @@
           </div>
         </div>
 
-        <!-- STEP 2 · VERSION -->
-        <div class="nsw-step" data-step="2">
+        <!-- STEP 3 · VERSION -->
+        <div class="nsw-step" data-step="3">
           <h2 data-i18n="nsw.versionT">Which Minecraft version?</h2>
           <p class="text-muted nsw2-lead">Keep <b>Latest</b> unless a mod or plugin page demands an older release.</p>
           <div class="nsw-version-cards">
@@ -584,8 +621,8 @@
           </div>
         </div>
 
-        <!-- STEP 3 · MEMORY -->
-        <div class="nsw-step" data-step="3">
+        <!-- STEP 4 · MEMORY -->
+        <div class="nsw-step" data-step="4">
           <h2 data-i18n="nsw.memoryT">How much memory?</h2>
           <p class="text-muted nsw2-lead" id="nswRamHint">Beginners: 2–4 GB is plenty for friends. Large worlds/modpacks need more.</p>
           <div class="nsw2-memory-head">
@@ -602,8 +639,8 @@
           <input id="nswMemorySlider" type="range" min="1" max="16" value="4" step="1">
         </div>
 
-        <!-- STEP 4 · REVIEW -->
-        <div class="nsw-step" data-step="4">
+        <!-- STEP 5 · REVIEW -->
+        <div class="nsw-step" data-step="5">
           <h2 data-i18n="nsw.reviewT">Review &amp; create</h2>
           <p class="text-muted nsw2-lead">Everything is editable — go Back any time before creating.</p>
           <div class="nsw-summary" id="nswSummary"></div>

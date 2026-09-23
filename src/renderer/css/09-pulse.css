@@ -199,3 +199,114 @@ html.motion-lite .hero,html.motion-lite .topbar .status-pill{box-shadow:none}
   .pulse-wave i,.status-dot .sd-ring,.status-dot .sd-spin{animation:none!important}
   .app-shell,.tab.active,.modal-overlay .modal,.log-line{animation:none!important}
 }
+
+/* ============ MICRO-INTERACTIONS (2.0.0, option A) ============
+   Small, functional motion for surfaces that snapped instantly. Deliberately understated:
+   only border/ink/opacity/shadow change — no lifts, no scale beyond the existing press rule.
+   Every duration uses var(--dur-*); the ratchet test and the global reduced-motion kill both
+   apply, and Lite mode keeps these (the comment in the LITE block says fast functional
+   transitions stay on — that is exactly this set). */
+
+/* Form controls: a soft focus hand-off instead of a hard snap. Covers every text input,
+   select, textarea and the number fields across Settings / Marketplace / Properties. */
+input,select,textarea{transition:border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+input:hover:not(:focus):not(:disabled),select:hover:not(:focus):not(:disabled),textarea:hover:not(:focus):not(:disabled){border-color:var(--border-strong)}
+input:disabled,select:disabled,textarea:disabled{opacity:.55}
+
+/* Filter chips / segmented buttons: colour eases in, the active chip gets a faint ring. */
+.filter-chip{transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.filter-chip:hover{border-color:var(--border-strong);color:var(--text-muted)}
+.filter-chip.active{box-shadow:0 0 0 1px var(--accent-weak)}
+
+/* Interactive rows/cards: hover only shifts border + background (no transform, per the
+   'no hover lifts' rule). Makes the roster, market, worlds and diagnostics feel responsive. */
+.player-row,.market-item,.backup-row,.world-row,.diag-card,.item-cell,.file-list li[data-name],.settings-card{transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.player-row:hover,.backup-row:hover,.world-row:hover,.diag-card:hover,.file-list li[data-name]:hover{border-color:var(--border-strong)}
+
+/* Icon / row actions and copy buttons: a quiet press + hover ink shift. */
+.inst-act,.row-action,[data-copy],.log-search-clear,.help-cards button{transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),opacity var(--dur-micro) var(--ease-out)}
+[data-copy]:active,.row-action:active,.inst-act:active,.help-cards button:active{transform:scale(.97)}
+
+/* Step chips (setup checklist) + badges: colour eases rather than pops. */
+.step-chip,.kpi-badge,.diag-badge,.inspect-badge,.player-badge,.channel-tag{transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
+.step-chip.bad:hover{transform:none}
+
+/* Progress bars already animate width; ease the colour too so a state change is not abrupt. */
+.kpi-bar i,.boot-bar i{transition:width var(--dur-slow) var(--ease-out),background var(--dur-fast) var(--ease-out)}
+
+/* Tabs (top command-bar channel buttons) — same quiet ink hand-off as the rail. */
+.command-bar button,.inst-dd-btn{transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
+
+/* Lite mode: the ambience is already off; these functional transitions are intentionally kept
+   (they are the 'fast functional' set). Reduced-motion already neutralises them globally. */
+html.motion-lite .step-chip.bad:hover{transform:none}
+
+/* ============ MICRO-INTERACTIONS II (2.0.0, option A) ============
+   Second wave: disclosure headers, checkboxes, rail icons, numeric readouts, panel borders.
+   Same contract as the block above — tokens only, no lifts, reduced-motion kills globally. */
+
+/* Disclosure headers (<details>): background + ink ease on hover, and the marker colour follows. */
+.tunnel-head,.perf-details>summary,.set-advanced>summary,.advanced-card summary,.prop-group>summary,.connect-advanced>summary,.tunnel-help>summary{transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.tunnel-head:hover,.perf-details>summary:hover,.set-advanced>summary:hover,.advanced-card summary:hover,.prop-group>summary:hover,.connect-advanced>summary:hover,.tunnel-help>summary:hover{color:var(--text)}
+.perf-details>summary::before,.prop-group>summary::before,.connect-advanced>summary::before{transition:color var(--dur-micro) var(--ease-out)}
+.perf-details>summary:hover::before,.prop-group>summary:hover::before,.connect-advanced>summary:hover::before{color:var(--accent)}
+
+/* Checkboxes / radios: smooth accent + a faint focus ring (the switch already animates). */
+input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);transition:box-shadow var(--dur-micro) var(--ease-out),filter var(--dur-micro) var(--ease-out)}
+input[type="checkbox"]:hover,input[type="radio"]:hover{filter:brightness(1.15)}
+
+/* Rail nav icons already use proximity opacity; ease the color hand-off on hover too. */
+.rail-nav .nav-item .nav-icon{transition:opacity var(--dur-micro) linear,filter var(--dur-micro) var(--ease-out)}
+.nav-item{transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+
+/* Numeric readouts: ease the colour change so a state flip (ok→warn→bad) is not a hard cut. */
+.srv-stats dd,.perf-kpi strong,.status-pill strong,.metric-hero-value,.srv-uptime b{transition:color var(--dur-fast) var(--ease-out)}
+
+/* Section-head icons (settings cards): tint follows the header on hover. */
+.sec-head img{transition:filter var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),opacity var(--dur-micro) var(--ease-out)}
+.sec-head img:hover{opacity:1}
+
+/* Panels / cards / terminal surfaces: border warms on hover (matches .glass). */
+.panel,.terminal,.settings-card,.perf-kpi,.diag-card,.chart-panel{transition:border-color var(--dur-fast) var(--ease-out),box-shadow var(--dur-fast) var(--ease-out)}
+.panel:hover,.terminal:hover,.settings-card:hover,.perf-kpi:hover{box-shadow:0 0 0 1px var(--border-strong)}
+
+/* Empty states + notices fade in rather than appear. */
+.log-empty,.chart-empty,.perf-status,.proxy-notice,.java-notice{animation:fadeSwap var(--dur-slow) var(--ease-out)}
+
+/* Command-bar path + eyebrow labels: subtle ink warmth on hover. */
+.command-bar-path{transition:color var(--dur-micro) var(--ease-out)}
+.command-bar-path:hover{color:var(--text-muted)}
+
+/* Lite mode keeps these functional transitions (fast + cheap); reduced-motion neutralises them. */
+html.motion-lite .panel:hover,html.motion-lite .terminal:hover,html.motion-lite .settings-card:hover,html.motion-lite .perf-kpi:hover{box-shadow:none}
+
+/* ============ SCROLLBAR — polished, on-hover emphasis (2.0.0) ============
+   The base thumb lives in 05-market.css; here we add track/corner cleanup and a hover/active
+   emphasis so the scroll affordance reads as part of the instrument. Purely visual. */
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{transition:background var(--dur-micro) linear}
+::-webkit-scrollbar-thumb:hover{background:var(--border-strong)}
+/* Thin scrollbars for dense inner lists keep their own width (07-polish) but share the hover ink. */
+.text-list::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
+
+/* ============ ACCORDIONS — smooth open/close (2.0.0) ============
+   <details> normally snaps between collapsed/expanded. ::details-content (Chromium 131+/Electron 44)
+   lets us animate block-size, and `interpolate-size: allow-keywords` lets block-size go 0 <-> auto.
+   Scoped to the known disclosure accordions so unrelated <details> are untouched. Progressive:
+   if the pseudo is unsupported, behaviour is the old instant toggle (no breakage). */
+:is(.set-advanced,.perf-details,.prop-group,.advanced-card,.connect-advanced,.tunnel-help,.tunnel-box){interpolate-size:allow-keywords}
+:is(.set-advanced,.perf-details,.prop-group,.advanced-card,.connect-advanced,.tunnel-help,.tunnel-box)::details-content{
+  block-size:0;
+  overflow:clip;
+  transition:block-size var(--dur-modal) var(--ease-out),content-visibility var(--dur-modal) allow-discrete
+}
+:is(.set-advanced,.perf-details,.prop-group,.advanced-card,.connect-advanced,.tunnel-help,.tunnel-box)[open]::details-content{block-size:auto}
+/* Marker/chevron flips already exist for some; ensure the details summary feels responsive. */
+:is(.set-advanced,.perf-details,.prop-group,.advanced-card,.connect-advanced,.tunnel-help,.tunnel-box)>summary{cursor:pointer}
+
+/* Lite mode + reduced motion: instant toggle (no height animation), scrollbar hover kept. */
+html.motion-lite :is(.set-advanced,.perf-details,.prop-group,.advanced-card,.connect-advanced,.tunnel-help,.tunnel-box)::details-content{transition:none}
+@media (prefers-reduced-motion:reduce){
+  :is(.set-advanced,.perf-details,.prop-group,.advanced-card,.connect-advanced,.tunnel-help,.tunnel-box)::details-content{transition:none}
+}

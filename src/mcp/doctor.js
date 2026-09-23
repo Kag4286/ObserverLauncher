@@ -22,6 +22,22 @@ const CONSOLE_RULES = [
   { re: /Can't keep up|running \d+ms behind|overloaded/i, level: 'warn', id: 'lag', label: 'Server cannot keep up (lag)', fix: 'Reduce view-distance, remove heavy plugins, or allocate more RAM.' },
   { re: /\[WARN\]|WARNING/i, level: 'warn', id: 'warn', label: 'Warning', fix: null },
 ];
+// Item 13 (Phase C): regex timeout guard. JS regex cannot be interrupted mid-call, so one
+// catastrophic-backtracking pattern on a long line can freeze the main process. We bound the WORK
+// instead: cap each line's length and stop a scan once the time budget is exceeded, returning
+// partial results rather than hanging. Analysis is best-effort, so partial output is acceptable.
+const REGEX_MAX_LINE = 4000;
+const ANALYZE_BUDGET_MS = 250;
+
+// Item 17 (Phase C): PII scrub. Before console/log text goes to an AI client (MCP) or an exported
+// file it may be shared publicly, strip IPv4 addresses and e-mail addresses. Best-effort: a plain
+// textual substitution, no attempt to keep loopback/private addresses (the goal is 'share safely').
+const PII_EMAIL = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+const PII_IPV4 = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+function scrubPII(text) {
+  return String(text == null ? '' : text).replace(PII_EMAIL, '[email]').replace(PII_IPV4, '[ip]');
+}
+
 // Strip volatile numbers so 100 stack-trace lines with different line numbers collapse to one key.
 function signatureOf(line) {
   return String(line)
@@ -35,11 +51,17 @@ function signatureOf(line) {
     .slice(0, 160);
 }
 // Pure: scan an array of {text, type} log lines, return ranked issue groups + a severity tally.
-function analyzeConsoleLines(lines) {
+function analyzeConsoleLines(lines, opts) {
+  const budget = Number(opts && opts.budgetMs);
+  const deadline = Date.now() + (Number.isFinite(budget) ? budget : ANALYZE_BUDGET_MS);
+  let timedOut = false;
   const groups = new Map();
   let errors = 0, warns = 0;
   for (const l of lines || []) {
-    const text = String(l && l.text != null ? l.text : l || '');
+    // Timeout guard: stop the whole scan once the budget is spent (partial result, never a hang).
+    if (Date.now() > deadline) { timedOut = true; break; }
+    const raw = String(l && l.text != null ? l.text : l || '');
+    const text = raw.length > REGEX_MAX_LINE ? raw.slice(0, REGEX_MAX_LINE) : raw;
     let hit = null;
     for (const rule of CONSOLE_RULES) { if (rule.re.test(text)) { hit = rule; break; } }
     if (!hit) continue;
@@ -51,7 +73,7 @@ function analyzeConsoleLines(lines) {
     groups.set(key, g);
   }
   const issues = [...groups.values()].sort((a, b) => (a.level === 'error' ? 0 : 1) - (b.level === 'error' ? 0 : 1) || b.count - a.count);
-  return { errors, warns, issues };
+  return { errors, warns, issues, timedOut };
 }
 
 // ---- Crash report summarising ----
@@ -209,6 +231,8 @@ function diagnoseFromData(d) {
 module.exports = {
   CONSOLE_RULES,
   signatureOf,
+  scrubPII,
+  REGEX_MAX_LINE,
   analyzeConsoleLines,
   summarizeCrashText,
   latestCrashReport,

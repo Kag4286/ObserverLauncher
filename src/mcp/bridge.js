@@ -36,12 +36,14 @@ function readConfig() {
 // Minecraft server MANAGER: what it can read freely, that write/destroy need GUI approval, and the
 // doctor workflow to follow when something is wrong.
 const INSTRUCTIONS = [
-  'You are connected to ObserverLauncher, a desktop launcher that hosts a local Minecraft server on the user\'s PC.',
+  'You are connected to ObserverLauncher, a desktop launcher that manages one or MORE local Minecraft server instances on the user\'s PC.',
+  'MULTI-INSTANCE: call list_instances FIRST to see every instance (id, name, serverPath, status). Most tools act on the ACTIVE instance; pass an optional "instance" id to target a specific one. get_instance_snapshot reads any instance\'s state (status/console/metrics/java/files) WITHOUT switching - prefer it over select_instance when you only need to inspect a background server.',
+  'SETTINGS/SCHEDULE tools (get_settings, set_setting, get_schedule, set_schedule) also honour the "instance" arg: they read/write that instance\'s per-instance keys.',
   'READ tools are free: use them to inspect status, console, players, files, world and performance before acting.',
   'WRITE tools change the server and require GUI approval unless the user enabled auto-allow-write; DESTROY tools always ask.',
   'WORKFLOW when something is wrong: call doctor_report (one-shot) or diagnose_server + analyze_console + explain_crash; each check returns a level (ok/warn/error) and a concrete fix.',
   'SAFE CHANGE: prefer prepare_and_start / safe_restart so a backup is taken and the health checks pass first.',
-  'You cannot set the server folder over MCP - that is GUI-only. Respect that serverPath is fixed.',
+  'You cannot set the server folder over MCP - that is GUI-only. Add/remove instances in the GUI.',
 ].join('\n');
 
 // Forward one tool call to the app. Resolves a tool result object {ok,result|error}.
@@ -181,6 +183,11 @@ const STATIC_TOOLS = [
   ['op_player', 'Grant/revoke operator.'],
   ['whitelist_player', 'Add/remove from whitelist.'],
   ['ban_player', 'Ban/unban a player.'],
+  ['list_instances', 'List all server instances (id, name, serverPath, status, active).'],
+  ['get_instance_snapshot', 'Read one instance\'s full state without making it active.'],
+  ['select_instance', 'Make an instance the active one.'],
+  ['start_instance', 'Start a specific instance by id.'],
+  ['stop_instance', 'Gracefully stop a specific instance by id.'],
   ['stop_server', 'Gracefully stop the server.'],
   ['force_stop_server', 'Kill the server process tree.'],
   ['delete_content', 'Delete a plugin/mod/datapack file.'],

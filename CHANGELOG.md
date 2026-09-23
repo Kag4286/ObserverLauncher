@@ -10,6 +10,286 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.0.0] — 2026-09-23
+
+**Headline: multi-instance management.** Single-server -> manage N servers, each with
+its own folder, Java runtime, RCON, schedule, backups and public tunnel. Work was phased
+(A foundation -> B UI -> C hardening). Plan + progress: docs/v2.0.0-plan.md. With a single
+instance the app behaves as before (lists and gates stay hidden).
+
+### Security — Playit agent integrity (Phase C item 12)
+- `installPlayitAgent` now verifies the downloaded agent before use: the SHA-256 is taken from the
+  release's `asset.digest` (GitHub publishes it with the API response — always current, never stale),
+  falling back to a pinned hash table (`PLAYIT_PINNED_SHA256`, v1.0.10) when no digest is present. A
+  mismatch deletes the file and refuses to install. `sha256File` streams the hash (no full-file buffer).
+- Authenticode: Windows-only `Get-AuthenticodeSignature` status is LOGGED (not enforced) — the agent
+  may legitimately be unsigned, so a hard failure would break the install.
+- **Fixed:** `pickPlayitAsset` used a plain `.find()`, so on Windows it selected
+  `playit-windows-x86_64-signed.msi` (listed first) over `playit-windows-x86_64.exe` and saved the MSI
+  as `playit.exe` — the agent would never run. Now installer/archive packages (.msi/.apk/.deb/...) are
+  deprioritised in favour of a runnable binary. Tests: tests/tunnel.test.js (32 asserts).
+- Hash source note: the GitHub API is anonymous rate-limited, but the release page's
+  `expanded_assets` fragment returns the same `sha256:` digests — how the pinned table was captured.
+
+### Fixed — MCP multi-instance correctness + agent workflow
+- **Settings/schedule tools now honour the `instance` arg.** `get_settings`/`set_setting`/`get_schedule`/
+  `set_schedule` used `loadSettings()`/`saveSettings()`, which always resolve the ACTIVE instance, so
+  targeting another instance read the wrong server and — worse — `set_setting` WROTE to the active one.
+  New `settings.saveSettingsFor(id, flat)` writes a SPECIFIC instance (global keys stay top-level);
+  the tools read via `loadSettingsFor(ctx.inst())`. Omitted instance = active (backward compatible).
+- **`kick_player` / `stop_server` / `stop_instance` now route through `sendConsoleCommand`** (RCON-first,
+  stdin fallback) instead of writing `ctx.serverProcess.stdin` directly — the old path silently failed
+  for an RCON-attached or adopted server (stdin stub is null).
+- Removed dead `loadSettings()` in `get_status`.
+### Added — `get_instance_snapshot` MCP tool (workflow)
+- Read ANY instance's full state (status, console tail, live metrics, java, files) WITHOUT making it
+  active — so an AI can inspect/compare a background server without flipping the user's GUI. Mirrors the
+  IPC `instances:snapshot`. bridge.js INSTRUCTIONS + STATIC_TOOLS updated. Tests: tests/mcp-instance-settings.test.js (48 files).
+
+### Fixed — Players tab flicker while the console was busy
+- The server folder watcher rescanned on every write while the server was running. A live server
+  writes logs/ and world/ constantly, so `fs.watch` fired nonstop; each rescan pushed `server:files`
+  -> `refreshUI()` -> a full rebuild of the Players (and Content) lists, which replayed their stagger
+  animation and looked like flicker. The watcher now rescans only while the server is fully stopped
+  (those mid-run writes never change what `serverFiles()` reports anyway).
+- `renderPlayers()` gained a signature guard: if the page content is unchanged it leaves the DOM
+  alone instead of rebuilding innerHTML (which restarted the row animation). The signature includes
+  the locale, filter, search, page and each row's state.
+
+### Fixed — Player inspector width + text clipping
+- The inspector modal is `class="modal wide player-modal"`. `.modal.wide` (specificity 0,2,0) in
+  06-modals.css beat `.player-modal` (0,1,0) in 07-polish.css, so the width stayed at 720px and the
+  two-column body squeezed its content. The rule now matches the specificity
+  (`.modal.wide.player-modal`) and the modal opens at 1120px.
+- The dimension line and the readout values used `white-space:nowrap` + ellipsis, which truncated
+  `minecraft:overworld` to `overwor...`. Both now wrap (`overflow-wrap:anywhere`).
+
+### Changed — README rewrite (2.0.0)
+- Rewrote README.md from scratch: shorter, denser, no filler. Removed the marketing tone, the
+  "What is this?" essay, and repeated superlatives. Added a multi-instance section (the 2.0.0
+  headline) and updated the FAQ entry that wrongly said settings are shared one-set-only.
+
+### Changed — micro-interactions (UI polish, option A)
+- Added an understated motion layer (end of `css/09-pulse.css`) for surfaces that used to snap:
+  form controls (input/select/textarea) now ease border/shadow on hover+focus; filter chips,
+  interactive rows/cards (player/backup/world/diag/file), icon/row/copy buttons, step chips and
+  badges, progress bars, and command-bar buttons get a quiet colour/border hand-off. No hover
+  lifts or scale beyond the existing press rule; every duration uses `var(--dur-*)`, so the
+  motion-tokens ratchet stays at 124 and the global reduced-motion kill still applies.
+- Accordions (`<details>`) now animate open/close via `::details-content` + `interpolate-size:
+  allow-keywords` (progressive — falls back to instant on older engines); scrollbars gained a
+  hover-emphasis thumb + transparent track/corner.
+
+### Added — Tunnel overview (Q2)
+- Settings > Advanced gains a **Tunnel overview** table: one row per instance with its
+  status dot, name and public Playit address (or a "no address yet" hint) plus an
+  **Open dashboard** button. Pure renderer — `listInstances()` now also returns the
+  per-instance `tunnelAddress`/`autoTunnel`, so no new IPC channel. Hidden with a single
+  instance, so the one-server screen is unchanged. i18n tun.ov* (7 locales, 837 keys).
+
+### Added — process identity helper (M1, orphan-cleanup prereq)
+- `platform.getProcessInfo(pid)` -> `{ alive, name, startTimeMs }` or `null`
+  (win32.js + linux.js). Windows: `Get-CimInstance Win32_Process` Name +
+  CreationDate->epoch-ms. Linux: `/proc/<pid>/stat` (state, starttime field 22) +
+  `/proc/stat btime`; a zombie (`Z`) reports not-alive. The creation time is the
+  PID-REUSE guard for orphan cleanup (never kill a recycled pid). Tests:
+  tests/process-info.test.js.
+
+### Added — settings schema v4 (M2, multi-instance store)
+- Settings move from flat single-server to `{ global..., instances:[],
+  activeInstanceId }`. `migrations.js` v3->v4 moves the per-instance keys
+  (serverPath, javaPath, memoryMin/Max, jvmArgs, autoRestart*, autoBackupMinutes,
+  backupRetention, schedule*, autoTunnel, tunnelAddress) into `instances[0]`
+  (id `default`, name = basename). Global keys stay top-level. Empty serverPath ->
+  `instances: []`.
+- **Data-loss trap closed.** `loadSettings()` now backs up `settings.json` ->
+  `settings.v3.bak.json` BEFORE migrating, and on a migration throw returns the
+  ORIGINAL settings (legacy code returned full defaults, which would silently wipe
+  a user's config). A store written by a NEWER app is not downgraded (version gate
+  + warning). Root cause note: migrate() runs inside try/catch in loadSettings.
+- **Flat-view shim** (`flattenActive`/`nestInstances`): `loadSettings()` still
+  returns the flat shape and `saveSettings()` re-nests, so the ~26 existing
+  callers (settings-handlers, wizard, tunnel, mcp/tools) needed NO change. Tests:
+  tests/migration-v4.test.js (35 asserts).
+
+### Added — persistent process identity (M3)
+- New `src/main/runtime-state.js`: per-instance `{ pid, processStartedAt,
+  serverPath }` in `userData/runtime.json` (kept separate from settings.json so the
+  settings:save rewrite cannot race/lose it). `server-lifecycle.js` records it on
+  spawn (start-time refined from getProcessInfo) and clears it on error/exit.
+  This is what makes orphan cleanup possible after an app crash. Tests:
+  tests/runtime-state.test.js.
+
+### Added — instance context foundation (M4a)
+- `context.js` gains `instances: Map`, `activeInstanceId`, and an
+  `AsyncLocalStorage`-backed `ctx.inst()` / `ctx.runInInstance(id, fn)` /
+  `ctx.seedInstances()`. `settings.js` gains `loadSettingsStore()` (nested store, for
+  seeding) while `loadSettings()` stays flat. Why: instance id travels WITH the async
+  call chain, so concurrent handlers cannot race a global mutation. Tests:
+  tests/instance-context.test.js (ALS isolation across interleaved chains).
+
+### Changed — per-instance ctx accessors + choke-point wrapping (M4b)
+- Every per-instance `ctx` field (`currentServerPath`, `serverProcess`,
+  `consoleBuffer`, `live`, `metricsHistory`, `currentSoftware`, restart/backup/
+  scheduler timers, `buildProcess`, `wizardAbort`, content/editor watchers, ...) is now
+  a getter/setter over the CURRENT instance's state object (`instState()`), so call-sites
+  keep plain property syntax while `ctx.inst()` (AsyncLocalStorage) routes each read/write
+  to the right instance. Single source of truth: `INST_FIELDS` + `freshInstState()`.
+- `serverStatus` / `javaInfo` / tunnel / mcp stay GLOBAL for now (serverStatus is deferred
+  to its own careful step because `setServerStatus` feeds it).
+- `ctx.seedInstances()` now MERGES instead of replacing the instances Map, so runtime
+  fields survive a settings-driven re-seed (previously a re-seed would wipe live state).
+- Choke points wrapped in `ctx.runInInstance(activeInstanceId, ...)`: the MCP `callTool`
+  handler (src/mcp/server.js) and every IPC handler (src/main.js routes a thin `ipcMain`
+  proxy that only rewrites `handle`). Stops an instance switch mid-await from leaking
+  state across concurrent calls. Tests: tests/arch-ctx-accessors.test.js (static guard +
+  accessor + ALS isolation).
+
+### Changed — per-instance event gate (M5)
+- `context.js` `send()` now gates four channels (`server:metrics`, `server:live`,
+  `server:files`, `server:log`): a push is dropped unless `ctx.inst()` equals the
+  active instance, so N background instances no longer cost N× IPC + N× renderer
+  redraws for a view nobody is looking at. Background instances still SAMPLE (metrics
+  history keeps filling).
+- `server:state` is NOT gated (the rail status dot must reflect a background crash/stop).
+  `server:log` error lines (`type:'error'` or ERROR/Exception text) BYPASS the gate so a
+  background crash still reaches the rail badge; all other lines are gated. `appendLog`
+  stamps `instanceId` on every line. Non-gated channels (`app:*`, `tunnel:*`, `market:*`,
+  ...) are unchanged. Tests: tests/instance-event-gate.test.js.
+- NOTE: the renderer-side switch snapshot (`getInstanceSnapshot(id)` on instance switch)
+  belongs to the Phase B UI and is not built yet; this is the backend half.
+
+### Added — multi-instance backend + rail list (Phase B, B1+B2)
+- B1 (backend CRUD): `settings.js` gains `listInstances/addInstance/switchInstance/
+  renameInstance/removeInstance` (id = 4 random bytes hex; add refuses a folder already
+  used by another instance; remove never touches the folder on disk). New IPC
+  `instances:list/add/switch/remove/rename` + preload bridge; `settings:get` now returns
+  `instances[]` + `activeInstanceId`. Every mutation re-seeds ctx. Tests:
+  tests/instance-crud.test.js (30).
+- B2 (rail): `.instance-list` between the brand and the nav (items use `.inst-item` +
+  data-instance, NOT `.nav-item`/data-tab, so switchTab + keyboard nav are untouched).
+  Renderer `renderInstanceList()` (called from refreshUI) + `switchInstance(id)` re-pulls
+  the snapshot. List stays hidden with a single instance, so first-run UI is unchanged.
+  i18n nav.instances/addInstance + inst.* (7 locales). CSS uses var(--dur-fast) (motion
+  ratchet).
+- B3 (add/remove/rename UI): the wizard is now the "Add instance" flow — 5 steps, step 1
+  picks the folder, and Review CREATES A NEW INSTANCE (fresh id, made active) for that
+  folder before running the download (never overwrites the active instance's settings).
+  The rail's "+ Add instance" and the onboarding/welcome "Create a new server" buttons
+  open it. Each rail row has rename (prompt) + remove (confirm, refuses while running,
+  never deletes the folder) icon buttons. i18n nsw.folder*/railFolder + inst.removeConfirm/
+  stopFirst (820 keys).
+- B4 (switch scope): `settings:get` also returns the active instance's `metricsHistory`.
+  On switch the renderer repaints the console from the new instance's buffer
+  (`repaintConsole`) and rebuilds the chart ring (`rebuildSamples`). The non-gated
+  `server:state` is now tracked per instance (`state.instanceStatus`) so a background
+  instance's crash/stop updates its rail dot WITHOUT flipping the active view.
+- B5 (concurrent start + RAM budget): `ctx.serverStatus`, `waitingForDone` and
+  `runtimeInstanceId` are now PER-INSTANCE (the last two were a module-level `let`). Every
+  server-process callback (error/stdout/stderr/exit + the two timers) is wrapped in
+  `ctx.runInInstance(instId, ...)` so a background server's events can never read or write the
+  active instance's state. Starting instance B while A runs is now allowed. New
+  `platform.getTotalMemoryMB()` + `checkRamBudget()`: sums memoryMax of running instances +
+  the new one vs total RAM — blocks >100%, logs a warning >80%. Tests:
+  tests/instance-start.test.js. NOTE: the metrics sampler is still a single global loop bound
+  to the active instance, so a BACKGROUND instance's metrics are not sampled yet (Phase C).
+
+### Hardened — Phase C (13/14/15/17)
+- 13: `doctor.js` console analysis now has a regex/scan budget — each line is capped at
+  REGEX_MAX_LINE (4000) and the whole scan stops after ANALYZE_BUDGET_MS (250ms), returning a
+  `timedOut` flag instead of risking a catastrophic-backtracking freeze.
+- 14/15: NEW `tests/arch-hardening.test.js` — (a) `13-bootcheck.js` must be the LAST script in
+  index.html; (b) every channel preload.js invokes is registered in src/main (64/64); (c) no
+  non-whitelisted `fs.writeFileSync` in src/main (atomic-write guard, whitelist for the atomic
+  helper + tiny/binary/staging/user-path writers).
+- 17: `doctor.scrubPII()` masks IPv4 + email; wired into the MCP read_console + analyze_console
+  tools and the console export, so logs shared with an AI or a file do not leak addresses.
+- A7/A8 (multi-instance foundation): `checkPortLease()` refuses starting an instance whose
+  `server-port` is already used by another RUNNING instance (reads each instance's
+  server.properties). `safeTarget` confinement is per-instance root (ctx.currentServerPath is an
+  ALS accessor), so a path resolving into instance B from instance A is rejected. Tests:
+  tests/instance-port-path.test.js.
+- 16: graceful-shutdown escalation. `server:stop` now arms `scheduleGracefulEscalation` —
+  `stop` -> wait 15s -> SIGTERM/taskkill -> wait 5s -> SIGKILL, logging which instance had to be
+  force-killed (its world may not be fully saved). Per-instance `shutdownTimer`; each tick runs
+  inside runInInstance(instId) so it can never touch another instance. Critical with N servers.
+
+### Added — orphan cleanup, 3-tier (M8)
+- NEW `src/main/orphan.js`. After a crash, `runtime.json` (M3) records a pid per instance and
+  `platform.getProcessInfo` (M1) reports whether it is alive + its real creation time. Tiers:
+  **t1** alive java + stored stopped -> auto-kill (leftover) + log; **t2** alive java + stored
+  running/starting -> left untouched for review (GUI dialog is a later step); **t3** alive but a
+  DIFFERENT creation time or not java (PID reuse) -> never kill, just drop the stale record.
+  `runtime-state.setInstanceStatus` + `context.setServerStatus` keep the tier hint current. Wired
+  into `main.js` boot. Tests: tests/orphan.test.js.
+
+### Changed — per-instance metrics sampling
+- `startMetrics` now samples EVERY instance, not just the active one: one interval loops the
+  instance ids and runs each tick inside `ctx.runInInstance(id, ...)`, so a background server's
+  `metricsHistory` keeps filling and its chart is correct the moment you switch to it. Per-instance
+  counters are keyed by instance id. GATED channels keep this at 0 IPC for unseen servers.
+
+### Added — RCON transport (M6)
+- NEW `src/main/rcon.js`: a dependency-free Source-RCON client (pure `encodePacket`/`decodePacket`
+  + `RconClient` connect/auth/exec/close; a `-1` packet id signals auth failure) plus
+  `makeRconCreds` and `desiredRconProps`.
+- Per-instance `rconPort`/`rconPassword` (added to PER_INSTANCE_KEYS + defaults — no new migration
+  version needed). Before spawn, `ensureRconInProperties` writes `enable-rcon=true` + the port +
+  password into server.properties (existing user RCON config is preserved). On `Done (...)!` the
+  app attaches an RCON client; on exit/error it closes it. Console commands now go through
+  `sendConsoleCommand` (RCON first, stdin fallback for the first seconds of boot). Both the IPC
+  `server:command` and the MCP `send_command` tool route through it. `checkPortLease` also guards
+  `rcon.port` across running instances. Tests: tests/rcon.test.js (real mock server + fallback).
+
+### Changed — per-instance Java (M7, JRE isolation)
+- `ctx.javaInfo` (the detected Java runtime) is now PER-INSTANCE, not a global. A background
+  instance's Java detection no longer overwrites the active instance's. `instances:switch`
+  re-detects Java from the target instance's own `javaPath`. Because each spawn uses
+  `ctx.javaInfo.path`, instance A (Java 17) and B (Java 21) can run at the same time. The JRE
+  auto-installer already caches per major version (userData/jre<major>), shared by instances.
+
+### Added — TunnelManager (M10)
+- The Playit daemon is GLOBAL (one process serves N tunnels); the app now tracks WHICH instances
+  still need it via `ctx.tunnelDaemonUsers` (Set<instanceId>) + `src/main/tunnel-manager.js`. When
+  an instance stops (or its server exits) it is dropped from the set, and the daemon is killed ONLY
+  when no instance still needs it AND the app started it — a user-run daemon is never stopped.
+  `autoStartTunnel` registers the instance before starting. `tunnelAddress` stays per-instance.
+
+### Added — MCP multi-instance (M11)
+- New MCP tools: `list_instances` (read), `select_instance` (write), `start_instance` /
+  `stop_instance` (write/destroy). Every server-scoped tool now accepts an optional `instance` arg
+  (resolved at the single `callTool` choke point); omitted -> the active instance, so existing AI
+  clients keep working. `settings.js` gains `loadSettingsFor(id)` + `resolveInstanceId(id)`.
+  bridge.js INSTRUCTIONS describe the multi-instance model and STATIC_TOOLS lists the 4 new names.
+
+### Changed — per-instance scheduler
+- `startScheduler` now runs the schedule for EVERY instance (looping `ctx.instances` and running
+  each tick inside `ctx.runInInstance(id)`), so a background server still auto start/stops on its
+  own schedule. `schedulerTick(ctx, now, settings?)` stays backward-compatible. Instances with no
+  server folder are skipped.
+- `startAutoBackupWatcher` also runs for EVERY instance now (each keeps its own autoBackupMinutes
+  cadence, since autoBackupMinutes/backupRetention are per-instance).
+- Orphan tier-2 now ASKS the user: a server left running by a crash shows a dialog (Reconnect /
+  Stop it). Reconnect keeps the runtime record (default on Escape); Stop force-kills the tree. New
+  `src/main/orphan-prompt.js` + i18n orphan.* (7 locales). Reconnect now FULLY re-attaches:
+  `adoptProcess` adopts the live pid (alive + java + start-time guard), makes it `ctx.serverProcess`
+  (stub, no stdin), sets status running, re-attaches RCON, resumes metrics on the pid, and a liveness
+  poll replaces the missing exit event; `server:stop` uses RCON for an adopted process. The foreign
+  process's stdout can't be recovered, so the live console tail is unavailable for an adopted server.
+
+### Added — instance snapshot (B4 follow-up)
+- `instances:snapshot(id)` returns a full state snapshot of ANY instance (status, console tail,
+  live, metrics history, java, files, active flag) without switching the active one. New preload
+  `instanceSnapshot(id)`; tests/instance-snapshot.test.js.
+
+### Notes
+- Test suite: 47 files, all passing (`npm test`); Playwright E2E `npm run test:e2e`.
+  With one instance the behaviour is unchanged by design (lists/gates stay hidden).
+- Known gap: Phase C item 12 (Playit binary SHA-256 pin + Authenticode verification)
+  is still open — it needs a real per-release hash, which is blocked by an anonymous
+  GitHub API rate limit. Authenticode can be checked from the downloaded file when the
+  pinned hash is available. See docs/v2.0.0-plan.md PROGRESS block.
+
 ## [1.5.0] — 2026-09-22
 
 A hardening release. No new server features. It closes four weaknesses found in an external review:

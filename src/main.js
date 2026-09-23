@@ -51,6 +51,8 @@ const { registerTunnel, stopTunnel } = require('./main/tunnel.js');
 const { createWindow, setupAutoUpdater, setupQuitHandler, initApp } = require('./main/app-lifecycle.js');
 const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
 const { registerMcpConfirm } = require('./mcp/confirm.js');
+const { runOrphanCleanup } = require('./main/orphan.js');
+const { registerOrphanPrompt } = require('./main/orphan-prompt.js');
 
 // Custom tex:// icon scheme — MUST be registered as privileged before the
 // app is ready, or Chromium treats it as non-standard and <img> loads fail.
@@ -58,16 +60,32 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'tex', privileges: { standard: t
 
 const ctx = createContext();
 
-registerServer(ipcMain, ctx);
-registerBackups(ipcMain, ctx);
-registerPlayers(ipcMain, ctx);
-registerMarketplace(ipcMain, ctx);
-registerModpacks(ipcMain, ctx);
-registerWizard(ipcMain, ctx);
-registerSettings(ipcMain, ctx);
-registerContent(ipcMain, ctx);
-registerTunnel(ipcMain, ctx);
-registerMcpConfirm(ipcMain, ctx);
+// M4b: every IPC handler runs inside AsyncLocalStorage pinned to the ACTIVE instance at
+// call time, so per-instance ctx accessors (currentServerPath, serverProcess, ...) resolve
+// correctly and an instance switch mid-await cannot leak state between concurrent calls.
+// A thin proxy over ipcMain only rewrites `handle`; every other method is bound to the real
+// ipcMain so Electron's internal state stays intact.
+const ipcWrap = new Proxy(ipcMain, {
+  get(target, prop) {
+    if (prop === 'handle') {
+      return (channel, fn) => target.handle(channel, (...a) => ctx.runInInstance(ctx.activeInstanceId, () => fn(...a)));
+    }
+    const v = target[prop];
+    return typeof v === 'function' ? v.bind(target) : v;
+  },
+});
+
+registerServer(ipcWrap, ctx);
+registerBackups(ipcWrap, ctx);
+registerPlayers(ipcWrap, ctx);
+registerMarketplace(ipcWrap, ctx);
+registerModpacks(ipcWrap, ctx);
+registerWizard(ipcWrap, ctx);
+registerSettings(ipcWrap, ctx);
+registerContent(ipcWrap, ctx);
+registerTunnel(ipcWrap, ctx);
+registerMcpConfirm(ipcWrap, ctx);
+registerOrphanPrompt(ipcWrap, ctx);
 
 app.whenReady().then(async () => {
   // BUGFIX (Start dead on launch): initApp used to run AFTER createWindow, so the
@@ -78,9 +96,13 @@ app.whenReady().then(async () => {
   // (server path + Java detected) BEFORE the window loads, so the first
   // snapshot is already correct. All initApp steps are win-independent
   // (ctx.send guards a missing window).
-  await initApp(ctx, ipcMain);
+  try { ctx.seedInstances(); } catch {}
+  await initApp(ctx, ipcWrap);
   await createWindow(ctx);
-  setupAutoUpdater(ctx, ipcMain);
+  // M8: after the window exists (so a tier-2 orphan can ASK the user), deal with any server left
+  // running by a crash. t1 leftovers auto-killed + logged; t3 stale records dropped; t2 -> GUI dialog.
+  try { await runOrphanCleanup(ctx); } catch {}
+  setupAutoUpdater(ctx, ipcWrap);
   // MCP integration: only start the loopback server when the user enabled it in Settings.
   // Toggling it later is handled by settings:save (see settings-handlers.js).
   try { const mcpOn = require('./main/settings.js').loadSettings().mcpEnabled; ctx.currentMcpEnabled = !!mcpOn; if (mcpOn) startMcpServer(ctx); } catch {}

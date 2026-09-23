@@ -93,5 +93,20 @@ ck('resolveCrashReport rejects traversal', doctor.resolveCrashReport(root2, '../
 ck('resolveCrashReport rejects non-crash name', doctor.resolveCrashReport(root2, 'notacrash.txt') === null);
 fs2.rmSync(root2, { recursive: true, force: true });
 
+// ---- Phase C: PII scrub + regex budget ----
+ck('scrubPII masks IPv4', doctor.scrubPII('connect 192.168.1.10:25565') === 'connect [ip]:25565');
+ck('scrubPII masks email', doctor.scrubPII('mail me at a.b@example.com') === 'mail me at [email]');
+ck('scrubPII null-safe', doctor.scrubPII(null) === '');
+ck('scrubPII leaves normal text', doctor.scrubPII('Done (1.2s)!') === 'Done (1.2s)!');
+// A huge line is capped at REGEX_MAX_LINE so a regex cannot scan an unbounded string.
+const huge = { text: 'X'.repeat(doctor.REGEX_MAX_LINE + 5000) + ' OutOfMemoryError', type: 'error' };
+const hugeAn = doctor.analyzeConsoleLines([huge]);
+ck('analyze handles a huge line (no hang, capped)', hugeAn !== undefined && typeof hugeAn.errors === 'number');
+// budgetMs: a tiny budget stops the scan early (partial result, timedOut flag).
+const many = Array.from({ length: 5000 }, () => ({ text: 'Caused by: x at net.Foo(Foo.java:1)', type: 'error' }));
+const t0 = Date.now();
+const capped = doctor.analyzeConsoleLines(many, { budgetMs: 0 });
+ck('analyze budget stops early', capped.timedOut === true && (Date.now() - t0) < 2000);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

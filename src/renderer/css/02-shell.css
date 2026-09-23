@@ -19,6 +19,66 @@
 .rail-nav .nav-item:hover .nav-icon{opacity:.8}
 .rail-nav .nav-item.active .nav-icon{opacity:1;filter:drop-shadow(0 0 6px rgba(255,255,255,.45))}
 .rail-nav .nav-item.active .nav-icon{opacity:1}
+/* v2.0.0 multi-instance list: sits between the brand and the nav. min-height:0 is MANDATORY —
+   a flex child without it does not scroll (same gotcha as the player inspector). Hidden when there
+   is only the migrated single instance (renderer toggles [hidden]). */
+.instance-list{padding:8px 8px 6px;border-bottom:1.5px solid var(--border);display:flex;flex-direction:column;gap:4px;max-height:34%;overflow-y:auto;min-height:0;flex-shrink:0}
+.instance-list-label{margin:2px 0 2px;padding:0 8px;font:700 9px var(--font-mono);letter-spacing:.16em;color:var(--text-dim);text-transform:uppercase;opacity:.65}
+.instance-items{display:flex;flex-direction:column;gap:2px}
+.inst-item{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:7px 8px;border:1px solid transparent;border-radius:var(--r-sm);background:transparent;color:var(--text-muted);font:600 13px var(--font-ui);cursor:pointer;text-align:left;--prox:0;transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
+/* Pulse signature: a hairline tick slides up the left edge on hover/active — same language as the
+   rail nav items so the instance list reads as part of the instrument, not a bolted-on list. */
+.inst-item::before{content:'';position:absolute;left:0;top:7px;height:calc(100% - 14px);width:2px;background:var(--border-strong);border-radius:0;transform:scaleY(0);transform-origin:center;transition:transform var(--dur-tab) var(--ease-out)}
+.inst-item:hover{background:var(--panel-raised);color:var(--text);border-color:var(--border)}
+.inst-item:hover::before{transform:scaleY(1);background:var(--text-dim)}
+.inst-item.active{background:var(--panel-raised);border-color:var(--border-strong);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+.inst-item.active::before{transform:scaleY(1);background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
+/* Cursor proximity (matches .nav-item): a left glow + dot brighten as the pointer nears. JS sets
+   --prox (0..1). Opacity-only so it never triggers layout. */
+.inst-item::after{content:'';position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--accent);opacity:calc(.5 * var(--prox));transition:opacity var(--dur-fast) linear}
+.inst-item.active::after{opacity:0}
+.inst-item .inst-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--text-dim);opacity:calc(.6 + .4 * var(--prox));transition:opacity var(--dur-fast) linear,background var(--dur-fast),box-shadow var(--dur-fast)}
+.inst-item .inst-dot.st-running{background:var(--success);box-shadow:0 0 8px var(--success)}
+.inst-item .inst-dot.st-starting{background:var(--accent);animation:instPulse var(--dur-pulse) ease-in-out infinite}
+.inst-item .inst-dot.st-stopping{background:var(--warning,#d6a24a)}
+@keyframes instPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.inst-item .inst-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inst-item .inst-badge{font:700 8px var(--font-mono);letter-spacing:.1em;color:var(--success);border:1px solid var(--border);border-radius:3px;padding:1px 4px}
+/* Stagger reveal: each row fades+slides in like the tab content rows (--stagger step). Re-applied
+   on every renderInstanceList so add/remove/switch feels alive instead of snapping. */
+@keyframes instReveal{from{opacity:0;transform:translateX(calc(-1 * var(--slide-x)))}to{opacity:1;transform:none}}
+.inst-item{animation:instReveal var(--dur-tab) var(--ease-out) both}
+.inst-acts{display:flex;gap:2px;flex-shrink:0}
+.inst-act{display:none;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--text-dim);font-size:11px;line-height:1;cursor:pointer}
+.inst-item:hover .inst-act,.inst-item.active .inst-act{display:inline-flex}
+.inst-act:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel)}
+.inst-act[data-act="remove"]:hover{color:var(--danger)}
+/* MOTION-LITE: kill the instance-list motion too, matching the rail contract. */
+html.motion-lite .inst-item{animation:none}
+html.motion-lite .inst-item::before,html.motion-lite .inst-item::after{display:none}
+html.motion-lite .inst-item .inst-dot{opacity:1}
+html.motion-lite .inst-item .inst-dot.st-starting{animation:none}
+/* Q2 tunnel overview (Settings > Advanced): one row per instance — status dot, name, public
+   address, open-dashboard button. Uses the same dot classes as the rail so status reads alike. */
+.tun-ov{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.tun-ov-row{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1.4fr) auto;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel);animation:instReveal var(--dur-tab) var(--ease-out) both}
+.tun-ov-row.active{border-color:var(--border-strong);box-shadow:inset 2px 0 0 var(--accent)}
+.tun-ov-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 13px var(--font-ui);color:var(--text)}
+.tun-ov-addr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12px var(--font-mono);color:var(--accent)}
+.tun-ov-addr.missing{color:var(--text-dim);font-style:italic}
+.tun-ov-row .inst-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--text-dim)}
+.tun-ov-row .inst-dot.st-running{background:var(--success);box-shadow:0 0 8px var(--success)}
+.tun-ov-row .inst-dot.st-starting{background:var(--accent);animation:instPulse var(--dur-pulse) ease-in-out infinite}
+.tun-ov-row .inst-dot.st-stopping{background:var(--warning,#d6a24a)}
+html.motion-lite .tun-ov-row .inst-dot.st-starting{animation:none}
+.tun-ov-open{flex-shrink:0}
+html.motion-lite .tun-ov-row{animation:none}
+/* Wizard step 1 (folder pick): button + path readout. */
+.nsw-folder-pick{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.nsw-folder-path{font:500 12px var(--font-mono);color:var(--text-muted);word-break:break-all;min-width:0}
+.inst-add{display:flex;align-items:center;gap:6px;margin-top:2px;padding:7px 8px;border:1px dashed var(--border);border-radius:var(--r-sm);background:transparent;color:var(--text-muted);font:600 12px var(--font-ui);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast)}
+.inst-add:hover{color:var(--text);border-color:var(--border-strong)}
+.inst-add span[aria-hidden]{font-size:15px;line-height:1}
 .rail-foot{padding:10px 12px;border-top:1.5px solid var(--border);font:500 10px var(--font-mono);color:var(--text-dim);display:flex;justify-content:flex-end}
 /* BUGFIX: with titleBarStyle:'hidden' (Windows) there was no -webkit-app-region drag strip anywhere,
 so the window could not be moved by dragging at all. The top command bar is now the drag handle. */
@@ -30,6 +90,18 @@ is active (renderer adds .wco-app to <html>), reserve its width on the right sid
 .wco-app .command-bar{padding-right:max(152px,calc(100vw - env(titlebar-area-width,100%) - env(titlebar-area-x,0px) + 14px))}
 .command-bar-path{flex:1;font:500 11px var(--font-mono);color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
 .channel-strip{display:none} /* hidden in mix, rail replaces it */
+/* Instance dropdown (command bar): the rail's instance switcher is hidden <1100px, so this compact
+   control takes over there. Hidden on wide screens (the rail list is the primary UI). */
+.inst-dd{display:none;position:relative;flex-shrink:0}
+.inst-dd-btn{display:flex;align-items:center;gap:8px;max-width:200px;padding:5px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel);color:var(--text-muted);font:600 12px var(--font-ui);cursor:pointer;transition:border-color var(--dur-fast),color var(--dur-fast)}
+.inst-dd-btn:hover{border-color:var(--border-strong);color:var(--text)}
+.inst-dd-btn[aria-expanded="true"]{border-color:var(--border-strong);color:var(--text)}
+.inst-dd-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.inst-dd-caret{font-size:10px;color:var(--text-dim);flex-shrink:0}
+.inst-dd-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:200px;max-width:min(320px,80vw);max-height:60vh;overflow-y:auto;padding:4px;background:var(--panel-raised);border:1px solid var(--border-strong);border-radius:var(--r);box-shadow:0 12px 30px -10px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:2px}
+.inst-dd-menu .inst-item{width:100%}
+/* The existing <1100px rule hides the rail (05-market.css); show the dropdown there instead. */
+@media(max-width:1100px){.inst-dd{display:block}}
 /* keep channelIndicator hidden but exists for JS */
 .channel-indicator{display:none}
 .workspace{display:flex;flex-direction:column;overflow:hidden;padding:0;background:radial-gradient(800px 400px at 20% 0%, rgba(0,229,255,.06), transparent 60%), var(--bg)}

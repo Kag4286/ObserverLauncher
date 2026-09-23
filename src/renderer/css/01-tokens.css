@@ -26,6 +26,7 @@
   --ease-emphasized:cubic-bezier(.34,1.4,.64,1);
   --dur-instant:0ms; --dur-fast:120ms; --dur-tab:170ms; --dur-modal:210ms; --dur-slow:320ms;
   --dur-micro:90ms; /* hover / press only */
+  --dur-pulse:1100ms; /* slow breathing loops (status dots) */
   --slide-x:10px;
   /* Stagger step for list reveals (players/content/market rows). Small = calm. */
   --stagger:28ms;

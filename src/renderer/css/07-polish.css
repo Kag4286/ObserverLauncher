@@ -130,7 +130,10 @@
 .wm-wpmain small{font:500 9.5px var(--font-mono);color:var(--text-dim)}
 @media(max-width:900px){.wm-main{grid-template-columns:1fr}.wm-panel{border-left:0;border-top:1px solid var(--border)}}
 /* ===== PLAYER INSPECTOR — TEXT-ONLY REDESIGN ===== */
-.player-modal{max-width:1120px;width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:modalIn .22s var(--ease)}
+/* FIX: the element is class="modal wide player-modal". `.modal.wide` (specificity 0,2,0) in
+   06-modals.css beat `.player-modal` (0,1,0) here, so the width stayed at 720px and the two
+   columns squeezed their text. Match the specificity so this rule wins. */
+.modal.wide.player-modal{max-width:1120px;width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:modalIn .22s var(--ease)}
 @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 #playerInspector{flex:1;overflow:auto;padding:0;display:flex;flex-direction:column;gap:16px}
 #playerDataForm{padding:18px 20px 20px;display:flex;flex-direction:column;gap:16px}
@@ -146,7 +149,7 @@
 .inspect-readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .pd-ro{display:flex;flex-direction:column;gap:3px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;min-width:0}
 .pd-ro>span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
-.pd-ro>b{font:600 14px var(--font-ui);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pd-ro>b{font:600 14px var(--font-ui);color:var(--text);overflow-wrap:anywhere;line-height:1.3}
 .pd-ro>b.ok{color:var(--success)} .pd-ro>b.dim{color:var(--text-muted)}
 .pd-live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .pd-live-cell{display:flex;align-items:flex-end;gap:10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:12px}
@@ -163,7 +166,9 @@
 .inspect-title{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
 .inspect-name-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
 .inspect-title b{font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-.inspect-title>span{font:500 11px var(--font-mono);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Dimension can be long ("minecraft:overworld" + a namespace); let it wrap to a second line
+   instead of truncating to "overwor...". */
+.inspect-title>span{font:500 11px var(--font-mono);color:var(--text-muted);overflow-wrap:anywhere;line-height:1.35}
 .inspect-uuid{font:500 10px var(--font-mono);color:var(--accent-dim);cursor:pointer;word-break:break-word;overflow-wrap:anywhere;line-height:1.35}
 .inspect-uuid.copied{color:var(--success)}
 .inspect-badge{font:600 9.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--warning);background:var(--warning-weak);border:1px solid rgba(255,210,63,.25);padding:3px 7px;border-radius:999px;white-space:nowrap;flex-shrink:0}

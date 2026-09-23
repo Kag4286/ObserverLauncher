@@ -94,7 +94,19 @@ async function callTool(ctx, toolName, args, cfg) {
     if (!yes) { auditLog(toolName, 'destroy', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (destructive tool).' }; }
   }
   try {
-    const r = await tool.handler(ctx, args || {});
+    // M11: an optional `instance` arg targets a specific instance; omitted -> the ACTIVE one
+    // (fully backward compatible). Unknown id -> a clear error. This is the ONE choke point, so
+    // every server-scoped tool gains instance targeting without per-tool changes.
+    let runId = ctx.activeInstanceId;
+    if (args && args.instance) {
+      const { resolveInstanceId } = require('../main/settings.js');
+      const resolved = resolveInstanceId(String(args.instance));
+      if (!resolved) return { ok: false, error: `Unknown instance "${args.instance}". Call list_instances for valid ids.` };
+      runId = resolved;
+    }
+    // M4b: run the handler inside AsyncLocalStorage for the target instance so per-instance ctx
+    // accessors resolve to it, and an instance switch mid-await cannot leak across calls.
+    const r = await ctx.runInInstance(runId, () => tool.handler(ctx, args || {}));
     if (tool.risk !== 'read') auditLog(toolName, tool.risk, r);
     return r;
   } catch (e) {

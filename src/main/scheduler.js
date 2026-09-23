@@ -5,7 +5,7 @@
 //
 // Model: a single daily window — optional startTime and/or stopTime ("HH:MM"), on a set
 // of weekdays (empty = every day). Deliberately NOT a cron engine / multi-schedule.
-const { loadSettings } = require('./settings.js');
+const { loadSettings, loadSettingsFor } = require('./settings.js');
 const { startServerInternal } = require('./server-lifecycle.js');
 
 // Parse "HH:MM" -> {h, m} | null. Only 24h clock, strict 2-digit fields.
@@ -75,9 +75,11 @@ function stopServerInternal(ctx) {
   return { ok: true };
 }
 
-// Timer tick — separated from the interval so tests can call it with a fixed clock.
-async function schedulerTick(ctx, now = new Date()) {
-  const s = loadSettings();
+// Timer tick — separated from the interval so tests can call it with a fixed clock. `settings` is
+// optional: when omitted it reads the ACTIVE instance (backward-compatible); when given it targets
+// that instance's schedule (the per-instance loop passes it in).
+async function schedulerTick(ctx, now = new Date(), settings) {
+  const s = settings || loadSettings();
   const schedule = { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime, stopTime: s.scheduleStopTime, days: s.scheduleDays || [] };
   ctx.schedulerLastFired = ctx.schedulerLastFired || { start: null, stop: null };
 
@@ -95,10 +97,26 @@ async function schedulerTick(ctx, now = new Date()) {
   }
 }
 
+// v2.0.0: run the schedule for EVERY instance, not just the active one — a background server must
+// still auto start/stop on its own schedule. Each tick runs inside ctx.runInInstance(id) so the
+// per-instance ctx accessors (serverStatus, schedulerLastFired, backupInProgress, ...) resolve to
+// the right instance. One interval, N instances (mirrors startMetrics).
 function startScheduler(ctx) {
   clearInterval(ctx.schedulerTimer);
   // 60s cadence matches startAutoBackupWatcher; the 90s fire window tolerates a missed tick.
-  ctx.schedulerTimer = setInterval(() => { schedulerTick(ctx).catch(() => {}); }, 60 * 1000);
+  ctx.schedulerTimer = setInterval(() => {
+    const now = new Date();
+    const ids = ctx.instances ? [...ctx.instances.keys()] : [];
+    if (!ids.length) ids.push(ctx.inst());
+    for (const id of ids) {
+      ctx.runInInstance(id, () => {
+        let s;
+        try { s = loadSettingsFor(id); } catch { return; }
+        if (!s || !s.serverPath) return; // never schedule an instance with no server folder
+        return schedulerTick(ctx, now, s).catch(() => {});
+      });
+    }
+  }, 60 * 1000);
 }
 
 module.exports = { parseTime, dayKey, shouldFire, schedulerTick, startScheduler, stopServerInternal, FIRE_WINDOW_MS };

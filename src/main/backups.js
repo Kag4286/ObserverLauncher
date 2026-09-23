@@ -64,19 +64,30 @@ function pruneBackups(ctx, keep) {
   } catch {}
 }
 
+// v2.0.0: run auto-backups for EVERY instance, not just the active one — autoBackupMinutes is a
+// per-instance setting, so each instance keeps its own cadence. Each tick runs inside
+// ctx.runInInstance(id) so createBackupInternal's ctx.currentServerPath / lastAutoBackupAt resolve
+// to the right instance. One interval, N instances (mirrors startMetrics / startScheduler).
 function startAutoBackupWatcher(ctx) {
   clearInterval(ctx.autoBackupTimer);
-  const { loadSettings } = require('./settings.js');
+  const { loadSettingsFor } = require('./settings.js');
   ctx.autoBackupTimer = setInterval(async () => {
-    const settings = loadSettings();
-    const minutes = Number(settings.autoBackupMinutes) || 0;
-    if (minutes <= 0 || !ctx.currentServerPath) return;
-    if (Date.now() - ctx.lastAutoBackupAt < minutes * 60 * 1000) return;
-    const result = await createBackupInternal(ctx, { auto: true });
-    if (result.ok) {
-      ctx.lastAutoBackupAt = Date.now();
-      ctx.appendLog(`Auto-backup: ${result.name}`, 'system');
-      pruneBackups(ctx, settings.backupRetention);
+    const ids = ctx.instances ? [...ctx.instances.keys()] : [];
+    if (!ids.length) ids.push(ctx.inst());
+    for (const id of ids) {
+      await ctx.runInInstance(id, async () => {
+        let settings;
+        try { settings = loadSettingsFor(id); } catch { return; }
+        const minutes = Number(settings.autoBackupMinutes) || 0;
+        if (minutes <= 0 || !ctx.currentServerPath) return;
+        if (Date.now() - ctx.lastAutoBackupAt < minutes * 60 * 1000) return;
+        const result = await createBackupInternal(ctx, { auto: true });
+        if (result.ok) {
+          ctx.lastAutoBackupAt = Date.now();
+          ctx.appendLog(`Auto-backup: ${result.name}`, 'system');
+          pruneBackups(ctx, settings.backupRetention);
+        }
+      }).catch(() => {});
     }
   }, 60 * 1000);
 }

@@ -29,6 +29,26 @@ if($candidates.Count -gt 0){
   }).catch(()=>null);
 }
 
+// Process identity for orphan cleanup (v2.0.0). Returns { alive, name, startTimeMs }
+// for a pid, or null if it is not running. startTimeMs (process creation time) is
+// unique per process lifetime and is what lets orphan cleanup detect PID REUSE
+// before killing: a reused pid (different creation time) must NEVER be killed.
+async function getProcessInfo(pid) {
+  const n = Number(pid);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const script = `[System.Threading.Thread]::CurrentThread.CurrentCulture=[cultureinfo]::InvariantCulture;
+$p=Get-CimInstance Win32_Process -Filter "ProcessId=${n}" -ErrorAction SilentlyContinue;
+if(-not $p){ exit 2 };
+"$($p.Name)|$(([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds())"`;
+  try {
+    const r = await runPowerShell(script, 8000);
+    if (!r.ok || !r.stdout || !r.stdout.trim()) return null;
+    const [name, ms] = String(r.stdout).trim().split('|');
+    const startTimeMs = Number(ms);
+    return { alive: true, name: name || null, startTimeMs: Number.isFinite(startTimeMs) ? startTimeMs : null };
+  } catch { return null; }
+}
+
 async function getProcessMetrics(pid) {
   // BUGFIX: PowerShell string output uses the CURRENT CULTURE — on a
   // vi-VN / de-DE / pt-BR system, TotalSeconds prints "45,6712" (comma).
@@ -86,7 +106,7 @@ async function allowFirewall(port) {
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not create firewall rule — UAC dismissed or rule exists.' };
 }
 
-module.exports = { findJavaDescendant, getProcessMetrics, createBackup, restoreBackup, allowFirewall, extractArchive, createArchive };
+module.exports = { findJavaDescendant, getProcessInfo, getProcessMetrics, createBackup, restoreBackup, allowFirewall, extractArchive, createArchive };
 
 // Cross-platform archive helpers used by the Java installer and .mrpack import/export.
 // Windows side wraps PowerShell's Expand-Archive / Compress-Archive (unchanged behaviour).

@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { app, dialog } = require('electron');
-const { loadSettings, saveSettings } = require('./settings.js');
+const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, removeInstance } = require('./settings.js');
 const { detectJava, requiredJavaForJar, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
 const { localIPv4s } = require('./network.js');
@@ -21,6 +21,7 @@ function registerSettings(ipcMain, ctx) {
   // snapshot; the UI refreshes for real on the next files push / save.
   ipcMain.handle('settings:get', async () => {
     const settings = loadSettings();
+    const inst = listInstances();
     let files = emptyServerFiles(), eulaAccepted = false, javaRequired = null;
     try {
       files = serverFiles(ctx.currentServerPath);
@@ -29,6 +30,8 @@ function registerSettings(ipcMain, ctx) {
     } catch {}
     return {
       settings,
+      instances: inst.instances,
+      activeInstanceId: inst.activeInstanceId,
       java: ctx.javaInfo,
       files,
       eulaAccepted,
@@ -36,6 +39,9 @@ function registerSettings(ipcMain, ctx) {
       running: ctx.serverStatus === 'running',
       logs: ctx.consoleBuffer,
       live: ctx.live,
+      // M5/B4: the active instance's sampled history (ring buffer) so the renderer can repaint
+      // the chart immediately after an instance switch instead of waiting for fresh metrics.
+      metricsHistory: ctx.metricsHistory,
       systemMemoryGB: Math.round(os.totalmem() / (1024 ** 3)),
       javaRequired,
       mcp: (() => {
@@ -144,6 +150,86 @@ function registerSettings(ipcMain, ctx) {
     };
   });
 
+  // --- v2.0.0 multi-instance CRUD (Phase B backend) ---
+  // Every mutation re-seeds ctx so activeInstanceId + the merged instance state stay in
+  // sync. With a single instance nothing here is user-reachable, so behaviour is unchanged.
+  ipcMain.handle('instances:list', async () => listInstances());
+
+  // Q3: does a folder ALREADY contain a Minecraft server? Lets the Add-instance wizard offer
+  // "import as-is" instead of downloading a fresh jar. Read-only probe, never throws.
+  ipcMain.handle('instances:probe', async (_, folder) => {
+    const root = String(folder || '');
+    if (!root) return { ok: false };
+    try {
+      const info = serverFiles(root);
+      return { ok: true, looksLikeServer: !!(info.jar || info.launchScript), jar: info.jar || null, launchScript: info.launchScript || null };
+    } catch { return { ok: false }; }
+  });
+
+  // M11/B4: one-shot snapshot of ANY instance (not just the active one) without switching — status,
+  // console tail, metrics history, files, java. Lets the renderer paint an instance before/without
+  // making it active. Unknown id -> {ok:false}.
+  ipcMain.handle('instances:snapshot', async (_, id) => {
+    const key = String(id || '');
+    const st = ctx.instances && ctx.instances.get(key);
+    if (!st) return { ok: false, error: 'Unknown instance.' };
+    const root = st.currentServerPath || st.serverPath || '';
+    let files = emptyServerFiles(), eulaAccepted = false, javaRequired = null;
+    try {
+      files = serverFiles(root);
+      eulaAccepted = readEula(root);
+      javaRequired = requiredJavaForJar(files.jar) || null;
+    } catch {}
+    return {
+      ok: true,
+      id: key,
+      status: st.serverStatus || 'stopped',
+      running: st.serverStatus === 'running',
+      logs: Array.isArray(st.consoleBuffer) ? st.consoleBuffer : [],
+      live: st.live || { tps: null, mspt: null, players: [] },
+      metricsHistory: Array.isArray(st.metricsHistory) ? st.metricsHistory : [],
+      java: st.javaInfo || null,
+      files, eulaAccepted, javaRequired,
+      active: key === ctx.activeInstanceId,
+    };
+  });
+
+  ipcMain.handle('instances:add', async (_, payload) => {
+    const r = addInstance(payload || {});
+    if (!r.ok) return r;
+    try { ctx.seedInstances(); } catch {}
+    return { ok: true, id: r.id };
+  });
+
+  ipcMain.handle('instances:switch', async (_, id) => {
+    const r = switchInstance(String(id || ''));
+    if (!r.ok) return r;
+    try { ctx.seedInstances(); } catch {}
+    // Point the active runtime state at the new instance's folder and refresh watchers/files.
+    let merged = {};
+    try { merged = loadSettings(); ctx.currentServerPath = merged.serverPath || ''; } catch {}
+    try { ctx.watchServerFolder(); } catch {}
+    // M7: detect THIS instance's Java (per-instance javaPath) so its javaInfo is correct — a
+    // background instance never overwrites the active instance's detected Java again.
+    try { ctx.javaInfo = await detectJava(merged.javaPath || 'java'); } catch {}
+    return { ok: true, activeInstanceId: ctx.activeInstanceId, java: ctx.javaInfo };
+  });
+
+  ipcMain.handle('instances:rename', async (_, { id, name } = {}) => {
+    const r = renameInstance(String(id || ''), name);
+    if (r.ok) { try { ctx.seedInstances(); } catch {} }
+    return r;
+  });
+
+  ipcMain.handle('instances:remove', async (_, id) => {
+    const r = removeInstance(String(id || ''));
+    if (!r.ok) return r;
+    try { ctx.seedInstances(); } catch {}
+    try { ctx.currentServerPath = loadSettings().serverPath || ''; } catch {}
+    try { ctx.watchServerFolder(); } catch {}
+    return { ok: true, activeInstanceId: ctx.activeInstanceId, instances: r.instances };
+  });
+
   ipcMain.handle('onboarding:complete', async () => {
     const s = loadSettings();
     s.onboarded = true;
@@ -191,7 +277,9 @@ function registerSettings(ipcMain, ctx) {
         filters: [{ name: 'Text file', extensions: ['txt'] }],
       });
       if (saveDialog.canceled || !saveDialog.filePath) return { ok: false, cancelled: true };
-      const body = lines.map(l => `[${l.time}] ${l.text}`).join('\n') + '\n';
+      // Phase C (item 17): scrub IPv4/email before the console is written to a shareable file.
+      const { scrubPII } = require('../mcp/doctor.js');
+      const body = lines.map(l => `[${l.time}] ${scrubPII(l.text)}`).join('\n') + '\n';
       fs.writeFileSync(saveDialog.filePath, body, 'utf8');
       return { ok: true, path: saveDialog.filePath, count: lines.length };
     } catch (error) {

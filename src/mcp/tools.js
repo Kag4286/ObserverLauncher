@@ -5,8 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { serverFiles, readPlayerData, findPlayerDataFile, readEula } = require('../main/server-files.js');
 const { safeTarget, readJsonList } = require('../main/fs-utils.js');
-const { loadSettings } = require('../main/settings.js');
-const { startServerInternal, forceStopServer } = require('../main/server-lifecycle.js');
+const { loadSettings, loadSettingsFor, saveSettingsFor } = require('../main/settings.js');
+const { startServerInternal, forceStopServer, sendConsoleCommand } = require('../main/server-lifecycle.js');
 const { createBackupInternal } = require('../main/backups.js');
 const { readLevel, readPlayers, readWaypoints } = require('../main/worldmap.js');
 const { localIPv4s } = require('../main/network.js');
@@ -23,7 +23,6 @@ const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server
 
 // ---- READ tools ----
 async function tGetStatus(ctx) {
-  const s = loadSettings();
   let files = {}; try { files = serverFiles(ctx.currentServerPath); } catch {}
   return { ok: true, result: {
     status: ctx.serverStatus, running: ctx.serverStatus === 'running',
@@ -35,7 +34,9 @@ async function tGetStatus(ctx) {
 async function tReadConsole(ctx, a) {
   const n = Math.min(Math.max(1, Number(a.lines) || 100), 2000);
   const buf = ctx.consoleBuffer.slice(-n);
-  return { ok: true, result: { lines: buf.map(l => `[${l.time}] ${l.text}`), count: buf.length } };
+  // Phase C (item 17): scrub IPv4/email before console text leaves to an AI client.
+  const { scrubPII } = require('./doctor.js');
+  return { ok: true, result: { lines: buf.map(l => `[${l.time}] ${scrubPII(l.text)}`), count: buf.length } };
 }
 async function tListPlayers(ctx) {
   const f = serverFiles(needPath(ctx));
@@ -139,11 +140,8 @@ async function tSendCommand(ctx, a) {
   const cmd = String(a.command || '').trim();
   if (!cmd) return { ok: false, error: 'command is required.' };
   if (cmd.length > 2000 || /[\r\n]/.test(cmd)) return { ok: false, error: 'Command must be single-line, max 2000 characters.' };
-  if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
-  ctx.serverProcess.stdin.write(cmd + '\r\n');
-  ctx.lastManualCommandAt = Date.now();
-  ctx.appendLog('> ' + cmd, 'command');
-  return { ok: true };
+  // M6: prefer RCON, stdin fallback (same helper the IPC path uses).
+  return await sendConsoleCommand(ctx, cmd);
 }
 async function tSetProperty(ctx, a) {
   const root = needPath(ctx);
@@ -200,7 +198,8 @@ async function tInstallJava(ctx) {
   return ok(await autoInstallJava(ctx));
 }
 async function tGetSettings(ctx) {
-  const s = loadSettings();
+  // M12: read the TARGET instance (ctx.inst() is set by runInInstance in callTool), not the active one.
+  const s = loadSettingsFor(ctx.inst());
   return { ok: true, result: { serverPath: s.serverPath || null, javaPath: s.javaPath || null, memoryMin: s.memoryMin, memoryMax: s.memoryMax, jvmArgs: s.jvmArgs || '', autoEula: !!s.autoEula, autoRestart: !!s.autoRestart, locale: s.locale || 'en', autoBackupMinutes: s.autoBackupMinutes || 0 } };
 }
 // serverPath is intentionally NOT settable over MCP (root of every file op) — GUI only.
@@ -223,11 +222,12 @@ async function tSetSetting(ctx, a) {
   const key = String(a.key || '');
   if (!SETTABLE[key]) return { ok: false, error: 'Key not settable over MCP: ' + key + '. Allowed: ' + Object.keys(SETTABLE).join(', ') };
   if (!SETTABLE[key](a.value)) return { ok: false, error: 'Invalid value for ' + key + '.' };
-  const { saveSettings } = require('../main/settings.js');
-  const s = loadSettings();
+  // M12: write the TARGET instance (ctx.inst()), not the active one.
+  const target = ctx.inst();
+  const s = loadSettingsFor(target);
   s[key] = a.value;
   if (Number(s.memoryMax) < Number(s.memoryMin)) return { ok: false, error: 'memoryMax must be >= memoryMin.' };
-  saveSettings(s);
+  saveSettingsFor(target, s);
   return { ok: true, result: { key, value: a.value } };
 }
 async function tInstallFromMarket(ctx, a) {
@@ -423,10 +423,79 @@ async function tStopServer(ctx) {
   ctx.manualStop = true;
   clearTimeout(ctx.restartTimer);
   ctx.setServerStatus('stopping');
-  try { ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
+  // M12: RCON-first (works for an adopted / RCON-attached server whose stdin stub is null).
+  try { await sendConsoleCommand(ctx, 'stop'); } catch {}
   return { ok: true };
 }
 async function tForceStopServer(ctx) { return ok(await forceStopServer(ctx)); }
+// ---- M11: multi-instance tools ----
+async function tListInstances(ctx) {
+  const { listInstances } = require('../main/settings.js');
+  const { instances, activeInstanceId } = listInstances();
+  // Include live status per instance (from ctx.instances) so the AI can pick one to act on.
+  const enriched = instances.map(i => {
+    const st = ctx.instances && ctx.instances.get(i.id);
+    return { id: i.id, name: i.name, serverPath: i.serverPath, status: (st && st.serverStatus) || 'stopped', active: i.id === activeInstanceId };
+  });
+  return { ok: true, result: { instances: enriched, activeInstanceId } };
+}
+// M12: read a NON-active instance's full state (status, console, metrics, files, java) WITHOUT
+// making it active. Mirrors the IPC instances:snapshot. Lets an AI inspect/compare servers without
+// flipping the user's GUI to another instance. Read-only.
+async function tGetInstanceSnapshot(ctx, a) {
+  const { resolveInstanceId } = require('../main/settings.js');
+  const id = resolveInstanceId(String(a.instance || a.id || '').trim() || null);
+  if (!id) return { ok: false, error: 'Unknown instance id. Call list_instances for valid ids.' };
+  const st = ctx.instances && ctx.instances.get(id);
+  if (!st) return { ok: false, error: 'Unknown instance.' };
+  const root = st.currentServerPath || st.serverPath || '';
+  let files = {}; try { files = serverFiles(root); } catch {}
+  const n = Math.min(Math.max(1, Number(a.lines) || 100), 2000);
+  const { scrubPII } = require('./doctor.js');
+  const logs = (Array.isArray(st.consoleBuffer) ? st.consoleBuffer.slice(-n) : []).map(l => `[${l.time}] ${scrubPII(l.text)}`);
+  const hist = Array.isArray(st.metricsHistory) ? st.metricsHistory : [];
+  return { ok: true, result: {
+    id, name: st.name || null, serverPath: root || null,
+    status: st.serverStatus || 'stopped', running: st.serverStatus === 'running',
+    active: id === ctx.activeInstanceId,
+    logs, live: st.live || { tps: null, mspt: null, players: [] },
+    metricsSamples: hist.length, java: st.javaInfo || null, files,
+  } };
+}
+async function tSelectInstance(ctx, a) {
+  const { switchInstance } = require('../main/settings.js');
+  const id = String(a.instance || a.id || '').trim();
+  if (!id) return { ok: false, error: 'instance id is required.' };
+  const r = switchInstance(id);
+  if (!r.ok) return r;
+  try { ctx.seedInstances(); } catch {}
+  return { ok: true, result: { activeInstanceId: ctx.activeInstanceId } };
+}
+async function tStartInstance(ctx, a) {
+  const { loadSettingsFor, resolveInstanceId } = require('../main/settings.js');
+  const id = resolveInstanceId(String(a.instance || a.id || '').trim() || null);
+  if (!id) return { ok: false, error: 'Unknown instance id.' };
+  return await ctx.runInInstance(id, async () => {
+    const s = loadSettingsFor(id);
+    // Prime the target instance's runtime folder so file ops inside startServerInternal resolve.
+    ctx.currentServerPath = s.serverPath || ctx.currentServerPath;
+    return ok(await startServerInternal(ctx, s));
+  });
+}
+async function tStopInstance(ctx, a) {
+  const { resolveInstanceId } = require('../main/settings.js');
+  const id = resolveInstanceId(String(a.instance || a.id || '').trim() || null);
+  if (!id) return { ok: false, error: 'Unknown instance id.' };
+  return await ctx.runInInstance(id, async () => {
+    if (ctx.serverStatus === 'stopped' || ctx.serverStatus === 'stopping') return { ok: false, error: 'Instance is not running.' };
+    if (!ctx.serverProcess) return { ok: false, error: 'Instance is not running.' };
+    ctx.manualStop = true;
+    clearTimeout(ctx.restartTimer);
+    ctx.setServerStatus('stopping');
+    try { await sendConsoleCommand(ctx, 'stop'); } catch {}
+    return { ok: true };
+  });
+}
 async function tDeleteContent(ctx, a) {
   const root = needPath(ctx);
   const kind = a.kind || 'plugin';
@@ -456,15 +525,16 @@ async function tRestoreBackup(ctx, a) {
 }
 
 async function tGetSchedule(ctx) {
-  const s = loadSettings();
+  // M12: the TARGET instance's schedule, not the active one.
+  const s = loadSettingsFor(ctx.inst());
   return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };
 }
 async function tSetSchedule(ctx, a) {
   const { parseTime } = require('../main/scheduler.js');
-  const { saveSettings } = require('../main/settings.js');
   const VALID_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const DAY_NUM = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-  const s = loadSettings();
+  const target = ctx.inst();
+  const s = loadSettingsFor(target);
   if (a.enabled !== undefined) {
     if (typeof a.enabled !== 'boolean') return { ok: false, error: 'enabled must be a boolean.' };
     s.scheduleEnabled = a.enabled;
@@ -486,7 +556,7 @@ async function tSetSchedule(ctx, a) {
     // MCP-created schedule silently never fire.
     s.scheduleDays = a.days.map(d => DAY_NUM[String(d).toLowerCase().slice(0, 3)]).filter(n => Number.isInteger(n));
   }
-  saveSettings(s);
+  saveSettingsFor(target, s);
   return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };
 }
 async function tListWaypoints(ctx) {
@@ -509,7 +579,9 @@ async function tKickPlayer(ctx, a) {
   const { isSafePlayerName } = require('../main/validate.js');
   if (!isSafePlayerName(name)) return { ok: false, error: 'Invalid player name - use 3-16 letters, numbers or underscores.' };
   if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
-  ctx.serverProcess.stdin.write('kick ' + name + '\r\n');
+  // M12: route through sendConsoleCommand (RCON-first) so kick works on an RCON/adopted server too.
+  const r = await sendConsoleCommand(ctx, 'kick ' + name);
+  if (!r.ok) return r;
   return { ok: true, result: { kicked: name } };
 }
 
@@ -534,7 +606,7 @@ async function tDiagnoseServer(ctx) {
 }
 async function tAnalyzeConsole(ctx, a) {
   const n = Math.min(Math.max(1, Number(a.lines) || 500), 2000);
-  const buf = (ctx.consoleBuffer || []).slice(-n);
+  const buf = (ctx.consoleBuffer || []).slice(-n).map(l => ({ text: doctor.scrubPII(l.text), type: l.type }));
   const analysis = doctor.analyzeConsoleLines(buf);
   return { ok: true, result: { scanned: buf.length, errors: analysis.errors, warns: analysis.warns, issues: analysis.issues } };
 }
@@ -704,6 +776,11 @@ const TOOLS = [
   { name: 'op_player', risk: 'write', description: 'Grant or revoke operator. level 1-4 applies when the server is STOPPED (writes ops.json); a running server always grants level 4 (vanilla /op has no level arg).', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' }, level: { type: 'number', description: 'operator level 1-4 (default 4; stopped server only)' } }, ['name']), handler: tOpPlayer },
   { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },
   { name: 'ban_player', risk: 'write', description: 'Ban or unban a player, or ban/unban an IP with ip.', inputSchema: S({ name: STR('player name (or any label when using ip)'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)'), ip: STR('ban by IP instead of name (optional)') }, ['name']), handler: tBanPlayer },
+  { name: 'list_instances', risk: 'read', description: 'List all configured server instances (id, name, serverPath, status, active). Call this FIRST to discover which instance to target, then pass instance: <id> to other tools.', inputSchema: S(), handler: tListInstances },
+  { name: 'get_instance_snapshot', risk: 'read', description: 'Read ONE instance\'s full state (status, console tail, live metrics, java, files) WITHOUT making it active - use to inspect/compare a background server without disturbing the user\'s GUI.', inputSchema: S({ instance: STR('instance id (from list_instances)'), lines: { type: 'number', description: 'console lines to return (default 100, max 2000)' } }, ['instance']), handler: tGetInstanceSnapshot },
+  { name: 'select_instance', risk: 'write', description: 'Make an instance the ACTIVE one (subsequent tools without an instance param target it).', inputSchema: S({ instance: STR('instance id (from list_instances)') }, ['instance']), handler: tSelectInstance },
+  { name: 'start_instance', risk: 'write', description: 'Start a specific instance by id (defaults to the active one).', inputSchema: S({ instance: STR('instance id (optional, default active)') }), handler: tStartInstance },
+  { name: 'stop_instance', risk: 'destroy', description: 'Gracefully stop a specific instance by id (defaults to the active one).', inputSchema: S({ instance: STR('instance id (optional, default active)') }), handler: tStopInstance },
   { name: 'stop_server', risk: 'destroy', description: 'Gracefully stop the server.', inputSchema: S(), handler: tStopServer },
   { name: 'force_stop_server', risk: 'destroy', description: 'Kill the server process tree.', inputSchema: S(), handler: tForceStopServer },
   { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name') }, ['name']), handler: tDeleteContent },

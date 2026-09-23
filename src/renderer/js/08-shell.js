@@ -50,6 +50,34 @@ function flushLogs(){
 }
 function addLog(line){ logQueue.push(line); if(!logFlushScheduled){ logFlushScheduled=true; requestAnimationFrame(flushLogs); } }
 function addLogsBatch(lines){ if(!lines||!lines.length) return; logQueue.push(...lines); if(!logFlushScheduled){ logFlushScheduled=true; requestAnimationFrame(flushLogs); } }
+// B4: replace the whole console with another instance's buffer on switch. Unlike flushLogs
+// (which appends), this clears first so no lines from the previous instance linger.
+function repaintConsole(lines){
+  const o=$('#logOutput'); if(!o) return;
+  logQueue=[]; logFlushScheduled=false;
+  o.innerHTML=''; o.classList.remove('has-content');
+  const arr=Array.isArray(lines)?lines:[];
+  if(!arr.length){ o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`; return; }
+  const frag=document.createDocumentFragment();
+  for(const line of arr){
+    const d=document.createElement('div'), level=logLevel(line);
+    d.className=`log-line ${line.type||''}`; d.dataset.level=level;
+    d.dataset.text=String(line.text||'').slice(0,2000);
+    d.innerHTML=`<span class="lvl">${LOG_BADGE[level]||'INF'}</span><span class="time">${esc(line.time)}</span> ${esc(line.text)}`;
+    if(!logVisible(level,line.text)) d.hidden=true;
+    frag.appendChild(d);
+  }
+  o.classList.add('has-content'); o.appendChild(frag);
+  o.scrollTop=o.scrollHeight;
+}
+// B4: rebuild the chart ring from the active instance's sampled history after a switch.
+function rebuildSamples(history){
+  const arr=(Array.isArray(history)?history:[]).slice(-38);
+  samples=arr.map(s=>({tps:s.tps??null,mspt:s.mspt??null,cpu:s.cpu??null,ram:s.ram??null}));
+  while(samples.length<38) samples.unshift({tps:null,mspt:null,cpu:null,ram:null});
+  try{ drawOvSpark(); }catch{}
+  try{ metricChart($('#miniChart')); metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
+}
 const channelOrder=['overview','console','players','performance','content','marketplace','worlds','properties'];
 function positionChannelIndicator(){const nav=$('#nav'),ind=$('#channelIndicator');if(!nav||!ind)return;const active=nav.querySelector('.nav-item.active');if(!active){ind.style.opacity='0';return} // rail is vertical — indicator is left border via CSS, no horizontal calc needed
   ind.style.opacity='0'; }
@@ -83,6 +111,184 @@ function switchTab(tab){
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
   if(tab==='worldmap'&&typeof wmLoad==='function')wmLoad().catch(e=>toast(`World Map failed to load: ${e?.message||e}`,'error'));
 }
+
+// ===== v2.0.0 MULTI-INSTANCE RAIL =====
+// Renders the instance list from state (settings:get returns instances[] + activeInstanceId).
+// Items use .inst-item + data-instance (NOT .nav-item/data-tab), so switchTab and its keyboard
+// nav are completely untouched. The block stays hidden until at least one instance exists, which
+// keeps the first-run screen unchanged.
+function instanceDotStatus(instId, activeId){
+  // The active instance's status is the authoritative `state.status`; a background instance's
+  // status comes from its last server:state event (tracked in state.instanceStatus).
+  if(instId===activeId) return state.status||'stopped';
+  return (state.instanceStatus&&state.instanceStatus[instId])||'stopped';
+}
+function renderInstanceList(){
+  const wrap=$('#instanceList'),host=$('#instanceItems');
+  if(!wrap||!host)return;
+  const list=Array.isArray(state.instances)?state.instances:[];
+  wrap.hidden=list.length===0;
+  if(list.length===0)return;
+  const activeId=state.activeInstanceId||(list[0]&&list[0].id);
+  host.innerHTML='';
+  list.forEach((inst,idx)=>{
+    const isActive=inst.id===activeId;
+    const st=instanceDotStatus(inst.id,activeId);
+    // A div (not a button) so the rename/remove icon buttons can live INSIDE it without nesting
+    // <button> elements (invalid HTML). Click anywhere on the row switches; the icons stopPropagation.
+    const row=document.createElement('div');
+    row.className='inst-item'+(isActive?' active':'');
+    row.dataset.instance=inst.id;
+    row.setAttribute('role','listitem');
+    row.tabIndex=0;
+    row.title=t('inst.switchTip');
+    // Stagger reveal: same cadence as tab-content rows (--stagger per index, capped so a long
+    // list never waits). Re-runs on every render, so add/remove/switch animates.
+    row.style.animationDelay=(idx*28)+'ms';
+    row.innerHTML='<span class="inst-dot st-'+st+'"></span>'
+      +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>'
+      +'<span class="inst-acts">'
+        +'<button type="button" class="inst-act" data-act="rename" title="'+esc(t('inst.rename'))+'" aria-label="'+esc(t('inst.rename'))+'">✎</button>'
+        +'<button type="button" class="inst-act" data-act="remove" title="'+esc(t('inst.remove'))+'" aria-label="'+esc(t('inst.remove'))+'">✕</button>'
+      +'</span>';
+    row.onclick=e=>{ if(e.target.closest('.inst-act'))return; switchInstance(inst.id); };
+    row.onkeydown=e=>{ if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.inst-act')){e.preventDefault();switchInstance(inst.id);} };
+    row.querySelector('[data-act="rename"]').onclick=e=>{e.stopPropagation();renameInstancePrompt(inst)};
+    row.querySelector('[data-act="remove"]').onclick=e=>{e.stopPropagation();removeInstancePrompt(inst)};
+    host.appendChild(row);
+  });
+  renderInstanceDropdown(list, activeId);
+}
+// Compact instance switcher for narrow screens (rail hidden <1100px). Same state as the rail list:
+// shows the active instance + a menu to switch. Hidden when there is 0-1 instance.
+function renderInstanceDropdown(list, activeId){
+  const dd=$('#instDropdown'),btn=$('#instDdBtn'),menu=$('#instDdMenu'),nameEl=$('#instDdName'),dot=$('#instDdDot');
+  if(!dd||!btn||!menu)return;
+  const multi=(list||[]).length>1;
+  dd.hidden=!multi;                 // CSS @media decides actual visibility; hidden avoids stale UI
+  if(!multi){menu.hidden=true;btn.setAttribute('aria-expanded','false');return}
+  const active=(list||[]).find(i=>i.id===activeId)||list[0];
+  nameEl.textContent=active.name||active.serverPath||'Server';
+  dot.className='inst-dot st-'+instanceDotStatus(active.id,activeId);
+  menu.innerHTML='';
+  list.forEach(inst=>{
+    const isActive=inst.id===activeId;
+    const st=instanceDotStatus(inst.id,activeId);
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='inst-item'+(isActive?' active':'');
+    b.setAttribute('role','option');
+    b.setAttribute('aria-selected',isActive?'true':'false');
+    b.dataset.instance=inst.id;
+    b.innerHTML='<span class="inst-dot st-'+st+'"></span><span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>';
+    b.onclick=()=>{ closeInstDd(); switchInstance(inst.id); };
+    menu.appendChild(b);
+  });
+}
+function closeInstDd(){
+  const dd=$('#instDropdown'),btn=$('#instDdBtn'),menu=$('#instDdMenu');
+  if(menu)menu.hidden=true;
+  if(btn)btn.setAttribute('aria-expanded','false');
+  if(dd)dd.classList.remove('open');
+}
+// Q2: Tunnel overview — one row per instance showing its public Playit address + status.
+// Pure renderer: reads state.instances (enriched by listInstances with tunnelAddress/autoTunnel)
+// and state.instanceStatus for the dots. Stays hidden with a single instance, so the one-server
+// screen is untouched. "Open dashboard" reuses the existing tunnelOpenUrl IPC (no new channel).
+function renderTunnelOverview(){
+  const sec=$('#tunnelOverviewSection'),host=$('#tunnelOverview');
+  if(!sec||!host)return;
+  const list=Array.isArray(state.instances)?state.instances:[];
+  sec.hidden=list.length<2;            // single instance -> the Overview tunnel panel already covers it
+  if(list.length<2)return;
+  const activeId=state.activeInstanceId||(list[0]&&list[0].id);
+  host.innerHTML='';
+  list.forEach(inst=>{
+    const st=instanceDotStatus(inst.id,activeId);
+    const addr=(inst.tunnelAddress||'').trim();
+    const row=document.createElement('div');
+    row.className='tun-ov-row'+(inst.id===activeId?' active':'');
+    const addrHtml=addr
+      ? '<span class="tun-ov-addr">'+esc(addr)+'</span>'
+      : '<span class="tun-ov-addr missing">'+esc(t('tun.ovMissing'))+'</span>';
+    row.innerHTML='<span class="inst-dot st-'+st+'"></span>'
+      +'<span class="tun-ov-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>'
+      +addrHtml
+      +'<button type="button" class="btn secondary sm tun-ov-open" data-i18n="tun.ovOpen">'+esc(t('tun.ovOpen'))+'</button>';
+    row.querySelector('.tun-ov-open').onclick=()=>window.observer.tunnelOpenUrl('https://playit.gg/account/tunnels');
+    host.appendChild(row);
+  });
+}
+$('#instDdBtn')?.addEventListener('click',e=>{
+  e.stopPropagation();
+  const menu=$('#instDdMenu'),btn=$('#instDdBtn');
+  if(!menu||!btn)return;
+  const willOpen=menu.hidden;
+  menu.hidden=!willOpen;
+  btn.setAttribute('aria-expanded',willOpen?'true':'false');
+  $('#instDropdown')?.classList.toggle('open',willOpen);
+});
+// Dismiss the dropdown on outside click / Escape.
+document.addEventListener('click',e=>{ if(!e.target.closest('#instDropdown'))closeInstDd(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeInstDd(); });
+// Rename an instance (display name only; the id and folder never change).
+async function renameInstancePrompt(inst){
+  const current=inst.name||'';
+  const name=window.prompt(t('inst.rename'),current);
+  if(name===null)return;
+  const trimmed=String(name).trim();
+  if(!trimmed||trimmed===current)return;
+  let r; try{ r=await window.observer.instanceRename({id:inst.id,name:trimmed}); }catch(e){ return toast(e?.message||'Rename failed.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Rename failed.','error');
+  const next=(state.instances||[]).map(i=>i.id===inst.id?{...i,name:r.name}:i);
+  state={...state,instances:next};refreshUI();
+}
+// Remove an instance from the LIST ONLY (never deletes the folder). Refuses while it is running.
+async function removeInstancePrompt(inst){
+  if(inst.id===state.activeInstanceId && state.status!=='stopped')return toast(t('inst.stopFirst'),'error');
+  const ok=await confirmDialog({title:t('inst.remove'),body:esc(t('inst.removeConfirm',{n:inst.name||inst.serverPath||'Server'})),ok:t('inst.remove'),danger:true});
+  if(!ok)return;
+  let r; try{ r=await window.observer.instanceRemove(inst.id); }catch(e){ return toast(e?.message||'Remove failed.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Remove failed.','error');
+  try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
+  refreshUI();
+}
+// Switch the active instance: the backend re-seeds ctx and repoints the runtime folder, then we
+// re-pull the whole snapshot so console/metrics/files/settings all reflect the new instance.
+async function switchInstance(id){
+  if(!id||id===state.activeInstanceId)return;
+  let r;
+  try{ r=await window.observer.instanceSwitch(id); }
+  catch(e){ return toast(e?.message||'Could not switch instance.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Could not switch instance.','error');
+  try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
+  // Repaint the active instance's console + chart immediately (server:metrics/log are gated in
+  // the main process, so a background instance's old lines would otherwise stay on screen).
+  repaintConsole(state.logs);
+  rebuildSamples(state.metricsHistory);
+  refreshUI();
+}
+// v2.0.0 Phase B: add an EXISTING server folder as a new instance, without the wizard. For users
+// who already have a server on disk and just want to manage it here. Creates a new instance, makes
+// it active, and pulls the snapshot (no download, no overwrite of another instance's settings).
+async function addExistingInstance(folder){
+  if(!folder){
+    try{ folder=await window.observer.pickFolder({title:t('inst.pickExisting')}); }catch(e){ return toast(e?.message||'Could not open the folder picker.','error'); }
+  }
+  if(!folder)return null;
+  let add;
+  try{ add=await window.observer.instanceAdd({serverPath:folder}); }
+  catch(e){ toast(e?.message||'Could not add the folder.','error'); return null; }
+  if(!add||!add.ok){ toast((add&&add.error)||'Could not add the folder.','error'); return null; }
+  let sw; try{ sw=await window.observer.instanceSwitch(add.id); }catch(e){ toast(e?.message||'Could not switch to the new instance.','error'); return null; }
+  if(!sw||!sw.ok){ toast((sw&&sw.error)||'Could not switch to the new instance.','error'); return null; }
+  try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
+  repaintConsole(state.logs);
+  rebuildSamples(state.metricsHistory);
+  refreshUI();
+  toast(t('inst.added'),'success');
+  return add.id;
+}
 async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t('toast.cmdInvalid'));const r=await window.observer.command(c);if(!r.ok)toast(r.error)}
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
@@ -97,7 +303,7 @@ $('#nav')?.addEventListener('keydown', e=>{
   else if(e.key==='End'){ e.preventDefault(); items[items.length-1]?.focus(); }
 });
 $$('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));$$('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));$$('[data-command]').forEach(b=>b.onclick=()=>{pushCmdHistory(b.dataset.command);command(b.dataset.command)});$$('[data-open]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.open));$$('[data-import]').forEach(b=>b.onclick=async()=>{const r=await window.observer.importContent(b.dataset.import);if(r.ok){state.files=r.files;refreshUI();toast(t('toast.importedRestart'))}else if(!r.cancelled)toast(r.error)});
-$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#welcomeCreateBtn')?.addEventListener('click', async()=>{ const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'}); if(folder) openNewServerWizard(); });$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true;const s=$('#logSearch');if(s){s.value='';const sc=$('#logSearchClear');if(sc)sc.hidden=true}logQuery='';updateLogHint()};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
+$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#addExistingBtn')?.addEventListener('click',addExistingInstance);$('#welcomeCreateBtn')?.addEventListener('click',()=>openNewServerWizard());$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true;const s=$('#logSearch');if(s){s.value='';const sc=$('#logSearchClear');if(sc)sc.hidden=true}logQuery='';updateLogHint()};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
 function updateLogHint(){
   const countVisible=$$('#logOutput .log-line:not([hidden])').length;
   const hint=$('.log-hint');
@@ -176,7 +382,14 @@ $('#manualKickBtn').onclick=async()=>{const p=manualPlayer();if(p&&await confirm
 $('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast(t('toast.choosePlayer'));if(!await confirmDialog({title:t('pd.apply'),body:t('toast.applyPlayerConfirm',{n:selectedPlayer.name}),ok:t('pd.apply')}))return;const changes={health:$('#pdHealth').value,food:$('#pdFood').value,saturation:$('#pdSaturation').value,xpLevel:$('#pdXpLevel').value,xpTotal:$('#pdXpTotal').value,gameType:$('#pdGameType').value};const r=await window.observer.playerSave({uuid:selectedPlayer.uuid,changes,clearInventory:$('#pdClearInventory').checked});if(!r.ok)return toast(r.error);toast(t('toast.playerSaved',{n:r.backup}));refreshUI()};
 $('#startBtn').onclick=async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||t('toast.startUnknown'),'error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast(t('toast.startRequested'))};$('#stopBtn').onclick=async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)};
 $('#forceStopBtn').onclick=async()=>{if(!await confirmDialog({title:t('top.forceStop'),body:t('top.forceStopConfirm'),ok:t('top.forceStop'),danger:true}))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')};
-window.observer.onLog(addLog);window.observer.onState(v=>{state.running=v.running;state.status=v.status||(v.running?'running':'stopped');
+window.observer.onLog(addLog);window.observer.onState(v=>{
+  // M5/B4: server:state is NOT gated (the rail needs a background instance's crash/stop). Record
+  // it per instance, then let the ACTIVE view ignore a background instance or it would flip the
+  // wrong server. renderInstanceList() repaints the dots from state.instanceStatus.
+  const _st=v.status||(v.running?'running':'stopped');
+  if(v&&v.instanceId){state.instanceStatus={...(state.instanceStatus||{}),[v.instanceId]:_st};try{renderInstanceList()}catch{}}
+  if(v&&v.instanceId&&state.activeInstanceId&&v.instanceId!==state.activeInstanceId)return;
+  state.running=v.running;state.status=_st;
   if(state.status==='running'&&!uptimeStart)uptimeStart=Date.now();else if(state.status==='stopped')uptimeStart=null;
   refreshUI()});window.observer.onFiles(f=>{state.files=f.files||f;if(f.eulaAccepted!==undefined)state.eulaAccepted=f.eulaAccepted;state.javaRequired=f.javaRequired??state.javaRequired;refreshUI()});let lastLivePlayersKey='';
 let lastMetrics=null;
@@ -341,11 +554,11 @@ async function markOnboarded(){await window.observer.onboardingComplete();state.
 // once, generically, so this can't quietly happen again for a future modal either.
 $('#onboardingClose').onclick=()=>hideOnboarding();
 $('#obSkip').onclick=async()=>{hideOnboarding();await markOnboarded()};
-$('#obPickExisting').onclick=async()=>{hideOnboarding();await markOnboarded();await chooseFolder()};
+$('#obPickExisting').onclick=async()=>{hideOnboarding();await markOnboarded();await addExistingInstance()};
 $('#obCreateNew').onclick=async()=>{
-  const folder=await chooseFolder({suggestNew:true,title:'Choose (or create) an empty folder for your new server'});
+  // The wizard's step 1 picks the folder and creates a NEW instance for it — do NOT run
+  // chooseFolder here: that would save serverPath onto the currently-active instance.
   hideOnboarding();await markOnboarded();
-  if(!folder)return;
   openNewServerWizard();
 };
 
@@ -424,6 +637,14 @@ window.observer.onState(v=>{
 // tool call can proceed or be denied. Read-only tools never reach this path.
 // Notify when an AI client first connects to the MCP server.
 window.observer.onMcpClient?.(() => { toast(t('mcp.clientConnected'), 'success'); });
+// M8 t2: a server left running by a crash. Ask the user Reconnect (keep it) or Stop it. The dialog
+// resolves 'reconnect' on Escape/backdrop (safer default — never force-kill without a clear answer).
+window.observer.onOrphanPrompt?.(req => {
+  if(!req||!req.instanceId)return;
+  confirmDialog({ title:t('orphan.title'), body:esc(t('orphan.body',{n:req.name||req.instanceId,p:req.pid})), ok:t('orphan.stop'), cancel:t('orphan.reconnect'), danger:true })
+    .then(stop => { window.observer.respondOrphan({ instanceId:req.instanceId, action: stop?'stop':'reconnect' }); toast(stop?t('orphan.stopToast'):t('orphan.reconnectToast')); })
+    .catch(() => window.observer.respondOrphan({ instanceId:req.instanceId, action:'reconnect' }));
+});
 window.observer.onMcpConfirmRequest?.(req => {
   if(!req||!req.reqId)return;
   const riskLabel=req.risk==='destroy'?t('mcp.riskDestroy'):t('mcp.riskWrite');
@@ -525,10 +746,11 @@ $('#motionLevelSelect')?.addEventListener('change',e=>{ try{ applyMotionLevel(e.
 // rAF-throttled mousemove; cheap (a handful of items). Disabled under reduced motion.
 (function cursorProximity(){
   const nav=$('#nav'); if(!nav||_rm.matches) return;
-  const items=$$('#nav .nav-item');
+  // Instance rows join the same proximity field as the nav items so the whole rail feels alive.
+  const itemsOf=()=>[...$$('#nav .nav-item'),...$$('#instanceItems .inst-item')];
   let raf=0,lastX=0,lastY=0;
   const apply=()=>{ raf=0;
-    for(const it of items){
+    for(const it of itemsOf()){
       const r=it.getBoundingClientRect();
       const cx=r.left+r.width/2, cy=r.top+r.height/2;
       const d=Math.hypot(lastX-cx,lastY-cy);

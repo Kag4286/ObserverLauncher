@@ -101,23 +101,41 @@ function queryHistory(history, opts = {}) {
   return { samples, count: samples.length, sourceCount: win.length, from, to, spanMinutes: Math.round((to - from) / 60000) };
 }
 
+// v2.0.0: sample EVERY instance, not just the active one, so a background server's history keeps
+// filling and its dot/chart is correct the moment you switch to it. ONE interval loops the instance
+// ids and runs each tick inside ctx.runInInstance(id, ...) — that pins ctx.inst()/ctx.serverProcess/
+// ctx.live to the right instance. Per-instance counters live in `states` (keyed by instance id).
+// GATED channels mean a background push is dropped, so this costs 0 IPC for unseen servers.
+function freshSampleState() {
+  return { consecutiveMisses: 0, lastMetrics: { serverMemory: 0, cpu: 0 }, javaRetryCount: 0, idleTicks: 0, sampling: false };
+}
 function startMetrics(ctx) {
-  // Counters live in this closure (not module-level) so restarting the sampler starts clean.
-  const st = { consecutiveMisses: 0, lastMetrics: { serverMemory: 0, cpu: 0 }, javaRetryCount: 0, idleTicks: 0, sampling: false };
+  const states = new Map(); // instanceId -> counters
+  const stateOf = id => { let s = states.get(id); if (!s) { s = freshSampleState(); states.set(id, s); } return s; };
   clearInterval(ctx.sampleTimer);
   ctx.sampleTimer = setInterval(async () => {
-    // BUGFIX: setInterval does NOT await an async callback. A slow tick (findJavaDescendant ~3s,
-    // getProcessMetrics ~5s) used to let the next tick start before the previous finished —
-    // overlapping 'server:metrics' sends and racing writes to ctx.previousCpu, which made the CPU%
-    // readout jitter. Skip a tick while the previous one is still in flight.
-    if (st.sampling) return;
-    st.sampling = true;
-    try { await metricsTick(ctx, st); }
-    catch (err) {
-      const used = process.memoryUsage().rss / 1024 / 1024;
-      ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: st.lastMetrics.serverMemory, cpu: st.lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
+    // Snapshot the ids first: seedInstances may replace ctx.instances mid-tick.
+    const ids = [...ctx.instances.keys()];
+    if (!ids.length) ids.push(ctx.inst());
+    for (const id of ids) {
+      const st = stateOf(id);
+      // BUGFIX (per instance now): setInterval does NOT await an async callback. A slow tick
+      // (findJavaDescendant ~3s, getProcessMetrics ~5s) must not overlap the next one for the SAME
+      // instance — skip while that instance's previous tick is still in flight.
+      if (st.sampling) continue;
+      st.sampling = true;
+      try {
+        await ctx.runInInstance(id, () => metricsTick(ctx, st));
+      } catch (err) {
+        try {
+          await ctx.runInInstance(id, () => {
+            const used = process.memoryUsage().rss / 1024 / 1024;
+            ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: st.lastMetrics.serverMemory, cpu: st.lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
+          });
+        } catch {}
+      }
+      finally { st.sampling = false; }
     }
-    finally { st.sampling = false; }
   }, 1000);
 }
 

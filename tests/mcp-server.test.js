@@ -35,6 +35,9 @@ function post(port, token, body) {
   const ctx = {
     currentServerPath: '', serverStatus: 'stopped', javaInfo: null, consoleBuffer: [], live: { players: [] },
     appendLog: () => {}, send: () => {}, setServerStatus() {}, pushFiles() {},
+    // M4b: real ctx pins tool handlers to an instance via AsyncLocalStorage; the mock only
+    // needs a pass-through so callTool can run the handler unchanged.
+    activeInstanceId: null, runInInstance: (id, fn) => fn(),
   };
   startMcpServer(ctx);
   // listen() is async; give it a tick.

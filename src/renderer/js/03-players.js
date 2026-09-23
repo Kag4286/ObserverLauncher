@@ -73,6 +73,7 @@ function buildPlayerRows(){
 }
 function badgeHtml(p){const b=[];if(p.op)b.push('<span class="player-badge op">OP</span>');if(p.whitelisted)b.push('<span class="player-badge whitelisted">WL</span>');if(p.banned)b.push(`<span class="player-badge banned">${t('ply.bannedBadge')}</span>`);return b.join('')}
 function rowActionBtn(action,label,active,cls='',extra=''){return `<button class="row-action ${cls} ${active?'active':''}" data-row-action="${action}" ${extra}>${label}</button>`}
+let lastPlayersSig='';
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
   const all=buildPlayerRows();
@@ -82,6 +83,12 @@ function renderPlayers(){
   const totalPages=Math.max(1,Math.ceil(list.length/PLAYERS_PAGE_SIZE));
   playerPage=Math.min(playerPage,totalPages-1);
   const page=list.slice(playerPage*PLAYERS_PAGE_SIZE,(playerPage+1)*PLAYERS_PAGE_SIZE);
+  // Signature guard: refreshUI() (server:files / server:state / live) can call this many times a
+  // second. Rebuilding innerHTML each time restarts the row stagger animation -> visible flicker.
+  // If the page content is unchanged, leave the DOM alone.
+  const sig=JSON.stringify([currentLocale,playerPage,playerFilter,q,totalPages,list.length,page.map(p=>[p.name,p.uuid,p.online,p.hasData,p.op,p.whitelisted,p.banned])]);
+  if(sig===lastPlayersSig)return;
+  lastPlayersSig=sig;
   const pager=$('#playersPager');
   const countEl=$('#rosterCount'); if(countEl) countEl.textContent=t('ply.count',{a:list.length,b:all.filter(p=>p.online).length});
   if(pager){pager.hidden=totalPages<=1;$('#playersPageLabel').textContent=`${t('ply.page')} ${playerPage+1} / ${totalPages}`;$('#playersPrevPage').disabled=playerPage<=0;$('#playersNextPage').disabled=playerPage>=totalPages-1}

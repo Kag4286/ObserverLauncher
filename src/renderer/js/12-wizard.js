@@ -1,10 +1,10 @@
 // js/12-wizard.js — split out of 08-shell.js; classic script, load AFTER 08-shell.js.
-// Guided 4-step "create a new server" wizard. Calls chooseFolder/getSettings/toast/switchTab/
-// debounce/esc/t/formatBytes (all defined in 08-shell.js or earlier) at click time, so loading
-// after 08 is safe.
-// FEATURE: guided 4-step wizard for people who don't already know what
-// software/version/memory means — separate from the full App settings tab.
-let nsw={step:1,software:'vanilla'};
+// Guided 5-step wizard that DOUBLES as the "Add instance" flow: step 1 picks the folder, then
+// software/version/memory, then Review creates a NEW instance (fresh id, made active) for that
+// folder and runs the download there. It never overwrites another instance's settings. Calls
+// getSettings/toast/switchTab/debounce/esc/t/formatBytes (defined in 08-shell.js or earlier) at
+// click time, so loading after 08 is safe.
+let nsw={step:1,software:'vanilla',folder:''};
 // Real-time version data for the wizard — loaded live from each software's official API
 // (wizard:versions IPC) instead of hardcoded chips that drifted out of date.
 let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
@@ -69,24 +69,27 @@ function checkNswJava(v){
 function nswRender(){
   $$('.nsw-step').forEach(s=>s.classList.toggle('active',Number(s.dataset.step)===nsw.step));
   $$('.nsw2-step').forEach(d=>{const n=Number(d.dataset.dot);d.classList.toggle('active',n===nsw.step);d.classList.toggle('done',n<nsw.step)});
-  $('#nswStepLabel').textContent=t('nsw.step',{a:nsw.step,b:4});
+  $('#nswStepLabel').textContent=t('nsw.step',{a:nsw.step,b:5});
   $('#nswBack').hidden=nsw.step===1;
-  $('#nswNext').textContent=nsw.step===4?t('nsw.create'):t('nsw.next');
+  $('#nswNext').textContent=nsw.step===5?t('nsw.create'):t('nsw.next');
   const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
   const version=versionMode==='specific'?($('#nswVersionInput').value.trim()||'—'):(nswVersions.latest||t('nsw.latestWord'));
+  const folderName=nsw.folder?nsw.folder.split(/[\\/]/).filter(Boolean).pop():t('nsw.noFolder');
+  const folderSub=$('#nswRailFolderSub'); if(folderSub)folderSub.textContent=folderName;
+  const fp=$('#nswFolderPath'); if(fp)fp.textContent=nsw.folder||t('nsw.noFolder');
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
   $('#nswRailSub3').textContent=`${$('#nswMemorySlider').value} GB`;
-  if(nsw.step===2)loadNswVersions(nsw.software);
-  if(nsw.step===3){
+  if(nsw.step===3)loadNswVersions(nsw.software);
+  if(nsw.step===4){
     if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=t('nsw.ramHint',{n:state.systemMemoryGB})}
     nswUpdateMemory();
   }
-  if(nsw.step===4){
+  if(nsw.step===5){
     const memory=$('#nswMemorySlider').value;
-    $('#nswSummary').innerHTML=`<div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${nswJava.java?`Java ${nswJava.java}${nswJava.exact?' (verified)':'+'}`:'—'}</b></div><div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div><div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(state.settings.serverPath||'—')}</b></div>`;
+    $('#nswSummary').innerHTML=`<div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(nsw.folder||'—')}</b></div><div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${nswJava.java?`Java ${nswJava.java}${nswJava.exact?' (verified)':'+'}`:'—'}</b></div><div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div>`;
   }
-  const spigotHint=$('#nswSpigotHint'); if(spigotHint) spigotHint.hidden=!(nsw.step===4&&nsw.software==='spigot');
+  const spigotHint=$('#nswSpigotHint'); if(spigotHint) spigotHint.hidden=!(nsw.step===5&&nsw.software==='spigot');
 }
 $$('[data-software]').forEach(c=>c.onclick=()=>{
   if(nsw.software===c.dataset.software)return;
@@ -94,7 +97,7 @@ $$('[data-software]').forEach(c=>c.onclick=()=>{
   $$('[data-software]').forEach(x=>x.classList.toggle('active',x===c));
   // invalidate the cached live list so step 2 refetches for this software
   nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
-  if(nsw.step===2)loadNswVersions(nsw.software);
+  if(nsw.step===3)loadNswVersions(nsw.software);
   nswRender();
 });
 $$('input[name="nswVersionMode"]').forEach(r=>r.onchange=()=>{
@@ -180,10 +183,12 @@ function nswVersionError(){
   return null;
 }
 $('#nswNext').onclick=async()=>{
-  if(nsw.step<4){
-    if(nsw.step===2){const verr=nswVersionError();if(verr)return toast(verr,'error');}
+  if(nsw.step<5){
+    if(nsw.step===1&&!nsw.folder)return toast(t('nsw.pickFolder'),'error');
+    if(nsw.step===3){const verr=nswVersionError();if(verr)return toast(verr,'error');}
     nsw.step++;nswRender();return
   }
+  if(!nsw.folder)return toast(t('nsw.pickFolder'),'error');
   const software=nsw.software;
   const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
   const version=versionMode==='specific'?$('#nswVersionInput').value.trim():'';
@@ -191,18 +196,29 @@ $('#nswNext').onclick=async()=>{
   $('#nswNext').disabled=true;$('#nswNext').textContent=t('nsw.downloading');$('#nswBack').disabled=true;
   $('#nswProgress').hidden=false;$('#nswProgressFill').style.width='0%';$('#nswProgressFill').classList.add('indeterminate');$('#nswProgressLabel').textContent=t('nsw.startingDownload');
   $('#nswCancel').hidden=false;
+  const resetBtn=()=>{$('#nswNext').disabled=false;$('#nswNext').textContent=t('nsw.create');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true};
+  // 1) Create a NEW instance for the chosen folder and make it active. The wizard download then
+  //    runs inside that instance (ctx.currentServerPath follows the switch). This is what makes
+  //    the wizard additive instead of replacing the active server's folder.
+  const add=await window.observer.instanceAdd({serverPath:nsw.folder});
+  if(!add||!add.ok){toast((add&&add.error)||t('toast.startUnknown'),'error');resetBtn();return}
+  const sw=await window.observer.instanceSwitch(add.id);
+  if(!sw||!sw.ok){toast((sw&&sw.error)||t('toast.startUnknown'),'error');resetBtn();return}
+  try{const s=await window.observer.getState();state={...state,...s}}catch{}
   const settingsNext={...getSettings(),memoryMin:Math.max(1,Math.floor(memory/2)),memoryMax:memory};
-  const sr=await window.observer.saveSettings(settingsNext);if(!sr||!sr.ok){toast((sr&&sr.error)||t('toast.startUnknown'),'error');$('#nswNext').disabled=false;$('#nswNext').textContent=t('nsw.create');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;return}state={...state,settings:settingsNext,java:sr.java};
+  const sr=await window.observer.saveSettings(settingsNext);if(!sr||!sr.ok){toast((sr&&sr.error)||t('toast.startUnknown'),'error');resetBtn();return}state={...state,settings:settingsNext,java:sr.java};
   const r=await window.observer.wizardCreate({software,version});
-  $('#nswNext').disabled=false;$('#nswNext').textContent=t(nsw.step===4?'nsw.create':'nsw.next');$('#nswBack').disabled=false;$('#nswProgress').hidden=true;$('#nswCancel').hidden=true;
+  resetBtn();
   if(!r.ok){ if(/cancel/i.test(r.error||'')){ toast(t('toast.downloadCancelled')); return; } toast(r.error,'error');return }
-  $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla'};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+  $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla',folder:''};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+  try{const s2=await window.observer.getState();state={...state,...s2}}catch{}
   if(r.building){toast(t('nsw.building',{n:r.name}));switchTab('console');return}
   state.files=r.files;refreshUI();switchTab('overview');
   toast(t('nsw.ready'),'success');
 };
-function openNewServerWizard(){
-  nsw={step:1,software:'vanilla'};
+// The Add-instance flow (also used by the welcome / onboarding "Create a new server" buttons).
+function openNewServerWizard(folder){
+  nsw={step:1,software:'vanilla',folder:folder||''};
   nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
   nswJava={version:'',java:null,exact:false};
   const jc=$('#nswJavaCheck');if(jc)jc.hidden=true;
@@ -217,3 +233,26 @@ function openNewServerWizard(){
   $('#nswProgress').hidden=true;
   nswRender();$('#newServerModal').hidden=false;
 }
+// Step 1: pick the folder for the new instance. Uses pickFolder directly (NOT chooseFolder),
+// because chooseFolder saves serverPath onto the ACTIVE instance — the wizard must not touch it.
+$('#nswChooseFolder')?.addEventListener('click',async()=>{
+  let f;
+  try{ f=await window.observer.pickFolder({suggestNew:true,title:t('nsw.pickFolder')}); }catch{ f=null; }
+  if(!f)return;
+  // Q3: if the folder ALREADY holds a Minecraft server, offer to import it as-is instead of
+  // downloading a fresh one. Import = the existing add-existing-folder flow (no download).
+  let probe=null;
+  try{ probe=await window.observer.instanceProbe(f); }catch{ probe=null; }
+  if(probe&&probe.ok&&probe.looksLikeServer){
+    const name=probe.jar||probe.launchScript||'server';
+    const importIt=await confirmDialog({title:t('nsw.foundServer'),body:esc(t('nsw.foundServerBody',{n:name})),ok:t('nsw.importIt'),cancel:t('nsw.downloadFresh')});
+    if(importIt){
+      $('#newServerModal').hidden=true;
+      await addExistingInstance(f);
+      return;
+    }
+  }
+  nsw.folder=f;nswRender();
+});
+// Rail '+ Add instance' button opens this same wizard (step 1 picks the folder).
+$('#addInstanceBtn')?.addEventListener('click',()=>openNewServerWizard());

@@ -47,4 +47,32 @@ ok('picks windows arm64', t.pickPlayitAsset(assets, 'win32', 'arm64').name === '
 ok('no assets -> null', t.pickPlayitAsset([], 'win32', 'x64') === null);
 ok('garbage -> null', t.pickPlayitAsset(null, 'win32', 'x64') === null);
 
+// --- ITEM 12 BUG FIX: prefer a runnable binary over the installer package ---
+// GitHub lists playit-windows-x86_64-signed.msi BEFORE playit-windows-x86_64.exe; the old plain
+// .find() picked the MSI and saved it as playit.exe, so the agent never ran.
+const winAssets = [
+  { name: 'playit-windows-x86_64-signed.msi' },
+  { name: 'playit-windows-x86_64.exe' },
+];
+ok('windows picks .exe not .msi', t.pickPlayitAsset(winAssets, 'win32', 'x64').name === 'playit-windows-x86_64.exe');
+// If only a package exists, it is still returned (better than nothing).
+ok('windows falls back to .msi when only package', t.pickPlayitAsset([{ name: 'playit-windows-x86_64.msi' }], 'win32', 'x64').name === 'playit-windows-x86_64.msi');
+
+// --- ITEM 12: SHA-256 verification sources ---
+// asset.digest (from the GitHub API) wins over the pinned fallback.
+const withDigest = { name: 'playit-cli-linux-amd64', digest: 'sha256:' + 'a'.repeat(64) };
+ok('expectedSha256 uses asset.digest', t.expectedSha256(withDigest) === 'a'.repeat(64));
+// No digest -> the pinned hash for that exact asset name.
+ok('expectedSha256 falls back to pinned', t.expectedSha256({ name: 'playit-cli-linux-amd64' }) === t.PLAYIT_PINNED_SHA256['playit-cli-linux-amd64']);
+// Unknown asset + no digest -> null (install proceeds unverified, logged).
+ok('expectedSha256 unknown -> null', t.expectedSha256({ name: 'playit-future-thing' }) === null);
+ok('expectedSha256 malformed digest -> null', t.expectedSha256({ name: 'x', digest: 'sha256:nothex' }) === null);
+ok('pinned has windows exe hash', /^[0-9a-f]{64}$/.test(t.PLAYIT_PINNED_SHA256['playit-windows-x86_64.exe']));
+// sha256File hashes a real temp file correctly (known vector: sha256('abc')).
+const fs = require('fs'), os = require('os'), path = require('path');
+const tmp = path.join(os.tmpdir(), 'ob-sha-test-' + Date.now() + '.bin');
+fs.writeFileSync(tmp, 'abc');
+ok('sha256File matches known vector', t.sha256File(tmp) === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+fs.rmSync(tmp, { force: true });
+
 console.log(`\n${passed} passed, 0 failed`);
