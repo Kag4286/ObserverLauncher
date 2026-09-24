@@ -33,8 +33,19 @@ function registerWizard(ipcMain, ctx) {
         return { ok: true, versions: v, latest: v[0] || null, raw: false };
       }
       if (s === 'paper' || s === 'folia' || s === 'velocity') {
+        // 2.2.0 (option 1a): the newest version often only has ALPHA/BETA builds, so "Latest" must
+        // resolve to the newest STABLE build, not versions[0]. Return per-version stability for the
+        // picker (status) AND a stable `latest` so the default download always works.
+        const { listFillVersionsWithStatus, resolveStableVersion } = require('./adapters/papermc.js');
         const v = await listFillVersions(s);
-        return { ok: true, versions: v, latest: v[0] || null, raw: false };
+        let status = [];
+        let stableLatest = null;
+        try {
+          status = await listFillVersionsWithStatus(s);
+          stableLatest = status.find(x => x.stable)?.version || null;
+          if (!stableLatest) { const r = await resolveStableVersion(s); stableLatest = r?.version || null; }
+        } catch {}
+        return { ok: true, versions: v, latest: stableLatest || v[0] || null, stableLatest, status, raw: false };
       }
       if (s === 'purpur') {
         const p = await json('https://api.purpurmc.org/v2/purpur');
@@ -55,9 +66,17 @@ function registerWizard(ipcMain, ctx) {
         const maven = s === 'neoforge' ? 'https://maven.neoforged.net/releases/net/neoforged/neoforge' : 'https://maven.minecraftforge.net/net/minecraftforge/forge';
         const { signal, cancel } = withTimeout(15000);
         const xml = await (await fetch(`${maven}/maven-metadata.xml`, { signal }).finally(cancel)).text();
-        const latest = xml.match(/<latest>([^<]+)<\/latest>/)?.[1] || null;
-        const all = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map(m => m[1]).reverse();
-        return { ok: true, versions: all, latest, raw: true };
+        // 2.2.0 FIX: the maven <latest> is frequently a -beta (NeoForge's is), and the list spans
+        // EVERY MC version (1700+ entries), so "Latest" could install a beta for the wrong MC and
+        // the installer would fail. Prefer the newest NON-prerelease; annotate each entry with its
+        // MC version + stable flag so the version step can group/filter. A prerelease is any tag
+        // with a hyphen (e.g. 26.3.0.16-beta).
+        const all = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map(m => m[1]).reverse(); // newest first
+        // Pure helpers (src/main/forge-versions.js) so the MC-label mapping is unit-tested.
+        const { isPrerelease, annotateVersions } = require('./forge-versions.js');
+        const latest = all.find(v => !isPrerelease(v)) || all[0] || null;
+        const versions = annotateVersions(all);
+        return { ok: true, versions: all, latest, raw: true, annotated: versions };
       }
       if (s === 'spigot') {
         const m = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
@@ -89,14 +108,35 @@ function registerWizard(ipcMain, ctx) {
     } catch (error) { return { ok: false, error: error?.message || 'Could not verify the Java requirement.' }; }
   });
 
-  ipcMain.handle('wizard:create', async (_, { software, version }) => {
+  ipcMain.handle('wizard:create', async (_, args) => {
+    const { software, version } = args || {};
+    // 2.2.0 CRITICAL: the renderer passes the TARGET instance id explicitly. The IPC proxy pins
+    // ALS to whatever activeInstanceId was at dispatch time, which after a fresh Add-instance can
+    // still be the PREVIOUS instance - so the folder check/download would otherwise run against the
+    // wrong server (the reported 'wizard sees another server's purpur.jar' bug). Run explicitly in
+    // the caller's instance.
+    const runId = (args && args.instance) ? String(args.instance) : ctx.inst();
+    return await ctx.runInInstance(runId, async () => {
     try {
       if (ctx.serverProcess) return { ok: false, error: 'Stop the current server before using the wizard.' };
       if (ctx.buildProcess) return { ok: false, error: 'A build is already running for this folder — check the Console tab for progress.' };
-      if (!ctx.currentServerPath) return { ok: false, error: 'Choose and apply an empty server folder first.' };
-      fs.mkdirSync(ctx.currentServerPath, { recursive: true });
+      // DEFENSE (2.2.0): always resolve the folder from THIS instance's own settings, not just
+      // ctx.currentServerPath. That accessor is per-instance, but if any earlier handler left it
+      // stale we would otherwise check/download into the WRONG instance's folder (the reported
+      // 'wizard sees another server's purpur.jar'). loadSettings() is the ACTIVE instance's flat
+      // view, and this handler already runs inside runInInstance(ctx.inst()).
+      let targetPath = ctx.currentServerPath;
+      try { const s = require('./settings.js').loadSettingsFor(ctx.inst()); if (s && s.serverPath) targetPath = s.serverPath; } catch {}
+      if (!targetPath) return { ok: false, error: 'Choose and apply an empty server folder first.' };
+      ctx.currentServerPath = targetPath;
+      fs.mkdirSync(targetPath, { recursive: true });
       const contents = fs.readdirSync(ctx.currentServerPath);
-      if (contents.some(x => /\.jar$/i.test(x))) return { ok: false, error: 'This folder already contains a server jar. Choose an empty folder to avoid overwriting it.' };
+      // BUGFIX (2.2.0): a Forge/NeoForge INSTALLER jar (neoforge-<ver>-installer.jar) left behind by
+      // a previous failed/retried install is NOT a server jar. The old check matched any '.jar', so
+      // retrying in a folder that only holds the leftover installer wrongly failed with 'already
+      // contains a server jar'. Ignore installer jars here.
+      const serverJar = contents.find(x => /\.jar$/i.test(x) && !/-installer\.jar$/i.test(x));
+      if (serverJar) return { ok: false, error: `This folder already contains a server jar (${serverJar}). Choose an empty folder to avoid overwriting it.` };
       const targetVersion = version?.trim();
       const onProgress = (received, total) => ctx.send('wizard:progress', { received, total });
       // Cancellation: a single AbortController per wizard run; wizard:cancel aborts it.
@@ -151,6 +191,7 @@ function registerWizard(ipcMain, ctx) {
       return { ok: true, files: serverFiles(ctx.currentServerPath), name, version: resolvedVersion };
     } catch (error) { ctx.buildProcess = null; return marketplaceError(error); }
     finally { ctx.wizardAbort = null; }
+    });
   });
 
   // Cancel a wizard download in progress (the AbortController created in wizard:create).

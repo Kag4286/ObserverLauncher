@@ -59,11 +59,16 @@ function javaBinName(osName = javaRuntimeOs()) { return osName === 'windows' ? '
 // FEATURE: extracted from main.js — needs serverFiles() to check for a runnable jar/launchScript, and
 // takes javaInfo explicitly instead of closing over the module-level variable, so this stays testable
 // on its own.
-function validateStart(settings, javaInfo, serverFilesFn) {
+function validateStart(settings, javaInfo, serverFilesFn, requiredJavaFn) {
   if (!settings.serverPath || !require('fs').existsSync(settings.serverPath)) return 'Choose a valid server folder first.';
   const info = serverFilesFn(settings.serverPath); if (!info.jar && !info.launchScript) return 'No runnable server .jar or run.bat was found in the selected folder.';
   if (!javaInfo?.ok) return 'Java was not detected. Set a valid Java path in Settings.';
-  const required = requiredJavaForJar(info.jar || ''), actual = javaMajor(javaInfo.version); if (required && actual && actual < required) return `${info.jar} needs Java ${required}+; detected Java ${actual}.`;
+  // 2.2.0 (Java gap): requiredJavaFn lets the caller resolve the requirement for a jar-less
+  // NeoForge/Forge run.bat server (via libraries/); injected to avoid a circular require between
+  // java.js and server-java.js. Falls back to the name-based jar check when not supplied.
+  const required = requiredJavaFn ? requiredJavaFn(settings.serverPath, serverFilesFn) : requiredJavaForJar(info.jar || '');
+  const actual = javaMajor(javaInfo.version);
+  if (required && actual && actual < required) return `${info.jar || info.launchScript} needs Java ${required}+; detected Java ${actual}.`;
   // FEATURE: 32-bit Java realistically cannot honor a large -Xmx (it errors out or silently clamps
   // depending on the build) — catch this before spawning instead of letting the process fail with a
   // JVM error that doesn't explain WHY. Custom JVM args are checked for an explicit -Xmx; otherwise the

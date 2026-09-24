@@ -7,30 +7,93 @@
 let nsw={step:1,software:'vanilla',folder:''};
 // Real-time version data for the wizard — loaded live from each software's official API
 // (wizard:versions IPC) instead of hardcoded chips that drifted out of date.
-let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
+// 2.2.0: Forge/NeoForge need MC-first selection (their version list spans every MC + betas).
+let nswMc=null;   // chosen Minecraft version for forge/neoforge
+const NSW_MC_FIRST={forge:true,neoforge:true};
+const isMcFirst=()=>!!NSW_MC_FIRST[nsw.software];
 const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity'};
 async function loadNswVersions(software){
-  if(nswVersions.software===software)return;
-  nswVersions={software,list:[],latest:null,raw:false,loading:true,failed:false,error:''};
+  // BUGFIX (2.2.0): re-entering step 3 for the same software returned early WITHOUT repainting the
+  // chips, so the version picker looked empty ('biến mất') after going Back from a later step.
+  // Repaint from cache on the early return.
+  if(nswVersions.software===software){
+    if(!nswVersions.loading) renderNswChips($('#nswVersionInput')?.value.trim()||'');
+    return;
+  }
+  nswVersions={software,list:[],latest:null,raw:false,loading:true,failed:false,error:'',annotated:[]};
+  if(!NSW_MC_FIRST[software])nswMc=null; // MC-first only applies to forge/neoforge
   renderNswChips('');
   $('#nswLatestLabel').textContent=t('nsw.latestSub');
   const r=await window.observer.wizardVersions(software);
   if(nswVersions.software!==software)return; // user switched software mid-request
   nswVersions.loading=false;
   if(!r||!r.ok){nswVersions.failed=true;nswVersions.error=r?.error||t('nsw.apiFail');}
-  else{nswVersions.list=r.versions||[];nswVersions.latest=r.latest||null;nswVersions.raw=!!r.raw;nswVersions.note=r.note||'';}
+  else{nswVersions.list=r.versions||[];nswVersions.latest=r.latest||null;nswVersions.raw=!!r.raw;nswVersions.note=r.note||'';nswVersions.annotated=Array.isArray(r.annotated)?r.annotated:[];nswVersions.stableLatest=r.stableLatest||null;nswVersions.status=Array.isArray(r.status)?r.status:[];}
   renderNswChips($('#nswVersionInput')?.value.trim()||'');
   $('#nswLatestLabel').textContent=nswVersions.latest?`${t('nsw.latest')}: ${nswVersions.latest}`:'';
   const mode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  if(nswVersions.latest&&mode!=='specific')checkNswJava(nswVersions.latest);
+  if(nswVersions.latest&&mode!=='specific')checkNswJava(isMcFirst()?nswMc:nswVersions.latest);
+}
+// 2.2.0 (NeoForge option a): distinct Minecraft versions present in the forge/neoforge maven list,
+// newest first, with whether that MC line has a non-prerelease build. Drives the MC-first picker.
+function mcChoices(){
+  const seen=new Map();
+  for(const a of nswVersions.annotated){
+    if(!a.mc)continue;
+    const cur=seen.get(a.mc);
+    if(cur){ if(!cur.stable&&a.stable)cur.stable=true; }
+    else seen.set(a.mc,{mc:a.mc,stable:!!a.stable});
+  }
+  // Sort newest-first by numeric MC parts (26.3 > 1.21.1).
+  const rank=m=>m.split('.').map(Number);
+  return [...seen.values()].sort((a,b)=>{const x=rank(a.mc),y=rank(b.mc);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(y[i]||0)-(x[i]||0);if(d)return d;}return 0});
+}
+// Builds for ONE MC (forge/neoforge), newest first, prereleases last.
+function buildsForMc(mc){
+  return nswVersions.annotated.filter(a=>a.mc===mc).sort((a,b)=>{
+    if(a.stable!==b.stable)return a.stable?-1:1;
+    const x=a.v.split('.').map(Number),y=b.v.split('.').map(Number);
+    for(let i=0;i<Math.max(x.length,y.length);i++){const d=(y[i]||0)-(x[i]||0);if(d)return d;}return 0;
+  });
 }
 function renderNswChips(filter){
   const box=$('#nswVersionChips');if(!box)return;
   if(nswVersions.loading){box.innerHTML=`<span class="nsw2-chiploading">${t('nsw.loadingVersions')}</span>`;return}
   if(nswVersions.failed){box.innerHTML=`<span class="nsw2-chiploading">${esc(nswVersions.error)} — ${t('nsw.typeManually')}</span>`;return}
+  // 2.2.0 NeoForge/Forge (option a): pick Minecraft FIRST, then a build for that MC.
+  if(isMcFirst()){
+    if(!nswMc){
+      const choices=mcChoices().filter(c=>!filter||c.mc.toLowerCase().includes(filter.toLowerCase()));
+      box.innerHTML=choices.length
+        ? choices.map(c=>`<button class="version-chip" data-mc="${esc(c.mc)}"${c.stable?'':' data-soft="1"'}>${esc(c.mc)}${c.stable?'':' <em class="nsw2-tag warn">beta</em>'}</button>`).join('')
+        : `<span class="nsw2-chiploading">${t('nsw.noMatches')}</span>`;
+      return;
+    }
+    // A MC is chosen -> show a breadcrumb with a BACK button so the user can pick another MC.
+    // Without this the build list was a dead end (the reported UX bug).
+    const list=buildsForMc(nswMc).filter(b=>!filter||b.v.toLowerCase().includes(filter.toLowerCase()));
+    const back=`<button type="button" class="version-chip version-back" data-mc-back="1">← ${esc(t('nsw.changeMc'))}</button>`;
+    const crumb=`<span class="nsw2-crumb">${esc(t('nsw.mcLabel'))}: <b>${esc(nswMc)}</b></span>`;
+    const chips=list.length
+      ? list.map(b=>`<button class="version-chip" data-version="${esc(b.v)}"${b.stable?'':' data-soft="1"'}>${esc(b.v)}${b.stable?'':' <em class="nsw2-tag warn">beta</em>'}</button>`).join('')
+      : `<span class="nsw2-chiploading">${t('nsw.noBuilds')}</span>`;
+    box.innerHTML=back+crumb+chips;
+    return;
+  }
   const q=(filter||'').toLowerCase();
   const list=q?nswVersions.list.filter(v=>v.toLowerCase().includes(q)):nswVersions.list;
-  box.innerHTML=list.length?list.map(v=>`<button class="version-chip" data-version="${esc(v)}">${esc(v)}</button>`).join(''):`<span class="nsw2-chiploading">${t('nsw.noMatches')}</span>`;
+  // P2b (2.2.0): Paper/Folia return per-version stability in `status` (ALPHA/BETA versions have no
+  // stable build). Mark those so a user can see which pick will actually install. Other software
+  // (vanilla/fabric/purpur/leaf) has no status -> every chip is normal.
+  const statusMap=new Map((nswVersions.status||[]).map(s=>[s.version,s]));
+  if(!list.length){box.innerHTML=`<span class="nsw2-chiploading">${t('nsw.noMatches')}</span>`;return}
+  box.innerHTML=list.map(v=>{
+    const st=statusMap.get(v);
+    const soft=st&&st.stable===false;
+    const tag=soft?` <em class="nsw2-tag warn">${esc((st.channel||'beta').toLowerCase())}</em>`:(st&&st.stable?'':'');
+    return `<button class="version-chip" data-version="${esc(v)}"${soft?' data-soft="1"':''}>${esc(v)}${tag}</button>`;
+  }).join('');
 }
 function nswValidateVersion(v){
   if(!v)return'';
@@ -73,21 +136,58 @@ function nswRender(){
   $('#nswBack').hidden=nsw.step===1;
   $('#nswNext').textContent=nsw.step===5?t('nsw.create'):t('nsw.next');
   const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  const version=versionMode==='specific'?($('#nswVersionInput').value.trim()||'—'):(nswVersions.latest||t('nsw.latestWord'));
+  // 2.2.0 NeoForge/Forge: show "MC <mc> · <build>" once chosen; else a hint to pick MC first.
+  let version;
+  if(isMcFirst()){
+    const build=$('#nswVersionInput').value.trim();
+    version=nswMc?(build?`${nswMc} · ${build}`:t('nsw.mcPicked',{mc:nswMc})):t('nsw.pickMcWord');
+  } else {
+    version=versionMode==='specific'?($('#nswVersionInput').value.trim()||'—'):(nswVersions.latest||t('nsw.latestWord'));
+  }
   const folderName=nsw.folder?nsw.folder.split(/[\\/]/).filter(Boolean).pop():t('nsw.noFolder');
   const folderSub=$('#nswRailFolderSub'); if(folderSub)folderSub.textContent=folderName;
   const fp=$('#nswFolderPath'); if(fp)fp.textContent=nsw.folder||t('nsw.noFolder');
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
   $('#nswRailSub3').textContent=`${$('#nswMemorySlider').value} GB`;
-  if(nsw.step===3)loadNswVersions(nsw.software);
+  if(nsw.step===3){
+    loadNswVersions(nsw.software);
+    // 2.2.0: Forge/NeoForge use MC-first — hide the latest/specific radios, always show the picker.
+    const mcFirst=isMcFirst();
+    const vc=$('#nswVersionCards');if(vc)vc.hidden=mcFirst;
+    const lead=$('#nswVersionLead');if(lead)lead.hidden=mcFirst;
+    const leadMc=$('#nswMcFirstLead');if(leadMc)leadMc.hidden=!mcFirst;
+    const picker=$('#nswVersionPicker');if(picker)picker.hidden=mcFirst?false:picker.hidden;
+    if(mcFirst){$('#nswVersionInput').disabled=false;}
+    // BUGFIX (2.2.0): ALWAYS repaint the chip box when step 3 is shown. loadNswVersions() may
+    // early-return (cache hit / already loading), which previously left the picker empty - the
+    // reported 'NeoForge version picker disappears'. Repainting here is idempotent and cheap.
+    if(!nswVersions.loading) renderNswChips($('#nswVersionInput')?.value.trim()||'');
+  }
   if(nsw.step===4){
     if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=t('nsw.ramHint',{n:state.systemMemoryGB})}
     nswUpdateMemory();
   }
   if(nsw.step===5){
     const memory=$('#nswMemorySlider').value;
-    $('#nswSummary').innerHTML=`<div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(nsw.folder||'—')}</b></div><div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div><div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${nswJava.java?`Java ${nswJava.java}${nswJava.exact?' (verified)':'+'}`:'—'}</b></div><div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div>`;
+    // P2d (2.2.0): the review shows the download source + where it lands + Java readiness, so the
+    // user knows what is about to happen before pressing Create.
+    const srcMap={vanilla:t('nsw.srcVanilla'),paper:t('nsw.srcPaper'),purpur:t('nsw.srcPurpur'),leaf:t('nsw.srcLeaf'),fabric:t('nsw.srcFabric'),forge:t('nsw.srcForge'),neoforge:t('nsw.srcForge'),folia:t('nsw.srcPaper'),spigot:t('nsw.srcSpigot'),velocity:t('nsw.srcPaper')};
+    const src=srcMap[nsw.software]||'';
+    const jm=state.java&&state.java.ok?javaMajorOf(state.java.version):null;
+    const javaNeed=nswJava.java;
+    const javaBad=javaNeed&&jm!=null&&jm<javaNeed;
+    const javaRow=javaNeed?`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${`Java ${javaNeed}${nswJava.exact?' (verified)':'+'}`}</b></div>`:`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>—</b></div>`;
+    const rows=[
+      `<div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(nsw.folder||'—')}</b></div>`,
+      `<div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div>`,
+      `<div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div>`,
+      src?`<div class="nsw2-kv"><span>${t('nsw.sumSource')}</span><b>${esc(src)}</b></div>`:'',
+      javaRow,
+      `<div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div>`,
+    ].join('');
+    const warn=javaBad?`<p class="proxy-notice">${esc(t('nsw.javaTooOld',{v:jm}))}</p>`:'';
+    $('#nswSummary').innerHTML=rows+warn;
   }
   const spigotHint=$('#nswSpigotHint'); if(spigotHint) spigotHint.hidden=!(nsw.step===5&&nsw.software==='spigot');
 }
@@ -96,7 +196,8 @@ $$('[data-software]').forEach(c=>c.onclick=()=>{
   nsw.software=c.dataset.software;
   $$('[data-software]').forEach(x=>x.classList.toggle('active',x===c));
   // invalidate the cached live list so step 2 refetches for this software
-  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
+  nswMc=null;
   if(nsw.step===3)loadNswVersions(nsw.software);
   nswRender();
 });
@@ -112,6 +213,26 @@ $$('input[name="nswVersionMode"]').forEach(r=>r.onchange=()=>{
 // Chips are rendered live from the API (renderNswChips), so bind once via delegation.
 $('#nswVersionChips').addEventListener('click',e=>{
   const chip=e.target.closest('.version-chip');if(!chip)return;
+  // 2.2.0 NeoForge/Forge: the BACK button clears the chosen MC so the MC list returns.
+  if(chip.dataset.mcBack!==undefined){
+    nswMc=null;
+    $('#nswVersionInput').value='';
+    $('#nswVersionClear').hidden=true;
+    renderNswChips('');
+    $('#nswVersionInfo').textContent=t('nsw.pickMc');
+    nswRender();
+    return;
+  }
+  // 2.2.0 NeoForge/Forge: first click picks the MC version, then we show that MC's builds.
+  if(chip.dataset.mc!==undefined){
+    nswMc=chip.dataset.mc;
+    $('#nswVersionInput').value='';
+    $('#nswVersionClear').hidden=true;
+    renderNswChips('');
+    $('#nswVersionInfo').textContent=t('nsw.pickBuild',{mc:nswMc});
+    nswRender();
+    return;
+  }
   const v=chip.dataset.version;
   $('#nswVersionInput').value=v;
   $('#nswVersionClear').hidden=false;
@@ -163,15 +284,45 @@ $('#nswCancel').onclick=async()=>{
 // onLog/onState/onFiles above) rather than subscribed per-click, so repeated wizard runs don't stack
 // up duplicate listeners. Harmless to keep receiving events when the modal isn't open; the elements
 // just sit updated and hidden.
+// P2e (2.2.0): track speed + ETA. A short EMA over recent deltas so the number is readable, not
+// jittery. Reset whenever a new download starts (received drops below the last seen value).
+let _nswSpeed={lastBytes:0,lastAt:0,ema:0};
+function nswEta(total,received){
+  if(!(_nswSpeed.ema>0))return '';
+  const remain=(total-received)/_nswSpeed.ema;
+  if(!Number.isFinite(remain)||remain<0||remain>86400)return '';
+  const s=Math.round(remain);
+  const txt=s<60?`${s}s`:(s<3600?`${Math.floor(s/60)}m ${s%60}s`:`${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`);
+  return `${t('nsw.eta')} ${txt}`;
+}
 window.observer.onWizardProgress(({received,total})=>{
   const fill=$('#nswProgressFill'),label=$('#nswProgressLabel');if(!fill)return;
-  if(total>0){fill.classList.remove('indeterminate');fill.style.width=`${Math.min(100,Math.round(received/total*100))}%`;label.textContent=`${formatBytes(received)} / ${formatBytes(total)} (${Math.min(100,Math.round(received/total*100))}%)`}
-  else{fill.classList.add('indeterminate');label.textContent=`${formatBytes(received)} downloaded…`}
+  const now=Date.now();
+  if(received<_nswSpeed.lastBytes)_nswSpeed={lastBytes:0,lastAt:0,ema:0}; // new download -> reset
+  if(_nswSpeed.lastAt&&now>_nswSpeed.lastAt){
+    const inst=(received-_nswSpeed.lastBytes)/((now-_nswSpeed.lastAt)/1000);
+    if(Number.isFinite(inst)&&inst>=0)_nswSpeed.ema=_nswSpeed.ema?_nswSpeed.ema*0.7+inst*0.3:inst;
+  }
+  _nswSpeed.lastBytes=received;_nswSpeed.lastAt=now;
+  const speed=_nswSpeed.ema>0?` · ${formatBytes(_nswSpeed.ema)}/s`:'';
+  if(total>0){
+    const pct=Math.min(100,Math.round(received/total*100));
+    fill.classList.remove('indeterminate');fill.style.width=pct+'%';
+    const eta=nswEta(total,received);
+    label.textContent=`${formatBytes(received)} / ${formatBytes(total)} (${pct}%)${speed}${eta?' · '+eta:''}`;
+  } else { fill.classList.add('indeterminate');label.textContent=`${formatBytes(received)} downloaded…${speed}`; }
 });
 // Returns an error string when the version step is not valid to proceed, else null.
 // Catches: "specific" chosen but empty, or a version that is definitively not in the live list.
 function nswVersionError(){
   const mode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
+  // 2.2.0 NeoForge/Forge (option a): must pick a Minecraft version AND a build.
+  if(isMcFirst()){
+    if(!nswMc)return t('nsw.pickMc');
+    const v=$('#nswVersionInput').value.trim();
+    if(!v)return t('nsw.pickBuildErr',{mc:nswMc});
+    return null;
+  }
   if(mode!=='specific')return null;
   const v=$('#nswVersionInput').value.trim();
   if(!v)return t('nsw.typeVersion');
@@ -182,6 +333,24 @@ function nswVersionError(){
   }
   return null;
 }
+// P2f (2.2.0): turn a raw download/install error into an actionable message. Falls back to the
+// original text when nothing matches, so no information is lost.
+function nswFriendlyError(msg){
+  const m=String(msg||'');
+  if(/no stable .* build/i.test(m))return t('nsw.errNoStable')+ (m.includes('newest stable')? ' '+m.slice(m.indexOf('The newest stable')) : '');
+  if(/timed out|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(m))return t('nsw.errNetwork');
+  if(/checksum|sha-?256/i.test(m))return t('nsw.errChecksum');
+  if(/Git is not installed|BuildTools/i.test(m))return t('nsw.errGit');
+  if(/JDK|javac/i.test(m))return t('nsw.errJdk');
+  if(/Java is required|Java not/i.test(m))return t('nsw.errJava');
+  if(/already contains a server jar|already has a server jar/i.test(m)){
+    // 2.2.0 debug: surface the EXACT backend text (which now includes the checked folder + instance
+    // id) so a wrong-instance bug is visible instead of being masked by a generic translation.
+    return m.replace(/^This folder already contains/, 'That folder already has');
+  }
+  if(/disk|ENOSPC|no space/i.test(m))return t('nsw.errDisk');
+  return m||t('toast.startUnknown');
+}
 $('#nswNext').onclick=async()=>{
   if(nsw.step<5){
     if(nsw.step===1&&!nsw.folder)return toast(t('nsw.pickFolder'),'error');
@@ -191,7 +360,8 @@ $('#nswNext').onclick=async()=>{
   if(!nsw.folder)return toast(t('nsw.pickFolder'),'error');
   const software=nsw.software;
   const versionMode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
-  const version=versionMode==='specific'?$('#nswVersionInput').value.trim():'';
+  // 2.2.0 NeoForge/Forge: the chosen build for the chosen MC. Others: specific version or 'latest'.
+  const version=isMcFirst()?$('#nswVersionInput').value.trim():(versionMode==='specific'?$('#nswVersionInput').value.trim():'');
   const memory=Number($('#nswMemorySlider').value)||4;
   $('#nswNext').disabled=true;$('#nswNext').textContent=t('nsw.downloading');$('#nswBack').disabled=true;
   $('#nswProgress').hidden=false;$('#nswProgressFill').style.width='0%';$('#nswProgressFill').classList.add('indeterminate');$('#nswProgressLabel').textContent=t('nsw.startingDownload');
@@ -205,11 +375,30 @@ $('#nswNext').onclick=async()=>{
   const sw=await window.observer.instanceSwitch(add.id);
   if(!sw||!sw.ok){toast((sw&&sw.error)||t('toast.startUnknown'),'error');resetBtn();return}
   try{const s=await window.observer.getState();state={...state,...s}}catch{}
-  const settingsNext={...getSettings(),memoryMin:Math.max(1,Math.floor(memory/2)),memoryMax:memory};
+  // CRITICAL (2.2.0): getSettings() reads serverPath from #serverFolderInput (the ACTIVE instance's
+  // folder input, which is still STALE right after instanceSwitch). Saving it verbatim would
+  // overwrite the NEW instance's folder with the PREVIOUS instance's path - the exact 'wizard sees
+  // another server's purpur.jar' bug. Force serverPath to the folder the wizard actually chose.
+  const settingsNext={...getSettings(),serverPath:nsw.folder,memoryMin:Math.max(1,Math.floor(memory/2)),memoryMax:memory};
   const sr=await window.observer.saveSettings(settingsNext);if(!sr||!sr.ok){toast((sr&&sr.error)||t('toast.startUnknown'),'error');resetBtn();return}state={...state,settings:settingsNext,java:sr.java};
-  const r=await window.observer.wizardCreate({software,version});
+  // 2.2.0 CRITICAL: pass the TARGET instance id so the main process runs the folder check +
+  // download in THIS instance, not whatever the IPC proxy pinned as active (the 'wizard sees
+  // another server's purpur.jar' bug).
+  const r=await window.observer.wizardCreate({software,version,instance:add.id});
   resetBtn();
-  if(!r.ok){ if(/cancel/i.test(r.error||'')){ toast(t('toast.downloadCancelled')); return; } toast(r.error,'error');return }
+  if(!r.ok){
+    if(/cancel/i.test(r.error||'')){ toast(t('toast.downloadCancelled')); return; }
+    // BUGFIX (2.2.0): the instance was added BEFORE wizard:create, so every failed attempt left an
+    // empty orphan instance behind (the reported 'a pile of McMod instances'). Undo the add on a
+    // real failure (a cancel keeps it — the user may resume). Removing never touches the folder.
+    try { await window.observer.instanceRemove(add.id); } catch {}
+    try { const s=await window.observer.getState(); state={...state,...s}; } catch {}
+    toast(nswFriendlyError(r.error),'error');
+    // P2f: if the failure was "no stable build", jump back to the version step so the user can retry.
+    if(/no stable .* build/i.test(r.error||'')){ nsw.step=3; }
+    nswRender();
+    return;
+  }
   $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla',folder:''};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
   try{const s2=await window.observer.getState();state={...state,...s2}}catch{}
   if(r.building){toast(t('nsw.building',{n:r.name}));switchTab('console');return}
@@ -219,7 +408,8 @@ $('#nswNext').onclick=async()=>{
 // The Add-instance flow (also used by the welcome / onboarding "Create a new server" buttons).
 function openNewServerWizard(folder){
   nsw={step:1,software:'vanilla',folder:folder||''};
-  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
+  nswMc=null;
   nswJava={version:'',java:null,exact:false};
   const jc=$('#nswJavaCheck');if(jc)jc.hidden=true;
   $$('[data-software]').forEach(x=>x.classList.toggle('active',x.dataset.software==='vanilla'));

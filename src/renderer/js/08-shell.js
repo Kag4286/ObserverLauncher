@@ -234,7 +234,9 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeInstDd(); });
 // Rename an instance (display name only; the id and folder never change).
 async function renameInstancePrompt(inst){
   const current=inst.name||'';
-  const name=window.prompt(t('inst.rename'),current);
+  // BUGFIX: window.prompt() is unsupported in Electron's sandboxed renderer; use the in-app
+  // promptDialog (Promise<string|null>) instead.
+  const name=await promptDialog({title:t('inst.rename'),value:current,ok:t('cf.ok')});
   if(name===null)return;
   const trimmed=String(name).trim();
   if(!trimmed||trimmed===current)return;

@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { serverFiles, readEula } = require('./server-files.js');
+const { requiredJavaForServer } = require('./server-java.js');
 const { AsyncLocalStorage } = require('async_hooks');
 
 // M5: channels that carry the ACTIVE instance's live state and are therefore gated in send()
@@ -81,6 +82,7 @@ function createContext() {
       lastAutoBackupAt: 0,
       buildProcess: null,
       rcon: null, // M6: live RconClient for this instance, or null (stdin fallback)
+      tpsUnsupported: false, // 2.2.0: set true when the server rejects our tps poll (e.g. `forge tps`) so we stop sending it
       wizardAbort: null,
       contentWatcher: null,
       contentWatchers: null,
@@ -113,7 +115,7 @@ function createContext() {
     'autoPollTimer', 'suppressStatusUntil', 'lastManualCommandAt', 'manualStop',
     'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
     'schedulerLastFired', 'serverStatus', 'waitingForDone', 'runtimeInstanceId',
-    'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon',
+    'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported',
     'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
     'edWatcher', 'edWatchMtime', 'edWatchDebounce',
   ];
@@ -163,7 +165,9 @@ function createContext() {
       // the renderer merges this in onFiles; without it the Overview EULA chip stayed "pending".
       let eulaAccepted = false;
       try { eulaAccepted = readEula(ctx.currentServerPath); } catch {}
-      send('server:files', { files, eulaAccepted, javaRequired: null });
+      let javaRequired = null;
+      try { javaRequired = requiredJavaForServer(ctx.currentServerPath, serverFiles) || null; } catch {}
+      send('server:files', { files, eulaAccepted, javaRequired });
     } catch {}
   }
 

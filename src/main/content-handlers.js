@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { dialog, shell } = require('electron');
 const { serverFiles, emptyServerFiles, buildPropertiesContent } = require('./server-files.js');
-const { requiredJavaForJar } = require('./java.js');
+const { requiredJavaForServer } = require('./server-java.js');
 const { writeFileAtomic, safeTarget } = require('./fs-utils.js');
 const editor = require('./editor.js');
 const worldmap = require('./worldmap.js');
@@ -12,7 +12,7 @@ function registerContent(ipcMain, ctx) {
   ipcMain.handle('files:get', async () => {
     try {
       const files = serverFiles(ctx.currentServerPath);
-      return { ok: true, files, javaRequired: requiredJavaForJar(files.jar) || null };
+      return { ok: true, files, javaRequired: requiredJavaForServer(ctx.currentServerPath, serverFiles) || null };
     } catch (error) {
       return { ok: true, files: emptyServerFiles(), javaRequired: null };
     }

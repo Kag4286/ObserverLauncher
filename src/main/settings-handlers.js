@@ -4,7 +4,8 @@ const os = require('os');
 const path = require('path');
 const { app, dialog } = require('electron');
 const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, removeInstance } = require('./settings.js');
-const { detectJava, requiredJavaForJar, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
+const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
+const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
 const { localIPv4s } = require('./network.js');
 const { download, marketplaceError, withTimeout } = require('./http.js');
@@ -26,7 +27,7 @@ function registerSettings(ipcMain, ctx) {
     try {
       files = serverFiles(ctx.currentServerPath);
       eulaAccepted = readEula(ctx.currentServerPath);
-      javaRequired = requiredJavaForJar(files.jar) || null;
+      javaRequired = requiredJavaForServer(ctx.currentServerPath, serverFiles) || null;
     } catch {}
     return {
       settings,
@@ -145,7 +146,7 @@ function registerSettings(ipcMain, ctx) {
       java: ctx.javaInfo,
       files: serverFiles(ctx.currentServerPath),
       eulaAccepted: readEula(ctx.currentServerPath),
-      javaRequired: requiredJavaForJar(serverFiles(ctx.currentServerPath).jar) || null,
+      javaRequired: requiredJavaForServer(ctx.currentServerPath, serverFiles) || null,
       mcp: mcpStatus
     };
   });
@@ -178,7 +179,7 @@ function registerSettings(ipcMain, ctx) {
     try {
       files = serverFiles(root);
       eulaAccepted = readEula(root);
-      javaRequired = requiredJavaForJar(files.jar) || null;
+      javaRequired = requiredJavaForServer(root, serverFiles) || null;
     } catch {}
     return {
       ok: true,
@@ -205,14 +206,23 @@ function registerSettings(ipcMain, ctx) {
     const r = switchInstance(String(id || ''));
     if (!r.ok) return r;
     try { ctx.seedInstances(); } catch {}
-    // Point the active runtime state at the new instance's folder and refresh watchers/files.
-    let merged = {};
-    try { merged = loadSettings(); ctx.currentServerPath = merged.serverPath || ''; } catch {}
-    try { ctx.watchServerFolder(); } catch {}
-    // M7: detect THIS instance's Java (per-instance javaPath) so its javaInfo is correct — a
-    // background instance never overwrites the active instance's detected Java again.
-    try { ctx.javaInfo = await detectJava(merged.javaPath || 'java'); } catch {}
-    return { ok: true, activeInstanceId: ctx.activeInstanceId, java: ctx.javaInfo };
+    // CRITICAL (2.2.0 bugfix): this IPC handler runs inside the ALS scope of the PREVIOUS active
+    // instance (the ipcMain proxy wraps it with runInInstance(activeInstanceId) at call time).
+    // After switchInstance() the active id is the TARGET, but the ALS store is still the OLD id —
+    // so writing ctx.currentServerPath / watchServerFolder / javaInfo here would clobber the OLD
+    // instance with the NEW instance's folder (the reported 'wizard checks the wrong server folder,
+    // sees another instance's purpur.jar'). Re-enter the TARGET instance's scope first.
+    const targetId = r.activeInstanceId;
+    return await ctx.runInInstance(targetId, async () => {
+      // Point THIS instance's runtime state at its own folder and refresh its watchers/files.
+      let merged = {};
+      try { merged = loadSettings(); ctx.currentServerPath = merged.serverPath || ''; } catch {}
+      try { ctx.watchServerFolder(); } catch {}
+      // M7: detect THIS instance's Java (per-instance javaPath) so its javaInfo is correct — a
+      // background instance never overwrites the active instance's detected Java again.
+      try { ctx.javaInfo = await detectJava(merged.javaPath || 'java'); } catch {}
+      return { ok: true, activeInstanceId: ctx.activeInstanceId, java: ctx.javaInfo };
+    });
   });
 
   ipcMain.handle('instances:rename', async (_, { id, name } = {}) => {
@@ -264,6 +274,27 @@ function registerSettings(ipcMain, ctx) {
 
   ipcMain.handle('java:auto-install', async () => autoInstallJava(ctx));
 
+  // 2.2.0 (Java D): list the Java runtimes this app has downloaded into userData (jre8/jre11/jre17/
+  // jre21/jre25). Lets the Settings UI offer a pick-list instead of forcing one Java for everything
+  // - a multi-instance setup may need Java 8 for an old server AND Java 21 for a new one.
+  ipcMain.handle('java:list', async () => {
+    const out = [];
+    try {
+      const ud = app.getPath('userData');
+      for (const major of [8, 11, 17, 21, 25]) {
+        const dir = path.join(ud, `jre${major}`);
+        if (!fs.existsSync(dir)) continue;
+        const binName = javaBinName();
+        const exe = findFileRecursive(dir, binName);
+        if (!exe) continue;
+        let version = null;
+        try { const info = await detectJava(exe); if (info.ok) version = info.version; } catch {}
+        out.push({ major, path: exe, version });
+      }
+    } catch {}
+    return { ok: true, runtimes: out };
+  });
+
   // FEATURE (0.9.0): export the in-memory console buffer to a text file the user picks. The buffer
   // lives in the main process (ctx.consoleBuffer, capped 2000 lines) so it survives renderer clears.
   ipcMain.handle('console:export', async () => {
@@ -292,14 +323,34 @@ function registerSettings(ipcMain, ctx) {
 // server jar's requirement (min Java 21), stages it, verifies the binary, then swaps it in.
 async function autoInstallJava(ctx) {
     if (javaInstalling) return { ok: false, error: 'A Java install is already in progress — check the Console tab.' };
-    if (ctx.javaInfo?.ok) return { ok: false, error: 'Java is already detected — no need to install it again.' };
+    // 2.2.0 (fix A): allow installing even when SOME Java is detected, as long as it is the WRONG
+    // version for this server. Only refuse when the detected Java already satisfies the requirement.
+    const _need = requiredJavaForServer(ctx.currentServerPath, serverFiles);
+    const _have = ctx.javaInfo?.ok ? javaMajor(ctx.javaInfo.version) : null;
+    // Refuse only when the detected Java is EXACTLY what this server wants. If it is older OR
+    // newer (e.g. Java 25 detected for a 1.21.1 server that wants 21), allow the install so the
+    // user can switch to the exact version.
+    // 2.2.0: the user may want a MANAGED Java even when the PATH Java "works" — e.g. a run.bat
+    // (NeoForge) server has no jar, so we cannot tell which Java it needs, and pinning a runtime is
+    // reasonable. So refuse ONLY when a managed javaPath is already set AND it exactly matches the
+    // known requirement. An empty javaPath (PATH java) or any mismatch/unknown -> allow the install.
+    let _managed = '';
+    try { _managed = String(loadSettings().javaPath || '').trim(); } catch {}
+    if (_managed && ctx.javaInfo?.ok && _need && _have != null && _have === _need) {
+      return { ok: false, error: 'Java is already set and matches this server\'s requirement — no need to install it again.' };
+    }
     javaInstalling = true;
     let zipPath;
     try {
-      let jar = null;
-      try { jar = serverFiles(ctx.currentServerPath).jar; } catch {}
-      const required = requiredJavaForJar(jar);
-      const major = required && required < 21 ? 21 : 25;
+      const required = requiredJavaForServer(ctx.currentServerPath, serverFiles);
+      // 2.2.0 (fix A): install the Java the SERVER actually needs, not always the newest. Old
+      // servers (1.16.5 and older -> Java 8) do NOT run on Java 17+, so installing Java 21/25 for
+      // them left the server unable to start. Adoptium ships LTS builds only (8/11/17/21/25); a
+      // 1.17 jar that wants Java 16 gets 17 (nearest LTS, the documented fallback). Unknown jar ->
+      // Java 21 (safe default for the common modern case).
+      const major = required
+        ? (required <= 8 ? 8 : required <= 11 ? 11 : required <= 17 ? 17 : required <= 21 ? 21 : 25)
+        : 21;
       ctx.appendLog(`Downloading a portable Java ${major} runtime from Adoptium (Eclipse Temurin)…`, 'system');
       const arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
       const osName = javaRuntimeOs(), ext = javaRuntimeExt(osName), binName = javaBinName(osName);

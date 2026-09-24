@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
 const { withTimeout, download } = require('../http.js');
@@ -18,10 +19,25 @@ async function install({ software, version, javaInfo, serverPath, onProgress }) 
   if (!targetVersion) throw new Error(`Could not resolve the newest ${software === 'neoforge' ? 'NeoForge' : 'Forge'} release.`);
   const name = `${software === 'neoforge' ? 'neoforge' : 'forge'}-${targetVersion}-installer.jar`;
   const url = `${mavenBase}/${encodeURIComponent(targetVersion)}/${encodeURIComponent(name)}`;
+  const installerPath = path.join(serverPath, name);
   // Forge/NeoForge installer jars are small (a few MB); cap at 256 MB.
-  await download(url, path.join(serverPath, name), onProgress, null, { maxBytes: 256 * 1024 * 1024 });
-  await new Promise((resolve, reject) => execFile(javaInfo.path, ['-jar', name, '--installServer'], { cwd: serverPath, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(stdout)));
-  return { name: software === 'neoforge' ? 'NeoForge server' : 'Forge server', version: targetVersion };
+  await download(url, installerPath, onProgress, null, { maxBytes: 256 * 1024 * 1024 });
+  // P1e (2.2.0): verify the installer is a plausible jar before running it. A tiny file (an HTML
+  // error page, a truncated download) would fail cryptically in the JVM; catch it here.
+  let size = 0; try { size = fs.statSync(installerPath).size; } catch {}
+  if (size < 4096) {
+    try { fs.rmSync(installerPath, { force: true }); } catch {}
+    throw new Error(`The ${software} installer download looks corrupt (only ${size} bytes). Check your connection and try again.`);
+  }
+  const label = software === 'neoforge' ? 'NeoForge' : 'Forge';
+  try {
+    await new Promise((resolve, reject) => execFile(javaInfo.path, ['-jar', name, '--installServer'], { cwd: serverPath, windowsHide: true, maxBuffer: 20 * 1024 * 1024 }, (error, stdout, stderr) => error ? reject(Object.assign(new Error(stderr || stdout || error.message), { code: error.code })) : resolve(stdout)));
+  } catch (e) {
+    // P1e: name the cause + keep a short tail of the installer output so the real error is visible.
+    const tail = String(e?.message || '').split(/\r?\n/).filter(Boolean).slice(-4).join(' ').slice(0, 400);
+    throw new Error(`The ${label} installer failed for version ${targetVersion}.${tail ? ' Installer output: ' + tail : ''}\nTry a different ${label} build (some versions need a newer/older Java).`);
+  }
+  return { name: `${label} server`, version: targetVersion };
 }
 
 module.exports = { install };

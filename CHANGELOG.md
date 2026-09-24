@@ -10,6 +10,116 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.2.0] — 2026-09-24
+
+**Headline: the Create-server wizard was reworked end to end, and the multi-instance folder bug is
+fixed.** This release fixes a serious bug where creating a new server could check/download into a
+DIFFERENT instance's folder, plus download failures (Paper/Folia "no stable build", NeoForge wrong
+version), Java version handling, and a console-spam bug. Plan + progress: docs/v2.2.0-plan.md.
+
+### Fixed — multi-instance folder leak (critical)
+- **The wizard could target the wrong instance's folder.** After `instanceAdd` + `instanceSwitch`,
+  `getSettings()` still read `serverPath` from the previous instance's DOM input, so `saveSettings`
+  overwrote the NEW instance with the OLD instance's path — the wizard then reported the old server's
+  jar (e.g. `purpur-26.2.jar`) for an empty new folder. FIX: the wizard forces `serverPath: nsw.folder`
+  when saving; `wizard:create` also takes an explicit `instance` id and runs inside
+  `runInInstance(id)`, and `instances:switch` re-enters the target instance's ALS scope before
+  touching `ctx.currentServerPath`/watchers/java. (src/renderer/js/12-wizard.js,
+  src/main/wizard.js, src/main/settings-handlers.js)
+- **Failed creates left orphan instances** ("a pile of McMod instances"). The instance is added
+  before `wizard:create`; on failure it is now removed (a cancel keeps it).
+
+### Fixed — server download
+- **Paper/Folia "no stable build" failure.** The wizard defaulted to the newest version, which
+  PaperMC often ships only as ALPHA/BETA right after a release, so "Latest" failed. `papermc.js` now
+  walks the newest versions for the newest STABLE build (`resolveStableVersion`) and the error names
+  it. Verified live: paper -> 26.2-83, folia -> 26.1.2-6.
+- **NeoForge installed a beta for the wrong Minecraft.** Maven `<latest>` is a `-beta`, and the list
+  spans every MC (1700+). The version step now defaults to the newest NON-prerelease and annotates
+  each entry with its MC + stable flag (src/main/forge-versions.js).
+- **Forge/NeoForge installer hardening (P1e):** the downloaded installer is rejected if it is
+  implausibly small (<4 KB), and a failed installer now reports a short tail of its output instead of
+  a bare exit code.
+
+### Added — Wizard GUI/UX rewrite (Phase 2)
+- **Card-based software picker:** a responsive 2-column grid, each card = icon + name + tag + one-line
+  description + a requirements pill (Git/JDK/installer); Vanilla carries a **Recommended** badge.
+- **MC-first version step for Forge/NeoForge:** pick the Minecraft version first, then a build for that
+  line (newest stable first, beta tagged). A **back button** returns to the MC list (the old picker was
+  a dead end). The MC labels are now real (`1.21.1`, not `21`).
+- **Version chips** mark/dim non-stable versions (Paper/Folia ALPHA, NeoForge beta).
+- **Review step** shows the download source, the Java the server needs, and warns when the local Java
+  is too old.
+- **Download state** shows speed (EMA) + ETA + Cancel.
+- **Actionable errors** (`nswFriendlyError`): network, checksum, Git, JDK, folder-not-empty, disk, and
+  "no stable build" (which jumps back to the version step).
+- **MCP confirm dialog** now names the target instance; `assemble_modpack` returns plan-level warnings.
+
+### Fixed — Java version handling
+- **Auto-install picked the wrong Java.** It always installed Java >= 21, so old servers (1.16.5-
+  need Java 8) got Java 21 and could not start. It now installs the LTS the jar needs (8/11/17/21/25),
+  and is allowed to install when the detected Java is the WRONG version (older OR newer) — e.g. switch
+  Java 25 -> 21 for a 1.21.1 server.
+- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
+  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
+  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
+  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
+  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
+  snapshot / server:files / start validation / MCP status+diagnose)
+- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
+  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
+  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
+  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
+  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
+  snapshot / server:files / start validation / MCP status+diagnose)
+- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
+  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
+  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
+  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
+  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
+  snapshot / server:files / start validation / MCP status+diagnose)
+- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
+  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
+  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
+  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
+  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
+  snapshot / server:files / start validation / MCP status+diagnose)
+- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
+  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
+  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
+  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
+  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
+  snapshot / server:files / start validation / MCP status+diagnose)
+- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
+  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
+  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
+  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
+  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
+  snapshot / server:files / start validation / MCP status+diagnose)
+- **Overview shows Java need vs detected** ("needs Java 21, have 25") with a warning when Java is
+  newer than an old server can use.
+
+### Fixed — MCP confirm dialog lost its buttons (GUI/UX)
+- **A long MCP confirmation dialog pushed Allow/Deny off-screen.** `assemble_modpack` (and any
+  tool with a big `args` payload) rendered the whole JSON body inside `.confirm-modal`, which had
+  no height cap; the overlay is a centered grid with no scroll, so the modal was clipped and the
+  action row was unreachable. The modal is now a height-capped flex column where only the body
+  scrolls, so the head and the Allow/Deny buttons stay pinned and always visible.
+  (src/renderer/css/06-modals.css)
+
+### Fixed — console spam
+- **`forge tps` spam.** Some NeoForge builds reject `forge tps`, so the 5s poll printed "Unknown or
+  incomplete command" forever. Those replies are now suppressed, and a per-instance `tpsUnsupported`
+  flag stops the tps poll entirely after the server rejects it.
+
+### Fixed — instance rename crash
+- **`prompt() is not supported`.** `renameInstancePrompt` used `window.prompt`, unsupported in
+  Electron's sandboxed renderer. Replaced with an in-app `promptDialog()`.
+
+### Tests
+- New tests/forge-versions.test.js (17 asserts). src/main/forge-versions.js extracted (pure mcFor/
+  isPrerelease/annotateVersions). npm test = 52 files.
+
 ## [2.1.0] — 2026-09-24
 
 **Headline: MCP modpack intelligence.** An AI client can now assemble a whole modpack - search,

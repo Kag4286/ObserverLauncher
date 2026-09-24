@@ -10,7 +10,8 @@ const { startServerInternal, forceStopServer, sendConsoleCommand } = require('..
 const { createBackupInternal } = require('../main/backups.js');
 const { readLevel, readPlayers, readWaypoints } = require('../main/worldmap.js');
 const { localIPv4s } = require('../main/network.js');
-const { requiredJavaForJar, javaMajor } = require('../main/java.js');
+const { javaMajor } = require('../main/java.js');
+const { requiredJavaForServer } = require('../main/server-java.js');
 const doctor = require('./doctor.js');
 const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
@@ -28,7 +29,7 @@ async function tGetStatus(ctx) {
     status: ctx.serverStatus, running: ctx.serverStatus === 'running',
     serverPath: ctx.currentServerPath || null, jar: files.jar || null, launchScript: files.launchScript || null,
     software: ctx.currentSoftware || null, java: ctx.javaInfo || null,
-    javaRequired: files.jar ? (requiredJavaForJar(files.jar) || null) : null,
+    javaRequired: requiredJavaForServer(ctx.currentServerPath, serverFiles) || null,
   } };
 }
 async function tReadConsole(ctx, a) {
@@ -664,7 +665,7 @@ async function tDiagnoseServer(ctx) {
   const root = ctx.currentServerPath || '';
   const s = loadSettings();
   let files = {}; try { files = serverFiles(root); } catch {}
-  const javaRequired = files.jar ? (requiredJavaForJar(files.jar) || null) : null;
+  const javaRequired = requiredJavaForServer(root, serverFiles) || null;
   let eulaAccepted = false; try { eulaAccepted = readEula(root); } catch {}
   const port = Number(files.properties?.['server-port']) || 25565;
   let portFree = null;

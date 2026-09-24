@@ -46,20 +46,45 @@
 .nsw2-lead{font-size:12px;margin:0 0 14px}
 .nsw2-group{margin:12px 0 6px}
 .nsw2-group:first-child{margin-top:0}
-/* Software picker rows — flat, hairline separated, no cards */
-#nswCards{display:flex;flex-direction:column}
-.nsw2-row{display:flex;gap:12px;align-items:center;text-align:left;padding:11px 10px;background:transparent;border:0;border-bottom:1px solid var(--border);cursor:pointer;color:var(--text-muted);transition:background .1s,box-shadow .1s;width:100%}
-.nsw2-row:last-child{border-bottom:0}
-.nsw2-row:hover{background:var(--panel-hover);box-shadow:inset 2px 0 0 rgba(0,229,255,.35)}
-.nsw2-row.active{background:var(--accent-weak);box-shadow:inset 2px 0 0 var(--accent);color:var(--text)}
-.nsw2-row img{width:30px;height:30px;flex-shrink:0;border:1px solid var(--border);background:var(--field);padding:3px;box-sizing:content-box;border-radius:var(--r-sm)}
+/* 2.2.0 (P2a): software picker is a responsive CARD grid (was a flat list). Each card = icon + name
+   + tag + one-line description + a requirements line; the recommended pick is highlighted. */
+#nswCards{display:block}
+.nsw2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:4px}
+@media(max-width:640px){.nsw2-grid{grid-template-columns:1fr}}
+.nsw2-row{display:flex;gap:11px;align-items:flex-start;text-align:left;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;color:var(--text-muted);transition:border-color var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard),box-shadow var(--dur-fast) var(--ease-standard);width:100%}
+.nsw2-row:hover{background:var(--panel-hover);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.nsw2-row.active{background:var(--accent-weak);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset,0 0 16px var(--accent-weak);color:var(--text)}
+.nsw2-row img{width:28px;height:28px;flex-shrink:0;border:1px solid var(--border);background:var(--field);padding:3px;box-sizing:content-box;border-radius:var(--r-sm)}
+.nsw2-rowbody{min-width:0;flex:1}
 .nsw2-row b{display:block;font:600 13px var(--font-ui);color:var(--text)}
-.nsw2-row span{display:block;margin-top:2px;font:500 11px var(--font-ui);line-height:1.45}
+.nsw2-row span{display:block;margin-top:3px;font:500 11px var(--font-ui);line-height:1.45}
+.nsw2-req{display:inline-block;margin-top:6px;font:600 9.5px var(--font-mono);letter-spacing:.04em;color:var(--text-dim);background:var(--field);border:1px solid var(--border);border-radius:999px;padding:2px 8px}
+.nsw2-req.warn{color:var(--warning);border-color:rgba(255,210,63,.35);background:var(--warning-weak)}
 .nsw2-tag{font:700 8.5px var(--font-mono);letter-spacing:.1em;font-style:normal;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-dim);vertical-align:1px;margin-left:6px}
 .nsw2-tag.accent{color:var(--accent);border-color:rgba(0,229,255,.35)}
 .nsw2-tag.warn{color:var(--warning);border-color:rgba(255,210,63,.35)}
 /* Version chips */
 .nsw2-chiploading{display:inline-block;font:500 11px var(--font-mono);color:var(--text-dim);padding:8px 2px}
+/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
+.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
+.nsw2-crumb b{color:var(--accent)}
+.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
+.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
+/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
+.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
+.nsw2-crumb b{color:var(--accent)}
+.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
+.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
+/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
+.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
+.nsw2-crumb b{color:var(--accent)}
+.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
+.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
+/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
+.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
+.nsw2-crumb b{color:var(--accent)}
+.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
+.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
 .nsw-version-chips{min-height:38px;max-height:190px;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;padding-right:4px}
 /* KPI "?" click bubble */
 .kpi-help{cursor:pointer}

@@ -386,6 +386,7 @@
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gem.svg" alt=""><h3 data-i18n="set.javaT">Java runtime</h3><small data-i18n="set.javaD">detection &amp; one-click install</small></div>
             <div id="javaNotice" class="java-notice"></div>
+            <label class="set-field" id="javaPickRow" hidden><span data-i18n="set.javaPick">Installed runtimes</span><select id="javaPickSelect" class="launcher-select"></select></label>
             <label class="set-field"><span data-i18n="set.javaPath">Executable path</span><input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false"></label>
             <button type="button" class="btn primary wide" id="javaAutoInstall" hidden data-i18n="set.autoInstallJava">Install Java automatically (no admin rights needed)</button>
             <div id="javaProgress" class="set-progress" hidden><div class="set-progress-track"><div class="set-progress-fill" id="javaProgressFill"></div></div><div class="set-progress-label" id="javaProgressLabel">Starting download…</div></div>
@@ -586,21 +587,20 @@
         <div class="nsw-step" data-step="2">
           <h2 data-i18n="nsw.softwareT">What kind of server?</h2>
           <p class="text-muted nsw2-lead">Beginners: <b>Vanilla</b> (simplest) or <b>Paper</b> (plugins). The rest are for mods, proxies or big servers.</p>
-          <div id="nswCards">
-            <p class="eyebrow nsw2-group">Start here</p>
-            <button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div><b>Vanilla <em class="nsw2-tag">Easiest</em></b><span data-i18n="nsw.desc.vanilla"><span>Mojang's official server — pure survival, no plugins or mods. Nothing extra to install.</span></div></button>
-            <button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div><b>Paper <em class="nsw2-tag accent">Popular</em></b><span data-i18n="nsw.desc.paper"><span>High performance + the Bukkit plugin API. 90% of public servers. Drop-in for Vanilla.</span></div></button>
-            <p class="eyebrow nsw2-group">More Paper family</p>
-            <button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div><b>Purpur</b><span data-i18n="nsw.desc.purpur"><span>Paper fork with extra gameplay config (rideable mobs, keep-inventory…) — all Paper plugins work.</span></div></button>
-            <button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div><b>Leaf</b><span data-i18n="nsw.desc.leaf"><span>Paper fork focused on tick speed while keeping vanilla behaviour intact.</span></div></button>
-            <p class="eyebrow nsw2-group">Mods &amp; experts</p>
-            <button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div><b>Fabric <em class="nsw2-tag">Modded</em></b><span data-i18n="nsw.desc.fabric"><span>Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span></div></button>
-            <button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div><b>NeoForge <em class="nsw2-tag">Modded</em></b><span data-i18n="nsw.desc.neoforge"><span>Maintained Forge successor (1.20.5+). Installer generates run files automatically.</span></div></button>
-            <button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div><b>Forge <em class="nsw2-tag">Modded</em></b><span data-i18n="nsw.desc.forge"><span>The classic loader (1.12–1.20.4) with the largest mod library. Uses an installer too.</span></div></button>
-            <button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div><b>Folia <em class="nsw2-tag warn">Expert</em></b><span data-i18n="nsw.desc.folia"><span>Paper's region-threaded fork — only helps 100+ player servers; many plugins break.</span></div></button>
-            <button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div><b>Spigot <em class="nsw2-tag warn">Compiles</em></b><span data-i18n="nsw.desc.spigot"><span>Built from source with BuildTools — needs Git, takes 5–10 min. Paper covers this today.</span></div></button>
-            <p class="eyebrow nsw2-group">Networks</p>
-            <button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div><b>Velocity <em class="nsw2-tag">Proxy</em></b><span data-i18n="nsw.desc.velocity"><span>Not a world — connects several servers behind one IP. Config: velocity.toml, port 25577.</span></div></button>
+          <div id="nswCards" class="nsw2-cards">
+            <p class="eyebrow nsw2-group" data-i18n="nsw.grpStart">Start here</p>
+            <div class="nsw2-grid">
+              <button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Leaf</b><span data-i18n="nsw.desc.leaf">Paper fork focused on tick speed while keeping vanilla behaviour.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button>
+              <button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button>
+              <button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button>
+              <button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+            </div>
             <small class="card-tech field-hint" hidden data-i18n="nsw.techHint">Selections are saved per run of the wizard; hover states show the exact download source used by the launcher.</small>
           </div>
         </div>
@@ -608,8 +608,9 @@
         <!-- STEP 3 · VERSION -->
         <div class="nsw-step" data-step="3">
           <h2 data-i18n="nsw.versionT">Which Minecraft version?</h2>
-          <p class="text-muted nsw2-lead">Keep <b>Latest</b> unless a mod or plugin page demands an older release.</p>
-          <div class="nsw-version-cards">
+          <p class="text-muted nsw2-lead" id="nswVersionLead">Keep <b>Latest</b> unless a mod or plugin page demands an older release.</p>
+          <p class="text-muted nsw2-lead" id="nswMcFirstLead" hidden data-i18n="nsw.mcFirstLead">Forge/NeoForge build for a specific Minecraft version: pick the Minecraft version first, then a build.</p>
+          <div class="nsw-version-cards" id="nswVersionCards">
             <label class="nsw-radio-card active"><input type="radio" name="nswVersionMode" value="latest" checked><div><b data-i18n="nsw.latest">Use the latest version</b><span id="nswLatestLabel" data-i18n="nsw.latestSub">Resolving latest…</span></div><span class="radio-dot"></span></label>
             <label class="nsw-radio-card"><input type="radio" name="nswVersionMode" value="specific"><div><b data-i18n="nsw.specific">Pick a specific version</b><span data-i18n="nsw.specificSub">Live-checked against the official list for this software</span></div><span class="radio-dot"></span></label>
           </div>
@@ -673,6 +674,16 @@
     <div class="confirm-actions">
       <button type="button" class="btn secondary" id="cfCancel" data-i18n="cf.cancel">Cancel</button>
       <button type="button" class="btn primary" id="cfOk" data-i18n="cf.ok">OK</button>
+    </div>
+  </div>
+</div>
+<div id="promptModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+  <div class="modal confirm-modal">
+    <div class="confirm-head"><span class="confirm-ico" id="pmIco">?</span><h2 id="pmTitle">Rename</h2></div>
+    <input type="text" id="pmInput" class="pm-input" autocomplete="off" maxlength="64">
+    <div class="confirm-actions">
+      <button type="button" class="btn secondary" id="pmCancel" data-i18n="cf.cancel">Cancel</button>
+      <button type="button" class="btn primary" id="pmOk" data-i18n="cf.ok">OK</button>
     </div>
   </div>
 </div>

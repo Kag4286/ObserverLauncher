@@ -9,6 +9,9 @@ const _missingI18nLogged=new Set();
 // Java major from a version string, e.g. '21.0.4' -> 21, '1.8.0' -> 8. Lives in core because
 // 07-overview.js calls it during boot, before the later-numbered files (12-wizard) have loaded.
 const javaMajorOf=s=>{const m=String(s||'').match(/(?:1\.)?(\d+)/);return m?Number(m[1]):null};
+// 2.2.0 (C): min Java a server jar needs. Mirrors src/main/java.js requiredJavaForJar so the UI can
+// show 'needs Java X' without an IPC round-trip. Calendar scheme 26.x -> 25; 1.x by minor/patch.
+const requiredJavaOf=jar=>{const s=String(jar||'');let m=s.match(/\b1\.(\d{1,2})(?:\.(\d{1,2}))?\b/);if(m){const minor=Number(m[1]),patch=Number(m[2]||0);if(minor>=21)return 21;if(minor===20&&patch>=5)return 21;if(minor>=18)return 17;if(minor>=17)return 16;return 8}if(/\b26\.\d{1,2}\b/.test(s))return 25;return null};
 function t(key,repl){
   const val=(window.LOCALES?.[currentLocale]?.[key]) ?? (window.LOCALES?.en?.[key]);
   if(val==null){ if(!_missingI18nLogged.has(key)){ _missingI18nLogged.add(key); console.warn(`[i18n] missing key: ${key} (locale: ${currentLocale})`);} return key; }
@@ -100,6 +103,36 @@ $('#cfOk')?.addEventListener('click',()=>closeConfirm(true));
 $('#cfCancel')?.addEventListener('click',()=>closeConfirm(false));
 $('#confirmModal')?.addEventListener('click',e=>{if(e.target.id==='confirmModal')closeConfirm(false)});
 document.addEventListener('keydown',e=>{const m=$('#confirmModal');if(!m||m.hidden)return;if(e.key==='Escape')closeConfirm(false);else if(e.key==='Enter')closeConfirm(true)});
+// BUGFIX (Electron sandbox): window.prompt() is NOT supported in this renderer (it throws
+// "prompt() is not supported"), which broke instance rename. This is a small in-app replacement
+// with the same Promise<string|null> contract as confirmDialog. Returns the trimmed value, or null
+// when cancelled/empty.
+let _pmResolve=null;
+function promptDialog(opts){
+  opts=opts||{};
+  const m=$('#promptModal');
+  if(!m) return Promise.resolve(null);
+  $('#pmTitle').textContent=opts.title||'Enter a value';
+  const input=$('#pmInput');
+  input.value=opts.value||'';
+  if(opts.placeholder) input.placeholder=opts.placeholder; else input.removeAttribute('placeholder');
+  $('#pmOk').textContent=opts.ok||t('cf.ok');
+  $('#pmCancel').textContent=opts.cancel||t('cf.cancel');
+  const ico=$('#pmIco');if(ico)ico.className='confirm-ico'+(opts.danger?' danger':'');
+  m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  setTimeout(()=>{input.focus();input.select();},20);
+  return new Promise(resolve=>{_pmResolve=resolve});
+}
+function closePrompt(result){
+  const m=$('#promptModal');if(!m||m.hidden)return;
+  m.classList.remove('show');m.hidden=true;
+  if(_pmResolve){const r=_pmResolve;_pmResolve=null;r(result===undefined?null:result)}
+}
+$('#pmOk')?.addEventListener('click',()=>{const v=($('#pmInput')?.value||'').trim();closePrompt(v||null)});
+$('#pmCancel')?.addEventListener('click',()=>closePrompt(null));
+$('#promptModal')?.addEventListener('click',e=>{if(e.target.id==='promptModal')closePrompt(null)});
+$('#pmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const v=($('#pmInput')?.value||'').trim();closePrompt(v||null)}});
+document.addEventListener('keydown',e=>{const m=$('#promptModal');if(!m||m.hidden)return;if(e.key==='Escape')closePrompt(null)});
 // MOTION (1.3.0): tween a number element toward a new value instead of snapping. Restrained:
 // short duration, no spring, and totally skipped under prefers-reduced-motion. Keeps the last
 // tween per element so rapid updates never fight each other.

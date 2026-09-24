@@ -55,7 +55,29 @@ function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale
    const wc=$('#worldsCountPill'), bc=$('#backupsCountPill'), be=$('#backupEmpty'); if(wc) wc.textContent=String((f.worlds||[]).length); if(bc) bc.textContent=String((f.backups||[]).length); if(be) be.hidden=(f.backups||[]).length>0;
    const cpc=$('#contentPluginsCount'), cmc=$('#contentModsCount'), cdc=$('#contentDatapacksCount'); if(cpc) cpc.textContent=String((f.plugins||[]).length); if(cmc) cmc.textContent=String((f.mods||[]).length); if(cdc) cdc.textContent=String((f.datapacks||[]).length);
    const abs=$('#autoBackupStatus');if(abs){const mins=s.autoBackupMinutes||0;abs.innerHTML=mins>0?t('wld.autoOn',{n:mins})+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.configure')+'</button>':t('wld.autoOff')+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.turnOn')+'</button>';abs.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump))}
-  renderPlayers();renderPerfDiagnostics();const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';n.className='java-notice '+(!j.ok?'bad':is32?'warn':'ok');n.textContent=!j.ok?t('set.javaBad',{m:j.message||'Set a Java path or use java from PATH.'}):is32?t('set.java32',{v:j.version,p:j.path}):t('set.javaOk',{v:j.version,p:j.path});$('#javaAutoInstall').hidden=!!j.ok;
+  renderPlayers();renderPerfDiagnostics();const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
+// 2.2.0 (C): show the Java the current server's jar NEEDS vs what is detected, and offer the
+// one-click install whenever the detected Java is missing OR the wrong version (not just missing).
+// 2.2.0 (Java gap): prefer the Java requirement resolved in the main process (it also handles a
+// jar-less NeoForge/Forge run.bat server by reading libraries/); fall back to the jar-name helper
+// when the backend has not reported it yet.
+const need=state.javaRequired||requiredJavaOf((state.files&&state.files.jar)||'');
+const have=j.ok?javaMajorOf(j.version):null;
+const mismatch=j.ok&&need&&have!=null&&have<need;
+const tooNew=j.ok&&need&&have!=null&&have>need;
+n.className='java-notice '+(!j.ok?'bad':(is32||mismatch)?'warn':'ok');
+if(!j.ok)n.textContent=t('set.javaBad',{m:j.message||'Set a Java path or use java from PATH.'});
+else if(mismatch)n.textContent=t('set.javaNeed',{need,have});
+else if(is32)n.textContent=t('set.java32',{v:j.version,p:j.path});
+else if(tooNew)n.textContent=t('set.javaNewer',{have,need});
+else n.textContent=t('set.javaOk',{v:j.version,p:j.path});
+// Show the install button when Java is missing, too OLD, or too NEW (so the user can switch to the
+// exact version the server needs - e.g. downgrade Java 25 -> 21 for a 1.21.1 server).
+// Show Install when Java is missing, mismatched/too-new, OR still coming from PATH (no managed
+// javaPath set) - so a run.bat server with no jar can still pin a specific runtime.
+const javaPathSet=!!((s.javaPath||'').trim());
+$('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
+  populateJavaPicker(j);
   // Launcher settings extras: folder health line + effective launch command preview.
   const fsEl=$('#folderStatus');
   if(fsEl){
@@ -210,6 +232,18 @@ function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),ja
 let settingsDirty=false;
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty)}
 function markSettingsSaved(){settingsDirty=false;updateApplyDirty()}
+// 2.2.0 (Java D): fill the 'Installed runtimes' pick-list from java:list. Hidden with 0-1 runtimes.
+let _javaRuntimes=null;
+async function populateJavaPicker(j){
+  const row=$('#javaPickRow'),sel=$('#javaPickSelect');if(!row||!sel)return;
+  if(_javaRuntimes===null){try{const r=await window.observer.javaList();_javaRuntimes=(r&&r.ok&&Array.isArray(r.runtimes))?r.runtimes:[];}catch{_javaRuntimes=[];}}
+  const list=_javaRuntimes||[];
+  if(list.length<2){row.hidden=true;return}
+  row.hidden=false;
+  const cur=((state.settings&&state.settings.javaPath)||'').replace(/\\/g,'/');
+  sel.innerHTML=list.map(rt=>'<option value="'+esc(rt.path)+'"'+(rt.path.replace(/\\/g,'/')===cur?' selected':'')+'>Java '+rt.major+(rt.version?' ('+esc(String(rt.version))+')':'')+'</option>').join('');
+  if(!sel._wired){sel._wired=true;sel.onchange=async()=>{const next={...getSettings(),javaPath:sel.value};const r=await window.observer.saveSettings(next);if(r&&r.ok){state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();toast(t('set.javaSwitched',{v:(r.java&&r.java.version)||''}),'success')}}}
+}
 function renderJvmPreview(){
   const el=$('#jvmPreview');if(!el)return;
   const s=state.settings||{},f=state.files||{};

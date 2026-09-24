@@ -10,6 +10,7 @@ const { spawn } = require('child_process');
 const { loadSettings, getActiveInstanceId } = require('./settings.js');
 const { setInstanceProcess, setInstanceStatus, clearInstanceProcess } = require('./runtime-state.js');
 const { validateStart } = require('./java.js');
+const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, detectSoftware, readEula, writeEula, parseServerLine, buildPropertiesContent } = require('./server-files.js');
 const { RconClient, desiredRconProps } = require('./rcon.js');
 const platform = require('./platform');
@@ -298,7 +299,7 @@ async function startServerInternal(ctx, settings) {
   // A7: refuse a port already leased by another running instance.
   const portCheck = checkPortLease(ctx, instId, settings);
   if (portCheck.block) return { ok: false, error: portCheck.message };
-  const error = validateStart(settings, ctx.javaInfo, serverFiles);
+  const error = validateStart(settings, ctx.javaInfo, serverFiles, requiredJavaForServer);
   if (error) return { ok: false, error };
   const info = serverFiles(settings.serverPath);
   if (!readEula(settings.serverPath)) {
@@ -307,6 +308,8 @@ async function startServerInternal(ctx, settings) {
   }
   const software = detectSoftware(info);
   ctx.currentSoftware = software;
+  // 2.2.0: fresh start -> re-try the tps poll (a previous run may have flagged it unsupported).
+  ctx.tpsUnsupported = false;
   const isProxy = software === 'proxy';
   // M6: make sure RCON is enabled in server.properties with a per-instance port + password BEFORE
   // the server reads the file. Existing user RCON config is preserved (see desiredRconProps).
@@ -373,9 +376,17 @@ async function startServerInternal(ctx, settings) {
         try { connectRcon(ctx, rconCfg, instId); } catch {}
         try { require('./tunnel.js').autoStartTunnel(ctx).catch(() => {}); } catch {}
       }
-      const isAutoPollStatus = Date.now() < ctx.suppressStatusUntil
-        && Date.now() - ctx.lastManualCommandAt > 1200
-        && /(players online|TPS from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:)/i.test(x);
+      // Suppress the echo of our OWN auto-poll commands + any "unknown command" reply they cause.
+      // A server that does not support a poll command (e.g. `forge tps` on some NeoForge builds)
+      // would otherwise print 'Unknown or incomplete command' + the echoed line every 5s forever.
+      // When we see that reply DURING a poll window, flag the instance so startAutoPoll stops
+      // sending the tps command (it is a server limitation, not a bug we can fix).
+      const duringPoll = Date.now() < ctx.suppressStatusUntil && Date.now() - ctx.lastManualCommandAt > 1200;
+      if (duringPoll && /Unknown or incomplete command|see below for error|<--\[HERE\]/i.test(x)) {
+        ctx.tpsUnsupported = true;
+      }
+      const isAutoPollStatus = duringPoll
+        && /(players online|TPS from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^list$)/i.test(x);
       if (!isAutoPollStatus) ctx.appendLog(x);
       parseServerLine(x, ctx.live, ctx.send);
     });

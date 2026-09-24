@@ -407,14 +407,23 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .blocked-row{display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border)}
 .blocked-row .blocked-name{flex:1;min-width:0;font:600 12.5px var(--font-ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .blocked-row .blocked-tag{flex-shrink:0;font:500 10.5px var(--font-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
-.confirm-modal{width:min(440px,100%);padding:0}
-.confirm-head{display:flex;gap:12px;align-items:center;padding:16px 18px 0}
+/* BUGFIX (MCP confirm dialog lost its buttons): a long body (e.g. an assemble_modpack
+   args JSON with dozens of items) made the modal taller than the viewport. The overlay is
+   display:grid/place-items:center with NO overflow, so the modal was clipped on both ends and
+   .confirm-actions (the Allow/Deny row) was pushed off-screen with no way to scroll to it.
+   Cap the height, make the modal a flex column, and let ONLY the body scroll — head + actions
+   stay pinned and always visible. */
+.confirm-modal{width:min(440px,100%);padding:0;max-height:calc(100vh - 36px);display:flex;flex-direction:column}
+.confirm-head{display:flex;gap:12px;align-items:center;padding:16px 18px 0;flex-shrink:0}
 .confirm-ico{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);color:var(--accent);font:700 16px var(--font-mono)}
 .confirm-ico.danger{background:var(--danger-weak);border-color:rgba(255,59,92,.3);color:var(--danger)}
 .confirm-head h2{font-size:16px}
-.confirm-body{margin:12px 18px 0;color:var(--text-muted);font:500 13px var(--font-ui);line-height:1.55}
+.confirm-body{margin:12px 18px 0;color:var(--text-muted);font:500 13px var(--font-ui);line-height:1.55;flex:1 1 auto;min-height:0;overflow:auto;overflow-wrap:anywhere}
 .confirm-body code{color:var(--accent);font:500 12px var(--font-mono)}
-.confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:18px}
+.confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:18px;flex-shrink:0}
+/* In-app prompt (replaces the unsupported window.prompt) — single text input + actions. */
+.pm-input{margin:12px 18px 0;width:calc(100% - 36px);padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg-inset,var(--bg-2));color:var(--text);font:500 13px var(--font-ui);outline:none;transition:border-color var(--dur-fast) var(--ease-standard),box-shadow var(--dur-fast) var(--ease-standard)}
+.pm-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
 
 /* ============ MCP SECTION HIGHLIGHT (0.9.0) ============ */
 /* Make the MCP/AI block stand out: cyan left edge + tinted header + live pill. */

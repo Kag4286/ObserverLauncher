@@ -225,6 +225,11 @@
 .version-chip:hover{border-color:var(--accent);background:var(--field);transform:translateY(-1px)}
 .version-chip.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 0 10px var(--accent-weak)}
 .version-chip.active span{background:rgba(0,0,0,.15);color:var(--accent-ink);border-color:transparent}
+/* 2.2.0: a version with no stable build (Paper/Folia ALPHA, NeoForge beta) is dimmed so the user
+   sees it may not install. It is still clickable (the user may opt in on purpose). */
+.version-chip[data-soft]{opacity:.62;border-style:dashed}
+.version-chip[data-soft]:hover{opacity:.9}
+.version-chip[data-soft] .nsw2-tag.warn{opacity:1}
 .nsw-version-info{margin-top:10px;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:4px;color:var(--text-muted);font:500 11px var(--font-ui);line-height:1.4}
 .nsw-version-hint{display:flex;gap:8px;align-items:center;margin-top:12px;padding:10px 12px;background:var(--accent-weak);border:1px solid rgba(0,229,255,.15);border-radius:4px;color:var(--text);font:500 11px var(--font-ui)}
 .nsw-version-hint .hint-icon{font-size:14px;flex-shrink:0}

@@ -8,11 +8,15 @@ function startAutoPoll(ctx, software) {
     ctx.suppressStatusUntil = Date.now() + 4000;
     try {
       ctx.serverProcess.stdin.write('list\r\n');
-      if (software === 'paper-like') {
-        ctx.serverProcess.stdin.write('tps\r\n');
-        ctx.serverProcess.stdin.write('tick query\r\n');
-      } else if (software === 'forge') {
-        ctx.serverProcess.stdin.write('forge tps\r\n');
+      // 2.2.0: skip the tps poll once the server has shown it does not understand the command
+      // (e.g. some NeoForge builds reject `forge tps`). tpsUnsupported is per-instance.
+      if (!ctx.tpsUnsupported) {
+        if (software === 'paper-like') {
+          ctx.serverProcess.stdin.write('tps\r\n');
+          ctx.serverProcess.stdin.write('tick query\r\n');
+        } else if (software === 'forge') {
+          ctx.serverProcess.stdin.write('forge tps\r\n');
+        }
       }
     } catch {}
   }, 5000);
