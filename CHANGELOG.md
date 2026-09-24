@@ -10,6 +10,76 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.1.0] — 2026-09-24
+
+**Headline: MCP modpack intelligence.** An AI client can now assemble a whole modpack - search,
+resolve versions, check item-vs-item and item-vs-server compatibility, follow dependencies, and
+install the batch in one confirmed action - instead of installing one file at a time. Rides along:
+secrets encrypted at rest, rule-based crash classification, port-holder diagnosis, and test debt.
+Plan + progress: docs/v2.1.0-plan.md.
+
+### Added — modpack planner/assembler (MCP)
+- **`plan_modpack` now detects item-vs-ITEM conflicts** (`planConflicts` in src/mcp/modpack-plan.js):
+  the same project planned at two different versions, two projects writing the same file, and Modrinth
+  `incompatible` relations. The per-item check only compared an item against the SERVER before; two
+  items could still clash with each other. Returned as `conflicts[]`.
+- **`plan_modpack` flags already-installed content** (`alreadyInstalled` per item + a top-level count),
+  so an AI can skip a re-install instead of overwriting a file the user already has.
+- **Plan-level warnings** (`planWarnings`): a Fabric/Quilt server with mods but no Fabric API
+  (`fabricApiMissing`), a proxy config present (`proxy`), and a per-mod Java requirement that exceeds
+  the server's Java (`java`) - each a stable code the AI can act on.
+- **Install a modpack from the registry.** `install_from_market` accepts `kind: 'modpack'` - it
+  downloads the `.mrpack` and runs the SAME `importMrpackFromPath` the GUI uses (files + overrides),
+  instead of requiring a manual download. New read tool **`search_modpacks`** (Modrinth).
+- **`list_market_versions` is multi-source** (Modrinth + Hangar + CurseForge) via a shared
+  `listMarketVersions()` in src/main/marketplace.js - was Modrinth-only. Pick an exact `versionId`
+  before installing.
+- **`assemble_modpack` preflight + undo aid.** It resolves every item first and returns
+  `preflight.totalBytes` (+ `over500MB`) before downloading, and records `createdFiles` so a partial
+  failure can be undone with a follow-up `delete_content` (the user still approves).
+- **Dependency follow depth raised 2 -> 3** (required Modrinth deps), keeping the seen-set cycle guard
+  and the `capPlan` budget.
+- `resolveMarketDownload` / `listMarketVersions` now also return `size` (non-breaking).
+- bridge.js `STATIC_TOOLS` + `search_modpacks` (drift guard passes). Tests: tests/mcp-modpack-plan.test.js.
+
+### Security — secrets encrypted at rest
+- New **src/main/secrets.js**: secrets are stored as `safe:<base64>` (Electron `safeStorage` - DPAPI /
+  libsecret / Keychain) or `plain:<value>` when no keyring is available. `settings.js` wraps every
+  secret on write and unwraps on read; applied to `curseforgeApiKey` and per-instance `rconPassword`.
+- No new migration version: wrapping is idempotent and backward compatible (a legacy value with no
+  prefix is read as plaintext). A `safe:` value that cannot be decrypted returns empty rather than
+  leaking ciphertext as a password. Tests: tests/settings-secrets.test.js.
+
+### Added — diagnostics
+- **Crash classifier** (`doctor.classifyCrash`): maps a crash report to a category an AI can act on -
+  out-of-memory, java-version, mixin-conflict, mod-dependency, port-conflict, corrupt-jar (or unknown) -
+  with a confidence and concrete hints. `explain_crash` now returns it as `classification`.
+- **Port-holder diagnosis** (`check_port`): when a port is busy, reports whether ANOTHER
+  ObserverLauncher instance holds it vs an unknown process, and suggests the next free port.
+- **PII scrub now covers IPv6** (and IPv4 octets are range-checked, so `999.1.1.1` is left alone),
+  while still leaving a log timestamp like `12:34:56` untouched. `select_instance` description warns
+  that it switches the user's GUI (prefer a per-call `instance:` or `get_instance_snapshot` to read).
+
+### Changed — polish
+- **MCP confirm dialog names the target instance.** The write/destroy confirmation now shows which
+  server the tool will act on (resolved before the dialog, not after), so a multi-instance user does
+  not have to read the raw JSON args to find out. New i18n key `mcp.targetInstance` (7 locales).
+- **`assemble_modpack` returns plan-level warnings** (Fabric API missing / proxy / Java) in its report,
+  the same helper `plan_modpack` uses, so the install result is self-contained.
+
+### Tests
+- New tests/mcp-modpack-plan.test.js (planner/conflict/warning helpers), tests/settings-secrets.test.js,
+  tests/server-properties.test.js (the `buildPropertiesContent` security choke point: in-place edits,
+  CRLF, newline-injection and prototype-pollution rejection). i18n dynamic-key coverage and the
+  metrics-tick assertion were verified already-present.
+
+### Notes
+- `detectServerCompat` (modpacks.js) is deliberately NOT merged with `detectSoftware`
+  (server-files.js): the former is finer (splits forge/neoforge + fabric/quilt) for modpack compat,
+  the latter returns the coarse group the UI wants. The `.mrpack` build path is already shared.
+- Deferred to 2.2.0: verify the Linux build on real hardware, the Electron 37 EOL upgrade, and
+  auto-update code-signing.
+
 ## [2.0.0] — 2026-09-23
 
 **Headline: multi-instance management.** Single-server -> manage N servers, each with

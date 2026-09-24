@@ -55,7 +55,9 @@ const readRaw = () => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
   ok('global key stays global (mcpEnabled)', raw.mcpEnabled === true);
   ok('global key stays global (locale)', raw.locale === 'vi');
   ok('global key stays global (playitPath)', raw.playitPath === '/opt/playit');
-  ok('global key stays global (curseforgeApiKey)', raw.curseforgeApiKey === 'K');
+  // B1 (v2.1.0): a secret is written with a prefix ('plain:' here since the test electron mock has
+  // no safeStorage keyring). The plaintext is preserved, just wrapped.
+  ok('global key stays global (curseforgeApiKey)', raw.curseforgeApiKey === 'plain:K');
   ok('flat view exposes active serverPath', s.serverPath === '/srv/survival');
   ok('flat view exposes memoryMax', s.memoryMax === 6);
   ok('flat view has no instances array', s.instances === undefined);

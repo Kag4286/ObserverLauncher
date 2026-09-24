@@ -53,14 +53,16 @@ function bridgeScriptPath() {
 
 // Ask the renderer to confirm a write/destroy tool. Resolves true/false. Times out to false
 // after 60s so a headless/closed window can never hang a tool call forever.
-function confirmOnGui(ctx, tool, args, risk) {
+function confirmOnGui(ctx, tool, args, risk, instanceName) {
   return new Promise(resolve => {
     let done = false;
     const finish = v => { if (!done) { done = true; resolve(!!v); } };
     const reqId = crypto.randomUUID();
     const timer = setTimeout(() => finish(false), 60000);
     if (typeof ctx.onMcpConfirm === 'function') {
-      ctx.onMcpConfirm({ reqId, tool, args, risk }, v => { clearTimeout(timer); finish(v); });
+      // instanceName lets the dialog show WHICH server the tool targets (a multi-instance user
+      // otherwise has to read the raw JSON args to find out). null when unresolved/single-instance.
+      ctx.onMcpConfirm({ reqId, tool, args, risk, instanceName }, v => { clearTimeout(timer); finish(v); });
     } else {
       clearTimeout(timer); finish(false);
     }
@@ -86,24 +88,30 @@ async function callTool(ctx, toolName, args, cfg) {
   // READ-ONLY MODE (1.2.0): let an AI explore freely with zero risk. write/destroy are refused
   // before any confirm dialog is even shown.
   if (cfg.readOnly && tool.risk !== 'read') return { ok: false, error: `Read-only mode is on - "${toolName}" (${tool.risk}) is blocked. A human can disable it in Settings > MCP.` };
+  // M11 + polish: resolve the target instance BEFORE any confirmation so the dialog can name it.
+  // An optional `instance` arg targets a specific instance; omitted -> the ACTIVE one (backward
+  // compatible). Unknown id -> a clear error. This is the ONE choke point for instance targeting.
+  let runId = ctx.activeInstanceId;
+  if (args && args.instance) {
+    const { resolveInstanceId } = require('../main/settings.js');
+    const resolved = resolveInstanceId(String(args.instance));
+    if (!resolved) return { ok: false, error: `Unknown instance "${args.instance}". Call list_instances for valid ids.` };
+    runId = resolved;
+  }
+  let instanceName = null;
+  try {
+    const { listInstances } = require('../main/settings.js');
+    const found = (listInstances().instances || []).find(i => i.id === runId);
+    instanceName = found ? found.name : null;
+  } catch {}
   if (tool.risk === 'write' && !cfg.autoAllowWrite) {
-    const yes = await confirmOnGui(ctx, toolName, args, 'write');
+    const yes = await confirmOnGui(ctx, toolName, args, 'write', instanceName);
     if (!yes) { auditLog(toolName, 'write', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (write tool).' }; }
   } else if (tool.risk === 'destroy') {
-    const yes = await confirmOnGui(ctx, toolName, args, 'destroy');
+    const yes = await confirmOnGui(ctx, toolName, args, 'destroy', instanceName);
     if (!yes) { auditLog(toolName, 'destroy', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (destructive tool).' }; }
   }
   try {
-    // M11: an optional `instance` arg targets a specific instance; omitted -> the ACTIVE one
-    // (fully backward compatible). Unknown id -> a clear error. This is the ONE choke point, so
-    // every server-scoped tool gains instance targeting without per-tool changes.
-    let runId = ctx.activeInstanceId;
-    if (args && args.instance) {
-      const { resolveInstanceId } = require('../main/settings.js');
-      const resolved = resolveInstanceId(String(args.instance));
-      if (!resolved) return { ok: false, error: `Unknown instance "${args.instance}". Call list_instances for valid ids.` };
-      runId = resolved;
-    }
     // M4b: run the handler inside AsyncLocalStorage for the target instance so per-instance ctx
     // accessors resolve to it, and an instance switch mid-await cannot leak across calls.
     const r = await ctx.runInInstance(runId, () => tool.handler(ctx, args || {}));

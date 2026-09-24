@@ -70,4 +70,70 @@ function capPlan(items, max) {
   return { items: list.slice(0, lim), trimmed: Math.max(0, list.length - lim) };
 }
 
-module.exports = { folderForKind, itemCompat, dedupeById, capPlan, LOADER_FAMILY };
+// Item-vs-ITEM conflict detection for a plan (A3). The per-item itemCompat() only compares an
+// item against the SERVER; two items can still clash with each other (same project twice at
+// different versions, two files landing on the same path, or a Modrinth 'incompatible' relation).
+// Pure so it is unit-testable. Returns { conflicts: [{ code, a, b, detail }] }.
+function planConflicts(items) {
+  const list = items || [];
+  const conflicts = [];
+  // (1) same (source, id) resolved to two different versions.
+  const byKey = new Map();
+  for (const it of list) {
+    const key = (it.source || 'modrinth') + ':' + String(it.id || '');
+    const prev = byKey.get(key);
+    if (prev && prev.version && it.version && prev.version !== it.version) {
+      conflicts.push({ code: 'duplicate-version', a: prev.id, b: it.id, detail: `${key} planned at both ${prev.version} and ${it.version}` });
+    }
+    if (!prev) byKey.set(key, it);
+  }
+  // (2) two different projects writing the SAME file (folder + filename) - one overwrites the other.
+  const byFile = new Map();
+  for (const it of list) {
+    if (!it.filename) continue;
+    const fileKey = String(it.folder || '') + '/' + String(it.filename).toLowerCase();
+    const prev = byFile.get(fileKey);
+    if (prev && ((prev.source || 'modrinth') + ':' + prev.id) !== ((it.source || 'modrinth') + ':' + it.id)) {
+      conflicts.push({ code: 'duplicate-file', a: prev.id, b: it.id, detail: `${fileKey} would be written by two projects` });
+    }
+    if (!prev) byFile.set(fileKey, it);
+  }
+  // (3) Modrinth relationType 'incompatible' surfaced earlier as a warning on the entry.
+  for (const it of list) {
+    if (Array.isArray(it.warnings) && it.warnings.includes('incompatible')) {
+      conflicts.push({ code: 'incompatible', a: it.id, b: null, detail: `${(it.source || 'modrinth') + ':' + it.id} declares an incompatible relation` });
+    }
+  }
+  return { conflicts };
+}
+
+// Plan-LEVEL warnings that need the whole list (A5). itemCompat stays item-vs-server; this looks
+// across the plan + a couple of server facts the caller passes in. Pure. Returns { warnings: [] }
+// with stable codes.
+//   opts: { hasProxy?: boolean, serverJava?: number|null }
+function planWarnings(items, server, opts) {
+  const list = items || [];
+  const o = opts || {};
+  const srv = server || {};
+  const warnings = [];
+  const isModLike = it => ['mod', 'forge', 'fabric', 'neoforge'].includes(it.kind);
+  // (a) Fabric/Quilt server with mods but no Fabric API in the plan -> many mods silently no-op.
+  if (['fabric', 'quilt'].includes(srv.loader)) {
+    const mods = list.filter(isModLike);
+    const hasApi = list.some(it => /fabric[-_ ]?api/i.test(String(it.id || '') + ' ' + String(it.title || '') + ' ' + String(it.filename || '')));
+    if (mods.length && !hasApi) warnings.push({ code: 'fabricApiMissing', detail: 'Fabric/Quilt server has mods but no Fabric API in the plan.' });
+  }
+  // (b) A proxy (Velocity/Bungee) does not load server mods itself - those belong on the backend.
+  if (o.hasProxy && list.some(isModLike)) warnings.push({ code: 'proxy', detail: 'A proxy config was found; server mods install on the backend server, not the proxy.' });
+  // (c) Java requirement per item, only when both the registry field and server Java are known.
+  if (Number.isInteger(o.serverJava)) {
+    for (const it of list) {
+      if (Number.isInteger(it.javaRequired) && it.javaRequired > o.serverJava) {
+        warnings.push({ code: 'java', detail: `${(it.source || 'modrinth') + ':' + it.id} needs Java ${it.javaRequired}+, server has ${o.serverJava}.` });
+      }
+    }
+  }
+  return { warnings };
+}
+
+module.exports = { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, LOADER_FAMILY };

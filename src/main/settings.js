@@ -17,6 +17,13 @@ function defaultMemoryGB() {
   return { min, max };
 }
 const { migrate, latestVersion, PER_INSTANCE_KEYS } = require('./migrations.js');
+const { wrapStore, unwrapStore } = require('./secrets.js');
+
+// B1 (v2.1.0): Electron safeStorage for secrets at rest. Lazily required so tests (which mock
+// 'electron' without safeStorage) get null and values stay plaintext, unchanged from before.
+function getSafeStorage() {
+  try { const { safeStorage } = require('electron'); return safeStorage || null; } catch { return null; }
+}
 
 // Per-instance defaults for the FLAT view. Used when there is no instance at all
 // (fresh install / last instance deleted) so callers still read a usable memoryMax
@@ -87,7 +94,7 @@ function nestInstances(flat) {
 
 // Raw read (no migration, no flatten) — internal use only.
 function loadSettingsRaw() {
-  try { return JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); } catch { return {}; }
+  try { return unwrapStore(JSON.parse(fs.readFileSync(settingsPath(), 'utf8')), getSafeStorage()); } catch { return {}; }
 }
 
 // The id of the ACTIVE instance (v4+ stores). flattenActive() strips
@@ -108,7 +115,7 @@ function getActiveInstanceId() {
 function loadSettingsStore() {
   let raw;
   try {
-    raw = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
+    raw = unwrapStore(JSON.parse(fs.readFileSync(settingsPath(), 'utf8')), getSafeStorage());
   } catch {
     // No file yet (first run) or unreadable JSON -> defaults. Nothing to lose here.
     return defaultGlobal();
@@ -238,7 +245,8 @@ function saveSettings(settings) {
   const nested = Array.isArray(settings.instances)
     ? { ...settings, version: latestVersion }
     : nestInstances(settings);
-  writeFileAtomic(settingsPath(), JSON.stringify({ ...nested, version: latestVersion }, null, 2));
+  const encrypted = wrapStore({ ...nested, version: latestVersion }, getSafeStorage());
+  writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
 // M12 (MCP fix): write the flat per-instance view into a SPECIFIC instance, not the active one.
@@ -261,7 +269,8 @@ function saveSettingsFor(instanceId, flat) {
   delete out.activeInstanceId;
   out.instances = next;
   out.activeInstanceId = raw.activeInstanceId || next[0].id;
-  writeFileAtomic(settingsPath(), JSON.stringify({ ...out, version: latestVersion }, null, 2));
+  const encrypted = wrapStore({ ...out, version: latestVersion }, getSafeStorage());
+  writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
 module.exports = { settingsPath, backupPathV3, defaultMemoryGB, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, removeInstance };

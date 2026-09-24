@@ -19,12 +19,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-2.0.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-2.0.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-2.1.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-2.1.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-2.0.0.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-2.1.0.AppImage`, then run it. No root needed.
 
 From source:
 
@@ -156,11 +156,11 @@ Plugins, players, backups and the world map are optional.
 - Java detection is per instance, so servers needing different Java versions can run at the same time.
 
 ### MCP / AI integration
-- Acts as an MCP server so an AI client can read and control the server in natural language (60 tools). See [MCP / AI integration](#mcp--ai-integration).
+- Acts as an MCP server so an AI client can read and control the server in natural language (66 tools). See [MCP / AI integration](#mcp--ai-integration).
 
 ## MCP / AI integration
 
-ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 60 tools.
+ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 66 tools.
 
 **Modpack builder.** The AI can search the marketplace, then `plan_modpack` turns candidates into an install plan with exact versions, per-item compatibility warnings, and required Modrinth dependencies. After you approve it, `assemble_modpack` installs the list in one confirmation and reports each item. The AI only picks ids; versions, URLs and hashes are resolved by the app from the registry.
 

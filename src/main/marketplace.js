@@ -80,10 +80,10 @@ async function searchMarket(opts) {
 // BOTH support Modrinth + Hangar + Spigot and the version/loader picking never drifts. Throws on
 // failure. Returns { url, filename, source }.
 async function resolveMarketDownload(item) {
-  const kind = ['forge', 'fabric', 'datapack', 'mod'].includes(item.kind) ? item.kind : 'plugin';
+  const kind = ['forge', 'fabric', 'datapack', 'mod', 'modpack'].includes(item.kind) ? item.kind : 'plugin';
   if (item.source === 'modrinth' || !item.source) {
     const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
-    const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'] }[kind];
+    const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
     const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
     let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
     if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
@@ -93,7 +93,7 @@ async function resolveMarketDownload(item) {
     // can check compatibility and follow required dependencies WITHOUT re-fetching or duplicating
     // the version-picking logic here.
     return {
-      url: f.url, filename: f.filename, source: 'modrinth',
+      url: f.url, filename: f.filename, source: 'modrinth', size: f.size || 0,
       versionNumber: target.version_number || null,
       gameVersions: target.game_versions || [],
       loaders: target.loaders || [],
@@ -106,7 +106,7 @@ async function resolveMarketDownload(item) {
     const target = (versions.result || []).find(v => v.downloads?.PAPER?.downloadUrl);
     const file = target?.downloads?.PAPER;
     if (!file) throw new Error('No Paper download was found for this Hangar project.');
-    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar' };
+    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0 };
   }
   if (item.source === 'spigot') {
     const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
@@ -123,7 +123,7 @@ async function resolveMarketDownload(item) {
     const inst = cf.cfFileInstallable(file);
     if (!inst.ok) { const e = new Error('blocked'); e.code = 'blocked'; throw e; }
     // dependencies: mapped best-effort (CF has no official relationType table — see cfDependencies).
-    return { url: inst.url, filename: file.fileName, source: 'curseforge', versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
+    return { url: inst.url, filename: file.fileName, source: 'curseforge', size: file.fileLength || 0, versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
   }
   throw new Error('Unsupported marketplace source.');
 }
@@ -231,4 +231,31 @@ function registerMarketplace(ipcMain, ctx) {
   });
 }
 
-module.exports = { registerMarketplace, searchMarket, resolveMarketDownload };
+// A2 (v2.1.0): version list for a project from the SAME sources search uses, so an AI can pick an
+// exact versionId before install. Modrinth has a rich version list; Hangar + CurseForge are mapped
+// to the same { id, number, gameVersions, loaders, date } shape. Caller is responsible for try/catch.
+async function listMarketVersions(opts) {
+  const item = opts || {};
+  const id = String(item.id || '');
+  if (!id) throw new Error('id is required.');
+  const source = ['modrinth', 'hangar', 'curseforge'].includes(item.source) ? item.source : 'modrinth';
+  if (source === 'modrinth') {
+    const r = await json('https://api.modrinth.com/v2/project/' + encodeURIComponent(id) + '/version');
+    return (r || []).map(v => ({ id: v.id, number: v.version_number, gameVersions: v.game_versions || [], loaders: v.loaders || [], date: v.date_published, size: (v.files || []).find(f => f.primary)?.size || (v.files || [])[0]?.size || 0 }));
+  }
+  if (source === 'hangar') {
+    const [owner, slug] = String(id).split('/');
+    if (!owner || !slug) throw new Error('Hangar id must be owner/slug.');
+    const data = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=25`);
+    return (data.result || []).map(v => ({ id: v.name, number: v.name, gameVersions: v.platformDependencies?.PAPER ? [v.platformDependencies.PAPER] : [], loaders: ['paper'], date: v.createdAt || null }));
+  }
+  // curseforge
+  const headers = cfHeaders();
+  if (!headers) { const e = new Error('CurseForge API key not set. Add your own key in Settings.'); e.code = 'noKey'; throw e; }
+  const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(id)}/files?pageSize=50`, headers);
+  const versions = (files.data || []).map(cf.mapCfFileToVersion).filter(Boolean);
+  versions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  return versions;
+}
+
+module.exports = { registerMarketplace, searchMarket, resolveMarketDownload, listMarketVersions };

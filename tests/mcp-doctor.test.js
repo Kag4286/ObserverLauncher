@@ -98,6 +98,14 @@ ck('scrubPII masks IPv4', doctor.scrubPII('connect 192.168.1.10:25565') === 'con
 ck('scrubPII masks email', doctor.scrubPII('mail me at a.b@example.com') === 'mail me at [email]');
 ck('scrubPII null-safe', doctor.scrubPII(null) === '');
 ck('scrubPII leaves normal text', doctor.scrubPII('Done (1.2s)!') === 'Done (1.2s)!');
+// P3 (v2.1.0): IPv6 coverage + IPv4 range check + timestamp safety.
+ck('scrubPII masks IPv6 full form', doctor.scrubPII('2001:0db8:85a3:0000:0000:8a2e:0370:7334') === '[ip]');
+ck('scrubPII masks IPv6 compressed', doctor.scrubPII('fe80::1c2b:3d4e:5f60:7a8b') === '[ip]');
+ck('scrubPII leaves a log timestamp alone', doctor.scrubPII('[12:34:56] done') === '[12:34:56] done');
+ck('scrubPII leaves short clock alone', doctor.scrubPII('at 10:30 ok') === 'at 10:30 ok');
+ck('scrubPII leaves invalid IPv4 (999.x) alone', doctor.scrubPII('999.1.1.1') === '999.1.1.1');
+ck('scrubPII still masks a real IPv4', doctor.scrubPII('host 192.168.1.10 up') === 'host [ip] up');
+ck('scrubPII masks IPv4 + IPv6 together', doctor.scrubPII('a 10.0.0.1 b ::1 c') === 'a [ip] b [ip] c');
 // A huge line is capped at REGEX_MAX_LINE so a regex cannot scan an unbounded string.
 const huge = { text: 'X'.repeat(doctor.REGEX_MAX_LINE + 5000) + ' OutOfMemoryError', type: 'error' };
 const hugeAn = doctor.analyzeConsoleLines([huge]);
@@ -107,6 +115,19 @@ const many = Array.from({ length: 5000 }, () => ({ text: 'Caused by: x at net.Fo
 const t0 = Date.now();
 const capped = doctor.analyzeConsoleLines(many, { budgetMs: 0 });
 ck('analyze budget stops early', capped.timedOut === true && (Date.now() - t0) < 2000);
+
+// ---- classifyCrash (C1) ----
+ck('OOM -> out-of-memory high', doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space').category === 'out-of-memory' && doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space').confidence === 'high');
+ck('UnsupportedClassVersion -> java-version', doctor.classifyCrash('java.lang.UnsupportedClassVersionError: class file version 65.0').category === 'java-version');
+ck('mixin error -> mixin-conflict', doctor.classifyCrash('org.spongepowered.asm.mixin.MixinApplyError: Mixin failed to apply').category === 'mixin-conflict');
+ck('Missing deps -> mod-dependency', doctor.classifyCrash('Missing or unsupported mandatory dependencies: mod x requires y').category === 'mod-dependency');
+ck('NoClassDefFoundError -> mod-dependency medium', doctor.classifyCrash('java.lang.NoClassDefFoundError: net/foo/Bar').category === 'mod-dependency' && doctor.classifyCrash('java.lang.NoClassDefFoundError: net/foo/Bar').confidence === 'medium');
+ck('BindException -> port-conflict', doctor.classifyCrash('java.net.BindException: Address already in use').category === 'port-conflict');
+ck('zip header -> corrupt-jar', doctor.classifyCrash('java.util.zip.ZipException: zip END header not found').category === 'corrupt-jar');
+ck('generic text -> unknown low', doctor.classifyCrash('everything is fine').category === 'unknown' && doctor.classifyCrash('everything is fine').confidence === 'low');
+ck('classifyCrash null-safe', doctor.classifyCrash(null).category === 'unknown');
+ck('every category has hints', doctor.classifyCrash('OutOfMemoryError').hints.length > 0);
+ck('priority: OOM beats generic', doctor.classifyCrash('OutOfMemoryError ... at net.Foo(Foo.java:1)').category === 'out-of-memory');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -30,12 +30,22 @@ const REGEX_MAX_LINE = 4000;
 const ANALYZE_BUDGET_MS = 250;
 
 // Item 17 (Phase C): PII scrub. Before console/log text goes to an AI client (MCP) or an exported
-// file it may be shared publicly, strip IPv4 addresses and e-mail addresses. Best-effort: a plain
-// textual substitution, no attempt to keep loopback/private addresses (the goal is 'share safely').
+// file it may be shared publicly, strip IPv4 + IPv6 addresses and e-mail addresses. Best-effort: a
+// plain textual substitution, no attempt to keep loopback/private addresses (goal is 'share safely').
 const PII_EMAIL = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
-const PII_IPV4 = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+// Octets are range-checked (0-255), so 999.1.1.1 is NOT scrubbed as an IP - it is not one.
+const PII_IPV4 = /\b(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\b/g;
+// IPv6: full form needs >=3 colons, so a log timestamp (12:34:56, two colons) is NOT matched.
+// Compressed forms (with ::) need at least one hex group, so a bare '::' is left alone.
+// Lookarounds (not \b) on the edges: ':' is a non-word char, so \b fails around '::1'. The
+// negative lookbehind also stops a match starting mid-address, and the lookahead stops it ending
+// mid-hex.
+const PII_IPV6 = /(?<![\w:])(?:[A-Fa-f0-9]{1,4}:){3,7}[A-Fa-f0-9]{1,4}(?![\w:])|(?<![\w:])(?:[A-Fa-f0-9]{1,4}:){1,7}:(?:[A-Fa-f0-9]{1,4}(?::[A-Fa-f0-9]{1,4})*)?(?![\w:])|(?<![\w:.])::(?:[A-Fa-f0-9]{1,4}(?::[A-Fa-f0-9]{1,4})*)(?![\w:])/g;
 function scrubPII(text) {
-  return String(text == null ? '' : text).replace(PII_EMAIL, '[email]').replace(PII_IPV4, '[ip]');
+  return String(text == null ? '' : text)
+    .replace(PII_EMAIL, '[email]')
+    .replace(PII_IPV6, '[ip]')
+    .replace(PII_IPV4, '[ip]');
 }
 
 // Strip volatile numbers so 100 stack-trace lines with different line numbers collapse to one key.
@@ -94,6 +104,37 @@ function summarizeCrashText(text) {
     }
   }
   return out;
+}
+// C1 (v2.1.0): classify a crash report into a category an AI can act on. Rule-based (no ML), so it
+// is deterministic and testable. Returns { category, confidence, hints }. The rules run in priority
+// order - the FIRST match wins because e.g. an OutOfMemoryError is more specific than a generic
+// 'Exception'. 'unknown' means the text did not match a known signature; the AI should fall back to
+// summarizeCrashText + read_server_log.
+const CRASH_RULES = [
+  { category: 'out-of-memory', re: /OutOfMemoryError|Java heap space|GC overhead limit exceeded|insufficient memory/i,
+    hints: ['Lower view-distance / simulation-distance.', 'Remove heavy mods/plugins.', 'Raise memoryMax in the instance settings (if the host has RAM).'] },
+  { category: 'java-version', re: /UnsupportedClassVersionError|class file version|requires Java (\d+)|has been compiled by a more recent version/i,
+    hints: ['The server jar needs a newer (or older) Java than the instance uses.', 'Check the required Java version for this MC version; set javaPath / install the right JRE.'] },
+  { category: 'mixin-conflict', re: /MixinApplyError|MixinTransformerError|mixin.*(conflict|failed to apply)|InvalidMixinException/i,
+    hints: ['Two mods patch the same class.', 'Remove or update one of the conflicting mods (check the crash report mod list).'] },
+  { category: 'mod-dependency', re: /Missing or unsupported mandatory dependencies|requires (\w[\w-]+) (\d|\(|@)|NoClassDefFoundError|ModResolutionException/i,
+    hints: ['A required dependency (or a matching version) is missing.', 'Install the missing mod/dependency, or update the mod that needs it.'] },
+  { category: 'port-conflict', re: /Address already in use|BindException|failed to bind|Perhaps a server is already running on that port/i,
+    hints: ['Another process holds the server port.', 'Stop the other server, or change server-port in server.properties.'] },
+  { category: 'corrupt-jar', re: /invalid LOC header|zip END header not found|error in opening zip file|invalid CEN header|Corrupt/i,
+    hints: ['A downloaded jar is truncated/corrupt.', 'Delete the file and re-install it (re-download).'] },
+];
+function classifyCrash(text) {
+  const s = String(text || '');
+  for (const rule of CRASH_RULES) {
+    const m = s.match(rule.re);
+    if (m) {
+      // Confidence: a dedicated marker (OOM / mixin / bind) is high; a broad token (NoClassDefFoundError) is medium.
+      const strong = ['out-of-memory', 'mixin-conflict', 'port-conflict', 'corrupt-jar', 'java-version'].includes(rule.category);
+      return { category: rule.category, confidence: strong ? 'high' : 'medium', hints: rule.hints };
+    }
+  }
+  return { category: 'unknown', confidence: 'low', hints: ['No known crash signature matched. Read the crash report and the server log for the first real cause.'] };
 }
 // Pick the newest crash report file in <root>/crash-reports (or null).
 function latestCrashReport(root) {
@@ -242,4 +283,5 @@ module.exports = {
   validateProperties,
   checkPortFree,
   diagnoseFromData,
+  classifyCrash,
 };
