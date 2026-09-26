@@ -7,6 +7,7 @@ const { serverFiles } = require('./server-files.js');
 const { safeTarget, recordManifestEntry } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
 const cf = require('./curseforge.js');
+const { normalizeEnv } = require('./mod-metadata.js');
 
 // CurseForge needs the user's own API key (ToS forbids sharing one). Returns the header object, or
 // null when no key is set — callers then treat CurseForge as unavailable rather than erroring.
@@ -18,14 +19,17 @@ function cfHeaders() {
 // Pure marketplace search shared by the IPC handler (GUI) and the MCP search_marketplace tool, so
 // both support the same three sources and never drift. Caller is responsible for try/catch.
 async function searchMarket(opts) {
-  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0 } = opts || {};
+  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0, loader = '' } = opts || {};
   const skip = Math.max(0, Number(offset) || 0);
   if (source === 'modrinth') {
+    // 2.3.0: an explicit `loader` (neoforge|forge|fabric|quilt) pins the search to that loader
+    // instead of the loose kind-group (which returned Forge builds for a NeoForge server).
     const loaderGroups = {
       plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
       forge: ['loaders:forge', 'loaders:neoforge'],
       fabric: ['loaders:fabric', 'loaders:quilt'],
     };
+    const explicit = ['neoforge', 'forge', 'fabric', 'quilt'].includes(loader) ? [`loaders:${loader}`] : null;
     const index = sort === 'latest' ? 'newest' : sort === 'downloads' ? 'downloads' : 'relevance';
     let lastTotal = null;
     const runSearch = async filters => {
@@ -49,7 +53,9 @@ async function searchMarket(opts) {
       if (!hits.length && skip === 0 && version) { hits = await runSearch([['project_type:mod'], loaderGroup]); if (hits.length) relaxed = 'version'; }
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod']]); if (hits.length) relaxed = 'loader'; }
     }
-    return { ok: true, relaxed, total: lastTotal, items: hits.map(x => ({ source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: x.env || null, loaders: x.loaders || [], date: x.date_created || null })) };
+    // BUGFIX (v2.3.0): Modrinth search does NOT return `env` — it returns client_side/server_side
+    // ('required'|'optional'|'unsupported'). Map them to our 4-bucket env so the field is populated.
+    return { ok: true, relaxed, total: lastTotal, items: hits.map(x => ({ source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: normalizeEnv({ client: x.client_side, server: x.server_side }), loaders: x.loaders || [], date: x.date_created || null })) };
   }
   if (source === 'hangar') {
     const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updatedAt' : '-stars';
@@ -201,7 +207,7 @@ function registerMarketplace(ipcMain, ctx) {
       const dest = path.join(destDir, path.basename(filename));
       // A single plugin/mod jar is normally well under 100 MB; cap at 512 MB.
       await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }), null, { maxBytes: 512 * 1024 * 1024 });
-      recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, installedAt: new Date().toISOString() });
+      recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, env: item.env || undefined, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
     } catch (error) {
       // A CurseForge project whose author disabled third-party distribution returns no download URL.

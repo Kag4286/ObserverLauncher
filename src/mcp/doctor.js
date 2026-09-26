@@ -269,6 +269,37 @@ function diagnoseFromData(d) {
   return { healthy, checks };
 }
 
+// 2.3.0: scan a server log (latest.log) for the SPECIFIC dependency / loader-skip lines a
+// crash-report header often omits. Fabric/NeoForge log e.g.
+//   "Missing or unsupported mandatory dependencies:"
+//   "\tMod ID: 'fzzy_config', Requested by: 'particle_core'"
+//   "Skipping jar ... because it is for Minecraft Forge"
+// Pure: takes the log text, returns { missingDeps:[{modId, requestedBy}], skippedJars:[...] }.
+function scanLogForMissingDeps(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const missingDeps = [];
+  const skippedJars = [];
+  let inBlock = false;
+  for (const raw of lines) {
+    const line = raw.replace(/§./g, '').replace(/\u001b\[[0-9;]*m/g, '').trim();
+    if (/Missing or unsupported mandatory dependencies/i.test(line)) { inBlock = true; continue; }
+    if (inBlock) {
+      // "Mod ID: 'x', Requested by: 'y'" (NeoForge/Forge)
+      const m = line.match(/Mod ID:\s*['"]([^'"]+)['"]\s*,\s*Requested by:\s*['"]([^'"]+)['"]/i);
+      if (m) { missingDeps.push({ modId: m[1], requestedBy: m[2] }); continue; }
+      // Fabric: "- Mod 'x' (y) is missing" / "requires any version of x"
+      const fm = line.match(/^[-*]?\s*Mod\s+['"]([^'"]+)['"]/i) || line.match(/requires .* of ([\w.-]+)/i);
+      if (fm) { missingDeps.push({ modId: fm[1], requestedBy: null }); continue; }
+      // End of the block when a blank line or a non-indented new section starts.
+      if (!line || (!/^[-*\t]/.test(raw) && missingDeps.length && !/dependencies?/i.test(line))) { inBlock = false; }
+    }
+    // Loader mismatch: "Skipping jar X because it is for Minecraft Forge" / "is for Fabric".
+    const sk = line.match(/Skipping (?:jar )?([^\s]+).*?is for (?:Minecraft )?(Forge|NeoForge|Fabric|Quilt)/i);
+    if (sk) skippedJars.push({ jar: sk[1], forLoader: sk[2] });
+  }
+  return { missingDeps, skippedJars };
+}
+
 module.exports = {
   CONSOLE_RULES,
   signatureOf,
@@ -284,4 +315,5 @@ module.exports = {
   checkPortFree,
   diagnoseFromData,
   classifyCrash,
+  scanLogForMissingDeps,
 };

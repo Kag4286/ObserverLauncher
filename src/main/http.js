@@ -2,8 +2,9 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 
 function withTimeout(ms) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), ms); return { signal: controller.signal, cancel: () => clearTimeout(timer) }; }
-async function json(url, extraHeaders, method, body) {
-  const { signal, cancel } = withTimeout(15000);
+async function json(url, extraHeaders, method, body, timeoutMs) {
+  // 2.3.0: default raised 15s -> 25s (registry searches timed out when several ran in parallel).
+  const { signal, cancel } = withTimeout(Number(timeoutMs) > 0 ? Number(timeoutMs) : 25000);
   try {
     const headers = { 'User-Agent': 'ObserverLauncher/0.2 (local Minecraft server launcher)', 'Accept': 'application/json', ...(extraHeaders || {}) };
     const opts = { signal, headers };
@@ -11,7 +12,7 @@ async function json(url, extraHeaders, method, body) {
     const r = await fetch(url, opts);
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     return await r.json();
-  } catch (error) { throw error.name === 'AbortError' ? new Error('Request timed out after 15s — check your internet connection.') : error; }
+  } catch (error) { throw error.name === 'AbortError' ? new Error('Request timed out — check your internet connection.') : error; }
   finally { cancel(); }
 }
 // BUGFIX (downloads died on a brief network hiccup): the old download used ONE fetch with a

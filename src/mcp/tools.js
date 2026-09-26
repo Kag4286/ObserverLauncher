@@ -17,7 +17,10 @@ const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
 const { importMrpackFromPath, detectServerCompat } = require('../main/modpacks.js');
 const { searchMarket, resolveMarketDownload, listMarketVersions } = require('../main/marketplace.js');
-const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings } = require('./modpack-plan.js');
+const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY } = require('./modpack-plan.js');
+const { detectServerTarget, versionMatchesServer } = require('../main/server-compat.js');
+const { openJar } = require('../main/jar-read.js');
+const { classifyJar } = require('../main/mod-metadata.js');
 
 const ok = r => (r && typeof r === 'object' && 'ok' in r) ? r : { ok: true, result: r };
 const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server folder selected.'); return ctx.currentServerPath; };
@@ -83,8 +86,91 @@ async function tSearchFiles(ctx, a) {
   return { ok: true, result: { query: q, hits, scannedFiles: i, truncated: scanned >= MAX_SCAN_BYTES } };
 }
 async function tListContent(ctx) {
-  const f = serverFiles(needPath(ctx));
-  return { ok: true, result: { plugins: f.plugins || [], mods: f.mods || [], datapacks: f.datapacks || [], datapackFolder: f.datapackFolder || null } };
+  const root = needPath(ctx);
+  const f = serverFiles(root);
+  // 2.3.0: flag jars whose declared loader does not match the server (e.g. a stray Forge jar in a
+  // NeoForge mods/ folder) so the AI/user sees the mismatch here instead of in a crash report.
+  const server = detectServerTarget(root, f);
+  // env source #2 (v2.3.0): a NeoForge/Forge jar has NO static side field, so fall back to the
+  // env recorded in observerlauncher-manifest.json when the mod was installed via the Marketplace
+  // (Modrinth knows client/server side). Keyed by lowercase fileName.
+  const manifestEnv = {};
+  try { for (const e of readJsonList(root, 'observerlauncher-manifest.json')) { if (e && e.fileName && e.env) manifestEnv[String(e.fileName).toLowerCase()] = e.env; } } catch {}
+  const flagJars = (names, folder) => (names || []).map(name => {
+    const row = { name };
+    try {
+      const jar = openJar(path.join(root, folder, name));
+      const cls = classifyJar(jar.read, name);
+      if (cls.loader) row.loader = cls.loader;
+      // Priority: authoritative env (Fabric metadata) > Modrinth env from the install manifest >
+      // weak jar hint (displayTest). A hint-only value is marked so callers know it may be wrong.
+      let env = cls.env || manifestEnv[String(name).toLowerCase()] || null;
+      let envSource = cls.env ? 'metadata' : (manifestEnv[String(name).toLowerCase()] ? 'modrinth' : null);
+      if (!env && cls.envHint) { env = cls.envHint; envSource = 'hint'; }
+      if (env) { row.env = env; row.serverUsable = env !== 'client-only'; if (envSource) row.envSource = envSource; }
+      // Only flag a mismatch when the loader came from real metadata (not a filename guess).
+      if (cls.loader && !cls.loaderGuessed && server.loader && LOADER_FAMILY[server.loader] && !LOADER_FAMILY[server.loader].includes(cls.loader)) row.loaderMismatch = true;
+    } catch { /* unreadable jar -> leave unannotated */ }
+    return row;
+  });
+  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, plugins: f.plugins || [], mods: flagJars(f.mods, 'mods'), datapacks: f.datapacks || [], datapackFolder: f.datapackFolder || null } };
+}
+// 2.3.0: pre-start compatibility scan of mods/ + plugins/. Reports loader mismatches, missing
+// required dependencies (from each jar's own metadata), and client-only mods. Read-only.
+async function tCheckModCompat(ctx) {
+  const root = needPath(ctx);
+  const f = serverFiles(root);
+  const server = detectServerTarget(root, f);
+  const families = LOADER_FAMILY[server.loader] || [];
+  const jarIssues = [];
+  const present = new Set();
+  // env fallback from the install manifest (NeoForge jars carry no static side field).
+  const manifestEnv = {};
+  try { for (const e of readJsonList(root, 'observerlauncher-manifest.json')) { if (e && e.fileName && e.env) manifestEnv[String(e.fileName).toLowerCase()] = e.env; } } catch {}
+  // First pass: collect every mod id present (so deps can resolve against each other).
+  const metas = [];
+  for (const name of f.mods || []) {
+    const cls = classifyJar(openJar(path.join(root, 'mods', name)).read, name);
+    if (!cls.env) cls.env = manifestEnv[String(name).toLowerCase()] || cls.envHint || null;
+    metas.push({ name, cls });
+    if (cls.modId) present.add(String(cls.modId).toLowerCase());
+  }
+  const declared = [];
+  for (const m of metas) {
+    const row = { name: m.name, loader: m.cls.loader || null, modId: m.cls.modId || null };
+    if (m.cls.loader && !m.cls.loaderGuessed && families.length && !families.includes(m.cls.loader)) { row.problem = 'loader-mismatch'; row.detail = `declares ${m.cls.loader}, server is ${server.loader}`; }
+    if (m.cls.env === 'client-only') { row.problem = row.problem || 'client-only'; row.detail = row.detail || 'client-only mod (no server effect)'; }
+    // Collect ALL declared deps (required AND incompatible) so both checks can use them.
+    for (const d of m.cls.dependencies || []) { declared.push({ from: m.cls.modId || m.name, modId: d.modId, mandatory: !!d.mandatory, optional: !!d.optional, incompatible: !!d.incompatible, reason: d.reason || null, versionRange: d.versionRange }); }
+    jarIssues.push(row);
+  }
+  const missing = missingDependencies(declared, present);
+  // v2.3.1: a declared `type="incompatible"` dep that IS present is a CONFLICT, not a missing dep.
+  const conflicts = conflictingDependencies(declared, present);
+  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, modsScanned: metas.length, issues: jarIssues.filter(r => r.problem), missingDeps: missing, conflicts, ok: jarIssues.every(r => !r.problem) && missing.length === 0 && conflicts.length === 0 } };
+}
+// 2.3.0: dedicated crash-report reader (path confined to crash-reports/) so the AI does not have to
+// route through the general file reader, which is rooted at the project, not the server folder.
+async function tReadCrashReport(ctx, a) {
+  const root = needPath(ctx);
+  const name = String(a.name || '');
+  let pick = name ? doctor.resolveCrashReport(root, name) : null;
+  if (name && !pick) return { ok: false, error: 'Crash report not found: ' + name };
+  if (!pick) { const latest = doctor.latestCrashReport(root); if (!latest) return { ok: true, result: { found: false } }; pick = latest.file; }
+  let text = '';
+  try { text = fs.readFileSync(pick, 'utf8'); } catch (e) { return { ok: false, error: 'Could not read: ' + (e.code || e.message) }; }
+  const summary = doctor.summarizeCrashText(text);
+  let classification = doctor.classifyCrash(text);
+  // BUGFIX (v2.3.1): an FML crash-report often says "<No associated exception found>" while the
+  // real cause (missing dependency / wrong-loader jar) is only in logs/latest.log. Always scan the
+  // log tail and merge it in; raise confidence when we find concrete entries.
+  let fromLog = { missingDeps: [], skippedJars: [] };
+  try { const tail = doctor.tailLogFile(root, { lines: 500 }); if (tail.ok) fromLog = doctor.scanLogForMissingDeps((tail.lines || []).join('\n')); } catch {}
+  if (fromLog.missingDeps.length || fromLog.skippedJars.length) {
+    classification = { category: fromLog.missingDeps.length ? 'mod-dependency' : 'loader-mismatch', confidence: 'high', hints: fromLog.missingDeps.length ? ['Install the missing dependency mod(s) listed in missingDeps, then restart.'] : ['Remove the listed jars that are for a different loader.'] };
+  }
+  const missing = fromLog.missingDeps.map(d => d.modId);
+  return { ok: true, result: { found: true, file: path.basename(pick), classification, missing, fromLog, ...summary } };
 }
 async function tGetProperties(ctx) {
   return { ok: true, result: serverFiles(needPath(ctx)).properties || {} };
@@ -123,8 +209,9 @@ async function tSearchMarketplace(ctx, a) {
   const version = a.version || '';
   const sort = a.sort || 'downloads';
   const offset = Number(a.offset) || 0;
+  const loader = String(a.loader || '');
   try {
-    return { ok: true, result: await searchMarket({ source, kind, query, version, sort, offset }) };
+    return { ok: true, result: await searchMarket({ source, kind, query, version, sort, offset, loader }) };
   } catch (e) { return { ok: false, error: e?.message || 'Search failed.' }; }
 }
 async function tListMarketVersions(ctx, a) {
@@ -281,7 +368,7 @@ async function tInstallFromMarket(ctx, a) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   // A single plugin/mod jar from the market; cap at 512 MB (mirrors the GUI install path).
   await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
-  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, installedAt: new Date().toISOString() }); } catch {}
+  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, env: item.env || undefined, installedAt: new Date().toISOString() }); } catch {}
   return { ok: true, result: { name: dl.filename, files: serverFiles(root) } };
 }
 async function tInstallLocalJar(ctx, a) {
@@ -358,13 +445,17 @@ async function tPlanModpack(ctx, a) {
   const max = Math.max(1, Math.min(100, Number(a.max) || 50));
   const resolveDeps = a.resolveDeps !== false;
   const props = serverFiles(root).properties || {};
-  const server = detectServerCompat(serverFiles(root));
+  // A8 (v2.3.0): detect the target from libraries/ too, so a jar-less NeoForge/Forge server is not
+  // misread as vanilla (which made the loader filter below a no-op).
+  const server = detectServerTarget(root, serverFiles(root));
   const seed = dedupeById(input.map(normalizePlanItem).filter(it => it.id));
   const { items: capped } = capPlan(seed, max);
   const seen = new Set(capped.map(it => it.source + ':' + it.id));
   const queue = [...capped];
   const plan = [];
+  const rejected = [];
   const problems = [];
+  const dlByKey = new Map(); // source:id -> resolved download (for the A9 jar inspection below)
   let depth = 0;
   while (queue.length && plan.length < max) {
     const batch = queue.splice(0, queue.length);
@@ -375,6 +466,11 @@ async function tPlanModpack(ctx, a) {
       try { dl = await resolveMarketDownload(it); }
       catch (e) { problems.push({ id: it.id, source: it.source, error: e?.message || 'Could not resolve a downloadable version.' }); continue; }
       const compat = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server);
+      // A8 (v2.3.0): HARD reject a version whose loader/MC does not match the server, instead of
+      // only warning - a Forge mod on NeoForge (or a wrong-MC build) must never reach the plan.
+      const vmatch = versionMatchesServer({ gameVersions: dl.gameVersions, loaders: dl.loaders }, server);
+      if (!vmatch.ok) { rejected.push({ id: it.id, source: it.source, kind: it.kind, reason: vmatch.reason, version: dl.versionNumber || it.version || null }); continue; }
+      dlByKey.set(it.source + ':' + it.id, dl);
       // CurseForge dependencies are listed (informational) but NOT auto-queued: CF publishes no
       // official relationType table, so we cannot reliably tell required from optional. Incompatible
       // ones become a warning. Modrinth deps (clear types) are followed below.
@@ -422,7 +518,7 @@ async function tPlanModpack(ctx, a) {
   try { hasProxy = fs.existsSync(path.join(root, 'velocity.toml')); } catch {}
   const serverJava = (() => { try { return javaMajor(ctx.javaInfo?.version); } catch { return null; } })();
   const { warnings: planWarn } = planWarnings(plan, server, { hasProxy, serverJava });
-  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, planned: plan.length, withWarnings: warnCount, alreadyInstalled: installedCount, conflicts, planWarnings: planWarn, plan, problems, note: 'Show this plan to the user, then call assemble_modpack with the same items to install them in one confirmed batch.' } };
+  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, planned: plan.length, withWarnings: warnCount, alreadyInstalled: installedCount, conflicts, planWarnings: planWarn, rejected, plan, problems, note: 'Show this plan to the user, then call assemble_modpack with the same items to install them in one confirmed batch.' } };
 }
 async function tAssembleModpack(ctx, a) {
   const root = needPath(ctx);
@@ -436,16 +532,22 @@ async function tAssembleModpack(ctx, a) {
   // Recompute compatibility per item so the REPORT itself carries warnings — assemble must not
   // rely on the caller having run plan_modpack first (the "show plan, then assemble" flow is
   // prompt-driven, not enforced). A failed compat check does not block the install; it is reported.
-  const server = detectServerCompat(serverFiles(root));
+  // A8 (v2.3.0): detect the target from libraries/ too (jar-less NeoForge/Forge run.bat).
+  const server = detectServerTarget(root, serverFiles(root));
+  const force = a.force === true;
   // A7 (v2.1.0) preflight: resolve each item first, sum the sizes the registry reports, and warn on
   // a big batch BEFORE any download so the AI can confirm with the user. Resolve failures are kept
   // and reported in the final results too (not silently dropped).
   const resolved = [];
   let totalBytes = 0, unknownSize = 0;
+  const blocked = [];
   for (const it of items) {
     try {
       const dl = await resolveMarketDownload(it);
       if (!isSafeDownloadUrl(dl.url)) { resolved.push({ it, dl, error: 'Download URL is not on an allowlisted public host.' }); continue; }
+      // A8 (v2.3.0): refuse a version whose loader/MC does not match the server (unless force:true).
+      const vmatch = versionMatchesServer({ gameVersions: dl.gameVersions, loaders: dl.loaders }, server);
+      if (!vmatch.ok && !force) { blocked.push({ id: it.id, source: it.source, kind: it.kind, reason: vmatch.reason }); continue; }
       if (Number.isFinite(dl.size) && dl.size > 0) totalBytes += dl.size; else unknownSize++;
       resolved.push({ it, dl });
     } catch (e) { resolved.push({ it, error: e?.message || 'Could not resolve a downloadable version.' }); }
@@ -462,7 +564,7 @@ async function tAssembleModpack(ctx, a) {
       if (!dest) { results.push({ id: it.id, ok: false, error: 'Unsafe destination path.' }); failed++; continue; }
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
-      try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, installedAt: new Date().toISOString() }); } catch {}
+      try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, env: it.env || undefined, installedAt: new Date().toISOString() }); } catch {}
       createdFiles.push(path.relative(root, dest).replace(/\\/g, '/'));
       const warnings = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server).warnings;
       const row = { id: it.id, ok: true, name: dl.filename };
@@ -482,7 +584,8 @@ async function tAssembleModpack(ctx, a) {
   const note = failed && createdFiles.length
     ? 'Some items installed before a failure. To undo, call delete_content for each file in createdFiles (needs user approval).'
     : undefined;
-  return { ok: true, result: { requested: items.length, installed, failed, withWarnings: warned, planWarnings: planWarn, preflight, createdFiles, note, results, files: serverFiles(root) } };
+  const blockedNote = blocked.length ? `${blocked.length} item(s) were skipped as incompatible with this ${server.loader} ${server.mc || ''} server (pass force:true to override).` : undefined;
+  return { ok: true, result: { requested: items.length, installed, failed, blocked, withWarnings: warned, planWarnings: planWarn, preflight, createdFiles, note: blockedNote || note, results, files: serverFiles(root) } };
 }
 async function tSavePlayerData(ctx, a) { return ok(await savePlayer(ctx, { uuid: a.uuid, changes: a.changes || {}, clearInventory: !!a.clearInventory })); }
 const { readPlayer, whitelistToggle, banToggle, opToggle, savePlayer } = require('../main/players.js');
@@ -702,7 +805,20 @@ async function tExplainCrash(ctx, a) {
   try { text = fs.readFileSync(pick.file, 'utf8'); } catch (e) { return { ok: false, error: 'Could not read the crash report: ' + (e.code || e.message) }; }
   // C1 (v2.1.0): add a rule-based category so the AI can act without reading the whole report.
   const classification = doctor.classifyCrash(text);
-  return { ok: true, result: { found: true, file: pick.name, mtime: pick.mtime, classification, ...doctor.summarizeCrashText(text) } };
+  // 2.3.0: the crash-report HEADER often says "No associated exception found" while the real cause
+  // (a missing mandatory dependency, a jar for the wrong loader) is only in logs/latest.log. Scan
+  // the tail of the log too and surface concrete missing-dep / skipped-jar entries, and raise
+  // confidence when we find them.
+  let fromLog = { missingDeps: [], skippedJars: [] };
+  try {
+    const tail = doctor.tailLogFile(root, { lines: 400 });
+    if (tail.ok) fromLog = doctor.scanLogForMissingDeps((tail.lines || []).join('\n'));
+  } catch { /* log scan is best-effort */ }
+  let finalClass = classification;
+  if (fromLog.missingDeps.length || fromLog.skippedJars.length) {
+    finalClass = { category: fromLog.missingDeps.length ? 'mod-dependency' : 'loader-mismatch', confidence: 'high', hints: fromLog.missingDeps.length ? ['Install the missing dependency mod(s) listed in missingDeps, then restart.'] : ['Remove the listed jars that are for a different loader.'] };
+  }
+  return { ok: true, result: { found: true, file: pick.name, mtime: pick.mtime, classification: finalClass, fromLog, ...doctor.summarizeCrashText(text) } };
 }
 async function tListCrashReports(ctx) {
   const root = needPath(ctx);
@@ -720,6 +836,8 @@ async function tCheckPerformance(ctx) {
   const notes = [];
   const push = (level, detail, fix) => notes.push({ level, detail, fix: fix || null });
   if (ctx.serverStatus !== 'running') push('info', 'Server is not running - live metrics are unavailable.');
+  // 2.3.0: right after start TPS is null for a few seconds; say so instead of a silent null.
+  else if (tps == null) { const secs = Math.round((Date.now() - (ctx.startedAt || Date.now())) / 1000); push('info', `Metrics are still warming up (server has been up ~${Math.max(0, secs)}s) - retry in a few seconds.`); }
   if (tps != null) { if (tps < 15) push('error', `TPS ${tps} - the server is struggling.`, 'Reduce view-distance, remove heavy plugins, or allocate more RAM.'); else if (tps < 19) push('warn', `TPS ${tps} - mild lag.`, 'Consider lowering view-distance or plugin load.'); else push('ok', `TPS ${tps} - healthy.`); }
   if (mspt != null) { if (mspt > 50) push('error', `MSPT ${mspt}ms - above the 50ms tick budget.`, 'The main thread cannot keep up; reduce load.'); else if (mspt > 40) push('warn', `MSPT ${mspt}ms - close to the 50ms budget.`); else push('ok', `MSPT ${mspt}ms - healthy.`); }
   return { ok: true, result: { running: ctx.serverStatus === 'running', tps, mspt, players, notes } };
@@ -831,7 +949,9 @@ const TOOLS = [
   { name: 'list_files', risk: 'read', description: 'List a directory inside the server folder.', inputSchema: S({ path: STR('relative dir, default .') }), handler: tListFiles },
   { name: 'read_file', risk: 'read', description: 'Read a text file inside the server folder.', inputSchema: S({ path: STR('relative file path') }, ['path']), handler: tReadFile },
   { name: 'search_files', risk: 'read', description: 'Grep text files inside the server folder.', inputSchema: S({ query: STR('substring') }, ['query']), handler: tSearchFiles },
-  { name: 'list_content', risk: 'read', description: 'Plugins, mods and datapacks.', inputSchema: S(), handler: tListContent },
+  { name: 'list_content', risk: 'read', description: 'Plugins, mods and datapacks (mods carry a loader flag + loaderMismatch when they do not match the server).', inputSchema: S(), handler: tListContent },
+  { name: 'check_mod_compat', risk: 'read', description: 'Pre-start scan of mods/: reports jars for the wrong loader, client-only mods, MISSING required dependencies (read from each jar metadata, incl. non-registry deps), and CONFLICTS (a declared type="incompatible" mod that is installed). Run before start_server to catch the crash chain early.', inputSchema: S(), handler: tCheckModCompat },
+  { name: 'read_crash_report', risk: 'read', description: 'Read a crash-report from crash-reports/ (default newest; pass name). Path is confined to the server folder (unlike read_file, which is rooted at the project).', inputSchema: S({ name: STR('crash report file name (optional, default newest)') }), handler: tReadCrashReport },
   { name: 'get_properties', risk: 'read', description: 'Parsed server.properties.', inputSchema: S(), handler: tGetProperties },
   { name: 'get_raw_properties', risk: 'read', description: 'Raw velocity.toml content.', inputSchema: S(), handler: tGetRawProperties },
   { name: 'get_world_info', risk: 'read', description: 'Seed, spawn, players and waypoints.', inputSchema: S(), handler: tGetWorldInfo },

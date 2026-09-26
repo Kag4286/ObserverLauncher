@@ -1,7 +1,7 @@
 // A3 (v2.1.0): planConflicts is the item-vs-ITEM check that itemCompat (item-vs-server) does not do.
 // Pure module - no electron, no network.
 const assert = require('assert');
-const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, LOADER_FAMILY } = require('../src/mcp/modpack-plan.js');
+const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, LOADER_FAMILY } = require('../src/mcp/modpack-plan.js');
 
 let passed = 0;
 function ok(name, cond) { assert(cond, `FAIL: ${name}`); console.log(`PASS ${name}`); passed++; }
@@ -67,5 +67,37 @@ ok('hasProxy + plugin only -> no proxy warning', planWarnings([{ id: 'a', kind: 
 ok('java requirement too high -> java warning', planWarnings([{ id: 'bigmod', kind: 'mod', javaRequired: 21 }], fabricSrv, { serverJava: 17 }).warnings.some(w => w.code === 'java'));
 ok('java requirement met -> no warning', planWarnings([{ id: 'bigmod', kind: 'mod', javaRequired: 17 }], fabricSrv, { serverJava: 17 }).warnings.every(w => w.code !== 'java'));
 ok('unknown server java -> no java warning', planWarnings([{ id: 'x', kind: 'mod', javaRequired: 21 }], fabricSrv, { serverJava: null }).warnings.every(w => w.code !== 'java'));
+
+// --- filterPlan (A8, v2.3.0): HARD reject loader/MC mismatches ---
+const match = (dl, s) => {
+  if (s.mc && dl.gameVersions && dl.gameVersions.length && !dl.gameVersions.includes(s.mc)) return { ok: false, reason: 'mc' };
+  const fam = LOADER_FAMILY[s.loader];
+  if (fam && dl.loaders && dl.loaders.length && !dl.loaders.some(l => fam.includes(l))) return { ok: false, reason: 'loader' };
+  return { ok: true, reason: null };
+};
+const neoServer = { mc: '1.21.1', loader: 'neoforge' };
+const fp = filterPlan([
+  { id: 'ok', source: 'modrinth', kind: 'mod', gameVersions: ['1.21.1'], loaders: ['neoforge'] },
+  { id: 'wrongloader', source: 'modrinth', kind: 'mod', gameVersions: ['1.21.1'], loaders: ['forge'] },
+  { id: 'wrongmc', source: 'modrinth', kind: 'mod', gameVersions: ['1.20.4'], loaders: ['neoforge'] },
+], neoServer, match);
+ok('filterPlan accepts matching', fp.accepted.length === 1 && fp.accepted[0].id === 'ok');
+ok('filterPlan rejects 2', fp.rejected.length === 2);
+ok('filterPlan rejects loader', fp.rejected.some(r => r.id === 'wrongloader' && r.reason === 'loader'));
+ok('filterPlan rejects mc', fp.rejected.some(r => r.id === 'wrongmc' && r.reason === 'mc'));
+
+// --- missingDependencies (A9, v2.3.0) ---
+const declared = [
+  { from: 'particle_core', modId: 'fzzy_config', mandatory: true, versionRange: '[0.1,)' },
+  { from: 'particle_core', modId: 'kotlinforforge', mandatory: true },
+  { from: 'particle_core', modId: 'neoforge', mandatory: true },
+  { from: 'particle_core', modId: 'sodium', mandatory: false },
+];
+const miss = missingDependencies(declared, new Set(['fzzy_config']));
+ok('missingDependencies drops platform (neoforge)', !miss.some(m => m.modId === 'neoforge'));
+ok('missingDependencies drops optional', !miss.some(m => m.modId === 'sodium'));
+ok('missingDependencies drops present (fzzy_config)', !miss.some(m => m.modId === 'fzzy_config'));
+ok('missingDependencies finds kotlinforforge', miss.some(m => m.modId === 'kotlinforforge'));
+ok('missingDependencies dedupes', missingDependencies([{ modId: 'x', mandatory: true }, { modId: 'X', mandatory: true }], []).length === 1);
 
 console.log(`\n${passed} passed, 0 failed`);

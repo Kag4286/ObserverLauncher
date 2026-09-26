@@ -129,5 +129,22 @@ ck('classifyCrash null-safe', doctor.classifyCrash(null).category === 'unknown')
 ck('every category has hints', doctor.classifyCrash('OutOfMemoryError').hints.length > 0);
 ck('priority: OOM beats generic', doctor.classifyCrash('OutOfMemoryError ... at net.Foo(Foo.java:1)').category === 'out-of-memory');
 
+// ---- scanLogForMissingDeps (v2.3.0) ----
+const neoLog = [
+  '[12:00:00] [main/INFO] Loading mods',
+  '[12:00:01] [main/ERROR] Missing or unsupported mandatory dependencies:',
+  "\tMod ID: 'fzzy_config', Requested by: 'particle_core', Version range: '[0.1,)', Acceptable versions: *",
+  "\tMod ID: 'kotlinforforge', Requested by: 'particle_core', Version range: '*'",
+  '',
+  '[12:00:02] [main/WARN] Skipping jar /mods/memoryleakfix-forge.jar because it is for Minecraft Forge',
+].join('\n');
+const scan = doctor.scanLogForMissingDeps(neoLog);
+ck('scan finds fzzy_config', scan.missingDeps.some(d => d.modId === 'fzzy_config'));
+ck('scan finds kotlinforforge', scan.missingDeps.some(d => d.modId === 'kotlinforforge'));
+ck('scan records requestedBy', scan.missingDeps.find(d => d.modId === 'fzzy_config').requestedBy === 'particle_core');
+ck('scan finds skipped forge jar', scan.skippedJars.some(s => /memoryleakfix/.test(s.jar) && /Forge/i.test(s.forLoader)));
+ck('scan clean log -> empty', doctor.scanLogForMissingDeps('all good here').missingDeps.length === 0);
+ck('scan null-safe', doctor.scanLogForMissingDeps(null).missingDeps.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

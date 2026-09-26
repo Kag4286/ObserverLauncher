@@ -43,8 +43,10 @@ function itemCompat(item, server) {
     const ok = it.loaders.some(l => fam.includes(l));
     if (!ok) warnings.push('loader');
   }
-  // Modrinth marks server-unsupported mods explicitly; installing those does nothing or breaks start.
-  if (it.env && it.env.server === 'unsupported') warnings.push('clientOnly');
+  // env may be our normalized string bucket ('client-only') OR a raw Modrinth {client,server} object
+  // (an AI may pass either). Either way, a server-unsupported mod does nothing on a server.
+  const envServerUnsupported = (typeof it.env === 'string' && it.env === 'client-only') || (it.env && typeof it.env === 'object' && it.env.server === 'unsupported');
+  if (envServerUnsupported) warnings.push('clientOnly');
   return { ok: warnings.length === 0, warnings };
 }
 
@@ -136,4 +138,69 @@ function planWarnings(items, server, opts) {
   return { warnings };
 }
 
-module.exports = { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, LOADER_FAMILY };
+// A8 (v2.3.0): HARD loader/MC filter. itemCompat() only WARNED on a loader/MC mismatch, so a plan
+// could still contain a Forge mod for a NeoForge 1.21.1 server (the crash chain this release
+// fixes). This separates a plan into accepted vs rejected, using the same versionMatchesServer
+// logic the tool layer uses. Pure: caller passes already-resolved items carrying { gameVersions,
+// loaders }. Rejected entries keep the reason so the AI can explain it.
+//   items: [{ id, source, kind, gameVersions, loaders, ... }]
+//   server: { mc, loader }
+//   match:  (dl, server) -> { ok, reason }  (injected to avoid a require cycle)
+function filterPlan(items, server, match) {
+  const accepted = [];
+  const rejected = [];
+  for (const it of items || []) {
+    const r = match ? match(it, server) : { ok: true, reason: null };
+    if (r.ok) accepted.push(it);
+    else rejected.push({ id: it.id, source: it.source, kind: it.kind, reason: r.reason, detail: r.reason === 'mc' ? `needs MC ${(it.gameVersions || []).join('/')} but server is ${server.mc}` : `not a ${server.loader} mod (loaders: ${(it.loaders || []).join('/') || 'unknown'})` });
+  }
+  return { accepted, rejected };
+}
+
+// A9 (v2.3.0): cross-check each item's DECLARED dependencies (read from its jar metadata, which
+// includes non-registry deps like Kotlin for Forge) against the set of mod IDs present in the
+// plan/folder. Returns the ones still missing. Pure.
+//   declared: [{ from, modId, mandatory, versionRange }]
+//   present:  Set/array of mod IDs already available (plan ids + installed mods)
+function missingDependencies(declared, present) {
+  const have = present instanceof Set ? present : new Set((present || []).map(String));
+  const platform = new Set(['minecraft', 'neoforge', 'forge', 'fabricloader', 'quilt_loader', 'java', 'fabric-api']);
+  const missing = [];
+  const seen = new Set();
+  for (const d of declared || []) {
+    // v2.3.1: skip optional AND incompatible deps. `incompatible` means the mod must NOT be
+    // present, so it is never a MISSING dependency (it is handled by conflictingDependencies).
+    // A soft integration (modernfix -> JEI) is optional, not required.
+    if (!d || !d.modId || d.optional || d.incompatible || !d.mandatory) continue;
+    const id = String(d.modId);
+    if (platform.has(id.toLowerCase())) continue;
+    if (have.has(id) || have.has(id.toLowerCase())) continue;
+    const key = id.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    missing.push({ modId: id, versionRange: d.versionRange || '*', neededBy: d.from || null });
+  }
+  return missing;
+}
+
+// v2.3.1: the OPPOSITE of missingDependencies — a declared `type = "incompatible"` dep that IS
+// present is a CONFLICT (the mod must not be installed). Returns [{ modId, reason, declaredBy }].
+//   declared: [{ from, modId, incompatible, reason }]
+//   present:  Set/array of mod IDs currently installed
+function conflictingDependencies(declared, present) {
+  const have = present instanceof Set ? present : new Set((present || []).map(String));
+  const conflicts = [];
+  const seen = new Set();
+  for (const d of declared || []) {
+    if (!d || !d.modId || !d.incompatible) continue;
+    const id = String(d.modId);
+    if (!(have.has(id) || have.has(id.toLowerCase()))) continue;
+    const key = id.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    conflicts.push({ modId: id, reason: d.reason || null, declaredBy: d.from || null });
+  }
+  return conflicts;
+}
+
+module.exports = { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY };

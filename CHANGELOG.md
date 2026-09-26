@@ -10,6 +10,99 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.3.0] — 2026-09-25
+
+**Headline: the MCP modpack tools now stop the wrong-loader / missing-dependency crash chain before
+it starts.** An AI building a modpack over MCP used to get a clean-looking plan that then crashed the
+server (a Forge mod on NeoForge, a wrong-MC build, or a required dependency the registry never
+published — e.g. Kotlin for Forge). Plan/assemble now hard-filter by the server's real loader + MC,
+read each mod's own metadata for required deps, and explain_crash reads the server log for the exact
+missing mod. Plus two new tools (`check_mod_compat`, `read_crash_report`) and marketplace/diagnostic
+polish.
+
+### Fixed — wrong-loader / wrong-MC installs (critical)
+- **The modpack planner only WARNED on a loader/MC mismatch, so bad versions still installed.**
+  `plan_modpack` + `assemble_modpack` now hard-reject a resolved version whose loader/MC does not
+  match the server (`filterPlan` + `versionMatchesServer`); the plan lists them under `rejected`, and
+  assemble skips them (reporting `blocked`) unless `force:true`. (src/mcp/modpack-plan.js,
+  src/mcp/tools.js)
+- **Root cause: the server target was detected from the jar NAME only.** A jar-less NeoForge/Forge
+  `run.bat` server resolved to `{ mc: null, loader: 'vanilla' }`, so the loader filter was a no-op.
+  New `detectServerTarget()` reads `libraries/` (via `detectForgeMcVersion`) for the real loader + MC.
+  (src/main/server-compat.js)
+- **`search_marketplace` could return a Forge/Fabric build for a NeoForge search** (it relaxed the
+  loader facet). Added a `loader` param that pins the loader and does NOT relax.
+  (src/main/marketplace.js, src/mcp/tools.js)
+
+### Fixed — missing transitive dependencies
+- **Dependencies that are not on the registry were invisible.** After a version resolves, its jar is
+  inspected (`META-INF/neoforge.mods.toml` / `mods.toml` / `fabric.mod.json`) for REQUIRED
+  dependencies and checked against the plan/folder; missing ones are returned as `missing_deps`.
+  (src/main/jar-read.js, src/main/mod-metadata.js, src/mcp/tools.js)
+- **New tool `check_mod_compat`:** pre-start scan of `mods/` for wrong-loader jars, client-only mods,
+  and missing required dependencies (reads each jar once via `openJar`).
+
+### Fixed — crash diagnosis missed the real cause
+- **`explain_crash` said "No associated exception found" while the cause was in `latest.log`.** It now
+  also scans the log tail for `Missing or unsupported mandatory dependencies` and
+  `Skipping jar … is for Minecraft Forge`, returning concrete `missingDeps` / `skippedJars` and
+  raising confidence to `high`. (src/mcp/doctor.js — `scanLogForMissingDeps`, src/mcp/tools.js)
+- **New tool `read_crash_report`:** read a crash-report from the server folder (the general
+  `read_file` is rooted at the project, not the server).
+
+### Changed — client/server environment model
+- **A single 4-bucket env model** (`client-only` | `server-only` | `both` | `unknown`) normalizes
+  Modrinth's `env` (`client`/`server`: required|optional|unsupported) and Fabric's
+  `environment` (client|server|*). `list_content` annotates each mod with `env` + `serverUsable`.
+- **Removed a WRONG env heuristic:** v2.3.0 derived `env` from NeoForge/Forge `displayTest`, but that
+  field only controls the client/server version-mismatch warning — it is NOT a side marker. NeoForge
+  now leaves `env` to Modrinth metadata. (src/main/mod-metadata.js `normalizeEnv`)
+- **`search_marketplace` env was always null:** the Modrinth search API returns `client_side` /
+  `server_side`, not `env`. Now mapped through `normalizeEnv`. (src/main/marketplace.js)
+- **`list_content` / `check_mod_compat` env for NeoForge jars:** a NeoForge jar has no static side
+  field, so env is now also read from `observerlauncher-manifest.json` (the Modrinth env recorded at
+  install time). Manifest entries now carry `env`. (src/mcp/tools.js, src/main/marketplace.js)
+- **`kotlinforforge` (and similar) had no `loader`:** its jar uses a non-standard layout, so no
+  descriptor was readable. `loaderFromFilename` derives the loader from the file name as a last
+  resort, and such a guessed loader is flagged (`loaderGuessed`) so it is NOT treated as an
+  authoritative mismatch (a Forge-named jar can run on NeoForge). (src/main/mod-metadata.js,
+  src/mcp/tools.js)
+- **NeoForge env hint restored (carefully):** dropping `displayTest` entirely was too aggressive —
+  it is a WEAK side hint and the only signal for a NeoForge jar not installed via the Marketplace.
+  `classifyJar` now stores it as `envHint` (NOT authoritative `env`), and env priority is
+  metadata > Modrinth manifest > `envHint` (each `list_content` row carries `envSource`).
+  (src/main/mod-metadata.js, src/mcp/tools.js)
+
+### Changed — polish
+- **`search_marketplace` timeout** raised 15s -> 25s (parallel searches could time out); `json()`
+  accepts an optional timeout. (src/main/http.js)
+- **`list_content`** annotates each mod with its declared `loader` and a `loaderMismatch` flag.
+- **`check_performance`** says "metrics warming up — retry in a few seconds" instead of a silent
+  `tps: null` right after start.
+
+### Fixed — follow-up bugs found in MCP testing (same release)
+- **`check_mod_compat` false positive on mods whose descriptor is unreadable** (e.g. Kotlin for Forge
+  ships `kotlinforforge-5.12.0-all.jar`): modId came back null, so an INSTALLED mod was reported as
+  missing. `classifyJar` now derives the mod id from the FILE NAME as a last resort
+  (`modIdFromFilename`), so present-set matching still works. (src/main/mod-metadata.js)
+- **Soft/optional dependencies were reported as required** (modernfix -> JEI, noisium -> biox).
+  `parseTomlDependencies` now respects `type = "optional"` (mandatory derived from type), and
+  `missingDependencies` skips optional deps. (src/main/mod-metadata.js, src/mcp/modpack-plan.js)
+- **`read_crash_report` returned confidence `medium` with no mods** for an FML report whose cause was
+  only in `logs/latest.log`. It now always scans the log tail (like `explain_crash`) and merges
+  `missing` / `fromLog`, raising confidence to `high`. (src/mcp/tools.js)
+- **`type = "incompatible"` deps were treated as missing** (Noisium declares `biox` as INCOMPATIBLE —
+  "crashes world gen" — yet it was reported as a missing required dependency). The parser now reads
+  the 4 relation types (required/optional/discouraged/incompatible) and keeps the `reason`;
+  `missingDependencies` skips incompatible, and new `conflictingDependencies` reports an incompatible
+  mod that IS installed under `conflicts`. (src/main/mod-metadata.js, src/mcp/modpack-plan.js,
+  src/mcp/tools.js)
+
+### Tests
+- New `tests/server-compat.test.js` (15 asserts), `tests/jar-metadata.test.js` (21). Extended
+  `mcp-modpack-plan` (filterPlan/missingDependencies) and `mcp-doctor` (scanLogForMissingDeps).
+  `npm test` = 55 files PASS; i18n 7x877 clean; STATIC_TOOLS drift guard passes.
+
 ## [2.2.0] — 2026-09-24
 
 **Headline: the Create-server wizard was reworked end to end, and the multi-instance folder bug is
