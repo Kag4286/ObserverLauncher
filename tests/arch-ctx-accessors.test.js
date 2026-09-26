@@ -37,7 +37,7 @@ const MIGRATED = [
   'autoPollTimer', 'suppressStatusUntil', 'lastManualCommandAt', 'manualStop',
   'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
   'schedulerLastFired', 'serverStatus', 'waitingForDone', 'runtimeInstanceId',
-  'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported',
+  'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported', 'sparkAvailable',
   'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
   'edWatcher', 'edWatchMtime', 'edWatchDebounce',
 ];

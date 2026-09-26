@@ -310,6 +310,9 @@ async function startServerInternal(ctx, settings) {
   ctx.currentSoftware = software;
   // 2.2.0: fresh start -> re-try the tps poll (a previous run may have flagged it unsupported).
   ctx.tpsUnsupported = false;
+  // 2.4.0: detect Spark (a common profiling plugin/mod) so a NeoForge server that rejects
+  // `forge tps` can still report TPS via `spark tps`.
+  try { ctx.sparkAvailable = (info.mods || []).some(m => /spark/i.test(m)) || (info.plugins || []).some(m => /spark/i.test(m)); } catch { ctx.sparkAvailable = false; }
   const isProxy = software === 'proxy';
   // M6: make sure RCON is enabled in server.properties with a per-instance port + password BEFORE
   // the server reads the file. Existing user RCON config is preserved (see desiredRconProps).
@@ -386,7 +389,7 @@ async function startServerInternal(ctx, settings) {
         ctx.tpsUnsupported = true;
       }
       const isAutoPollStatus = duringPoll
-        && /(players online|TPS from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^list$)/i.test(x);
+        && /(spark-worker-pool|players online|TPS from last|Tick durations|CPU usage from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|\(system\)|\(process\)|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^spark tps$|^list$)/i.test(x);
       if (!isAutoPollStatus) ctx.appendLog(x);
       parseServerLine(x, ctx.live, ctx.send);
     });

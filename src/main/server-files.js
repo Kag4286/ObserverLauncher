@@ -4,6 +4,10 @@ const crypto = require('crypto');
 const nbt = require('prismarine-nbt');
 const { readJsonList } = require('./fs-utils.js');
 
+// Per-`live` state for the spark two-line (header -> values) parsing. WeakMap so it never leaks
+// and is scoped to each instance's live object.
+const _sparkPending = new WeakMap();
+
 // FEATURE: servers running online-mode=false (very common for local/test hosting) save playerdata
 // under an "offline" UUID derived from the player's name — NOT the online UUID stored in
 // usercache.json. This reproduces Minecraft's own algorithm (UUID v3, name-based, MD5 of
@@ -180,6 +184,32 @@ function parseServerLine(text, live, send) {
   if (list) { live.players = list[2] ? list[2].split(',').map(x => x.trim()).filter(Boolean) : []; changed = true; }
   const joined = clean.match(/:\s+([\w.-]+) joined the game/i); if (joined && !live.players.includes(joined[1])) { live.players.push(joined[1]); changed = true; }
   const left = clean.match(/:\s+([\w.-]+) left the game/i); if (left) { const before = live.players.length; live.players = live.players.filter(x => x !== left[1]); if (live.players.length !== before) changed = true; }
+  // --- spark (`spark tps`) splits a HEADER and its VALUES across two lines: ---
+  //   [..] TPS from last 5s, 10s, 1m, 5m, 15m:
+  //   [..] 20.0, *20.0, *20.0, *20.0, *20.0
+  //   [..] Tick durations (min/med/95%ile/max ms) from last 10s, 1m:
+  //   [..]  3.5/5.9/29.3/146.3;  3.5/5.9/29.3/146.3
+  // The single-line patterns below cannot see those, so remember the header and consume the NEXT
+  // line. State is keyed per `live` (WeakMap) so multiple instances never cross-contaminate.
+  const pend = _sparkPending.get(live) || {};
+  const body = clean.replace(/^(\[[^\]]*\]\s*:?\s*)+/, '').trim();
+  if (pend.tps) {
+    const nums = body.match(/\d+(?:\.\d+)?/g);
+    if (nums && nums.length) { const v = Number(nums[0]); if (Number.isFinite(v) && v >= 0 && v <= 25 && v !== live.tps) { live.tps = v; changed = true; } }
+    pend.tps = false; _sparkPending.set(live, pend);
+    if (changed && typeof send === 'function') send('server:live', live);
+    return;
+  }
+  if (pend.mspt) {
+    const m = body.match(/([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/);
+    if (m) { const v = Number(m[2]); if (Number.isFinite(v) && v >= 0 && v < 10000 && v !== live.mspt) { live.mspt = v; changed = true; } }
+    pend.mspt = false; _sparkPending.set(live, pend);
+    if (changed && typeof send === 'function') send('server:live', live);
+    return;
+  }
+  // A spark header ends with a colon and has NO numbers after it; flag it and wait one line.
+  if (/^TPS from last[^:]*:\s*$/i.test(body)) { pend.tps = true; _sparkPending.set(live, pend); return; }
+  if (/^Tick durations[^:]*:\s*$/i.test(body)) { pend.mspt = true; _sparkPending.set(live, pend); return; }
   // Paper/Purpur/Leaf/Folia panel can emit:
   //   TPS from last 5s, 10s, 1m, 5m, 15m: *20.0, 20.0, 20.0, 20.0, 20.0
   //   TPS from last 1m, 5m, 15m: *20.0, 20.0, 20.0

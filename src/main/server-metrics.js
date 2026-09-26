@@ -37,9 +37,21 @@ async function metricsTick(ctx, st) {
       st.javaRetryCount = 0;
     } else {
       st.javaRetryCount++;
-      if (st.javaRetryCount >= 2 || ctx.currentSoftware === 'paper-like') {
+      // BUGFIX (2.4.0): a run.bat server's root pid is cmd.exe, NOT java — measuring that showed
+      // 0% CPU / ~0 MB forever. Only fall back to the root pid when it is ITSELF java (a plain jar
+      // server). Otherwise keep retrying to find java.exe; after many tries give up for this run
+      // (java never appeared), but never report cmd.exe's near-zero numbers as the server's.
+      const rootIsJava = st.rootIsJava === true; // resolved once below
+      if (st.javaRetryCount >= 2 && (ctx.currentSoftware === 'paper-like' || rootIsJava)) {
         ctx.monitoredPid = ctx.serverProcess.pid;
       } else {
+        // Resolve once whether the root pid is java.exe, so we know if the fallback is safe.
+        if (st.rootIsJava === undefined) {
+          try {
+            const info = await platform.getProcessInfo(ctx.serverProcess.pid);
+            st.rootIsJava = !!(info && info.name && /^java(w)?\.exe$/i.test(info.name));
+          } catch { /* leave undefined; try again next tick */ }
+        }
         ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: st.lastMetrics.serverMemory, cpu: st.lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
         return;
       }
@@ -107,7 +119,7 @@ function queryHistory(history, opts = {}) {
 // ctx.live to the right instance. Per-instance counters live in `states` (keyed by instance id).
 // GATED channels mean a background push is dropped, so this costs 0 IPC for unseen servers.
 function freshSampleState() {
-  return { consecutiveMisses: 0, lastMetrics: { serverMemory: 0, cpu: 0 }, javaRetryCount: 0, idleTicks: 0, sampling: false };
+  return { consecutiveMisses: 0, lastMetrics: { serverMemory: 0, cpu: 0 }, javaRetryCount: 0, idleTicks: 0, sampling: false, rootIsJava: undefined };
 }
 function startMetrics(ctx) {
   const states = new Map(); // instanceId -> counters

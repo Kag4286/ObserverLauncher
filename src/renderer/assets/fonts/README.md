@@ -1,26 +1,26 @@
 # Space Grotesk — self-hosted font
 
-`style.css` declares `@font-face` pointing to:
+`style.css` declares an `@font-face` pointing to:
 
 ```
 ./assets/fonts/SpaceGrotesk-Variable.woff2
 ```
 
-That file is **not bundled** in this patch (sandbox này không có mạng để tải binary).
-Nếu file không tồn tại, trình duyệt/Electron sẽ tự fallback về
-`-apple-system, "Segoe UI", Inter, Roboto, Arial, sans-serif` — app vẫn chạy
-và style vẫn đúng, chỉ khác font một chút.
+That file is **not bundled** in this patch (this sandbox has no network to download the binary).
+If the file is missing, the browser/Electron falls back to
+`-apple-system, "Segoe UI", Inter, Roboto, Arial, sans-serif` — the app still works and the style
+is still correct, only the font differs slightly.
 
-## Cách thêm font thật (làm 1 lần, trên máy bạn có mạng)
+## How to add the real font (one time, on a machine with network access)
 
-1. Tải variable font Space Grotesk (giấy phép OFL, miễn phí) từ một trong hai nguồn:
-   - Fontsource: https://fontsource.org/fonts/space-grotesk → tải bản "variable" `.woff2`
-   - Google Fonts (Github repo gốc): https://github.com/googlefonts/space-grotesk → build hoặc
-     lấy file `SpaceGrotesk[wght].ttf` rồi convert sang `.woff2` (vd bằng `fonttools varLib.instancer`
-     hoặc trang https://transfonter.org, chọn "TTF/OTF → WOFF2").
-2. Đổi tên file thành `SpaceGrotesk-Variable.woff2` và đặt vào đúng thư mục này
+1. Download the Space Grotesk variable font (OFL license, free) from one of these sources:
+   - Fontsource: https://fontsource.org/fonts/space-grotesk → download the "variable" `.woff2`
+   - Google Fonts (upstream GitHub repo): https://github.com/googlefonts/space-grotesk → build it or
+     grab `SpaceGrotesk[wght].ttf` and convert it to `.woff2` (e.g. with `fonttools varLib.instancer`
+     or https://transfonter.org, choosing "TTF/OTF → WOFF2").
+2. Rename the file to `SpaceGrotesk-Variable.woff2` and place it in this folder
    (`src/renderer/assets/fonts/`).
-3. Reload app (`npm start`) — không cần đổi gì trong CSS/CSP, vì file nằm trong app
-   (`'self'`) nên không vi phạm `default-src 'self'` / không cần domain Google Fonts nào.
+3. Reload the app (`npm start`) — no CSS/CSP change needed, because the file lives inside the app
+   (`'self'`) so it does not violate `default-src 'self'` and needs no Google Fonts domain.
 
-Không bắt buộc — chỉ ảnh hưởng phần chữ, không ảnh hưởng chức năng.
+Optional — it only affects the typography, not any functionality.

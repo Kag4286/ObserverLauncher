@@ -1,29 +1,47 @@
 const { execFile } = require('child_process');
 const { runPowerShell, psQuote } = require('../http.js');
+const psHost = require('./ps-host.js');
+
+// 2.4.0 (perf): prefer the persistent PowerShell host (no per-call spawn) and fall back to the
+// one-shot runPowerShell if the host is unavailable / errors, so behaviour never regresses.
+// Returns the same { ok, stdout, error } shape runPowerShell does.
+async function runPS(script, timeoutMs) {
+  if (psHost.IS_WIN) {
+    try {
+      const stdout = await psHost.run(script, timeoutMs || 8000);
+      return { ok: true, error: null, stdout };
+    } catch { /* fall through to one-shot */ }
+  }
+  return runPowerShell(script, timeoutMs);
+}
 
 // Find the real java.exe descendant of a root pid (handles cmd.exe -> java.exe via run.bat, and shim cases)
 function findJavaDescendant(rootPid) {
+  // 2.4.0 (perf + correctness): walk the process tree ONE LEVEL AT A TIME (children of the current
+  // frontier) instead of enumerating EVERY process each call. Cheaper AND more reliable for a
+  // run.bat server (cmd.exe -> java.exe). Returns the java pid, or empty.
   const script = `
 $root=${Number(rootPid)}
-try { $procs=Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,Name,WorkingSetSize } catch { $procs=Get-WmiObject Win32_Process | Select-Object ProcessId,ParentProcessId,Name,WorkingSetSize }
-if(-not $procs){ try{ $procs=Get-Process | Select-Object Id,@{N='ProcessId';E={$_.Id}},@{N='ParentProcessId';E={0}},@{N='Name';E={$_.ProcessName+'.exe'}},@{N='WorkingSetSize';E={$_.WorkingSet64}} }catch{} }
-$queue=New-Object System.Collections.Generic.Queue[int]
-$queue.Enqueue($root)
-$visited=New-Object System.Collections.Generic.HashSet[int]
-$candidates=New-Object System.Collections.Generic.List[object]
-while($queue.Count -gt 0){
-  $cur=$queue.Dequeue()
-  if(-not $visited.Add($cur)){continue}
-  $node=$procs | Where-Object { $_.ProcessId -eq $cur }
-  if($node -and $node.Name -match '^java(w)?\\.exe$'){ $candidates.Add($node) }
-  $procs | Where-Object { $_.ParentProcessId -eq $cur } | ForEach-Object { $queue.Enqueue($_.ProcessId) }
+$frontier=@($root); $visited=New-Object System.Collections.Generic.HashSet[int]; $best=0; $bestWs=-1
+$guard=0
+while($frontier.Count -gt 0 -and $guard -lt 32){
+  $guard++
+  $next=@()
+  foreach($cur in $frontier){
+    if(-not $visited.Add([int]$cur)){ continue }
+    $kids=Get-CimInstance Win32_Process -Filter "ParentProcessId=$cur" -ErrorAction SilentlyContinue
+    if(-not $kids){ $kids=Get-WmiObject Win32_Process -Filter "ParentProcessId=$cur" -ErrorAction SilentlyContinue }
+    foreach($k in $kids){
+      if($k.Name -match '^java(w)?\\.exe$'){ $ws=0; try{ $ws=[int64]$k.WorkingSetSize }catch{}; if($ws -gt $bestWs){ $bestWs=$ws; $best=[int]$k.ProcessId } }
+      $next += [int]$k.ProcessId
+    }
+  }
+  $frontier=$next
 }
-if($candidates.Count -gt 0){
-  $best = $candidates | Sort-Object WorkingSetSize -Descending | Select-Object -First 1
-  "$($best.ProcessId)"
-} elseif((Get-Process -Id $root -ErrorAction SilentlyContinue).ProcessName -match '^java(w)?$'){ "$root" }
+if($best -gt 0){ "$best" }
+else { $r=Get-Process -Id $root -ErrorAction SilentlyContinue; if($r -and $r.ProcessName -match '^java(w)?$'){ "$root" } }
 `.trim();
-  return runPowerShell(script).then(r => {
+  return runPS(script).then(r => {
     const id = parseInt(String(r.stdout).trim(), 10);
     return Number.isFinite(id) ? id : null;
   }).catch(()=>null);
@@ -36,12 +54,11 @@ if($candidates.Count -gt 0){
 async function getProcessInfo(pid) {
   const n = Number(pid);
   if (!Number.isFinite(n) || n <= 0) return null;
-  const script = `[System.Threading.Thread]::CurrentThread.CurrentCulture=[cultureinfo]::InvariantCulture;
-$p=Get-CimInstance Win32_Process -Filter "ProcessId=${n}" -ErrorAction SilentlyContinue;
-if(-not $p){ exit 2 };
-"$($p.Name)|$(([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds())"`;
+  // NO `exit` here: this runs inside the persistent REPL, where `exit` would kill the whole host.
+  const script = `$p=Get-CimInstance Win32_Process -Filter "ProcessId=${n}" -ErrorAction SilentlyContinue;
+if($p){ "$($p.Name)|$(([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds())" }`;
   try {
-    const r = await runPowerShell(script, 8000);
+    const r = await runPS(script, 8000);
     if (!r.ok || !r.stdout || !r.stdout.trim()) return null;
     const [name, ms] = String(r.stdout).trim().split('|');
     const startTimeMs = Number(ms);
@@ -56,8 +73,8 @@ async function getProcessMetrics(pid) {
   // 0% (previousCpu never updates). Force InvariantCulture so decimals are
   // always "." regardless of the user's Windows language.
   const script = `[System.Threading.Thread]::CurrentThread.CurrentCulture=[cultureinfo]::InvariantCulture;
-$p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue;if(-not $p){ exit 1 };$c=0;try{$c=$p.TotalProcessorTime.TotalSeconds}catch{try{$c=$p.CPU}catch{}};try{ $ws=$p.WorkingSet64 }catch{ $ws=0 }; if($ws -eq 0){ try{ $ws=(Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}" -ErrorAction SilentlyContinue).WorkingSetSize }catch{} }; "$([math]::Round($ws/1MB,2))|$([math]::Round($c,3))"`;
-  const r = await runPowerShell(script);
+$p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue;if(-not $p){ return };$c=0;try{$c=$p.TotalProcessorTime.TotalSeconds}catch{try{$c=$p.CPU}catch{}};try{ $ws=$p.WorkingSet64 }catch{ $ws=0 }; if($ws -eq 0){ try{ $ws=(Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}" -ErrorAction SilentlyContinue).WorkingSetSize }catch{} }; "$([math]::Round($ws/1MB,2))|$([math]::Round($c,3))"`;
+  const r = await runPS(script);
   if (!r.stdout || !r.stdout.trim()) {
     // Fallback via wmic/tasklist if PowerShell Get-Process failed (e.g., 32/64-bit mismatch or policy)
     try{

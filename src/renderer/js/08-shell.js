@@ -455,9 +455,11 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   if(resEmpty) resEmpty.hidden=!!(v.cpu!=null || ram!=null);
   const liveBadge=$('#resourceLiveBadge'); if(liveBadge){ liveBadge.textContent=v.running?t('perf.live'):t('perf.offlineBadge'); liveBadge.style.color=v.running?'var(--success)':'var(--text-dim)'; liveBadge.style.borderColor=v.running?'rgba(0,229,160,.25)':'var(--border)'; }
   metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')});
- // Fallback: nếu main gửi chậm hoặc miss, vẫn giữ UI đồng bộ mỗi 2s từ lastMetrics/live
+ // Fallback: if the main process is slow or misses a push, keep the UI in sync from
+ // lastMetrics/live every 2s.
  setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const displayTps=v.tps??state.live?.tps??null; const displayMspt=v.mspt??state.live?.mspt??null; if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
- // Redraw charts định kỳ khi tab performance đang mở (fix canvas 0x0 khi tab hidden lúc metrics đến)
+ // Periodically redraw charts while the Performance tab is open (fixes a 0x0 canvas when the tab
+ // was hidden as metrics arrived).
  setInterval(()=>{ try{ if(document.getElementById('performance')?.classList.contains('active')){ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); } }catch{} }, 2000);
 // FEATURE: Aikar's flags preset (a widely recommended JVM/G1GC config for Paper/Purpur servers),
 // auto-filled from the current memoryMin/memoryMax instead of making the user type the long flag string.

@@ -17,7 +17,10 @@ async function createWindow(ctx) {
     width: 1480, height: 930, minWidth: 1080, minHeight: 720,
     backgroundColor: '#08090a',
     icon: path.join(__dirname, '..', 'renderer', 'assets', 'icons', 'observer.png'),
-    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
+    // 2.4.0 (perf): backgroundThrottling lets Chromium throttle timers/rAF when the window is
+    // hidden, cutting renderer CPU while the app sits in the tray. The live charts keep updating
+    // because they are driven by IPC pushes, not rAF.
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: true }
   };
   if (process.platform === 'win32') Object.assign(winOpts, { titleBarStyle: 'hidden', titleBarOverlay: { color: '#08090a', symbolColor: '#e9edf0', height: 42 } });
   ctx.win = new BrowserWindow(winOpts);
@@ -65,6 +68,8 @@ function setupQuitHandler(ctx) {
     clearInterval(ctx.autoPollTimer);
     clearInterval(ctx.autoBackupTimer);
     clearInterval(ctx.schedulerTimer);
+    // 2.4.0: stop the persistent PowerShell host so its process does not linger after quit.
+    try { require('./platform/ps-host.js').dispose(); } catch {}
     if (quitHandled || (!ctx.serverProcess && !ctx.buildProcess)) return;
     event.preventDefault();
     quitHandled = true;

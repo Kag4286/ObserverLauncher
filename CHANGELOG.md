@@ -10,6 +10,43 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.4.0] — 2026-09-26
+
+**Headline: performance + telemetry polish.** Two long-standing issues a real user hit while
+running a NeoForge modpack server: the launcher burned ~17% CPU even when the server was idle, and
+the in-app Performance tab showed **0% CPU / 0 MB** for a `run.bat` (jar-less) server because it was
+measuring `cmd.exe` instead of the JVM. TPS/MSPT also stayed blank on NeoForge (which rejects
+`forge tps`). All three are fixed.
+
+### Fixed — launcher CPU burned by per-second PowerShell spawns (critical)
+- **Every metrics tick (1x/s) spawned a fresh `powershell.exe`.** Startup is ~50-120ms of CPU +
+  a console-window host, so an idle app showed ~17% CPU. New `src/main/platform/ps-host.js` runs
+  **ONE long-lived PowerShell** (a stdin REPL verified to stream line-by-line) shared by all metric
+  queries; per-call startup is paid once. Falls back to the one-shot path if the host cannot start.
+- **`findJavaDescendant` enumerated EVERY process** each call; now walks only the root pid's
+  descendants, one level at a time. (src/main/platform/win32.js)
+- `backgroundThrottling` enabled so a hidden window's renderer timers are throttled. (app-lifecycle.js)
+
+### Fixed — Performance showed 0% CPU / 0 MB for a run.bat server
+- **A `run.bat` server's root pid is `cmd.exe`, not `java`.** The sampler used to fall back to the
+  root pid after two misses, reporting cmd.exe's near-zero numbers forever. It now measures the root
+  pid ONLY when that pid is itself java; otherwise it keeps resolving the JVM.
+  (src/main/server-metrics.js)
+
+### Fixed — TPS/MSPT blank on NeoForge
+- **NeoForge rejects `forge tps`**, so the poll was disabled and TPS stayed empty even with Spark
+  installed. When the native tps command is rejected, the launcher now uses **`spark tps`**.
+  Spark presence is detected in `mods/`/`plugins/`. (src/main/server-poll.js, server-lifecycle.js)
+- **Spark prints TPS / tick-durations as a HEADER line then a VALUES line**, which the single-line
+  parser never saw. `parseServerLine` now remembers the header (per-instance WeakMap) and reads the
+  next line's numbers (`TPS from last...` -> tps, `Tick durations...` -> mspt median).
+  (src/main/server-files.js)
+- **`spark tps` output spammed the console** (`[spark-worker-pool-...]` lines). The auto-poll
+  suppress filter now also hides Spark's TPS / tick-duration / CPU-usage lines. (server-lifecycle.js)
+
+### Tests
+- New `tests/ps-host.test.js` (8 asserts). `npm test` = 56 files PASS; arch ctx covers `sparkAvailable`.
+
 ## [2.3.0] — 2026-09-25
 
 **Headline: the MCP modpack tools now stop the wrong-loader / missing-dependency crash chain before

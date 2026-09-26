@@ -83,6 +83,7 @@ function createContext() {
       buildProcess: null,
       rcon: null, // M6: live RconClient for this instance, or null (stdin fallback)
       tpsUnsupported: false, // 2.2.0: set true when the server rejects our tps poll (e.g. `forge tps`) so we stop sending it
+      sparkAvailable: false, // 2.4.0: server has Spark -> use `spark tps` when the native tps command is rejected
       wizardAbort: null,
       contentWatcher: null,
       contentWatchers: null,
@@ -115,7 +116,7 @@ function createContext() {
     'autoPollTimer', 'suppressStatusUntil', 'lastManualCommandAt', 'manualStop',
     'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
     'schedulerLastFired', 'serverStatus', 'waitingForDone', 'runtimeInstanceId',
-    'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported',
+    'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported', 'sparkAvailable',
     'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
     'edWatcher', 'edWatchMtime', 'edWatchDebounce',
   ];
