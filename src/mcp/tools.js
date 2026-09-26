@@ -16,11 +16,12 @@ const doctor = require('./doctor.js');
 const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
 const { importMrpackFromPath, detectServerCompat } = require('../main/modpacks.js');
-const { searchMarket, resolveMarketDownload, listMarketVersions } = require('../main/marketplace.js');
+const { searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject } = require('../main/marketplace.js');
 const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY } = require('./modpack-plan.js');
 const { detectServerTarget, versionMatchesServer } = require('../main/server-compat.js');
 const { openJar } = require('../main/jar-read.js');
 const { classifyJar } = require('../main/mod-metadata.js');
+const repair = require('./repair.js');
 
 const ok = r => (r && typeof r === 'object' && 'ok' in r) ? r : { ok: true, result: r };
 const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server folder selected.'); return ctx.currentServerPath; };
@@ -938,6 +939,86 @@ async function tDoctorReport(ctx) {
   return { ok: true, result: { healthy: diag.result?.healthy ?? null, checks: diag.result?.checks || [], console: cons.result, performance: perf.result, config: config.checks, crash } };
 }
 
+// ============ v2.5.0 AUTONOMOUS DOCTOR (propose + apply) ============
+// propose_fix GATHERS the facts (diagnose + port + mod compat + crash loop + RAM trend) and asks
+// repair.js for a structured plan. It changes NOTHING - the AI shows the plan to the user, then
+// calls apply_fix. apply_fix re-uses the existing tool handlers so all guards still apply.
+async function tProposeFix(ctx) {
+  const root = needPath(ctx);
+  // Facts. Each source is best-effort so one failure does not abort the whole diagnosis.
+  let diag = {}; try { diag = (await tDiagnoseServer(ctx)).result || {}; } catch {}
+  let port = {}; try { port = (await tCheckPort(ctx, {})).result || {}; } catch {}
+  let compat = {}; try { compat = (await tCheckModCompat(ctx)).result || {}; } catch {}
+  let reports = []; try { reports = doctor.listCrashReports(root) || []; } catch {}
+  let newestBackup = null; try { const b = serverFiles(root).backups || []; newestBackup = b[0] ? b[0].name : null; } catch {}
+  // RAM pressure: use the active instance's sampled history + the configured memoryMax (MB).
+  let ram = {}; try { const s = loadSettingsFor(ctx.inst()); ram = repair.detectRamPressure(ctx.metricsHistory || [], (Number(s.memoryMax) || 6) * 1024, {}); } catch {}
+  const crashLoop = repair.detectCrashLoop(reports, {});
+  const facts = {
+    issues: diag.checks || [],
+    port,
+    missingDeps: compat.missingDeps || [],
+    crashLoop,
+    ram,
+    newestBackup,
+  };
+  const r = repair.proposeRepair(facts);
+  return { ok: true, result: { server: { mc: compat.server?.mc ?? null, loader: compat.server?.loader ?? null }, healthy: diag.healthy ?? null, diagnosis: { port, missingDeps: facts.missingDeps, crashLoop, ram }, plan: r.plan, summary: r.summary, note: 'Show this plan to the user. Call apply_fix with the same actions (confirmed) to run them. Nothing has changed yet.' } };
+}
+// apply_fix EXECUTES a plan from propose_fix. Each item { action, args } is routed to an existing
+// tool handler, so every guard (safeTarget, isSafeDownloadUrl, confirm tier) still applies.
+async function tApplyFix(ctx, a) {
+  const items = Array.isArray(a && a.actions) ? a.actions : [];
+  if (!items.length) return { ok: false, error: 'actions is required: pass the plan[] entries from propose_fix.' };
+  const results = [];
+  for (const it of items) {
+    const action = it && it.action;
+    const args = (it && it.args) || {};
+    try {
+      if (action === repair.ACTION.CHANGE_PORT) {
+        const r = await tSetProperty(ctx, { key: String(args.key || 'server-port'), value: String(args.value) });
+        results.push({ action, ok: r.ok !== false, result: r });
+      } else if (action === repair.ACTION.INSTALL_DEPENDENCY) {
+        // Resolve the dependency by name via the marketplace, then install it (write tier).
+        // BUGFIX (2.5.1): pin the search + install to the SERVER's real loader (neoforge/forge/
+        // fabric/quilt) so a NeoForge server never gets a Forge-only build. detectServerTarget
+        // reads libraries/ for a jar-less run.bat server too. Fall back to the generic 'mod' group
+        // when the loader is unknown (vanilla).
+        let loader = '';
+        try { const t = detectServerTarget(needPath(ctx), serverFiles(needPath(ctx))); loader = ['neoforge', 'forge', 'fabric', 'quilt'].includes(t.loader) ? t.loader : ''; } catch {}
+        // v2.5.0 fix: a bare modId rarely matches Modrinth full-text search ('alexsmobs' -> 0 hits
+        // while 'Alex Mobs' works). findMarketProject tries query variants + a direct slug lookup,
+        // then scores the hits and REFUSES when ambiguous - so we never install the wrong mod
+        // (the old blind top-1 could pick an unrelated result).
+        const found = await findMarketProject(String(args.query || ''), { loader });
+        if (!found.ok || !found.item) {
+          results.push({ action, ok: false, error: found.error || `No mod found matching "${args.query}".`, candidates: found.candidates || [] });
+          continue;
+        }
+        const hit = found.item;
+        const r = await tInstallFromMarket(ctx, { id: hit.id, kind: 'mod', source: 'modrinth', loader });
+        results.push({ action, ok: r.ok !== false, name: hit.title, loader: loader || 'any', result: r });
+      } else if (action === repair.ACTION.TUNE_PERFORMANCE) {
+        // Lower view-distance one notch (never below 4). Memory increase is only SUGGESTED (the plan
+        // reason carries it) - changing RAM needs a restart and a deliberate user choice.
+        let cur = 10; try { cur = Number(serverFiles(needPath(ctx)).properties['view-distance']) || 10; } catch {}
+        const next = Math.max(4, cur - 2);
+        const r = await tSetProperty(ctx, { key: 'view-distance', value: String(next) });
+        results.push({ action, ok: r.ok !== false, detail: `view-distance ${cur} -> ${next}`, suggestMemoryIncrease: !!args.suggestMemoryIncrease, result: r });
+      } else if (action === repair.ACTION.RESTORE_BACKUP) {
+        const name = args.name || (() => { try { const b = serverFiles(needPath(ctx)).backups || []; return b[0] ? b[0].name : null; } catch { return null; } })();
+        if (!name) { results.push({ action, ok: false, error: 'No backup available to restore.' }); continue; }
+        const r = await tRestoreBackup(ctx, { name });
+        results.push({ action, ok: r.ok !== false, name, result: r });
+      } else {
+        results.push({ action, ok: false, error: 'Unknown action: ' + action });
+      }
+    } catch (e) { results.push({ action, ok: false, error: e?.message || String(e) }); }
+  }
+  const okCount = results.filter(r => r.ok).length;
+  return { ok: true, result: { applied: okCount, total: items.length, results, note: okCount < items.length ? 'Some fixes failed - see results. A restart may be needed for port/view-distance changes.' : 'All fixes applied. Restart the server if a port or view-distance changed.' } };
+}
+
 const S = (props, required) => ({ type: 'object', properties: props || {}, required: required || [] });
 const STR = desc => ({ type: 'string', description: desc });
 
@@ -973,6 +1054,7 @@ const TOOLS = [
   { name: 'read_many_files', risk: 'read', description: 'Read up to 5 text files in one call (batch, cheaper than 5 read_file calls).', inputSchema: S({ paths: { type: 'array', items: { type: 'string' }, description: 'relative file paths (max 5)' } }, ['paths']), handler: tReadManyFiles },
   { name: 'doctor_report', risk: 'read', description: 'One-shot full report: diagnose + console analysis + performance + config + crash, combined.', inputSchema: S(), handler: tDoctorReport },
   { name: 'read_audit_log', risk: 'read', description: 'Recent MCP write/destroy actions (what an assistant changed), newest last.', inputSchema: S({ lines: { type: 'number', description: 'lines (default 100, max 500)' } }), handler: tReadAuditLog },
+  { name: 'propose_fix', risk: 'read', description: 'Autonomous Doctor: gather port/mod-dep/crash-loop/RAM facts and return a STRUCTURED repair plan (change_port, install_dependency, tune_performance, restore_backup). Changes NOTHING - show the plan to the user, then call apply_fix.', inputSchema: S(), handler: tProposeFix },
   { name: 'start_server', risk: 'write', description: 'Start the server.', inputSchema: S(), handler: tStartServer },
   { name: 'send_console_command', risk: 'write', description: 'Send one command to the running server.', inputSchema: S({ command: STR('single-line command') }, ['command']), handler: tSendCommand },
   { name: 'set_property', risk: 'write', description: 'Set one server.properties key.', inputSchema: S({ key: STR('property key'), value: STR('value') }, ['key']), handler: tSetProperty },
@@ -1010,6 +1092,7 @@ const TOOLS = [
   { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name') }, ['name']), handler: tDeleteContent },
   { name: 'delete_backup', risk: 'destroy', description: 'Delete a backup ZIP.', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tDeleteBackup },
   { name: 'restore_backup', risk: 'destroy', description: 'Restore a backup (overwrites worlds).', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tRestoreBackup },
+  { name: 'apply_fix', risk: 'destroy', description: 'Autonomous Doctor: execute the actions from a propose_fix plan (change_port, install_dependency, tune_performance, restore_backup). Always requires confirmation. Pass the plan entries you showed the user.', inputSchema: S({ actions: { type: 'array', description: 'plan[] entries from propose_fix: [{action, args}]', items: { type: 'object' } } }, ['actions']), handler: tApplyFix },
 ];
 
 function getTool(name) { return TOOLS.find(t => t.name === name) || null; }

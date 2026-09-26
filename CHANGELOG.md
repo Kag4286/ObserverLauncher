@@ -10,6 +10,89 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.5.0] — 2026-09-26
+
+**Headline: two-way MCP + Autonomous Doctor, and the project moves to Apache-2.0.** The AI
+integration used to be one-directional (the AI calls a tool, the app answers). It is now
+two-directional: the AI can SUBSCRIBE to live resources (metrics, console tail, players,
+instances) and get pushed updates, and a new `propose_fix` / `apply_fix` pair turns the Server
+Doctor from a diagnostician into a repair planner - it proposes a structured fix plan (port
+change, missing mod dep, RAM tuning, crash-loop rollback) that the user confirms before anything
+runs. License changed MIT -> Apache-2.0 (adds an explicit patent grant + retaliation clause; MIT
+has neither).
+
+### Added — MCP two-way resources + subscribe (E1/E2)
+- **4 new dynamic resources** exposed by `resourceForUri` (src/mcp/server.js) and advertised in
+  `STATIC_RESOURCES` (bridge.js): `observer://metrics/history`, `observer://console/tail`,
+  `observer://world/players`, `observer://instances`. Each maps to an existing read tool.
+- **`resources/subscribe` / `resources/unsubscribe`** in bridge.js. The bridge polls the subscribed
+  resource every 5s and emits `notifications/resources/updated` when the body hash changes, so an
+  AI client reacts to changes instead of polling. Capabilities now advertise `subscribe: true` +
+  `subscriptions.listen: true`. INSTRUCTIONS updated.
+
+### Added — Autonomous Server Doctor (E3/E4)
+- **NEW `src/mcp/repair.js`** (pure, testable): `detectCrashLoop` (>=3 crash-reports in 1h),
+  `detectRamPressure` (steady climb = leak, high avg = pressure), `proposeRepair(facts)` ->
+  structured plan of `{action, risk, reason, args}`. Actions: `change_port`, `install_dependency`,
+  `tune_performance`, `restore_backup`.
+- **`propose_fix` (read)** gathers facts (diagnose + port + mod compat + crash loop + RAM trend)
+  and returns the plan - changes NOTHING.
+- **`apply_fix` (destroy)** executes the approved plan by routing each action to the existing tool
+  handlers (set_property / search+install_from_market / restore_backup), so every guard still
+  applies. Always confirmed.
+- Tool count 68 -> 70. bridge.js STATIC_TOOLS synced (drift guard passes).
+
+### Changed — License MIT -> Apache-2.0
+- `LICENSE` rewritten as the Apache License 2.0 (keeps the ObserverLauncher disclaimer at the end);
+  new `NOTICE` file with copyright + third-party attribution. `package.json` + `package-lock.json`
+  license fields -> `Apache-2.0`; README badge + License section updated. `build.files` now bundles
+  `LICENSE` + `NOTICE` into the installer (Apache 2.0 requires distribution of both).
+
+### Changed — polish / cleanup
+- **MCP confirm dialog** now shows a short human summary of the tool args (e.g. "Install X (mod)",
+  "3 fix(es)", "install X, change_port") instead of a raw JSON dump; falls back to truncated JSON.
+  4 i18n keys (mcp.sumInstall/sumAssemble/sumFixes/detail) x7.
+- **Removed dead `#miniChart` references** from 07-overview.js + 08-shell.js (the Overview chart
+  panel was removed in 1.1.0; the calls were guarded no-ops).
+
+### Fixed — autonomous Doctor could not install a mod it proposed (found by a live MCP test)
+- **A run-together modId does not match Modrinth full-text search.** The Doctor only knows the
+  modId from jar metadata (e.g. `alexsmobs`), but Modrinth's search returns 0 hits for it while
+  `Alex Mobs` works. `apply_fix` therefore reported "No mod found" for a dependency the Doctor had
+  correctly detected.
+- **New `candidateQueries()` + `pickBestMatch()` in src/mcp/repair.js (pure, tested).** A query is
+  expanded into variants (raw, hyphen/space swapped, plural split) and the pooled hits are SCORED;
+  the install only proceeds on an exact/normalised match. Two equal candidates -> **ambiguous**, so
+  it returns the candidate list instead of blindly installing the top hit (the old code used
+  `items[0]`, which could pick an unrelated mod).
+- **New `findMarketProject(query, {loader})` in src/main/marketplace.js** ties it together: direct
+  `/v2/project/{slug}` lookup first (catches slug-only projects), then variant searches, then the
+  scored pick. `apply_fix` INSTALL_DEPENDENCY uses it and reports candidates on ambiguity.
+
+### Fixed — marketplace loader search (same live test)
+- **A generic `kind:'mod'` marketplace search fell through to the PLUGIN loader group**, so a mod
+  lookup matched nothing. `loaderGroups` in marketplace.js now has a `mod` key (forge/neoforge/
+  fabric/quilt union). The `mod` branch uses `explicit || loaderGroups[kind] || loaderGroups.plugin`
+  (the `explicit` loader-pin variable was computed but never used before).
+- **`apply_fix` pins the install to the server's real loader** (`detectServerTarget`), so a
+  NeoForge server cannot get a Forge-only build.
+
+### Fixed — transient registry fetch failures
+- **`json()` (src/main/http.js) now retries GETs** with a short backoff (3 attempts, 400/1200 ms).
+  A live test observed 2/5 Modrinth calls fail with a transient `fetch failed`. A 4xx is a real
+  answer and is never retried; POSTs (CurseForge file-id lookup) are not retried blindly.
+
+### Fixed — auto-update could fail to install while a server was running
+- **`app:quit-install` called `quitAndInstall()` directly.** That triggers the app quit -> `before-quit`,
+  but `setupQuitHandler` `preventDefault()`s that event while a server is running (to let the world
+  save), which can leave the NSIS installer half-triggered and the update unapplied. The handler now
+  STOPS the server first (RCON/stdin `stop`), waits up to 30s for the process to exit, force-kills if
+  it hangs, THEN calls `quitAndInstall()` with a clean quit path.
+
+### Tests
+- NEW `tests/repair.test.js` (40 asserts). `tests/mcp-tools.test.js` +7 asserts (doctor tools +
+  marketplace loader regression guards). `npm test` = 58 files PASS; i18n 7x881 clean.
+
 ## [2.4.0] — 2026-09-26
 
 **Headline: performance + telemetry polish.** Two long-standing issues a real user hit while

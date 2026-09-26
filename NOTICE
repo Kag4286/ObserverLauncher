@@ -1,0 +1,26 @@
+ObserverLauncher
+Copyright 2026 ObserverLauncher contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+---
+
+This product includes software developed by third parties:
+
+- Electron (https://github.com/electron/electron) — MIT License
+- electron-updater (https://github.com/electron-userland/electron-builder) — MIT License
+- prismarine-nbt (https://github.com/PrismarineJS/prismarine-nbt) — MIT License
+- Playwright (https://github.com/microsoft/playwright) — Apache License 2.0 (development only)
+- electron-builder (https://github.com/electron-userland/electron-builder) — MIT License
+
+---
+
+ObserverLauncher is an independent, unofficial tool and is not affiliated
+with, endorsed by, or sponsored by Mojang Studios, Microsoft, or any of the
+third-party server software projects (PaperMC, Purpur, Fabric, Forge,
+NeoForge, Spigot, CraftBukkit, Velocity) or plugin/mod hosting platforms
+(Modrinth, Hangar, SpigotMC) it can download from. "Minecraft" is a trademark
+of Mojang Studios. Using this launcher to run a Minecraft server still
+requires you to accept Mojang's End User License Agreement (EULA), which
+this tool surfaces but does not modify.

@@ -2,8 +2,7 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 
 function withTimeout(ms) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), ms); return { signal: controller.signal, cancel: () => clearTimeout(timer) }; }
-async function json(url, extraHeaders, method, body, timeoutMs) {
-  // 2.3.0: default raised 15s -> 25s (registry searches timed out when several ran in parallel).
+async function jsonAttempt(url, extraHeaders, method, body, timeoutMs) {
   const { signal, cancel } = withTimeout(Number(timeoutMs) > 0 ? Number(timeoutMs) : 25000);
   try {
     const headers = { 'User-Agent': 'ObserverLauncher/0.2 (local Minecraft server launcher)', 'Accept': 'application/json', ...(extraHeaders || {}) };
@@ -14,6 +13,28 @@ async function json(url, extraHeaders, method, body, timeoutMs) {
     return await r.json();
   } catch (error) { throw error.name === 'AbortError' ? new Error('Request timed out — check your internet connection.') : error; }
   finally { cancel(); }
+}
+// 2.5.0: registry APIs (Modrinth especially) intermittently fail with a transient network error
+// (observed live: 2/5 calls 'fetch failed'). A GET is safe to retry; a POST (CurseForge file-id
+// lookup) is NOT retried blindly. Retries are short + few so a genuinely-down API still fails fast.
+async function json(url, extraHeaders, method, body, timeoutMs) {
+  const isGet = !method || method === 'GET';
+  const attempts = isGet ? 3 : 1;
+  const backoff = [400, 1200];
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try { return await jsonAttempt(url, extraHeaders, method, body, timeoutMs); }
+    catch (error) {
+      lastError = error;
+      // A 4xx is a real answer (not found / bad request) - never retry it. Only retry network/
+      // timeout/5xx style failures.
+      const msg = String(error && error.message || '');
+      const retryable = !/^\s*4\d\d\b/.test(msg);
+      if (!isGet || !retryable || i === attempts - 1) throw error;
+      await new Promise(r => setTimeout(r, backoff[i] || 1200));
+    }
+  }
+  throw lastError;
 }
 // BUGFIX (downloads died on a brief network hiccup): the old download used ONE fetch with a
 // hard 5-minute total timeout. On a slow link a perfectly healthy 80MB jar could be aborted

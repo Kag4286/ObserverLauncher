@@ -76,7 +76,7 @@ function rebuildSamples(history){
   samples=arr.map(s=>({tps:s.tps??null,mspt:s.mspt??null,cpu:s.cpu??null,ram:s.ram??null}));
   while(samples.length<38) samples.unshift({tps:null,mspt:null,cpu:null,ram:null});
   try{ drawOvSpark(); }catch{}
-  try{ metricChart($('#miniChart')); metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
+  try{ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
 }
 const channelOrder=['overview','console','players','performance','content','marketplace','worlds','properties'];
 function positionChannelIndicator(){const nav=$('#nav'),ind=$('#channelIndicator');if(!nav||!ind)return;const active=nav.querySelector('.nav-item.active');if(!active){ind.style.opacity='0';return} // rail is vertical — indicator is left border via CSS, no horizontal calc needed
@@ -100,7 +100,7 @@ function switchTab(tab){
     panel.onanimationend=e=>{if(e.target===panel)panel.classList.remove('tab-enter-fwd','tab-enter-back')};
   }
   if(tab==='marketplace'&&!$('#marketResults').innerHTML)$('#marketSearch').click();
-  if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); metricChart($('#miniChart'));}catch{}})}); }
+  if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource');}catch{}})}); }
   // Sparkline was 0-sized while Overview was hidden — redraw on reveal (same class of bug as
   // the hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
   if(tab==='overview')requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));
@@ -123,6 +123,12 @@ function instanceDotStatus(instId, activeId){
   if(instId===activeId) return state.status||'stopped';
   return (state.instanceStatus&&state.instanceStatus[instId])||'stopped';
 }
+// UX FIX (2.5.0): refreshUI() runs on every tab switch / state event, and this used to rebuild the
+// whole list (innerHTML='') each time -> the instReveal stagger animation replayed whenever the user
+// opened the Content tab (etc). A signature guard skips the rebuild when the STRUCTURE is unchanged
+// (same ids/names/active/locale) and only repaints the status dots in place, so the animation plays
+// only on a real change (add / remove / rename / switch).
+let lastInstSig='';
 function renderInstanceList(){
   const wrap=$('#instanceList'),host=$('#instanceItems');
   if(!wrap||!host)return;
@@ -130,6 +136,17 @@ function renderInstanceList(){
   wrap.hidden=list.length===0;
   if(list.length===0)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
+  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||''])]);
+  if(sig===lastInstSig){
+    // Same list/active/names -> just refresh the dots (status can change without a rebuild).
+    host.querySelectorAll('.inst-item').forEach(row=>{
+      const d=row.querySelector('.inst-dot');
+      if(d)d.className='inst-dot st-'+instanceDotStatus(row.dataset.instance,activeId);
+    });
+    renderInstanceDropdown(list, activeId);
+    return;
+  }
+  lastInstSig=sig;
   host.innerHTML='';
   list.forEach((inst,idx)=>{
     const isActive=inst.id===activeId;
@@ -454,7 +471,7 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   if(tickEmpty) tickEmpty.hidden=!!(displayTps!=null || displayMspt!=null);
   if(resEmpty) resEmpty.hidden=!!(v.cpu!=null || ram!=null);
   const liveBadge=$('#resourceLiveBadge'); if(liveBadge){ liveBadge.textContent=v.running?t('perf.live'):t('perf.offlineBadge'); liveBadge.style.color=v.running?'var(--success)':'var(--text-dim)'; liveBadge.style.borderColor=v.running?'rgba(0,229,160,.25)':'var(--border)'; }
-  metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')});
+  metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')});
  // Fallback: if the main process is slow or misses a push, keep the UI in sync from
  // lastMetrics/live every 2s.
  setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const displayTps=v.tps??state.live?.tps??null; const displayMspt=v.mspt??state.live?.mspt??null; if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
@@ -595,7 +612,7 @@ if(!initial.java?.ok||!initial.files?.jar&&!initial.files?.launchScript){setTime
 // cover the server-path text in the command bar. Detect the Window Controls Overlay and flag it so
 // CSS can reserve its width (.wco-app rules in style.css).
 try{const wco=navigator.windowControlsOverlay;if(wco){const sync=()=>document.documentElement.classList.toggle('wco-app',!!wco.visible);sync();wco.addEventListener('geometrychange',sync);}}catch{}
-bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
+bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
 
 // ===== AUTO-UPDATE UI =====
 const updateBtn=$('#checkUpdateBtn');
@@ -649,17 +666,39 @@ window.observer.onOrphanPrompt?.(req => {
     .then(stop => { window.observer.respondOrphan({ instanceId:req.instanceId, action: stop?'stop':'reconnect' }); toast(stop?t('orphan.stopToast'):t('orphan.reconnectToast')); })
     .catch(() => window.observer.respondOrphan({ instanceId:req.instanceId, action:'reconnect' }));
 });
+// v2.5.0: turn a tool's args into a short, human-readable summary for the confirm dialog instead
+// of dumping raw JSON. Falls back to truncated JSON when nothing matches. A few shapes cover the
+// common write/destroy tools (install, edit_file, write_file, delete_*, apply_fix, send_command).
+function summarizeMcpArgs(tool, args){
+  try{
+    args=args||{};
+    if(tool==='install_from_market')return t('mcp.sumInstall',{id:args.id||'?'})+(args.kind?' ('+args.kind+')':'');
+    if(tool==='assemble_modpack'&&Array.isArray(args.items))return t('mcp.sumAssemble',{n:args.items.length});
+    if(tool==='apply_fix'&&Array.isArray(args.actions))return t('mcp.sumFixes',{n:args.actions.length})+': '+args.actions.map(a=>a&&a.action).filter(Boolean).join(', ');
+    if(tool==='edit_file'||tool==='write_file')return (args.path||'')+(tool==='write_file'&&args.content?(' — '+(args.content.length)+' chars'):'');
+    if(tool==='send_console_command')return args.command||'';
+    if(tool==='set_property')return (args.key||'')+' = '+(args.value==null?'':args.value);
+    if(tool==='delete_content'||tool==='delete_backup'||tool==='restore_backup')return args.name||args.fileName||'';
+    if(tool==='ban_player'||tool==='kick_player'||tool==='op_player'||tool==='whitelist_player')return args.name||args.ip||'';
+  }catch{}
+  return null;
+}
 window.observer.onMcpConfirmRequest?.(req => {
   if(!req||!req.reqId)return;
   const riskLabel=req.risk==='destroy'?t('mcp.riskDestroy'):t('mcp.riskWrite');
+  // v2.5.0: try a short human summary first; fall back to truncated JSON only when nothing matches.
   let argText='';
-  try{argText=JSON.stringify(req.args||{},null,2)}catch{argText=''}
-  // Truncate the preview so a 2MB write_file payload does not blow up the dialog DOM.
-  if(argText.length>2000)argText=argText.slice(0,2000)+'\n… ('+(argText.length-2000)+' more chars)';
+  const summary=summarizeMcpArgs(req.tool,req.args);
+  if(summary) argText=summary;
+  else{
+    try{argText=JSON.stringify(req.args||{},null,2)}catch{argText=''}
+    // Truncate the preview so a 2MB write_file payload does not blow up the dialog DOM.
+    if(argText.length>2000)argText=argText.slice(0,2000)+'\n… ('+(argText.length-2000)+' more chars)';
+  }
   const body=(req.risk==='destroy'?t('mcp.confirmDestroy'):t('mcp.confirmWrite',{t:req.tool}))
     +(req.instanceName?`\n\n`+t('mcp.targetInstance')+`: `+req.instanceName:'')
     +`\n\n`+t('mcp.tool')+`: `+req.tool+`  ·  `+t('mcp.risk')+`: `+riskLabel
-    +(argText&&argText!=='{}'?`\n\n`+t('mcp.args')+`:\n`+argText:'');
+    +(argText&&argText!=='{}'?`\n\n`+t(summary?'mcp.detail':'mcp.args')+`:\n`+argText:'');
   confirmDialog({title:t('mcp.confirmTitle'),body:esc(body).replace(/\n/g,'<br>'),ok:t('mcp.allow'),cancel:t('mcp.deny'),danger:req.risk==='destroy'})
     .then(allow=>window.observer.respondMcpConfirm({reqId:req.reqId,allow:!!allow}))
     .catch(()=>window.observer.respondMcpConfirm({reqId:req.reqId,allow:false}));

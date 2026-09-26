@@ -102,6 +102,19 @@ check('tool exists: assemble_modpack', !!getTool('assemble_modpack'));
 check('assemble_modpack is write', getTool('assemble_modpack')?.risk === 'write');
 check('assemble_modpack requires items', (getTool('assemble_modpack').inputSchema.required || []).includes('items'));
 
+
+// --- v2.5.0 Autonomous Doctor + marketplace loader bugfix regression ---
+check('tool exists: propose_fix', !!getTool('propose_fix'));
+check('propose_fix is read', getTool('propose_fix')?.risk === 'read');
+check('tool exists: apply_fix', !!getTool('apply_fix'));
+check('apply_fix is destroy', getTool('apply_fix')?.risk === 'destroy');
+check('apply_fix requires actions', (getTool('apply_fix').inputSchema.required || []).includes('actions'));
+// BUG (found by a live MCP test on 2.5.0): a generic kind:'mod' search fell through to the
+// PLUGIN loader group, so a mod lookup (apply_fix installing a missing dep) matched nothing.
+// And `explicit` was computed but never used, so the loader param did nothing.
+const mpSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main', 'marketplace.js'), 'utf8');
+check('marketplace loaderGroups has a mod key', /\bmod:\s*\['loaders:forge'/.test(mpSrc));
+check('marketplace uses explicit loader', /const loaderGroup = explicit \|\|/.test(mpSrc));
 // --- STATIC_TOOLS drift guard (this class of bug shipped 3 times) ---
 // bridge.js offline list must name the SAME tools as the live registry. Parse the source instead of
 // require()-ing bridge.js (which attaches a stdin listener and would hang the test runner).

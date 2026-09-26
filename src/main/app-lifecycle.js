@@ -55,8 +55,24 @@ function setupAutoUpdater(ctx, ipcMain) {
   ipcMain.handle('app:check-update', guard(() => autoUpdater.checkForUpdates()));
   ipcMain.handle('app:download-update', guard(() => autoUpdater.downloadUpdate()));
   ipcMain.handle('app:quit-install', async () => {
-    try { autoUpdater.quitAndInstall(); return { ok: true }; }
-    catch (err) { return { ok: false, error: err?.message || String(err) }; }
+    try {
+      // BUGFIX (2.5.0): quitAndInstall() triggers an app quit -> before-quit. setupQuitHandler
+      // preventDefault()s that event while a server is running (to let the world save), which can
+      // leave the NSIS installer half-triggered / the update not applied. So STOP the server FIRST
+      // and wait for the process to exit, then install with a clean quit path.
+      if (ctx.serverProcess && ctx.serverStatus !== 'stopped') {
+        ctx.manualStop = true;               // the exit handler must not auto-restart
+        try { clearTimeout(ctx.restartTimer); } catch {}
+        try { const { sendConsoleCommand } = require('./server-lifecycle.js'); await sendConsoleCommand(ctx, 'stop'); }
+        catch { try { if (ctx.serverProcess?.stdin?.writable) ctx.serverProcess.stdin.write('stop\r\n'); } catch {} }
+        const deadline = Date.now() + 30000;
+        while (ctx.serverProcess && Date.now() < deadline) await new Promise(r => setTimeout(r, 300));
+        // Still alive after 30s -> force-kill so the installer can proceed (world may not be fully saved).
+        if (ctx.serverProcess) { try { require('./kill.js').killTree(ctx.serverProcess.pid); } catch {} await new Promise(r => setTimeout(r, 500)); }
+      }
+      autoUpdater.quitAndInstall();
+      return { ok: true };
+    } catch (err) { return { ok: false, error: err?.message || String(err) }; }
   });
 }
 

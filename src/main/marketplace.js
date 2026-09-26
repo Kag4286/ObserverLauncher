@@ -28,6 +28,10 @@ async function searchMarket(opts) {
       plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
       forge: ['loaders:forge', 'loaders:neoforge'],
       fabric: ['loaders:fabric', 'loaders:quilt'],
+      // BUGFIX (2.5.1): a generic 'mod' search used to fall through to the PLUGIN group, so a mod
+      // lookup (e.g. apply_fix installing a missing dependency) matched nothing. Union all mod
+      // loaders; an explicit `loader` param still pins one (see `explicit` below).
+      mod: ['loaders:forge', 'loaders:neoforge', 'loaders:fabric', 'loaders:quilt'],
     };
     const explicit = ['neoforge', 'forge', 'fabric', 'quilt'].includes(loader) ? [`loaders:${loader}`] : null;
     const index = sort === 'latest' ? 'newest' : sort === 'downloads' ? 'downloads' : 'relevance';
@@ -46,7 +50,9 @@ async function searchMarket(opts) {
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['loaders:datapack']]); if (hits.length) relaxed = 'loader'; }
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['categories:datapack']]); if (hits.length) relaxed = 'loader'; }
     } else {
-      const loaderGroup = loaderGroups[kind] || loaderGroups.plugin;
+      // BUGFIX (2.5.1): `explicit` was computed but never used, so the `loader` param did nothing.
+      // A caller pinning loader=neoforge still got the loose kind-group back. Use `explicit` when set.
+      const loaderGroup = explicit || loaderGroups[kind] || loaderGroups.plugin;
       let filters = [['project_type:mod'], loaderGroup];
       if (version) filters.push([`versions:${version}`]);
       hits = await runSearch(filters);
@@ -264,4 +270,41 @@ async function listMarketVersions(opts) {
   return versions;
 }
 
-module.exports = { registerMarketplace, searchMarket, resolveMarketDownload, listMarketVersions };
+// v2.5.0 (Doctor fix): resolve a modId-ish string to a REAL Modrinth project, without blindly
+// installing the top search hit. Steps: (1) try query variants ('alexsmobs' -> 'alexs mobs');
+// (2) try a direct /v2/project/{slug} lookup for each candidate (handles slug-only projects that
+// full-text search misses); (3) score hits with pickBestMatch and REFUSE when ambiguous so the AI
+// surfaces candidates instead of installing the wrong mod. Returns { ok, item } or { ok:false, ... }.
+// `loader` (optional) is passed straight to searchMarket so a mod is matched for the right loader.
+async function findMarketProject(query, opts) {
+  const o = opts || {};
+  const { candidateQueries, pickBestMatch } = require('../mcp/repair.js');
+  const variants = candidateQueries(query);
+  if (!variants.length) return { ok: false, error: 'No query given.' };
+  // 1) direct slug lookup first - cheapest and most exact. A project slug is lowercase, no spaces.
+  const slug = String(query || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (slug) {
+    try {
+      const p = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(slug)}`);
+      if (p && p.id) return { ok: true, item: { source: 'modrinth', id: p.id, title: p.title, slug: p.slug } };
+    } catch { /* 404 is expected for most ids - fall through to search */ }
+  }
+  // 2) search each variant, score the pooled hits.
+  const pooled = [];
+  const seen = new Set();
+  for (const v of variants) {
+    let s;
+    try { s = await searchMarket({ source: 'modrinth', kind: 'mod', query: v, loader: o.loader || '' }); }
+    catch { continue; }
+    for (const it of (s && s.items) || []) { if (it && it.id && !seen.has(it.id)) { seen.add(it.id); pooled.push(it); } }
+    // Stop as soon as a variant already gave a clear winner.
+    const early = pickBestMatch(query, pooled);
+    if (early.best) return { ok: true, item: early.best };
+  }
+  const pick = pickBestMatch(query, pooled);
+  if (pick.best) return { ok: true, item: pick.best };
+  if (pick.ambiguous) return { ok: false, ambiguous: true, candidates: pick.candidates.map(c => ({ id: c.id, title: c.title })), error: `Multiple mods match "${query}" - pick one by id.` };
+  return { ok: false, candidates: pick.candidates.map(c => ({ id: c.id, title: c.title })), error: `No mod found matching "${query}".` };
+}
+
+module.exports = { registerMarketplace, searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject };

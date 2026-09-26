@@ -1,8 +1,8 @@
 {
   "name": "observerlauncher",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "A beginner-friendly and advanced-capable desktop launcher for hosting local Minecraft servers on Windows and Linux.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "ObserverLauncher contributors",
   "keywords": [
     "minecraft",
@@ -28,7 +28,9 @@
     "productName": "ObserverLauncher",
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE",
+      "NOTICE"
     ],
     "asarUnpack": [
       "src/mcp/bridge.js"

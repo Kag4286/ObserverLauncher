@@ -22,11 +22,17 @@ const { TOOLS, getTool } = require('./tools.js');
 // RESOURCES (1.2.0): expose server state as read-only MCP resources so an AI client can pull
 // context without spending a tool call. Each URI maps to an existing read tool's result.
 async function resourceForUri(ctx, uri) {
-  const call = async name => { const t = getTool(name); return t ? await t.handler(ctx, {}) : { ok: false, error: 'tool missing: ' + name }; };
+  const call = async (name, args) => { const t = getTool(name); return t ? await t.handler(ctx, args || {}) : { ok: false, error: 'tool missing: ' + name }; };
   if (uri === 'observer://server/status') return call('get_status');
   if (uri === 'observer://server/properties') return call('get_properties');
   if (uri === 'observer://server/console') return call('read_console');
   if (uri === 'observer://server/diagnosis') return call('diagnose_server');
+  // v2.5.0: dynamic resources an AI can SUBSCRIBE to (bridge polls + pushes
+  // notifications/resources/updated). Each maps to an existing read tool.
+  if (uri === 'observer://metrics/history') return call('get_metrics_history');
+  if (uri === 'observer://console/tail') return call('read_console', { lines: 200 });
+  if (uri === 'observer://world/players') return call('list_players');
+  if (uri === 'observer://instances') return call('list_instances');
   return { ok: false, error: 'Unknown resource: ' + uri };
 }
 

@@ -40,6 +40,7 @@ const INSTRUCTIONS = [
   'MULTI-INSTANCE: call list_instances FIRST to see every instance (id, name, serverPath, status). Most tools act on the ACTIVE instance; pass an optional "instance" id to target a specific one. get_instance_snapshot reads any instance\'s state (status/console/metrics/java/files) WITHOUT switching - prefer it over select_instance when you only need to inspect a background server.',
   'SETTINGS/SCHEDULE tools (get_settings, set_setting, get_schedule, set_schedule) also honour the "instance" arg: they read/write that instance\'s per-instance keys.',
   'READ tools are free: use them to inspect status, console, players, files, world and performance before acting.',
+  'RESOURCES: prefer resources/list + resources/read for polling-free context (observer://server/status, /properties, /console, /diagnosis, observer://metrics/history, /console/tail, /world/players, /instances). SUBSCRIBE with resources/subscribe to get notifications/resources/updated when a resource changes, instead of polling with tools.',
   'WRITE tools change the server and require GUI approval unless the user enabled auto-allow-write; DESTROY tools always ask.',
   'WORKFLOW when something is wrong: call doctor_report (one-shot) or diagnose_server + analyze_console + explain_crash; each check returns a level (ok/warn/error) and a concrete fix.',
   'SAFE CHANGE: prefer prepare_and_start / safe_restart so a backup is taken and the health checks pass first.',
@@ -91,7 +92,36 @@ const STATIC_RESOURCES = [
   { uri: 'observer://server/properties', name: 'server.properties', description: 'Parsed server.properties.', mimeType: 'application/json' },
   { uri: 'observer://server/console', name: 'Console buffer', description: 'Recent console lines.', mimeType: 'application/json' },
   { uri: 'observer://server/diagnosis', name: 'Health diagnosis', description: 'The doctor health check result.', mimeType: 'application/json' },
+  { uri: 'observer://metrics/history', name: 'Metrics history', description: 'Sampled metrics time series (tps/mspt/cpu/ram/players).', mimeType: 'application/json' },
+  { uri: 'observer://console/tail', name: 'Console tail', description: 'Last 200 console lines.', mimeType: 'application/json' },
+  { uri: 'observer://world/players', name: 'Players', description: 'Online, whitelisted, banned, op and known players.', mimeType: 'application/json' },
+  { uri: 'observer://instances', name: 'Instances', description: 'Every server instance (id, name, path, status, active).', mimeType: 'application/json' },
 ];
+
+// v2.5.0 SUBSCRIBE: MCP clients can subscribe to a resource; the bridge polls the app every
+// RESOURCE_POLL_MS and pushes notifications/resources/updated when the body changes. This is the
+// simple, dependency-free path (a server-initiated subscriptions/listen stream is deferred).
+const RESOURCE_POLL_MS = 5000;
+const subscriptions = new Map(); // uri -> { hash }
+let subTimer = null;
+function hashStr(s) { const crypto = require('crypto'); return crypto.createHash('sha1').update(String(s)).digest('hex'); }
+async function pollSubscriptions() {
+  for (const [uri, rec] of subscriptions) {
+    let body;
+    try { body = await fetchResource(uri); } catch { continue; }
+    if (!body || !body.ok) continue;
+    const text = typeof body.text === 'string' ? body.text : JSON.stringify(body.data ?? body);
+    const h = hashStr(text);
+    if (rec.hash && rec.hash !== h) write({ jsonrpc: '2.0', method: 'notifications/resources/updated', params: { uri } });
+    rec.hash = h;
+  }
+  if (subscriptions.size === 0 && subTimer) { clearInterval(subTimer); subTimer = null; }
+}
+function startSubPolling() {
+  if (subTimer) return;
+  subTimer = setInterval(() => { pollSubscriptions().catch(() => {}); }, RESOURCE_POLL_MS);
+  if (subTimer.unref) subTimer.unref();
+}
 
 // GET the real tool list (with full inputSchema) from the app. Falls back to the static
 // name/description list if the app isn't reachable, so tools/list still answers — the actual
@@ -159,6 +189,7 @@ const STATIC_TOOLS = [
   ['read_many_files', 'Read up to 5 text files in one call.'],
   ['doctor_report', 'One-shot combined health report.'],
   ['read_audit_log', 'Recent MCP write/destroy actions.'],
+  ['propose_fix', 'Autonomous Doctor: return a structured repair plan (changes nothing).'],
   ['start_server', 'Start the server.'],
   ['send_console_command', 'Send one command to the running server.'],
   ['set_property', 'Set one server.properties key.'],
@@ -196,6 +227,7 @@ const STATIC_TOOLS = [
   ['delete_content', 'Delete a plugin/mod/datapack file.'],
   ['delete_backup', 'Delete a backup ZIP.'],
   ['restore_backup', 'Restore a backup (overwrites worlds).'],
+  ['apply_fix', 'Autonomous Doctor: execute a propose_fix plan (always confirms).'],
 ].map(([name, description]) => ({ name, description, inputSchema: { type: 'object', properties: {} } }));
 
 // ---- JSON-RPC over stdio ----
@@ -208,7 +240,7 @@ async function handle(msg) {
   if (method === 'initialize') {
     return reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2025-06-18',
-      capabilities: { tools: { listChanged: false }, resources: { listChanged: false, subscribe: false } },
+      capabilities: { tools: { listChanged: false }, resources: { listChanged: false, subscribe: true }, subscriptions: { listen: true } },
       serverInfo: { name: 'observerlauncher', version: (readConfig() || {}).appVersion || 'dev' },
       instructions: INSTRUCTIONS,
     });
@@ -221,6 +253,19 @@ async function handle(msg) {
   }
   if (method === 'resources/list') {
     return reply(id, { resources: STATIC_RESOURCES });
+  }
+  if (method === 'resources/subscribe') {
+    const uri = params && params.uri;
+    if (!uri || !STATIC_RESOURCES.some(r => r.uri === uri)) return replyError(id, -32602, 'Unknown resource: ' + uri);
+    subscriptions.set(uri, { hash: null });
+    startSubPolling();
+    pollSubscriptions().catch(() => {}); // seed the hash so the first change fires
+    return reply(id, {});
+  }
+  if (method === 'resources/unsubscribe') {
+    const uri = params && params.uri;
+    if (uri) subscriptions.delete(uri);
+    return reply(id, {});
   }
   if (method === 'resources/read') {
     const uri = params && params.uri;

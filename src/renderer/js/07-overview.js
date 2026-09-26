@@ -125,13 +125,12 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   // panels are hidden until a server folder exists, so an empty first screen never
   // looks broken or overwhelming. All elements stay in the DOM (JS keeps working).
   const overviewSec=$('#overview'); if(overviewSec) overviewSec.classList.toggle('has-server', hasFolder);
-  const miniEmpty=$('#miniChartEmpty'); if(miniEmpty) miniEmpty.hidden = state.status!=='stopped';
   // Performance tab: single offline banner + dimmed numbers while stopped.
   const perfSec=$('#performance'); if(perfSec) perfSec.classList.toggle('is-live', state.status==='running');
   const perfStatus=$('#perfStatus'); if(perfStatus) perfStatus.hidden = state.status!=='stopped';
   if(typeof renderInstanceList==='function')renderInstanceList();
   if(typeof renderTunnelOverview==='function')renderTunnelOverview();
-  requestAnimationFrame(()=>{metricChart($('#miniChart'));metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')})}
+  requestAnimationFrame(()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')})}
 // FEATURE: plain-language setup checklist for beginners — one glance says what
 // is missing (folder / server file / Java / EULA) instead of making them decode
 // mono micro-labels. Advanced users get the details via title tooltips. Chips

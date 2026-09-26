@@ -6,7 +6,7 @@ ObserverLauncher handles the setup work around hosting: it downloads the server 
 
 [![Release](https://img.shields.io/github/v/release/Kag4286/ObserverLauncher?label=release)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 [![Tests](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml/badge.svg)](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
 > Since 1.0.0 the project favours stability and polish over new features. Changes are listed in the [CHANGELOG](CHANGELOG.md).
@@ -19,12 +19,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-2.4.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-2.4.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-2.5.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-2.5.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-2.4.0.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-2.5.0.AppImage`, then run it. No root needed.
 
 From source:
 
@@ -156,11 +156,11 @@ Plugins, players, backups and the world map are optional.
 - Java detection is per instance, so servers needing different Java versions can run at the same time.
 
 ### MCP / AI integration
-- Acts as an MCP server so an AI client can read and control the server in natural language (66 tools). See [MCP / AI integration](#mcp--ai-integration).
+- Acts as an MCP server so an AI client can read and control the server in natural language (70 tools). See [MCP / AI integration](#mcp--ai-integration).
 
 ## MCP / AI integration
 
-ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 66 tools.
+ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 70 tools.
 
 **Modpack builder.** The AI can search the marketplace, then `plan_modpack` turns candidates into an install plan with exact versions, per-item compatibility warnings, and required Modrinth dependencies. After you approve it, `assemble_modpack` installs the list in one confirmation and reports each item. The AI only picks ids; versions, URLs and hashes are resolved by the app from the registry.
 
@@ -381,7 +381,7 @@ The project is developed with AI tools (DeepSeek, Claude, ChatGPT, Qwen) for cod
 
 ## License
 
-[MIT](LICENSE) © ObserverLauncher contributors.
+[Apache-2.0](LICENSE) © ObserverLauncher contributors. See [NOTICE](NOTICE) for third-party attributions.
 
 ## Disclaimer
 
