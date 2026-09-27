@@ -8,6 +8,9 @@ ObserverLauncher handles the setup work around hosting: it downloads the server 
 [![Tests](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml/badge.svg)](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+[![Website](https://img.shields.io/badge/website-observerlauncher--site.kag4286.workers.dev-00e5ff)](https://observerlauncher-site.kag4286.workers.dev)
+
+> **Website:** [observerlauncher-site.kag4286.workers.dev](https://observerlauncher-site.kag4286.workers.dev) — an overview of the whole project, all seven languages, and the full changelog.
 
 > Since 1.0.0 the project favours stability and polish over new features. Changes are listed in the [CHANGELOG](CHANGELOG.md).
 
@@ -19,12 +22,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-2.5.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-2.5.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-2.6.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-2.6.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-2.5.0.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-2.6.0.AppImage`, then run it. No root needed.
 
 From source:
 
@@ -307,10 +310,10 @@ MAIN  (src/main.js)  thin composition root
     context, server-lifecycle, backups, players, marketplace, modpacks,
     wizard, settings-handlers, content-handlers, tunnel, scheduler, app-lifecycle
   Pure helpers: java, server-files, settings, fs-utils, http, editor,
-    worldmap, textures, validate, migrations
+    worldmap, textures, validate, migrations, server-compat, jar-read, mod-metadata, secrets
   Per-software resolvers: adapters/
   Per-OS process/metrics/firewall: platform/
-  MCP server + stdio bridge: mcp/
+  MCP server + stdio bridge + doctor/repair: mcp/
 ```
 
 - `src/main/context.js` holds the shared mutable state object (`ctx`) plus helpers such as `send`, `appendLog` and `setServerStatus`. Every status change goes through `setServerStatus`.

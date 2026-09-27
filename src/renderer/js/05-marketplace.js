@@ -217,6 +217,7 @@ function openInstallModal(item){
   installState={item,detail:null,versionId:null,busy:false,done:false};
   const card=$('#installModal .im');if(card)card.classList.remove('installing','success');
   $('#installModal').hidden=false;
+  trapFocus($('#installModal'));
   $('#imTitle').textContent=item.title||'—';
   $('#imMeta').textContent=`${item.author||t('mkt.unknownAuthor')} · ${item.source} · ${t('mkt.downloads',{n:Number(item.downloads||0).toLocaleString()})}`;
   $('#imKind').textContent=item.kind;
@@ -244,7 +245,7 @@ function openInstallModal(item){
     const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.install');
   });
 }
-function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast(t('toast.waitInstall'),'error');if(m.hidden)return;m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent=t('mkt.install')}
+function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast(t('toast.waitInstall'),'error');if(m.hidden)return;releaseFocus();m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent=t('mkt.install')}
 $('#imClose').onclick=closeInstallModal;
 $('#imCancel').onclick=closeInstallModal;
 $('#imInstall').onclick=()=>{if(installState.done)return closeInstallModal();if(installState.busy)return;startInstall()};

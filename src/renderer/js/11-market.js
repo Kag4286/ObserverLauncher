@@ -36,6 +36,9 @@ async function runMarketSearch(page){
   const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent=marketTotal!=null?tf('mkt.found',{a:marketTotal}):`${marketItems.length}`;
   renderMarket(marketItems);
   if(typeof renderMarketChips==='function')renderMarketChips();
+  // UX (2.6.0): a page change should land at the TOP of the fresh results, not leave the user at
+  // the bottom of the previous page. Only scroll when actually paging (not the initial search).
+  if(page>1){const top=$('#marketResults');if(top)top.scrollIntoView({block:'start'});}
   $('#marketPager').hidden=!(page>1||marketHasNext);
   $('#marketPrev').disabled=page<=1;$('#marketNext').disabled=!marketHasNext;
   $('#marketPageLabel').textContent=marketTotal!=null?t('mkt.pageOf',{p:page,t:Math.max(1,Math.ceil(marketTotal/20))}):t('mkt.page',{p:page});

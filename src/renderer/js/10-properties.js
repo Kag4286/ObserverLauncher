@@ -36,7 +36,7 @@ $$('[data-prop-filter]').forEach(c=>c.onclick=()=>{
 // Track unsaved edits in both property editors (see propsDirty above). Programmatic value writes in
 // renderProperties/refreshProxyProperties don't fire 'input', so this only trips on real typing.
 document.addEventListener('input',e=>{const el=e.target;if(el&&(el.closest?.('#propertiesGrid')||el.id==='propertiesRaw'))propsDirty=true});
-$('#saveProperties').onclick=async()=>{
+$('#saveProperties').onclick=()=>withBusy($('#saveProperties'),async()=>{
   if(isProxyServer()){
     const raw=$('#propertiesRaw').value;
     if(raw.length>200000) return toast(t('toast.tomlBig'),'error');
@@ -65,5 +65,5 @@ $('#saveProperties').onclick=async()=>{
     }
   });
   if(firstInvalid){ firstInvalid.focus(); return; }
-  const r=await window.observer.saveProperties(p);if(r.ok){propsDirty=false;state.files.properties=p;loadConnectInfo();toast(t('toast.propsSaved'),'success')}else toast(t('toast.propsFolder'),'error')
-};
+  const r=await window.observer.saveProperties(p);if(r.ok){propsDirty=false;state.files.properties=p;loadConnectInfo();toast(t('toast.propsSaved'),'success')}else toast(friendlyError(r.error)||t('toast.propsFolder'),'error')
+});

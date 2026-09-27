@@ -10,6 +10,56 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [2.6.0] — 2026-09-27
+
+**Headline: a UX-polish release — no GUI changes, only behaviour and feedback.** Every async
+action now guards against double-clicks, every modal traps and restores keyboard focus, each tab
+remembers its scroll position, and destructive list actions offer a one-click Undo. Raw backend
+errors are mapped to readable, localized messages. No layout, component or visual change.
+
+### Added — shared interaction helpers (src/renderer/js/00-core.js)
+- **`withBusy(btn, fn)`** — disables a trigger + sets `aria-busy` for the duration of an async
+  action, restores it in a `finally` (so a thrown error never leaves a button stuck disabled), and
+  swallows a second click while one is in flight. Applied to Start/Stop/Force-stop, Save settings,
+  Save RAM, Apply properties, Create backup, Check update + Download, Start tunnel, and the player
+  row actions (op/whitelist/ban/kick).
+- **`trapFocus(root)` / `releaseFocus()`** — Tab/Shift+Tab cycle inside the open modal and focus
+  returns to the element that opened it. Wired into confirm, prompt, install, player-inspector,
+  onboarding and the new-server wizard modals.
+- **`friendlyError(msg)`** — maps raw errno/network strings (ETIMEDOUT, ENOSPC, EACCES, EBUSY,
+  checksum, ENOENT, …) to short localized sentences; falls back to the original text. Used by
+  saveSettings, chooseFolder and saveProperties.
+- **`toast(message, kind, action)`** — optional `{label, fn}` action renders an inline button
+  (CSS `.toast-action`) and extends the toast lifetime to ~5.2s. First use: Undo after removing an
+  instance (re-adds the same folder as an instance; the folder on disk is never touched).
+
+### Changed — keyboard & state continuity
+- **Roster keyboard nav** (03-players.js): `.player-row` are focusable (`tabindex=0`, `role=listitem`)
+  and ArrowUp/ArrowDown move focus between rows, matching the rail nav.
+- **KPI "?" bubbles** (00-core.js): `role=button` + `tabindex=0`; Enter/Space opens, Escape closes.
+- **Per-tab scroll memory** (08-shell.js `switchTab`): the scroll position of `.workspace main` is
+  saved per tab and restored on return (console is exempt — it keeps its own auto-tail).
+- **Paging lands at the top** of fresh results — Marketplace and Players pagination now
+  `scrollIntoView` the results container instead of leaving the user at the bottom of the previous page.
+- **TPS readout tweens** (08-shell.js `onMetrics`) like CPU/RAM instead of snapping, so all metric
+  values settle together.
+
+### Fixed
+- Double-clicking an async trigger (Start, Stop, Save, Create backup, row actions, …) fired the
+  action twice; the second call is now swallowed while the first is in flight.
+- Modals let Tab escape to the page behind the overlay; focus is now trapped and restored.
+- Raw backend error strings leaked to toasts in Settings / Properties / folder pick; now mapped to
+  localized text.
+
+### i18n
+- 8 new keys × 7 locales: `inst.removed`, `toast.undo`, `toast.errNetwork`, `toast.errDisk`,
+  `toast.errPermission`, `toast.errBusy`, `toast.errChecksum`, `toast.errNotFound`. Totals: 7 locales
+  × 889 keys, no missing/extra/duplicate.
+
+### Verified
+- `npm test` green (58 files), `npm run test:e2e` green (12/12). Motion ratchet untouched (helpers
+  use `var(--dur-*)` only; no new literal durations).
+
 ## [2.5.0] — 2026-09-26
 
 **Headline: two-way MCP + Autonomous Doctor, and the project moves to Apache-2.0.** The AI

@@ -80,6 +80,41 @@ html.is-starting .topbar .status-pill{border-color:var(--accent);box-shadow:0 0 
 #toast.show{opacity:1;transform:none;pointer-events:auto}
 #toast.show.success{border-color:var(--success);box-shadow:0 0 0 1px rgba(0,229,160,.25)}
 #toast.show.error{border-color:var(--danger);box-shadow:0 0 0 1px rgba(255,59,92,.25)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
+/* UX (2.6.0): optional inline action (e.g. Undo) inside the toast. */
+#toast{display:flex;align-items:center;gap:12px}
+.toast-action{margin-left:auto;flex-shrink:0;background:transparent;border:1px solid var(--border-strong);color:var(--accent);font:600 11.5px var(--font-ui);padding:3px 10px;border-radius:var(--r-sm);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.toast-action:hover{background:var(--accent-weak);border-color:var(--accent)}
+.toast-action:active{transform:scale(.97)}
 
 /* ============ LIVE dot flash on metric value change (used by JS) ============ */
 @keyframes valPop{0%{box-shadow:0 0 0 0 var(--accent-glow)}100%{box-shadow:0 0 0 6px transparent}}

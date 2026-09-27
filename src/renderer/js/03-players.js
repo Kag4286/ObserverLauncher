@@ -96,7 +96,7 @@ function renderPlayers(){
     const attrs=`data-player="${esc(p.name)}" data-uuid="${esc(p.uuid||'')}"`;
     const avatar=p.uuid?`https://mc-heads.net/avatar/${encodeURIComponent(p.uuid)}/36`:`https://mc-heads.net/avatar/MHF_Steve/36`;
     const meta=[p.online?`<span style="color:var(--success)">${t('ply.online')}</span>`:`<span>${t('ply.offline')}</span>`, p.hasData?t('ply.hasData'):t('ply.noData'), p.uuid?`UUID ${esc(p.uuid.slice(0,8))}…`:null].filter(Boolean).join(' • ');
-    return `<div class="player-row ${p.online?'online':''}">
+    return `<div class="player-row ${p.online?'online':''}" tabindex="0" role="listitem">
       <img class="player-avatar" src="${avatar}" alt="" onerror="this.src='https://mc-heads.net/avatar/MHF_Steve/36'">
       <div class="player-main">
         <div class="player-name"><i class="player-row-dot"></i><b>${esc(p.name)}</b>${badgeHtml(p)}</div>
@@ -115,10 +115,10 @@ function renderPlayers(){
 async function togglePlayerOp(p,on){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerOpToggle({uuid:p.uuid,name:p.name,op:on});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(on?'toast.nowOp':'toast.noLongerOp',{n:p.name}))}
 async function togglePlayerWhitelist(p,add){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerWhitelistToggle({uuid:p.uuid,name:p.name,add});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(add?'toast.addedWl':'toast.removedWl',{n:p.name}))}
 async function togglePlayerBan(p,ban){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerBanToggle({uuid:p.uuid,name:p.name,ban});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(ban?'toast.banned':'toast.unbanned',{n:p.name}))}
-function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; }
+function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; trapFocus(m); }
 // Fade-out is handled by the universal .modal-overlay [hidden] transition (08-motion.css) — just
 // flip the attribute and drop the transient class after the fade finishes.
-function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
+function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; releaseFocus(); m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
 // ============ PLAYER INSPECTOR (3-tab rework) ============
 // Overview (always read-only) · Live actions (console commands while the server runs) ·
 // Saved data (edit the .dat — server must be stopped). Separating these keeps reading, live
@@ -201,11 +201,13 @@ async function openPlayerInspector(uuid,name){
 $('#playersList').addEventListener('click',async e=>{
   const btn=e.target.closest('[data-row-action]');if(!btn||btn.disabled)return;
   const action=btn.dataset.rowAction,name=btn.dataset.player,uuid=btn.dataset.uuid||null,p={uuid,name};
-  if(action==='op')togglePlayerOp(p,btn.dataset.value==='on');
-  else if(action==='whitelist')togglePlayerWhitelist(p,btn.dataset.value==='on');
-  else if(action==='ban'){if(btn.dataset.value==='on'&&!await confirmDialog({title:t('ply.ban'),body:t('ply.confirmBan',{n:name}),ok:t('ply.ban'),danger:true}))return;togglePlayerBan(p,btn.dataset.value==='on')}
-  else if(action==='kick'){const bad=playerNameError(name);if(bad)return toast(bad);if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))command(`kick ${name}`)}
-  else if(action==='inspect')openPlayerInspector(uuid,name);
+  // UX (2.6.0): disable the row button for the duration of the async action so a double-click
+  // cannot fire op/whitelist/ban/kick twice against the server files or the console.
+  if(action==='op')return withBusy(btn,()=>togglePlayerOp(p,btn.dataset.value==='on'));
+  if(action==='whitelist')return withBusy(btn,()=>togglePlayerWhitelist(p,btn.dataset.value==='on'));
+  if(action==='ban')return withBusy(btn,async()=>{if(btn.dataset.value==='on'&&!await confirmDialog({title:t('ply.ban'),body:t('ply.confirmBan',{n:name}),ok:t('ply.ban'),danger:true}))return;return togglePlayerBan(p,btn.dataset.value==='on')});
+  if(action==='kick')return withBusy(btn,async()=>{const bad=playerNameError(name);if(bad)return toast(bad);if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))command(`kick ${name}`)});
+  if(action==='inspect')openPlayerInspector(uuid,name);
 });
 $('#invSearch')?.addEventListener('input',e=>{invSearchQuery=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#invShowEmpty')?.addEventListener('change',e=>{invShowEmpty=e.target.checked;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#invSort')?.addEventListener('change',e=>{invSortBy=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#playerInspectClose').onclick=closePlayerInspectModal;
 $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
@@ -213,8 +215,18 @@ $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
   $$('[data-player-filter]').forEach(x=>{ const on=x===b; x.classList.toggle('active',on); x.setAttribute('aria-pressed', on?'true':'false'); });
   renderPlayers();
 });
-$('#playersPrevPage').onclick=()=>{if(playerPage>0){playerPage--;renderPlayers()}};
-$('#playersNextPage').onclick=()=>{playerPage++;renderPlayers()};
+// UX (2.6.0) a11y: arrow keys move focus between roster rows (like the rail nav). Enter/Space on a
+// focused row is left to the inner action buttons; the row itself is a focus target only.
+$('#playersList')?.addEventListener('keydown',e=>{
+  if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;
+  const rows=[...$$('#playersList .player-row')]; if(!rows.length)return;
+  const cur=rows.indexOf(document.activeElement); if(cur<0)return;
+  e.preventDefault();
+  const next=e.key==='ArrowDown'?Math.min(rows.length-1,cur+1):Math.max(0,cur-1);
+  rows[next].focus();
+});
+$('#playersPrevPage').onclick=()=>{if(playerPage>0){playerPage--;renderPlayers();$('#playersList')?.scrollIntoView({block:'start'})}};
+$('#playersNextPage').onclick=()=>{playerPage++;renderPlayers();$('#playersList')?.scrollIntoView({block:'start'})};
 // BUGFIX: this file loads BEFORE 08-shell.js (where debounce() is defined), so calling
 // debounce() here at load time threw ReferenceError and the search box never got a
 // listener. Use an inline debounce so this file is self-contained.

@@ -421,7 +421,7 @@ function openNewServerWizard(folder){
   $('#nswLatestLabel').textContent=t('nsw.resolvingLatest');
   $('#nswMemorySlider').value=4;$('#nswMemoryValue').textContent='4';
   $('#nswProgress').hidden=true;
-  nswRender();$('#newServerModal').hidden=false;
+  nswRender();const _m=$('#newServerModal');_m.hidden=false;trapFocus(_m);
 }
 // Step 1: pick the folder for the new instance. Uses pickFolder directly (NOT chooseFolder),
 // because chooseFolder saves serverPath onto the ACTIVE instance — the wizard must not touch it.

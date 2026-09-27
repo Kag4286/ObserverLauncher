@@ -49,6 +49,12 @@ document.addEventListener('click',e=>{
   if(h){e.stopPropagation();showKpiTip(h);return}
   closeKpiTip();
 });
+// UX (2.6.0) a11y: make the KPI "?" bubbles reachable/operable by keyboard. They are plain
+// spans; give each a role+tabindex and open the same tip on Enter/Space, close on Escape.
+document.querySelectorAll('.kpi-help').forEach(h=>{
+  h.setAttribute('role','button'); h.setAttribute('tabindex','0');
+  h.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();showKpiTip(h)} else if(e.key==='Escape'){closeKpiTip()} });
+});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeKpiTip()});
 window.addEventListener('resize',closeKpiTip);
 let state = { settings:{serverPath:'',javaPath:'',memoryMin:2,memoryMax:6,autoEula:true}, files:{plugins:[],mods:[],datapacks:[],worlds:[],backups:[],properties:{}}, running:false, live:{players:[]} };
@@ -65,6 +71,22 @@ const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 // a SECOND command on the server stdin, so reject it HERE for instant
 // feedback (the backend re-validates as defense in depth).
 function isSafePlayerName(name){return typeof name==='string'&&/^[A-Za-z0-9_]{3,16}$/.test(name)}
+// UX (2.6.0): turn a raw backend/IPC error string into a short, human-readable sentence. Central
+// mapping so every tab (settings, properties, folder pick, wizard) reports failures the same way
+// instead of dumping a raw stack/errno. Falls back to the original text so nothing is lost.
+const _ERR_MAP=[
+  [/timed out|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|getaddrinfo|ECONNREFUSED|network|fetch failed/i,'toast.errNetwork'],
+  [/ENOSPC|no space|disk full/i,'toast.errDisk'],
+  [/EACCES|EPERM|permission denied|access is denied/i,'toast.errPermission'],
+  [/EBUSY|resource busy|being used by another process/i,'toast.errBusy'],
+  [/checksum|sha-?256/i,'toast.errChecksum'],
+  [/is not a directory|ENOENT|no such file/i,'toast.errNotFound'],
+];
+function friendlyError(msg){
+  const m=String(msg==null?'':msg);
+  for(const [re,key] of _ERR_MAP){ if(re.test(m)){ const s=t(key); if(s!==key) return s; } }
+  return m;
+}
 function playerNameError(name){
   if(!name) return t('ply.nameFirst');
   if(/[\r\n]/.test(name)) return t('ply.nameLineBreak');
@@ -72,8 +94,54 @@ function playerNameError(name){
   return null;
 }
 let toastQueue=[],toastTimer=null;
-function toast(message,kind){toastQueue.push({message,kind});if(toastQueue.length>3)toastQueue.shift();flushToast()}
-function flushToast(){if(toastTimer)return;const item=toastQueue.shift();if(!item)return;const el=$('#toast');el.textContent=item.message;el.className='show '+(item.kind||'');toastTimer=setTimeout(()=>{el.classList.remove('show');toastTimer=null;setTimeout(flushToast,80)},2800)}
+function toast(message,kind,action){toastQueue.push({message,kind,action});if(toastQueue.length>3)toastQueue.shift();flushToast()}
+function flushToast(){
+  if(toastTimer)return;
+  const item=toastQueue.shift();if(!item)return;
+  const el=$('#toast');el.innerHTML='';
+  const span=document.createElement('span');span.textContent=item.message;el.appendChild(span);
+  // UX (2.6.0): an optional undo/action button. When present the toast lingers longer so the user
+  // has a real chance to click it; clicking runs fn, then dismisses immediately.
+  if(item.action&&typeof item.action.fn==='function'){
+    const b=document.createElement('button');b.type='button';b.className='toast-action';
+    b.textContent=item.action.label||t('toast.undo');
+    b.onclick=()=>{ try{item.action.fn()}catch{} clearTimeout(toastTimer);toastTimer=null;el.classList.remove('show');setTimeout(flushToast,80); };
+    el.appendChild(b);
+  }
+  el.className='show '+(item.kind||'');
+  const life=(item.action&&item.action.fn)?5200:2800;
+  toastTimer=setTimeout(()=>{el.classList.remove('show');toastTimer=null;setTimeout(flushToast,80)},life);
+}
+// UX (2.6.0): shared interaction helpers. withBusy() disables a trigger for the duration of an
+// async action so a double-click can't fire it twice; it always restores the button (even on throw)
+// and returns fn's value. Focus trap keeps Tab/Shift+Tab inside an open modal and remembers what had
+// focus so it can be restored on close — Chromium otherwise tabs into the page behind an overlay.
+async function withBusy(btn, fn){
+  if(!btn) return fn();
+  if(btn.dataset.busy==='1') return undefined; // already running — swallow the second click
+  btn.dataset.busy='1'; btn.disabled=true; btn.setAttribute('aria-busy','true');
+  try{ return await fn(); }
+  finally{ delete btn.dataset.busy; btn.disabled=false; btn.removeAttribute('aria-busy'); }
+}
+const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+function focusablesIn(root){ return [...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetParent!==null||el===document.activeElement); }
+let _trapRoot=null,_trapPrev=null;
+function trapFocus(root){
+  _trapRoot=root; _trapPrev=document.activeElement;
+  root.addEventListener('keydown',_trapKeydown);
+}
+function releaseFocus(){
+  if(_trapRoot) _trapRoot.removeEventListener('keydown',_trapKeydown);
+  const prev=_trapPrev; _trapRoot=null; _trapPrev=null;
+  if(prev&&typeof prev.focus==='function'&&document.contains(prev)) try{prev.focus()}catch{}
+}
+function _trapKeydown(e){
+  if(e.key!=='Tab'||!_trapRoot) return;
+  const f=focusablesIn(_trapRoot); if(!f.length) return;
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
 // In-app confirm dialog (replaces native confirm()) — same Promise<boolean> shape so call
 // sites read `if(!await confirmDialog(...)) return;`. One overlay reuses for every prompt;
 // the pending resolver is stored so Escape / Cancel / backdrop all resolve false exactly once.
@@ -91,12 +159,14 @@ function confirmDialog(opts){
   const ico=$('#cfIco');if(ico)ico.className='confirm-ico'+(opts.danger?' danger':'');
   const cancel=$('#cfCancel');if(cancel)cancel.hidden=!!opts.hideCancel;
   m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  trapFocus(m);
   setTimeout(()=>ok.focus(),20);
   return new Promise(resolve=>{_cfResolve=resolve});
 }
 function closeConfirm(result){
   const m=$('#confirmModal');if(!m||m.hidden)return;
   m.classList.remove('show');m.hidden=true;
+  releaseFocus();
   if(_cfResolve){const r=_cfResolve;_cfResolve=null;r(!!result)}
 }
 $('#cfOk')?.addEventListener('click',()=>closeConfirm(true));
@@ -120,12 +190,14 @@ function promptDialog(opts){
   $('#pmCancel').textContent=opts.cancel||t('cf.cancel');
   const ico=$('#pmIco');if(ico)ico.className='confirm-ico'+(opts.danger?' danger':'');
   m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  trapFocus(m);
   setTimeout(()=>{input.focus();input.select();},20);
   return new Promise(resolve=>{_pmResolve=resolve});
 }
 function closePrompt(result){
   const m=$('#promptModal');if(!m||m.hidden)return;
   m.classList.remove('show');m.hidden=true;
+  releaseFocus();
   if(_pmResolve){const r=_pmResolve;_pmResolve=null;r(result===undefined?null:result)}
 }
 $('#pmOk')?.addEventListener('click',()=>{const v=($('#pmInput')?.value||'').trim();closePrompt(v||null)});

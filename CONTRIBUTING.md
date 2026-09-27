@@ -30,7 +30,9 @@ The app is plain Electron — **no bundler, no build step for development**. The
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
     `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
-    (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key).
+    (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key),
+    `server-compat.js`, `server-java.js`, `forge-versions.js`, `jar-read.js`, `mod-metadata.js`,
+    `secrets.js`.
   - `mcp/` — optional MCP/AI integration (see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang).
@@ -40,7 +42,7 @@ The app is plain Electron — **no bundler, no build step for development**. The
   Each of these modules is a plain `require()`-able file with no dependency on a running window, so
   it can be unit-tested in isolation.
 
-- **MCP** (`src/mcp/`) — optional local-only AI integration. `tools.js` is the tool registry (name, risk tier, schema, handler): read tools run freely, write tools ask in-app, destructive always ask. `server.js` is a loopback HTTP server (127.0.0.1, random port, fresh token) started when enabled; `bridge.js` is a dependency-free stdio MCP server a client launches that forwards calls to the app (runs on the app's own binary via `ELECTRON_RUN_AS_NODE=1`, no system Node needed); `confirm.js` bridges write/destroy calls to the in-app dialog. `doctor.js` holds the Server-Doctor diagnostics — pure, testable helpers (console-log analysis, crash summarising, `server.properties` validation, the composite health check) with no Electron dependency. Handlers reuse the same backend functions the IPC layer uses.
+- **MCP** (`src/mcp/`) — optional local-only AI integration. `tools.js` is the tool registry (name, risk tier, schema, handler): read tools run freely, write tools ask in-app, destructive always ask. `server.js` is a loopback HTTP server (127.0.0.1, random port, fresh token) started when enabled; `bridge.js` is a dependency-free stdio MCP server a client launches that forwards calls to the app (runs on the app's own binary via `ELECTRON_RUN_AS_NODE=1`, no system Node needed); `confirm.js` bridges write/destroy calls to the in-app dialog. `doctor.js` holds the Server-Doctor diagnostics — pure, testable helpers (console-log analysis, crash summarising, `server.properties` validation, the composite health check) with no Electron dependency. `repair.js` holds the Autonomous Doctor logic (crash-loop / RAM-pressure detection, the `propose_fix` repair planner, and the marketplace mod-name matching used by `apply_fix`); `modpack-plan.js` resolves candidate projects into an install plan with versions + required dependencies. Handlers reuse the same backend functions the IPC layer uses.
 
 - **Preload** (`src/preload.js`) — the **only** bridge between main and renderer. It exposes
   `window.observer.*` over `contextBridge`. `contextIsolation` is on and `nodeIntegration` is off,
@@ -150,9 +152,14 @@ add a regression test with a synthesized NBT fixture (see
    translated yet.
 2. Add an entry to `window.LOCALES_META` in `src/renderer/locales/meta.js`:
    `{ code: 'it', name: 'Italiano' }`.
-3. Add a matching `<option>` to the `#languageSelect` dropdown in `src/renderer/index.html`.
-4. Make sure the new file is loaded: it must be required the same way the other languages are (see
-   `tests/i18n.test.js` and how `index.html` includes the locale files).
+3. Load the new file in `src/renderer/index.html` — add `<script src="locales/it.js"></script>`
+   alongside the other locale tags (they sit just before the `js/*` tags).
+4. Add the language code to **both** hardcoded lists so the tests and CI see it:
+   - `tests/i18n.test.js` — the `['en', 'vi', …]` array near the top.
+   - `window.LOCALES_META` in `src/renderer/locales/meta.js` (step 2 above).
+   NOTE: the `#languageSelect` dropdown is populated at runtime from `LOCALES_META`
+   (`08-shell.js`), so you do **not** edit `index.html` options by hand — a manual `<option>`
+   would be overwritten on boot.
 5. Run `npm test` — the i18n test checks every locale has every key the `en` block defines, and
    that every key referenced from `index.html` **and** from `t('…')`/`tf('…')` literals in
    `src/renderer/js/*.js` actually exists in `en`. (Dynamic/concatenated keys are skipped.)

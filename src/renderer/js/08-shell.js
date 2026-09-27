@@ -82,7 +82,14 @@ const channelOrder=['overview','console','players','performance','content','mark
 function positionChannelIndicator(){const nav=$('#nav'),ind=$('#channelIndicator');if(!nav||!ind)return;const active=nav.querySelector('.nav-item.active');if(!active){ind.style.opacity='0';return} // rail is vertical — indicator is left border via CSS, no horizontal calc needed
   ind.style.opacity='0'; }
 let lastTabIdx=0;
+// UX (2.6.0): remember each tab's scroll position so returning to a tab lands where the user left
+// it, instead of snapping back to the top. The scrolling container is `.workspace main`.
+const _tabScroll={};
+let _lastTab=null;
 function switchTab(tab){
+  const _main=document.querySelector('.workspace main');
+  if(_main&&_lastTab&&_lastTab!==tab)_tabScroll[_lastTab]=_main.scrollTop;
+  _lastTab=tab;
   $$('.nav-item').forEach(b=>{ const on=b.dataset.tab===tab; b.classList.toggle('active',on); b.setAttribute('aria-current', on?'page':'false'); });
   // Direction-aware slide: forward in rail order slides from the right.
   const order=[...channelOrder,'worldmap','settings'];
@@ -110,6 +117,9 @@ function switchTab(tab){
   // hook switchTab itself: it evaluates before this file, so capturing
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
   if(tab==='worldmap'&&typeof wmLoad==='function')wmLoad().catch(e=>toast(`World Map failed to load: ${e?.message||e}`,'error'));
+  // Restore this tab's scroll position (rAF so the panel is laid out first). Console is exempt —
+  // it manages its own auto-scroll/tail behavior and should always pin to the newest line.
+  if(_main&&tab!=='console'){const y=_tabScroll[tab]||0;requestAnimationFrame(()=>{_main.scrollTop=y})}
 }
 
 // ===== v2.0.0 MULTI-INSTANCE RAIL =====
@@ -271,6 +281,10 @@ async function removeInstancePrompt(inst){
   if(!r||!r.ok)return toast((r&&r.error)||'Remove failed.','error');
   try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
   refreshUI();
+  // UX (2.6.0): offer a one-click undo — re-adds the same folder as an instance. Never touches the
+  // folder on disk either way, so this is purely a list-level convenience.
+  const _path=inst.serverPath||'';
+  if(_path) toast(t('inst.removed',{n:inst.name||_path}),undefined,{label:t('toast.undo'),fn:async()=>{ try{ const a=await window.observer.instanceAdd({serverPath:_path}); if(a&&a.ok){ const s2=await window.observer.getState(); state={...state,...s2}; refreshUI(); toast(t('inst.added'),'success'); } }catch{} }});
 }
 // Switch the active instance: the backend re-seeds ctx and repoints the runtime folder, then we
 // re-pull the whole snapshot so console/metrics/files/settings all reflect the new instance.
@@ -312,7 +326,7 @@ async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
 function renderRecentCommands(){const wrap=$('#recentCommands'),group=$('#recentCommandsGroup');if(!wrap||!group)return;if(!cmdHistory.length){group.hidden=true;return}group.hidden=false;wrap.innerHTML='';cmdHistory.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.title=c;b.onclick=()=>command(c);wrap.append(b)})}
-async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
+async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
 $$('.nav-item').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $('#nav')?.addEventListener('keydown', e=>{
   const items=[...$$('.nav-item')]; const idx=items.indexOf(document.activeElement);
@@ -359,7 +373,7 @@ document.addEventListener('keydown', e=>{
 const logOutputEl=$('#logOutput');if(logOutputEl)logOutputEl.addEventListener('scroll',()=>{const atBottom=logOutputEl.scrollHeight-logOutputEl.scrollTop-logOutputEl.clientHeight<40;logPaused=!atBottom;if(atBottom){const j=$('#logJump');if(j)j.hidden=true}/* scrolled away by hand -> reflect it on the auto-scroll toggle */if(!atBottom&&logAutoScroll){logAutoScroll=false;const b=$('#logAutoscroll');if(b){b.classList.remove('active');b.setAttribute('aria-pressed','false')}}});
 const logJumpEl=$('#logJump');if(logJumpEl)logJumpEl.onclick=()=>{logOutputEl.scrollTop=logOutputEl.scrollHeight;logJumpEl.hidden=true;logPaused=false};
 const cmdInputEl=$('#commandInput');if(cmdInputEl)cmdInputEl.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){if(!cmdHistory.length)return;e.preventDefault();cmdHistoryIdx=Math.min(cmdHistory.length-1,cmdHistoryIdx+1);cmdInputEl.value=cmdHistory[cmdHistoryIdx]||''}else if(e.key==='ArrowDown'){e.preventDefault();cmdHistoryIdx=Math.max(-1,cmdHistoryIdx-1);cmdInputEl.value=cmdHistoryIdx===-1?'':cmdHistory[cmdHistoryIdx]}});
-$('#saveSettings').onclick=async()=>{
+$('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const next=getSettings();
   const folderInput=$('#serverFolderInput'), javaInput=$('#javaPathInput');
   if(folderInput) folderInput.style.borderColor='';
@@ -372,23 +386,23 @@ $('#saveSettings').onclick=async()=>{
   if(next.jvmArgs && /["'<>|]/.test(next.jvmArgs)) return toast(t('set.errJvmChars'),'error');
   if(state.java?.arch==='32-bit' && next.memoryMax>2) return toast(t('set.errJava32'),'error');
   const r=await window.observer.saveSettings(next);
-  if(!r.ok) return toast(r.error,'error');
+  if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
   state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
-};
-$('#saveRamOverview').onclick=async()=>{
+});
+$('#saveRamOverview').onclick=()=>withBusy($('#saveRamOverview'),async()=>{
   const next=getSettings();
   if(next.memoryMax<next.memoryMin)return toast(t('set.errMemOrder'),'error');
   const r=await window.observer.saveSettings(next);state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
-};
+});
 $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value;applyLocale();const next={...getSettings(),locale:currentLocale};const r=await window.observer.saveSettings(next);state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();renderJvmPreview();if(!$('#newServerModal').hidden)nswRender();if(!$('#installModal').hidden){imRenderCompat();imRenderWarns()}};
 // Performance tab: offline banner CTA reuses the main Start button so there is
 // exactly one start path (same guards, same toasts, no duplicated logic).
 $('#perfStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
 // Properties tab (search/filter/save) moved to 10-properties.js.
-$('#createBackup').onclick=async()=>{if(!await confirmDialog({title:t('wld.backupsT'),body:t('toast.confirmBackup'),ok:t('wld.create')}))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)};
+$('#createBackup').onclick=()=>withBusy($('#createBackup'),async()=>{if(!await confirmDialog({title:t('wld.backupsT'),body:t('toast.confirmBackup'),ok:t('wld.create')}))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)});
 // Marketplace state moved to 11-market.js.
 function debounce(fn,ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 // Marketplace search/paging UI moved to 11-market.js.
@@ -399,8 +413,8 @@ $('#manualWhitelistBtn').onclick=()=>{const p=manualPlayer();if(p)togglePlayerWh
 $('#manualBanBtn').onclick=async()=>{const p=manualPlayer();if(p&&await confirmDialog({title:t('ply.ban'),body:`Ban ${p.name}?`,ok:t('ply.ban'),danger:true}))togglePlayerBan(p,true)};
 $('#manualKickBtn').onclick=async()=>{const p=manualPlayer();if(p&&await confirmDialog({title:t('ply.kick'),body:`Kick ${p.name}?`,ok:t('ply.kick'),danger:true}))command(`kick ${p.name}`)};
 $('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast(t('toast.choosePlayer'));if(!await confirmDialog({title:t('pd.apply'),body:t('toast.applyPlayerConfirm',{n:selectedPlayer.name}),ok:t('pd.apply')}))return;const changes={health:$('#pdHealth').value,food:$('#pdFood').value,saturation:$('#pdSaturation').value,xpLevel:$('#pdXpLevel').value,xpTotal:$('#pdXpTotal').value,gameType:$('#pdGameType').value};const r=await window.observer.playerSave({uuid:selectedPlayer.uuid,changes,clearInventory:$('#pdClearInventory').checked});if(!r.ok)return toast(r.error);toast(t('toast.playerSaved',{n:r.backup}));refreshUI()};
-$('#startBtn').onclick=async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||t('toast.startUnknown'),'error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast(t('toast.startRequested'))};$('#stopBtn').onclick=async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)};
-$('#forceStopBtn').onclick=async()=>{if(!await confirmDialog({title:t('top.forceStop'),body:t('top.forceStopConfirm'),ok:t('top.forceStop'),danger:true}))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')};
+$('#startBtn').onclick=()=>withBusy($('#startBtn'),async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||t('toast.startUnknown'),'error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast(t('toast.startRequested'))});$('#stopBtn').onclick=()=>withBusy($('#stopBtn'),async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)});
+$('#forceStopBtn').onclick=()=>withBusy($('#forceStopBtn'),async()=>{if(!await confirmDialog({title:t('top.forceStop'),body:t('top.forceStopConfirm'),ok:t('top.forceStop'),danger:true}))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')});
 window.observer.onLog(addLog);window.observer.onState(v=>{
   // M5/B4: server:state is NOT gated (the rail needs a background instance's crash/stop). Record
   // it per instance, then let the ACTIVE view ignore a background instance or it would flip the
@@ -440,7 +454,9 @@ function drawOvSpark(){
 }
 window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const key=(v.players||[]).slice().sort().join(',');if(key!==lastLivePlayersKey){lastLivePlayersKey=key;try{renderPlayers()}catch{}}
-});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}]; try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} try{$('#tps').textContent=displayTps?.toFixed?.(2)??'—';}catch{} try{$('#perfTps').textContent=displayTps?.toFixed?.(2)??'—';}catch{}
+});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}]; try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
+  const tpsFmt=x=>x.toFixed(2);
+  try{const c=$('#tps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{} try{const c=$('#perfTps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{}
   const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—'}
   // overview color coding
   const tpsClass=displayTps==null?'':displayTps>=19?'ok':displayTps>=17?'warn':'bad';
@@ -498,7 +514,7 @@ async function loadConnectInfo(){
   const fw=$('#allowFirewall'); if(fw){ fw.textContent = launcherPlatform==='linux' ? t('conn.copyFwCmd') : t('conn.firewall'); }
 }
 
-$('#tunnelStart').onclick=async()=>{if(!await confirmDialog({title:t('tun.start'),body:t('tun.confirm'),ok:t('tun.start'),danger:true}))return;const r=await window.observer.tunnelStart('playit');if(!r.ok)return toast(r.error,'error');toast(t('tun.started'),'success')};
+$('#tunnelStart').onclick=()=>withBusy($('#tunnelStart'),async()=>{if(!await confirmDialog({title:t('tun.start'),body:t('tun.confirm'),ok:t('tun.start'),danger:true}))return;const r=await window.observer.tunnelStart('playit');if(!r.ok)return toast(r.error,'error');toast(t('tun.started'),'success')});
 $('#tunnelDashboard').onclick=()=>window.observer.tunnelOpenUrl('https://playit.gg/account/tunnels');
 $('#autoTunnelQuick')?.addEventListener('change',async()=>{const next={...getSettings(),autoTunnel:$('#autoTunnelQuick').checked};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return}state={...state,settings:next,java:r.java};if($('#autoTunnelInput'))$('#autoTunnelInput').checked=next.autoTunnel;toast(next.autoTunnel?t('tun.autoOnToast'):t('tun.autoOffToast'),'success')});
 const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim());window.observer.saveManualTunnel(tunnelManual.value.trim())})}
@@ -565,8 +581,8 @@ $('#javaAutoInstall').onclick=async()=>{
 // FEATURE: first-run onboarding flow — create a new server (recommended for beginners), pick an
 // existing server folder, or skip to explore on your own. Doesn't ask again once completed
 // (settings.onboarded).
-function showOnboarding(){$('#onboardingModal').hidden=false}
-function hideOnboarding(){$('#onboardingModal').hidden=true}
+function showOnboarding(){const m=$('#onboardingModal');m.hidden=false;trapFocus(m)}
+function hideOnboarding(){const m=$('#onboardingModal');if(m.hidden)return;releaseFocus();m.hidden=true}
 async function markOnboarded(){await window.observer.onboardingComplete();state.settings={...state.settings,onboarded:true}}
 // BUGFIX: this modal had no way to dismiss it besides picking one of the 3 onboarding choices — fine
 // on a genuinely first run, but "Show welcome guide again" (Settings) reopens this same modal on an
@@ -598,7 +614,7 @@ const modalBusy=overlay=>overlay.id==='newServerModal'&&$('#nswNext').disabled||
 // The overlay's fade-out is now driven by CSS discrete transitions on [hidden] (08-motion.css),
 // so we only flip the attribute — the browser keeps the element painted during the fade and then
 // sets display:none. No manual setTimeout timing to drift out of sync.
-function closeOverlayAnimated(el){ el.classList.add('closing'); el.hidden=true; setTimeout(()=>el.classList.remove('closing'),220); }
+function closeOverlayAnimated(el){ releaseFocus(); el.classList.add('closing'); el.hidden=true; setTimeout(()=>el.classList.remove('closing'),220); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=$$('.modal-overlay').find(m=>!m.hidden);if(open&&!modalBusy(open)){ if(open.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(open); }}});
 $$('.modal-overlay').forEach(overlay=>overlay.addEventListener('click',e=>{if(e.target===overlay&&!modalBusy(overlay)){ if(overlay.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(overlay); }}));
 
@@ -618,12 +634,12 @@ bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window
 const updateBtn=$('#checkUpdateBtn');
 // BUGFIX: every update call is now awaited and its {ok:false} / thrown error is shown, and the
 // status text resets to a retryable state instead of sticking on "Checking…" after a failure.
-if(updateBtn)updateBtn.onclick=async()=>{
+if(updateBtn)updateBtn.onclick=()=>withBusy(updateBtn,async()=>{
   const st=$('#updateStatus');
   if(st)st.textContent=t('upd.checking');
   try{const r=await window.observer.checkUpdate();if(r&&!r.ok&&st)st.textContent=r.error||t('upd.none');}catch(e){if(st)st.textContent=e?.message||String(e);}
-};
-window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.available',{v:v.version})+' <button class="btn primary sm" id="dlBtn">'+t('upd.download')+'</button>';const b=$('#dlBtn');if(b)b.onclick=async()=>{const s=$('#updateStatus');try{const r=await window.observer.downloadUpdate();if(r&&!r.ok&&s)s.textContent=r.error||'Download failed.';}catch(e){if(s)s.textContent=e?.message||String(e);}};});
+});
+window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.available',{v:v.version})+' <button class="btn primary sm" id="dlBtn">'+t('upd.download')+'</button>';const b=$('#dlBtn');if(b)b.onclick=()=>withBusy(b,async()=>{const s=$('#updateStatus');try{const r=await window.observer.downloadUpdate();if(r&&!r.ok&&s)s.textContent=r.error||'Download failed.';}catch(e){if(s)s.textContent=e?.message||String(e);}});});
 window.observer.onUpdateProgress(p=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.downloading',{p:Math.round(p.percent)});});
 window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.ready')+' <button class="btn primary sm" id="installBtn">'+t('upd.install')+'</button>';const b=$('#installBtn');if(b)b.onclick=async()=>{
   // Installing restarts the app, which stops any running server. Warn first so nobody loses an
