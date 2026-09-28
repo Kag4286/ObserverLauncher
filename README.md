@@ -12,7 +12,7 @@ ObserverLauncher handles the setup work around hosting: it downloads the server 
 
 > **Website:** [observerlauncher-site.kag4286.workers.dev](https://observerlauncher-site.kag4286.workers.dev) — an overview of the whole project, all seven languages, and the full changelog.
 
-> Since 1.0.0 the project favours stability and polish over new features. Changes are listed in the [CHANGELOG](CHANGELOG.md).
+> 3.0.0 adds a headless mode, an `observer` command line, and MCP that runs without a window — the GUI is unchanged and shares every line of backend code. Changes are listed in the [CHANGELOG](CHANGELOG.md).
 
 [Install](#install) · [Quick start](#quick-start) · [Features](#features) · [Troubleshooting](#troubleshooting) · [Architecture](#architecture)
 
@@ -22,12 +22,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-2.6.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-2.6.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-3.0.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-3.0.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-2.6.0.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-3.0.0.AppImage`, then run it. No root needed.
 
 From source:
 
@@ -169,7 +169,9 @@ ObserverLauncher can act as an MCP server, letting an MCP client read and contro
 
 **Server Doctor.** The AI can run a health check (`doctor_report` / `diagnose_server`), scan the console (`analyze_console`), summarise the newest crash report (`explain_crash`), check TPS/MSPT (`check_performance`), validate `server.properties`, test the port, and run composite workflows (`prepare_and_start`, `safe_restart`). Every write and destroy call is written to an audit log the AI can read back (`read_audit_log`).
 
-**Enable it:** Settings → **Advanced** → **MCP / AI** → *Enable MCP server*. The launcher starts a local-only server (127.0.0.1, random port, a fresh token each launch) and writes its connection info to `mcp-bridge.json` in the launcher's data folder. The app must stay open while the client is used.
+**Enable it:** Settings → **Advanced** → **MCP / AI** → *Enable MCP server*. The launcher starts a local-only server (127.0.0.1, random port, a fresh token each launch) and writes its connection info to `mcp-bridge.json` in the launcher's data folder. With the GUI open, the app stays running while the client is used.
+
+**Headless:** since 3.0.0 the same MCP server can run with **no window** — `node src/headless.js` (or `OBSERVER_DATA_DIR=<dir> node src/headless.js`). With no GUI, write and destructive tools are **refused by default** and written to the audit log; set `OBSERVER_CONFIRM_MODE=allowlist` + `OBSERVER_CONFIRM_ALLOW=tool_a,tool_b` to allow specific ones for automation. When MCP is on, the loopback server also answers an unauthenticated `GET /health` (`{ok, uptime, version}`) for container health checks; every tool route still needs the bearer token.
 
 **Connect a client:** click **Copy MCP config** and paste it into your client's MCP settings. The launcher runs the bridge with its own binary (`ELECTRON_RUN_AS_NODE=1`), so Node.js is not required.
 
@@ -219,7 +221,7 @@ MyServer/
 
 Newer Minecraft versions may store player data under `world/players/data/` instead of `world/playerdata/`. The launcher reads both.
 
-Launcher data lives outside the server folder, in Electron's `userData` directory (on Windows usually `C:\Users\<you>\AppData\Roaming\ObserverLauncher`, on Linux `~/.config/ObserverLauncher`): `settings.json`, downloaded item and block icons under `textures/`, and update state.
+Launcher data lives outside the server folder, in Electron's `userData` directory (on Windows usually `C:\Users\<you>\AppData\Roaming\ObserverLauncher`, on Linux `~/.config/ObserverLauncher`): `settings.json`, downloaded item and block icons under `textures/`, and update state. In headless mode you can point this elsewhere with the `OBSERVER_DATA_DIR` environment variable.
 
 ## Troubleshooting
 
@@ -281,7 +283,7 @@ The app never uploads your world, configs or player data, never collects usage s
 
 ### Linux notes
 
-Linux is supported but has not been verified on real hardware. The platform code is code-analysed and unit-tested only, so treat the Linux build as less battle-tested than Windows.
+Linux is supported and verified in CI on a real Linux kernel (unit + E2E both run on `ubuntu-latest`). The Linux platform code is also exercised by a dedicated boot test (`tests/linux-boot.test.js`), which spawns a real Java process and checks the `/proc` walk, process metrics and a real zip backup round-trip.
 
 - The firewall is not opened for you. The button copies `sudo ufw allow <port>/tcp` to the clipboard; the launcher never requests sudo.
 - Backups need `zip` or `tar`. If neither is present, the launcher tells you what to install.
@@ -314,6 +316,11 @@ MAIN  (src/main.js)  thin composition root
   Per-software resolvers: adapters/
   Per-OS process/metrics/firewall: platform/
   MCP server + stdio bridge + doctor/repair: mcp/
+
+HEADLESS  (src/headless.js + src/cli.js)  same backend, no window
+  data-dir.js resolves the data folder (OBSERVER_DATA_DIR env -> userData -> platform default)
+  ipc-shim.js is a fake ipcMain so feature modules register unchanged (ALS pinning preserved)
+  headless.js registers every module + backend init; cli.js exposes the `observer` command
 ```
 
 - `src/main/context.js` holds the shared mutable state object (`ctx`) plus helpers such as `send`, `appendLog` and `setServerStatus`. Every status change goes through `setServerStatus`.
@@ -333,6 +340,8 @@ npm run test:e2e  # Playwright end-to-end (real Electron app)
 The unit suite covers boot state, editor safety rails, force-stop, input validation, Java/version mapping, metric parsing, marketplace and poll suppression, the world map (including heightmap helpers and modded-dimension detection), player equipment (old and new NBT layouts), download resume, explored-chunk filtering, the scheduler, modpack compatibility, and MCP (tool registry, HTTP server, stdio bridge).
 
 E2E boots the real app and drives real flows: a full tab and modal tour that must stay free of renderer errors, the Settings sub-tab glider, language switching, motion-level persistence across a reload, and, against a throwaway fixture server folder, the Content list, the file-browser and editor round-trip, and the Properties editor. The suite runs offline; boot skips the network version fetch and the real Java probe under `OBSERVER_E2E=1`.
+
+Since 3.0.0 the suite also covers the headless path: `data-dir` resolution, the IPC shim, the no-window entry point and CLI, the headless confirm policy, MCP over headless (`/health`), JSONL audit with rotation, and server templates — plus a ratchet (`tests/headless-guard.test.js`) that fails the build if the backend is re-welded to Electron.
 
 ### Build
 
@@ -357,10 +366,13 @@ Releases are automated via GitHub Actions when you push a `v*` tag.
 ObserverLauncher/
 ├── src/
 │   ├── main.js          # Electron main process (thin wiring)
+│   ├── headless.js      # No-window entry point (same backend, no Electron)
+│   ├── cli.js           # `observer` command line (bin)
 │   ├── preload.js       # Safe IPC bridge
 │   ├── main/            # Backend modules (see Architecture above)
 │   │   ├── adapters/    # Server software download resolvers
-│   │   └── platform/    # Windows/Linux process, metrics, firewall
+│   │   ├── platform/    # Windows/Linux process, metrics, firewall
+│   │   └── data-dir.js / ipc-shim.js / templates.js  # headless support + server templates
 │   └── renderer/        # UI
 │       ├── index.html   # Shell (loads css/*, locales/*, js/* in order)
 │       ├── js/          # Frontend per tab (00-core ... 13-bootcheck)

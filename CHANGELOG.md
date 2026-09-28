@@ -10,6 +10,67 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [3.0.0] — 2026-09-28
+
+**Headline: the launcher goes headless — a CLI, a no-window entry point, and MCP that runs without
+Electron.** 3.0.0 makes the SAME backend (and the SAME 70 MCP tools) run under plain `node`, so an AI
+or a script can drive a server with no window at all. It is NOT a rewrite: the GUI is unchanged and
+shares every line of backend code with the new headless mode. Docker, CI/CD and remote management are
+deferred to 3.1.0 / 3.2.0 / 3.3.0 (they stack on top of this core).
+
+### Added — headless core
+- **`src/main/data-dir.js`** — `dataDir()` = `OBSERVER_DATA_DIR` env || Electron `userData` || a
+  per-platform default; `tempDir()` = the OS temp dir. Replaces every direct `app.getPath(...)` so
+  the backend no longer requires Electron at require-time.
+- **`src/main/ipc-shim.js`** — a fake `ipcMain` (`handle`/`on`) + `invoke`/`emit`/`listChannels`,
+  so the feature modules register unchanged without Electron. Reproduces `main.js`'s AsyncLocalStorage
+  pinning so multi-instance state cannot leak headless.
+- **`src/headless.js`** — the no-window entry point: `createHeadless` + `initHeadless` + `start`/`stop`.
+  Registers every feature module via the shim, runs backend-only init (Java detect, folder watcher,
+  metrics, auto-backup, scheduler), and starts the MCP server when enabled. NO window, NO auto-updater,
+  NO `tex://` protocol, NO single-instance lock. `SIGTERM`/`SIGINT` stop the tunnel + MCP cleanly.
+- **`src/cli.js`** — the `observer` command: `status`, `players`, `logs`, `start`, `stop`, `backup`,
+  `doctor`, `list`, `install`, `templates`, `init --template <id>`. `--json` for scripting,
+  `--instance <id>` to target one server. Wired as `bin.observer` in `package.json`.
+- **`src/main/templates.js`** — three server templates (`survival-5`, `creative-build`,
+  `modded-performance`) and a PURE `templatePlan()` that resolves a template into an ordered plan of
+  existing-tool calls (no new low-level code).
+- **Unauthenticated `GET /health`** on the MCP loopback server (liveness + version only; `/tools` and
+  `/rpc` still require the per-launch bearer token). Needed by a container healthcheck (3.1.0).
+
+### Changed
+- **MCP audit log is now JSONL and ROTATES** (`mcp-audit.log.1`/`.2`/`.3`, keep 3) instead of being
+  deleted wholesale at 256 KB — write/destroy history now survives the cap, and `read_audit_log`
+  parses it structurally across the rotation set.
+- **Headless confirm policy** is explicit: `ctx.confirmMode` = `gui` (default) | `auto-deny` |
+  `allowlist`. Headless defaults to `auto-deny` (env `OBSERVER_CONFIRM_MODE` / `OBSERVER_CONFIRM_ALLOW`),
+  so write/destroy tools are refused deliberately and audited — never by the accident of a missing
+  GUI bridge.
+
+### Fixed
+- The backend no longer throws at require-time under plain Node (top-level `const { app } =
+  require('electron')` removed from settings, runtime-state, textures, modpacks, settings-handlers,
+  content-handlers, tunnel, mcp/server, mcp/tools). GUI dependencies (dialog/shell/net/BrowserWindow)
+  moved to lazy requires inside GUI-only paths.
+
+### Tests
+- `tests/linux-boot.test.js` — real Linux boot coverage: spawns a java process and exercises
+  `findJavaDescendant` / `getProcessInfo` / `getProcessMetrics` + a real zip backup round-trip (gated
+  on Linux; CI installs temurin JDK 21 + zip/unzip). Now STRICT under CI: a missing tool is a failure,
+  not a silent skip.
+- `tests/data-dir.test.js`, `tests/ipc-shim.test.js`, `tests/headless.test.js`,
+  `tests/headless-confirm.test.js`, `tests/headless-guard.test.js`, `tests/cli.test.js`,
+  `tests/mcp-health.test.js`, `tests/mcp-audit.test.js`, `tests/templates.test.js`.
+- **`tests/headless-guard.test.js`** is a RATCHET: it fails the build if a top-level
+  `require('electron')` or an `app.getPath('userData'|'temp')` reappears outside `data-dir.js`.
+- `npm test` green (68 files).
+
+### Notes
+- Settings schema stays v4 — 3.0.0 adds NO new settings field, so no migration is needed.
+- The GUI is unchanged: same windows, same IPC channels, same visual design.
+- Docker -> 3.1.0, modpack CI/CD -> 3.2.0, remote management -> 3.3.0 (outlined in
+  `docs/v3.0.0-plan.md`).
+
 ## [2.6.0] — 2026-09-27
 
 **Headline: a UX-polish release — no GUI changes, only behaviour and feedback.** Every async
