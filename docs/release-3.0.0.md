@@ -43,6 +43,8 @@ Three ship today:
 
 `init` prints the exact steps it would run; the same steps are the same actions the app already knows how to do, so nothing is magic.
 
+The app itself has the same idea: in the "What kind of server?" step of the new-server wizard, a new **template picker** lets you pick one of these recipes in a click — it fills in the software and memory for you and jumps you to the version step.
+
 ## The app can run with no window at all
 
 A new background mode starts the whole backend — the server manager, metrics, backups, the scheduler and the MCP server — with no window. It is the same code the window uses, so your settings, your server folders and your instances all carry over. Close it with Ctrl+C and it shuts down cleanly.
@@ -62,6 +64,16 @@ When the MCP server is running, it answers a simple `GET /health` with “yes, I
 ## A better record of what an assistant did
 
 The audit log — the list of write and destructive actions an assistant performed — is now stored as structured entries and **keeps its history**: instead of throwing everything away when it gets large, it rolls over to older files, so you can still see what happened days ago.
+
+## Safer downloads
+
+When you install a plugin or mod from the Marketplace, the app now **checks the file against the fingerprint the registry publishes** before keeping it. If the downloaded file does not match — a corrupted transfer, a tampered mirror, someone sitting between you and the server — it is deleted on the spot and you get a clear message instead of a broken (or dangerous) jar in your `plugins/`/`mods/` folder. The same check now runs for every file inside an imported modpack. Servers that publish no fingerprint still install normally; the check simply does not apply there.
+
+Backups are also a little stricter: if a `.zip` is so damaged that the app cannot read the list of files inside, a restore is now **refused** instead of extracting it blindly. Restoring a normal backup is unchanged.
+
+## A fix for mods installed from the app
+
+A mod installed through the Marketplace window could land in the `plugins/` folder instead of `mods/` — where a mod loader never looks, so it silently did nothing. That is fixed: mods now always go to `mods/`. (Mods installed through the AI/MCP path were already correct.)
 
 ## Linux is now officially verified
 
@@ -87,4 +99,4 @@ Every change is now checked on a real Linux kernel automatically — the unit te
 
 ---
 
-*Developer notes: `npm test` (68 files) passes. New: a headless entry point, an `observer` CLI, server templates, an MCP `/health` endpoint, JSONL audit with rotation, an explicit headless confirm policy, and Linux verified on a real kernel (unit + E2E + a real server boot in CI). The GUI shares every line of backend code with the headless mode.*
+*Developer notes: `npm test` (69 files) passes. New: a headless entry point, an `observer` CLI, server templates (CLI + a wizard picker), an MCP `/health` endpoint, JSONL audit with rotation, an explicit headless confirm policy, marketplace/modpack download hash verification, and Linux verified on a real kernel (unit + E2E + a real server boot in CI). The GUI shares every line of backend code with the headless mode.*
