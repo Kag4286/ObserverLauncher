@@ -16,7 +16,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { app } = require('electron');
+// B1 (v3.0.0): no top-level electron require (throws in plain Node). All data paths go through
+// dataDir(); the one remaining Electron use (app.getVersion) stays lazily inside a try/catch.
+const { dataDir } = require('../main/data-dir.js');
 const { TOOLS, getTool } = require('./tools.js');
 
 // RESOURCES (1.2.0): expose server state as read-only MCP resources so an AI client can pull
@@ -39,7 +41,7 @@ async function resourceForUri(ctx, uri) {
 const MAX_BODY = 4 * 1024 * 1024; // 4 MB — generous for file writes, capped to avoid abuse
 
 function bridgeConfigPath() {
-  return path.join(app.getPath('userData'), 'mcp-bridge.json');
+  return path.join(dataDir(), 'mcp-bridge.json');
 }
 
 // Absolute path to bridge.js as an MCP client must invoke it. In a packaged build the file is
@@ -60,6 +62,17 @@ function bridgeScriptPath() {
 // Ask the renderer to confirm a write/destroy tool. Resolves true/false. Times out to false
 // after 60s so a headless/closed window can never hang a tool call forever.
 function confirmOnGui(ctx, tool, args, risk, instanceName) {
+  // B4 (v3.0.0): explicit headless confirm policy so write/destroy handling is DELIBERATE, not an
+  // accident of ctx.onMcpConfirm being undefined. Modes:
+  //   'gui'        (default) - ask the renderer dialog (unchanged).
+  //   'auto-deny'  - refuse write/destroy immediately + audit; never open a dialog or wait 60s.
+  //   'allowlist'  - allow ONLY tools named in ctx.confirmAllow, deny the rest.
+  const mode = ctx.confirmMode || 'gui';
+  if (mode === 'auto-deny') return Promise.resolve(false);
+  if (mode === 'allowlist') {
+    const allow = Array.isArray(ctx.confirmAllow) ? ctx.confirmAllow : [];
+    return Promise.resolve(allow.includes(tool));
+  }
   return new Promise(resolve => {
     let done = false;
     const finish = v => { if (!done) { done = true; resolve(!!v); } };
@@ -80,7 +93,7 @@ function confirmOnGui(ctx, tool, args, risk, instanceName) {
 // ~256 KB so it can never grow unbounded.
 function auditLog(tool, risk, result) {
   try {
-    const file = path.join(app.getPath('userData'), 'mcp-audit.log');
+    const file = path.join(dataDir(), 'mcp-audit.log');
     try { if (fs.statSync(file).size > 256 * 1024) fs.rmSync(file, { force: true }); } catch {}
     const line = `${new Date().toISOString()}\t${risk}\t${tool}\t${result && result.ok === false ? 'denied/error: ' + (result.error || '') : 'ok'}\n`;
     fs.appendFileSync(file, line);
@@ -110,12 +123,17 @@ async function callTool(ctx, toolName, args, cfg) {
     const found = (listInstances().instances || []).find(i => i.id === runId);
     instanceName = found ? found.name : null;
   } catch {}
+  // B4: when NOT in GUI mode the deny is a POLICY decision, so the message says so (the GUI text
+  // stays byte-identical for the existing confirm-flow tests).
+  const denyMsg = (riskLabel) => ((ctx.confirmMode && ctx.confirmMode !== 'gui')
+    ? `Denied by headless confirm policy (${riskLabel}).`
+    : `Denied by user (${riskLabel}).`);
   if (tool.risk === 'write' && !cfg.autoAllowWrite) {
     const yes = await confirmOnGui(ctx, toolName, args, 'write', instanceName);
-    if (!yes) { auditLog(toolName, 'write', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (write tool).' }; }
+    if (!yes) { auditLog(toolName, 'write', { ok: false, error: 'denied by user' }); return { ok: false, error: denyMsg('write tool') }; }
   } else if (tool.risk === 'destroy') {
     const yes = await confirmOnGui(ctx, toolName, args, 'destroy', instanceName);
-    if (!yes) { auditLog(toolName, 'destroy', { ok: false, error: 'denied by user' }); return { ok: false, error: 'Denied by user (destructive tool).' }; }
+    if (!yes) { auditLog(toolName, 'destroy', { ok: false, error: 'denied by user' }); return { ok: false, error: denyMsg('destructive tool') }; }
   }
   try {
     // M4b: run the handler inside AsyncLocalStorage for the target instance so per-instance ctx
@@ -133,7 +151,7 @@ async function callTool(ctx, toolName, args, cfg) {
 // userData on first use and point the script at it. Best-effort: failure is logged, not fatal.
 function ensureLauncherScript() {
   try {
-    const userData = app.getPath('userData');
+    const userData = dataDir();
     const bridgeSrc = path.join(__dirname, 'bridge.js');
     const bridgeDst = path.join(userData, 'mcp', 'bridge.js');
     fs.mkdirSync(path.dirname(bridgeDst), { recursive: true });

@@ -10,10 +10,12 @@
 // file from renderer state, so a pid stored there would race and be lost.
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+// B1 (v3.0.0): dataDir() replaces the top-level `{ app } = require('electron')` destructure, which
+// threw at require-time in plain Node. See data-dir.js.
+const { dataDir } = require('./data-dir.js');
 const { writeFileAtomic } = require('./fs-utils.js');
 
-const runtimePath = () => path.join(app.getPath('userData'), 'runtime.json');
+const runtimePath = () => path.join(dataDir(), 'runtime.json');
 
 function readAll() {
   try {

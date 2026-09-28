@@ -15,9 +15,11 @@
 // Mojang asset note: textures are fetched to the USER'S machine at runtime from the public
 // PrismarineJS mirror — nothing is redistributed inside this repository.
 
-const { app, net, BrowserWindow } = require('electron');
+// B1 (v3.0.0): no top-level electron require (throws in plain Node). dataDir() resolves the cache
+// root; net/BrowserWindow are required LAZILY inside the GUI-only paths that actually use them.
 const fs = require('fs');
 const path = require('path');
+const { dataDir } = require('./data-dir.js');
 
 const DEFAULT_VERSION = '26.1'; // newest version the PrismarineJS mirror reliably has
 const RAW_BASE = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data';
@@ -35,7 +37,11 @@ const PLACEHOLDER_PNG = Buffer.from(
 
 function broadcast(channel, payload) {
   if (typeof notifyIcon === 'function') { notifyIcon(channel, payload); return; }
-  for (const w of BrowserWindow.getAllWindows()) { try { w.webContents.send(channel, payload); } catch {} }
+  try {
+    const { BrowserWindow } = require('electron');
+    if (!BrowserWindow) return;
+    for (const w of BrowserWindow.getAllWindows()) { try { w.webContents.send(channel, payload); } catch {} }
+  } catch { /* headless: no windows to notify */ }
 }
 function init({ serverNames: getNames, notify }) {
   if (typeof getNames === 'function') serverNames = getNames;
@@ -51,7 +57,7 @@ function detectMcVersion(names) {
   return null;
 }
 
-function cacheRoot() { return path.join(app.getPath('userData'), 'textures'); }
+function cacheRoot() { return path.join(dataDir(), 'textures'); }
 
 // kind is the renderer's singular form ('item'|'block'); both cache and bundled use that layout.
 function resolveLocal(version, kind, file) {
@@ -96,6 +102,9 @@ function queueRemote(version, kind, file) {
   (async () => {
     const folder = kind === 'item' ? 'items' : 'blocks'; // upstream uses plural names
     const url = `${RAW_BASE}/${encodeURIComponent(version)}/${folder}/${encodeURIComponent(file)}`;
+    // GUI-only: net is an Electron module. Headless has no icon fetcher, so the request is skipped.
+    const { net } = require('electron');
+    if (!net || typeof net.fetch !== 'function') return;
     const r = await net.fetch(url);
     if (!r.ok) return;
     const buf = Buffer.from(await r.arrayBuffer());

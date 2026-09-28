@@ -1,14 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { app } = require('electron');
 const { writeFileAtomic } = require('./fs-utils.js');
+// B1 (v3.0.0): route data paths through dataDir() instead of requiring electron at the top
+// level — `const { app } = require('electron')` throws at require-time in plain Node, blocking
+// the headless entry point. dataDir() honours OBSERVER_DATA_DIR, then Electron userData.
+const { dataDir } = require('./data-dir.js');
 
-const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+const settingsPath = () => path.join(dataDir(), 'settings.json');
 // One-time safety copy written before the v3->v4 migration. loadSettings() must backup
 // BEFORE migrating: a failed migration returns defaults on throw (legacy behaviour),
 // so without a backup a migration bug would silently wipe the user's config.
-const backupPathV3 = () => path.join(app.getPath('userData'), 'settings.v3.bak.json');
+const backupPathV3 = () => path.join(dataDir(), 'settings.v3.bak.json');
 
 function defaultMemoryGB() {
   const totalGB = os.totalmem() / (1024 ** 3);

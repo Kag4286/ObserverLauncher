@@ -29,6 +29,19 @@ jobs:
 
       - run: npm ci
 
+      # Linux boot test (tests/linux-boot.test.js) needs a JDK + zip/unzip to exercise the
+      # real /proc walk, process metrics and the zip backup round-trip. ubuntu runners have
+      # neither zip nor a JDK by default. Windows runs the same suite but the test skips there.
+      - uses: actions/setup-java@v4
+        if: runner.os == 'Linux'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install zip/unzip (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zip unzip
+
       - run: npm test
 
   e2e:

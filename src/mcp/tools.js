@@ -3,6 +3,7 @@
 // Handlers reuse the SAME backend functions the IPC layer uses, so behaviour is identical.
 const fs = require('fs');
 const path = require('path');
+const { dataDir, tempDir } = require('../main/data-dir.js');
 const { serverFiles, readPlayerData, findPlayerDataFile, readEula } = require('../main/server-files.js');
 const { safeTarget, readJsonList } = require('../main/fs-utils.js');
 const { loadSettings, loadSettingsFor, saveSettingsFor } = require('../main/settings.js');
@@ -417,7 +418,7 @@ async function tExportModpack(ctx, a) {
   const files = buildMrpackEntries(root, manifest, destFolders);
   if (!files.length) return { ok: false, error: 'None of the tracked files still exist on disk.' };
   const dependencies = dependenciesFor(serverFiles(root));
-  const stagingDir = path.join(require('electron').app.getPath('temp'), 'ob-mcp-export-' + Date.now());
+  const stagingDir = path.join(tempDir(), 'ob-mcp-export-' + Date.now());
   fs.mkdirSync(path.join(stagingDir, 'overrides'), { recursive: true });
   const index = { formatVersion: 1, game: 'minecraft', versionId: 'mcp-' + Date.now(), name: path.basename(root), summary: 'Exported via MCP - ' + files.length + ' item(s).', files, dependencies };
   fs.writeFileSync(path.join(stagingDir, 'modrinth.index.json'), JSON.stringify(index, null, 2));
@@ -747,7 +748,7 @@ async function tListWaypoints(ctx) {
 async function tReadAuditLog(ctx, a) {
   const n = Math.min(Math.max(1, Number(a.lines) || 100), 500);
   try {
-    const file = require('path').join(require('electron').app.getPath('userData'), 'mcp-audit.log');
+    const file = path.join(dataDir(), 'mcp-audit.log');
     const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-n);
     return { ok: true, result: { lines, count: lines.length } };
   } catch { return { ok: true, result: { lines: [], count: 0, note: 'No audit log yet - write/destroy tool calls are recorded here.' } }; }

@@ -3,7 +3,9 @@
 // Progress events go through ctx.send; renderer wiring untouched.
 const fs = require('fs');
 const path = require('path');
-const { app, dialog } = require('electron');
+// B1 (v3.0.0): no top-level electron require (throws in plain Node). tempDir() covers staging
+// paths; `dialog` is required lazily inside the GUI-only import/export handlers below.
+const { tempDir } = require('./data-dir.js');
 const { serverFiles } = require('./server-files.js');
 const { readJsonList, fileHashes, safeTarget } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
@@ -95,13 +97,14 @@ function dependenciesFor(serverInfo) {
 }
 
 async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
+  const { dialog } = require('electron'); // GUI-only: the compat/overwrite prompts below
   let tempZip, extractDir;
   try {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     onInfo?.({ phase: 'extract', name: 'Extracting modpack archive…', received: 0, total: 0 });
     const stamp = Date.now();
-    tempZip = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}.zip`);
-    extractDir = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}`);
+    tempZip = path.join(tempDir(), `observerlauncher-import-${stamp}.zip`);
+    extractDir = path.join(tempDir(), `observerlauncher-import-${stamp}`);
     fs.copyFileSync(mrpackPath, tempZip);
     const r = await platform.extractArchive(tempZip, extractDir);
     if (!r.ok) throw new Error(r.error || 'Could not extract the modpack archive.');
@@ -187,6 +190,7 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
 // Shared overrides copy (used by BOTH the .mrpack and CurseForge import paths). Lists every file
 // that would be clobbered before copying, and confirms with the user.
 async function copyOverridesWithConfirm(ctx, overridesDir) {
+  const { dialog } = require('electron'); // GUI-only: the overwrite prompt below
   if (!fs.existsSync(overridesDir)) return;
   const sensitiveSet = new Set(['server.properties', 'eula.txt']);
   const clobbered = [];
@@ -220,6 +224,7 @@ async function copyOverridesWithConfirm(ctx, overridesDir) {
 // key), downloads what is distributable, copies overrides, and RETURNS the list of mods whose
 // author blocked third-party downloads so the renderer can offer the manual fallback.
 async function importCfModpack(ctx, extractDir, index, onInfo) {
+  const { dialog } = require('electron'); // GUI-only: the compat prompt below
   const headers = (() => { try { const k = String(require('./settings.js').loadSettings().curseforgeApiKey || '').trim(); return k ? { 'x-api-key': k } : null; } catch { return null; } })();
   if (!headers) return { ok: false, error: 'Importing a CurseForge modpack needs your CurseForge API key. Add it in Settings, then try again.' };
   const name = index.name || 'CurseForge modpack';
@@ -265,8 +270,8 @@ async function importModpackFromPath(ctx, modpackPath, onInfo, source = 'local')
   try {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     const stamp = Date.now();
-    tempZip = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}.zip`);
-    extractDir = path.join(app.getPath('temp'), `observerlauncher-import-${stamp}`);
+    tempZip = path.join(tempDir(), `observerlauncher-import-${stamp}.zip`);
+    extractDir = path.join(tempDir(), `observerlauncher-import-${stamp}`);
     fs.copyFileSync(modpackPath, tempZip);
     const r = await platform.extractArchive(tempZip, extractDir);
     if (!r.ok) throw new Error(r.error || 'Could not extract the modpack archive.');
@@ -287,6 +292,7 @@ async function importModpackFromPath(ctx, modpackPath, onInfo, source = 'local')
 }
 
 function registerModpacks(ipcMain, ctx) {
+  const { dialog } = require('electron'); // GUI-only: the file-open dialog below
   ipcMain.handle('modpack:install-from-market', async (_, { id, version, versionId }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     let tempMrpack;
@@ -298,7 +304,7 @@ function registerModpacks(ipcMain, ctx) {
       if (!target) target = (byVersion.length ? byVersion : versions).find(hasMrpack);
       const file = target?.files?.find(f => /\.mrpack$/i.test(f.filename));
       if (!file) throw new Error('No .mrpack file was found for this modpack.');
-      tempMrpack = path.join(app.getPath('temp'), `observerlauncher-market-modpack-${Date.now()}.mrpack`);
+      tempMrpack = path.join(tempDir(), `observerlauncher-market-modpack-${Date.now()}.mrpack`);
       // The .mrpack package itself can be large; cap at 1 GB.
       await download(file.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: file.filename, received, total }), null, { maxBytes: 1024 * 1024 * 1024 });
       return await importMrpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info), 'market');
@@ -358,7 +364,7 @@ function registerModpacks(ipcMain, ctx) {
       const index = { formatVersion: 1, game: 'minecraft', versionId: `${folderName}-${Date.now()}`, name: folderName, summary: `Exported from ObserverLauncher — ${files.length} item(s).`, files, dependencies };
       const saveDialog = await dialog.showSaveDialog(ctx.win, { title: 'Export modpack', defaultPath: `${folderName}.mrpack`, filters: [{ name: 'Modrinth modpack', extensions: ['mrpack'] }] });
       if (saveDialog.canceled || !saveDialog.filePath) return { ok: false, cancelled: true };
-      stagingDir = path.join(app.getPath('temp'), `observerlauncher-export-${Date.now()}`);
+      stagingDir = path.join(tempDir(), `observerlauncher-export-${Date.now()}`);
       fs.mkdirSync(path.join(stagingDir, 'overrides'), { recursive: true });
       fs.writeFileSync(path.join(stagingDir, 'modrinth.index.json'), JSON.stringify(index, null, 2));
       try { fs.copyFileSync(path.join(ctx.currentServerPath, 'server.properties'), path.join(stagingDir, 'overrides', 'server.properties')); } catch {}

@@ -129,7 +129,8 @@ function findPlayitBinary() {
 // Download + install the Playit agent into userData/playit and remember its path. Mirrors
 // autoInstallJava: fetch → verify it is a real file → save playitPath. No admin rights needed.
 async function installPlayitAgent(ctx) {
-  const { app } = require('electron');
+  // B1 (v3.0.0): dataDir() replaces app.getPath('userData') so this works headless too.
+  const { dataDir } = require('./data-dir.js');
   const { json } = require('./http.js');
   const { isSafeDownloadUrl } = require('./validate.js');
   try {
@@ -138,7 +139,7 @@ async function installPlayitAgent(ctx) {
     const asset = pickPlayitAsset(rel?.assets, process.platform, process.arch);
     if (!asset?.browser_download_url) throw new Error('No matching Playit agent build was found for this system.');
     if (!isSafeDownloadUrl(asset.browser_download_url)) throw new Error('Refused an unsafe download URL.');
-    const dir = path.join(app.getPath('userData'), 'playit');
+    const dir = path.join(dataDir(), 'playit');
     fs.mkdirSync(dir, { recursive: true });
     const exeName = process.platform === 'win32' ? 'playit.exe' : 'playit';
     const dest = path.join(dir, exeName);

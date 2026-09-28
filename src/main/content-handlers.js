@@ -1,7 +1,8 @@
 // Content / properties / editor / worldmap handlers (extracted from main.js).
 const fs = require('fs');
 const path = require('path');
-const { dialog, shell } = require('electron');
+// B1 (v3.0.0): no top-level electron require (throws in plain Node). `dialog`/`shell` are
+// required LAZILY inside the two GUI-only handlers that use them (files:open, content:import).
 const { serverFiles, emptyServerFiles, buildPropertiesContent } = require('./server-files.js');
 const { requiredJavaForServer } = require('./server-java.js');
 const { writeFileAtomic, safeTarget } = require('./fs-utils.js');
@@ -20,7 +21,10 @@ function registerContent(ipcMain, ctx) {
 
   ipcMain.handle('files:open', async (_, relative) => {
     const target = safeTarget(ctx.currentServerPath, relative);
-    if (target && fs.existsSync(target)) await shell.openPath(target);
+    if (target && fs.existsSync(target)) {
+      const { shell } = require('electron'); // GUI-only: opens a file in the OS default app
+      await shell.openPath(target);
+    }
     return true;
   });
 
@@ -77,6 +81,7 @@ function registerContent(ipcMain, ctx) {
     const folders = { plugin: 'plugins', mod: 'mods', datapack: path.join(levelName, 'datapacks') };
     const folder = folders[kind];
     if (!folder || !ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const { dialog } = require('electron'); // GUI-only: the file-picker below
     const r = await dialog.showOpenDialog(ctx.win, { title: `Import ${kind}`, properties: ['openFile', 'multiSelections'], filters: [{ name: kind === 'datapack' ? 'Datapacks' : 'Java archives', extensions: kind === 'datapack' ? ['zip', 'jar'] : ['jar'] }] });
     if (r.canceled) return { ok: false, cancelled: true };
     const target = safeTarget(ctx.currentServerPath, folder);

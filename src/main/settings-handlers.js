@@ -2,7 +2,9 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { app, dialog } = require('electron');
+// B1 (v3.0.0): no top-level electron require (throws in plain Node). Data paths go through
+// dataDir()/tempDir(); `dialog`/`app` are required LAZILY inside the GUI-only handlers.
+const { dataDir, tempDir } = require('./data-dir.js');
 const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, removeInstance } = require('./settings.js');
 const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { requiredJavaForServer } = require('./server-java.js');
@@ -15,6 +17,10 @@ const platform = require('./platform');
 let javaInstalling = false;
 
 function registerSettings(ipcMain, ctx) {
+  // GUI-only Electron modules. Required lazily and destructured loosely: in a headless process
+  // require('electron') is a string, so these are undefined — but no headless code path calls
+  // the dialog/app handlers below (they only run with a renderer).
+  const { dialog, app } = require('electron');
   // BUGFIX: this is the very first IPC the renderer calls at boot. It must
   // NEVER reject (a throw here used to abort the whole boot sequence, leaving
   // default/empty state with no error shown). Folder reads are guarded so a
@@ -53,12 +59,12 @@ function registerSettings(ipcMain, ctx) {
         let config = null;
         try {
           if (ctx.mcpLauncher && ctx.mcpLauncher.bridgeDst) {
-            config = { command: ctx.mcpLauncher.command || process.execPath, args: [ctx.mcpLauncher.bridgeDst], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
+            config = { command: ctx.mcpLauncher.command || process.execPath, args: [ctx.mcpLauncher.bridgeDst], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: dataDir() } };
           } else {
             // Fallback before the launcher has been generated: still use the app binary as Node so
             // the config never depends on a system Node.js install.
             const { bridgeScriptPath } = require('../mcp/server.js');
-            config = { command: process.execPath, args: [bridgeScriptPath()], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: require('electron').app.getPath('userData') } };
+            config = { command: process.execPath, args: [bridgeScriptPath()], env: { ELECTRON_RUN_AS_NODE: '1', OBSERVER_MCP_USERDATA: dataDir() } };
           }
         } catch {}
         return { enabled: !!ctx.mcpServer, running, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite, config };
@@ -280,7 +286,7 @@ function registerSettings(ipcMain, ctx) {
   ipcMain.handle('java:list', async () => {
     const out = [];
     try {
-      const ud = app.getPath('userData');
+      const ud = dataDir();
       for (const major of [8, 11, 17, 21, 25]) {
         const dir = path.join(ud, `jre${major}`);
         if (!fs.existsSync(dir)) continue;
@@ -355,10 +361,10 @@ async function autoInstallJava(ctx) {
       const arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
       const osName = javaRuntimeOs(), ext = javaRuntimeExt(osName), binName = javaBinName(osName);
       const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${osName}/${arch}/jre/hotspot/normal/eclipse`;
-      zipPath = path.join(app.getPath('temp'), `observerlauncher-jre-${Date.now()}.${ext}`);
+      zipPath = path.join(tempDir(), `observerlauncher-jre-${Date.now()}.${ext}`);
       // A JDK/JRE archive is typically 40-200 MB; cap at 512 MB.
       await download(url, zipPath, (received, total) => ctx.send('java:progress', { received, total }), null, { maxBytes: 512 * 1024 * 1024 });
-      const targetDir = path.join(app.getPath('userData'), `jre${major}`);
+      const targetDir = path.join(dataDir(), `jre${major}`);
       // BUGFIX (a bad install could wipe a working Java): extract into a staging folder first; only
       // swap it in after the java binary is confirmed present, so a failure leaves the previous install
       // intact. Cross-platform: PowerShell on Windows, unzip/tar on Linux/mac (was Windows-only).
