@@ -63,9 +63,11 @@ When the MCP server is running, it answers a simple `GET /health` with “yes, I
 
 The audit log — the list of write and destructive actions an assistant performed — is now stored as structured entries and **keeps its history**: instead of throwing everything away when it gets large, it rolls over to older files, so you can still see what happened days ago.
 
-## Linux gets real boot coverage
+## Linux is now officially verified
 
-The test suite now boots a real Java process on Linux and checks the Linux-specific parts for real: finding the server process, reading its memory and CPU, and making and restoring a zip backup. This runs automatically in CI, on a real Linux machine.
+For a long time the Linux build came with a caveat: it was written and reasoned about on Windows, but nobody had actually run it on a real Linux machine. That caveat is gone.
+
+Every change is now checked on a real Linux kernel automatically — the unit tests, the full app test, and, for the first time, a test that **downloads a real Paper server, boots it, waits for it to finish starting, and shuts it down cleanly**. The Linux-specific parts (finding the server process, reading its memory and CPU, making and restoring a backup) are exercised for real rather than assumed. If a Linux-only problem ever slips in, the build turns red before it reaches you.
 
 ---
 
@@ -85,4 +87,4 @@ The test suite now boots a real Java process on Linux and checks the Linux-speci
 
 ---
 
-*Developer notes: `npm test` (68 files) passes. New: a headless entry point, an `observer` CLI, server templates, an MCP `/health` endpoint, JSONL audit with rotation, and an explicit headless confirm policy. The GUI shares every line of backend code with the headless mode.*
+*Developer notes: `npm test` (68 files) passes. New: a headless entry point, an `observer` CLI, server templates, an MCP `/health` endpoint, JSONL audit with rotation, an explicit headless confirm policy, and Linux verified on a real kernel (unit + E2E + a real server boot in CI). The GUI shares every line of backend code with the headless mode.*

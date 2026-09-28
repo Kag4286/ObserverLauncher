@@ -15,8 +15,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
 **Headline: the launcher goes headless — a CLI, a no-window entry point, and MCP that runs without
 Electron.** 3.0.0 makes the SAME backend (and the SAME 70 MCP tools) run under plain `node`, so an AI
 or a script can drive a server with no window at all. It is NOT a rewrite: the GUI is unchanged and
-shares every line of backend code with the new headless mode. Docker, CI/CD and remote management are
-deferred to 3.1.0 / 3.2.0 / 3.3.0 (they stack on top of this core).
+shares every line of backend code with the new headless mode. **Linux support is now officially
+verified on a real Linux kernel** (unit + E2E + a real server boot in CI) — closing a gap that had
+stood since the Linux build first shipped. Docker, CI/CD and remote management are deferred to 3.1.0
+/ 3.2.0 / 3.3.0 (they stack on top of this core).
 
 ### Added — headless core
 - **`src/main/data-dir.js`** — `dataDir()` = `OBSERVER_DATA_DIR` env || Electron `userData` || a
@@ -64,6 +66,18 @@ deferred to 3.1.0 / 3.2.0 / 3.3.0 (they stack on top of this core).
 - **`tests/headless-guard.test.js`** is a RATCHET: it fails the build if a top-level
   `require('electron')` or an `app.getPath('userData'|'temp')` reappears outside `data-dir.js`.
 - `npm test` green (68 files).
+
+### Linux — now officially verified (end of a long-standing gap)
+- **Linux support is no longer "code-analysed only".** For a long time the launcher shipped a Linux
+  build that was developed and reasoned about on Windows but never actually *run* on a real Linux
+  kernel — the README said so plainly ("has not been verified on real hardware"). 3.0.0 closes that.
+- Every push and pull request now runs `npm test` **and** the Electron E2E suite on `ubuntu-latest`
+  (real Linux, real kernel). Added in 3.0.0: `tests/linux-boot.test.js` boots a real java process and
+  exercises the `/proc` walk, process metrics and a real zip backup round-trip.
+- **`scripts/linux-full-boot.js` + the `linux-boot` CI job** go further: they download a real Paper
+  server, boot it headless, wait for the server's own `Done (` line, stop it, and assert no process
+  is left behind. This is the end-to-end Linux boot that was the last unverified foundation piece.
+- The README's Linux notes were corrected from "unverified" to "CI-verified on a real Linux kernel".
 
 ### Notes
 - Settings schema stays v4 — 3.0.0 adds NO new settings field, so no migration is needed.
