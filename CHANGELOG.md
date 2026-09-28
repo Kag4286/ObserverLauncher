@@ -49,6 +49,18 @@ stood since the Linux build first shipped. Docker, CI/CD and remote management a
   so write/destroy tools are refused deliberately and audited — never by the accident of a missing
   GUI bridge.
 
+### Security
+- **Marketplace downloads are now hash-verified.** The registries (Modrinth, CurseForge, Hangar)
+  publish a file hash for every download, but the install paths fetched the jar and used it WITHOUT
+  checking — a compromised CDN or a MITM could serve a trojaned `.jar` that then runs on the user's
+  server. `market:install`, the MCP `install_from_market` tool and `.mrpack` import now verify the
+  downloaded file against the registry's hash (sha512/sha256/sha1/md5) and DELETE it on a mismatch. A
+  source that publishes no hash still installs (verification is skipped, never blocks). New helper
+  `verifyFileHash` in `fs-utils.js` + `tests/hash-verify.test.js`.
+- **Fixed: mods installed from the GUI landed in `plugins/`.** `market:install` did not accept the
+  `mod`/`neoforge` kind, so a mod jar was written to `plugins/` where the mod loader never loads it
+  (the MCP path was already correct). Now every mod loader maps to `mods/`.
+
 ### Fixed
 - The backend no longer throws at require-time under plain Node (top-level `const { app } =
   require('electron')` removed from settings, runtime-state, textures, modpacks, settings-handlers,

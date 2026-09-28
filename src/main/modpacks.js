@@ -140,7 +140,7 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
       if (!isSafeDownloadUrl(url)) { skipped++; continue; }
       const dest = safeTarget(ctx.currentServerPath, file.path);
       if (!dest) throw new Error(`This modpack's file list contains an unsafe path ("${file.path}") — import stopped for safety.`);
-      installable.push({ url, dest, name: path.basename(dest), size: file.fileSize || 0 });
+      installable.push({ url, dest, name: path.basename(dest), size: file.fileSize || 0, hashes: file.hashes || null });
     }
     for (let i = 0; i < installable.length; i++) {
       const f = installable[i];
@@ -148,6 +148,11 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
       fs.mkdirSync(path.dirname(f.dest), { recursive: true });
       // Individual files inside a modpack (mods/configs): 512 MB each is plenty.
       await download(f.url, f.dest, (received, total) => onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.name, received, fileTotal: total || f.size }), null, { maxBytes: 512 * 1024 * 1024 });
+      // SECURITY (supply-chain): the .mrpack index carries {sha1,sha512} per file — verify it before
+      // keeping the downloaded content (a tampered pack/CDN must not silently install a bad jar).
+      const { verifyFileHash } = require('./fs-utils.js');
+      const vh = verifyFileHash(f.dest, f.hashes);
+      if (!vh.ok) { try { fs.rmSync(f.dest, { force: true }); } catch {} throw new Error(`Modpack file "${f.name}" ${vh.error} Import stopped.`); }
       installed++;
     }
     const overridesDir = path.join(extractDir, 'overrides');

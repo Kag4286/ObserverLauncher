@@ -22,6 +22,28 @@ function fileHashes(filePath) {
   const buffer = fs.readFileSync(filePath);
   return { sha1: crypto.createHash('sha1').update(buffer).digest('hex'), sha512: crypto.createHash('sha512').update(buffer).digest('hex') };
 }
+// SECURITY (supply-chain, v3.0.0): the marketplace registries (Modrinth/CurseForge) publish a file
+// hash for every download, but the install paths fetched the jar and used it WITHOUT checking — a
+// compromised CDN or a MITM could serve a trojaned .jar that then runs on the user's server. This
+// verifies the downloaded file against the registry's hash before it is kept. `hashes` is
+// { sha512?, sha1?, md5? } (any subset); a missing hash is a SKIP (ok:true) so a source with no
+// hash data never blocks an install. Any mismatch fails. Pure (reads the file).
+function verifyFileHash(filePath, hashes) {
+  if (!hashes || typeof hashes !== 'object') return { ok: true, skipped: true };
+  const wanted = [];
+  if (hashes.sha512) wanted.push(['sha512', String(hashes.sha512).toLowerCase()]);
+  if (hashes.sha256) wanted.push(['sha256', String(hashes.sha256).toLowerCase()]);
+  if (hashes.sha1) wanted.push(['sha1', String(hashes.sha1).toLowerCase()]);
+  if (hashes.md5) wanted.push(['md5', String(hashes.md5).toLowerCase()]);
+  if (!wanted.length) return { ok: true, skipped: true };
+  let buffer;
+  try { buffer = fs.readFileSync(filePath); } catch (e) { return { ok: false, error: e?.message || 'Could not read the downloaded file.' }; }
+  for (const [algo, expected] of wanted) {
+    const got = crypto.createHash(algo).update(buffer).digest('hex');
+    if (got !== expected) return { ok: false, algo, expected, got, error: `Downloaded file failed its ${algo} checksum.` };
+  }
+  return { ok: true };
+}
 function findFileRecursive(dir, filename, depth = 5) {
   if (depth < 0) return null;
   let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
@@ -71,4 +93,4 @@ function recordManifestEntry(root, entry) {
   writeJsonList(root, 'observerlauncher-manifest.json', list);
 }
 
-module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp };
+module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, verifyFileHash, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp };

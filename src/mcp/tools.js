@@ -366,10 +366,13 @@ async function tInstallFromMarket(ctx, a) {
   const dest = safeTarget(root, path.join(folder, path.basename(dl.filename)));
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   const { download } = require('../main/http.js');
-  const { recordManifestEntry } = require('../main/fs-utils.js');
+  const { recordManifestEntry, verifyFileHash } = require('../main/fs-utils.js');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   // A single plugin/mod jar from the market; cap at 512 MB (mirrors the GUI install path).
   await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
+  // SECURITY (supply-chain): verify against the registry hash before keeping the file.
+  const vh = verifyFileHash(dest, dl.hashes);
+  if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} return { ok: false, error: `${vh.error} The file was deleted — retry, or install manually from the project page.` }; }
   try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, env: item.env || undefined, installedAt: new Date().toISOString() }); } catch {}
   return { ok: true, result: { name: dl.filename, files: serverFiles(root) } };
 }

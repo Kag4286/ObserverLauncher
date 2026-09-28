@@ -106,6 +106,7 @@ async function resolveMarketDownload(item) {
     // the version-picking logic here.
     return {
       url: f.url, filename: f.filename, source: 'modrinth', size: f.size || 0,
+      hashes: f.hashes || null,
       versionNumber: target.version_number || null,
       gameVersions: target.game_versions || [],
       loaders: target.loaders || [],
@@ -118,7 +119,8 @@ async function resolveMarketDownload(item) {
     const target = (versions.result || []).find(v => v.downloads?.PAPER?.downloadUrl);
     const file = target?.downloads?.PAPER;
     if (!file) throw new Error('No Paper download was found for this Hangar project.');
-    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0 };
+    const hangarHashes = file.fileInfo?.sha256Hash ? { sha256: file.fileInfo.sha256Hash } : null;
+    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0, hashes: hangarHashes };
   }
   if (item.source === 'spigot') {
     const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
@@ -135,7 +137,15 @@ async function resolveMarketDownload(item) {
     const inst = cf.cfFileInstallable(file);
     if (!inst.ok) { const e = new Error('blocked'); e.code = 'blocked'; throw e; }
     // dependencies: mapped best-effort (CF has no official relationType table — see cfDependencies).
-    return { url: inst.url, filename: file.fileName, source: 'curseforge', size: file.fileLength || 0, versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
+    // CurseForge returns hashes as [{ value, algo }]: algo 1 = sha1, algo 2 = md5.
+    let cfHashes = null;
+    try {
+      const list = Array.isArray(file.hashes) ? file.hashes : [];
+      const sha1 = list.find(h => Number(h.algo) === 1)?.value;
+      const md5 = list.find(h => Number(h.algo) === 2)?.value;
+      if (sha1 || md5) cfHashes = { ...(sha1 ? { sha1: String(sha1).toLowerCase() } : {}), ...(md5 ? { md5: String(md5).toLowerCase() } : {}) };
+    } catch {}
+    return { url: inst.url, filename: file.fileName, source: 'curseforge', size: file.fileLength || 0, hashes: cfHashes, versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
   }
   throw new Error('Unsupported marketplace source.');
 }
@@ -199,12 +209,15 @@ function registerMarketplace(ipcMain, ctx) {
   ipcMain.handle('market:install', async (_, item) => {
     try {
       if (!ctx.currentServerPath) return { ok: false, error: 'Choose and apply a server folder first.' };
-      const kind = ['forge', 'fabric', 'datapack'].includes(item.kind) ? item.kind : 'plugin';
+      const kind = ['forge', 'fabric', 'neoforge', 'mod', 'datapack'].includes(item.kind) ? item.kind : 'plugin';
       const levelName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
-      const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', datapack: path.join(levelName, 'datapacks') };
+      // BUGFIX (v3.0.0): a 'mod' (or neoforge) item was NOT in the kind list, so it fell through to
+      // 'plugin' and a mod jar landed in plugins/ where the mod loader never sees it. Map every mod
+      // loader to mods/ (mirrors the MCP install_from_market path).
+      const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', neoforge: 'mods', mod: 'mods', datapack: path.join(levelName, 'datapacks') };
       const destDir = safeTarget(ctx.currentServerPath, destFolders[kind]);
       fs.mkdirSync(destDir, { recursive: true });
-      const { url, filename } = await resolveMarketDownload(item);
+      const { url, filename, hashes } = await resolveMarketDownload(item);
       // SECURITY (SSRF): the download URL comes from a remote registry API. Validate it is a public
       // http(s) host BEFORE fetching (same guard modpacks + the MCP install path already use), so a
       // crafted API entry pointing at file://, localhost or a private range can never be fetched.
@@ -213,6 +226,10 @@ function registerMarketplace(ipcMain, ctx) {
       const dest = path.join(destDir, path.basename(filename));
       // A single plugin/mod jar is normally well under 100 MB; cap at 512 MB.
       await download(url, dest, (received, total) => ctx.send('market:progress', { phase: 'file', name: filename, received, total }), null, { maxBytes: 512 * 1024 * 1024 });
+      // SECURITY (supply-chain): verify the file against the registry's hash before keeping it.
+      const { verifyFileHash } = require('./fs-utils.js');
+      const vh = verifyFileHash(dest, hashes);
+      if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} return { ok: false, error: `${vh.error} The file was deleted — retry, or install manually from the project page.` }; }
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, env: item.env || undefined, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
     } catch (error) {
