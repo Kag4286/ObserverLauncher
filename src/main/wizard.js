@@ -199,6 +199,24 @@ function registerWizard(ipcMain, ctx) {
     if (ctx.wizardAbort) { try { ctx.wizardAbort.abort(); } catch {} return { ok: true }; }
     return { ok: false, error: 'No wizard download is running.' };
   });
+
+  // D3 (v3.0.0): server templates for the wizard's template picker. PURE (src/main/templates.js) —
+  // no I/O. Registered here so the channel also works headless (wizard.js is a headless module).
+  ipcMain.handle('templates:list', async () => {
+    try {
+      const { listTemplates } = require('./templates.js');
+      return { ok: true, templates: listTemplates() };
+    } catch (error) { return { ok: false, error: error?.message || 'Could not load templates.' }; }
+  });
+  ipcMain.handle('templates:plan', async (_, id) => {
+    try {
+      const { templatePlan } = require('./templates.js');
+      const plan = templatePlan(String(id || ''));
+      if (!plan) return { ok: false, error: 'Unknown template.' };
+      if (plan.ok === false) return { ok: false, error: (plan.errors || []).join(', ') };
+      return { ok: true, plan };
+    } catch (error) { return { ok: false, error: error?.message || 'Could not resolve the template.' }; }
+  });
 }
 
 module.exports = { RESOLVERS, registerWizard };

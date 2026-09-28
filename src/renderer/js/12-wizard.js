@@ -13,6 +13,38 @@ let nswMc=null;   // chosen Minecraft version for forge/neoforge
 const NSW_MC_FIRST={forge:true,neoforge:true};
 const isMcFirst=()=>!!NSW_MC_FIRST[nsw.software];
 const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity'};
+// D3 (v3.0.0): server templates. A template pre-fills the wizard (software + memory); its plugin and
+// config steps are shown as a plan the user can act on after creation. Loaded once from the main
+// process (templates:list) and cached. Degrades silently when the IPC is unavailable.
+let nswTemplates=null;
+async function loadNswTemplates(){
+  const box=$('#nswTemplates'),chips=$('#nswTemplateChips');
+  if(!box||!chips)return;
+  if(nswTemplates){renderNswTemplates();return}
+  try{const r=await window.observer.templatesList();nswTemplates=(r&&r.ok&&Array.isArray(r.templates))?r.templates:[];}catch{nswTemplates=[];}
+  renderNswTemplates();
+}
+function renderNswTemplates(){
+  const box=$('#nswTemplates'),chips=$('#nswTemplateChips');if(!box||!chips)return;
+  const list=nswTemplates||[];
+  box.hidden=list.length===0;
+  chips.innerHTML=list.map(tp=>`<button type="button" class="nsw2-row" data-template="${esc(tp.id)}"><div class="nsw2-rowbody"><b>${esc(tp.name)}</b><span>${esc(tp.description||'')}</span><small class="nsw2-req">${esc(tp.software)} · ${esc(String(tp.memoryGB))} GB</small></div></button>`).join('');
+}
+$('#nswTemplateChips')?.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-template]');if(!b)return;
+  const id=b.dataset.template;
+  const tp=(nswTemplates||[]).find(x=>x.id===id);if(!tp)return;
+  // Pre-fill software + memory from the template, then let the user continue through the wizard.
+  nsw.software=tp.software;
+  nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
+  nswMc=null;
+  $$('[data-software]').forEach(x=>x.classList.toggle('active',x.dataset.software===tp.software));
+  const mem=Math.max(1,Math.min(64,Number(tp.memoryGB)||4));
+  const sl=$('#nswMemorySlider'); if(sl){sl.value=mem;const mv=$('#nswMemoryValue');if(mv)mv.textContent=String(mem);nswUpdateMemory()}
+  // Surface the template's plan (plugins + config) so the user knows what to install afterwards.
+  try{const pr=await window.observer.templatesPlan(id);if(pr&&pr.ok&&pr.plan&&pr.plan.steps){const extra=pr.plan.steps.filter(s=>s.step==='install_content').length;toast(t('nsw.tplApplied',{n:tp.name,m:mem,x:extra}),'success');}}catch{}
+  nsw.step=3;nswRender();
+});
 async function loadNswVersions(software){
   // BUGFIX (2.2.0): re-entering step 3 for the same software returned early WITHOUT repainting the
   // chips, so the version picker looked empty ('biến mất') after going Back from a later step.
@@ -150,6 +182,7 @@ function nswRender(){
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
   $('#nswRailSub3').textContent=`${$('#nswMemorySlider').value} GB`;
+  if(nsw.step===2){loadNswTemplates()}
   if(nsw.step===3){
     loadNswVersions(nsw.software);
     // 2.2.0: Forge/NeoForge use MC-first — hide the latest/specific radios, always show the picker.
