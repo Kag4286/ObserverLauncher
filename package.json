@@ -15,8 +15,12 @@
     "forge"
   ],
   "main": "src/main.js",
+  "bin": {
+    "observer": "src/cli.js"
+  },
   "scripts": {
     "start": "electron .",
+    "cli": "node src/cli.js",
     "build:win": "electron-builder --win nsis",
     "build:linux": "electron-builder --linux AppImage",
     "build:all": "electron-builder --win nsis --linux AppImage",

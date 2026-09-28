@@ -46,6 +46,17 @@ process.env.OBSERVER_DATA_DIR = tmpData;
   }
   check('registered a healthy number of channels', channels.length >= 30, 'got ' + channels.length);
 
+  // B7: every preload `invoke` channel must be registered headless TOO, except the GUI-only
+  // app:* update channels (setupAutoUpdater is never registered without a window). This catches a
+  // feature module that silently skips registration headless. Channels are parsed from preload.js.
+  {
+    const preload = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+    const invokeChannels = [...new Set([...preload.matchAll(/ipcRenderer\.invoke\(\s*'([\w:.-]+)'/g)].map(m => m[1]))];
+    const GUI_ONLY = new Set(['app:check-update', 'app:download-update', 'app:quit-install']);
+    const missing = invokeChannels.filter(ch => !GUI_ONLY.has(ch) && !channels.includes(ch));
+    check(`all ${invokeChannels.length} preload invoke channels registered headless (minus app:*)`, missing.length === 0, 'missing: ' + missing.join(', '));
+  }
+
   // initHeadless must run without Electron and without throwing.
   try {
     await headless.initHeadless(rt.ctx);
@@ -58,6 +69,21 @@ process.env.OBSERVER_DATA_DIR = tmpData;
   // A real IPC call works headless (settings:get is the first thing the renderer calls at boot).
   const sg = await rt.shim.invoke('settings:get');
   check('invoke(settings:get) returns a snapshot', sg && typeof sg === 'object' && !!sg.settings, JSON.stringify(sg && Object.keys(sg)));
+
+  // B7: dataDir honours OBSERVER_DATA_DIR (the headless/CLI/Docker override).
+  {
+    const { dataDir } = require('../src/main/data-dir.js');
+    check('dataDir honours OBSERVER_DATA_DIR', dataDir() === tmpData, dataDir());
+  }
+
+  // B7: a write tool call with no window returns a CLEAN policy error (not a 60s hang / crash).
+  {
+    const { callTool } = require('../src/mcp/server.js');
+    const t0 = Date.now();
+    const r = await callTool(rt.ctx, 'stop_server', {}, { autoAllowWrite: false, readOnly: false });
+    check('write/destroy tool denied cleanly headless', r && r.ok === false, JSON.stringify(r));
+    check('denial is fast (no 60s timer)', Date.now() - t0 < 2000, String(Date.now() - t0));
+  }
 
   // Headless has NO GUI confirm -> server.js confirmOnGui auto-denies.
   check('ctx.onMcpConfirm stays undefined (GUI confirm not registered)', rt.ctx.onMcpConfirm === undefined || rt.ctx.onMcpConfirm === null);

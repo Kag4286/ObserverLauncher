@@ -18,7 +18,9 @@ const path = require('path');
 // — so it is scanned alongside src/main + src/mcp. When ROOTS contains a FILE, walk() is skipped and
 // the file is scanned directly (the flatMap below only walks directories).
 const SRC = path.join(__dirname, '..', 'src');
-const ROOTS = [path.join(SRC, 'main'), path.join(SRC, 'mcp'), path.join(SRC, 'headless.js')];
+// Both no-GUI entry points (headless + CLI) are scanned alongside src/main + src/mcp — they are the
+// files that MUST stay Electron-free.
+const ROOTS = [path.join(SRC, 'main'), path.join(SRC, 'mcp'), path.join(SRC, 'headless.js'), path.join(SRC, 'cli.js')];
 
 // GUI-only modules that legitimately keep Electron access (never reachable headless).
 const TOPLEVEL_ALLOW = new Set(['app-lifecycle.js']);

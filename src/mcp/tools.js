@@ -749,7 +749,22 @@ async function tReadAuditLog(ctx, a) {
   const n = Math.min(Math.max(1, Number(a.lines) || 100), 500);
   try {
     const file = path.join(dataDir(), 'mcp-audit.log');
-    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-n);
+    // C3: read newest-first across the rotation set (.log.3 oldest .. .log newest), parse each JSONL
+    // line, then return the newest n as formatted strings for the AI.
+    const files = [`${file}.3`, `${file}.2`, `${file}.1`, file];
+    const entries = [];
+    for (const f of files) {
+      let raw = '';
+      try { raw = fs.readFileSync(f, 'utf8'); } catch { continue; }
+      for (const line of raw.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          entries.push(`${e.ts}\t${e.risk}\t${e.tool}\t${e.ok ? 'ok' : 'denied/error: ' + (e.error || '')}`);
+        } catch { entries.push(line); } // tolerate a legacy/partial line
+      }
+    }
+    const lines = entries.slice(-n);
     return { ok: true, result: { lines, count: lines.length } };
   } catch { return { ok: true, result: { lines: [], count: 0, note: 'No audit log yet - write/destroy tool calls are recorded here.' } }; }
 }

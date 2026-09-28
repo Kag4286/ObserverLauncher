@@ -91,12 +91,30 @@ function confirmOnGui(ctx, tool, args, risk, instanceName) {
 // AUDIT LOG (1.2.0): append every write/destroy call to userData/mcp-audit.log so the user (and
 // the AI via read_audit_log) can see exactly what an assistant changed. Best-effort, capped at
 // ~256 KB so it can never grow unbounded.
+// C3 (v3.0.0): JSONL + rotation. The old format was a TSV text that was DELETED wholesale at 256 KB,
+// so any write/destroy history older than the last ~256 KB was lost. Now each line is a JSON object
+// and the file ROTATES to mcp-audit.log.1/.2/.3 (keep 3), so history survives across the cap and an
+// AI can parse entries structurally instead of re-splitting tabs.
+const AUDIT_MAX_BYTES = 256 * 1024;
+const AUDIT_KEEP = 3;
+function rotateAuditIfNeeded(file) {
+  try {
+    if (!fs.existsSync(file) || fs.statSync(file).size <= AUDIT_MAX_BYTES) return;
+    // Shift .N-1 -> .N (oldest dropped), then base -> .1.
+    for (let i = AUDIT_KEEP - 1; i >= 1; i--) {
+      const a = `${file}.${i}`, b = `${file}.${i + 1}`;
+      try { if (fs.existsSync(a)) fs.renameSync(a, b); } catch {}
+    }
+    try { fs.renameSync(file, `${file}.1`); } catch {}
+  } catch {}
+}
 function auditLog(tool, risk, result) {
   try {
     const file = path.join(dataDir(), 'mcp-audit.log');
-    try { if (fs.statSync(file).size > 256 * 1024) fs.rmSync(file, { force: true }); } catch {}
-    const line = `${new Date().toISOString()}\t${risk}\t${tool}\t${result && result.ok === false ? 'denied/error: ' + (result.error || '') : 'ok'}\n`;
-    fs.appendFileSync(file, line);
+    rotateAuditIfNeeded(file);
+    const denied = !!(result && result.ok === false);
+    const entry = { ts: new Date().toISOString(), risk, tool, ok: !denied, ...(denied ? { error: result.error || '' } : {}) };
+    fs.appendFileSync(file, JSON.stringify(entry) + '\n');
   } catch {}
 }
 
@@ -203,6 +221,16 @@ function startMcpServer(ctx) {
     if (host && host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]' && host !== '::1') {
       res.writeHead(403); return res.end('forbidden');
     }
+    // C2 (v3.0.0): UNAUTHENTICATED /health for container/orchestrator healthchecks (Docker 3.1.0).
+    // The per-launch token is unreadable to a healthcheck, so it cannot be gated. It exposes only
+    // liveness + version (NO tool access, NO server state) and stays behind the same loopback +
+    // Origin/Host guards above, so it is still not reachable off-host.
+    if (req.method === 'GET' && req.url === '/health') {
+      let version = 'dev';
+      try { version = require('electron').app.getVersion(); } catch { try { version = require('../../package.json').version; } catch {} }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, uptime: Math.round(process.uptime()), version }));
+    }
     const auth = req.headers['authorization'] || '';
     // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
     // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.
@@ -284,4 +312,4 @@ function stopMcpServer(ctx) {
   try { fs.rmSync(bridgeConfigPath(), { force: true }); } catch {}
 }
 
-module.exports = { startMcpServer, stopMcpServer, callTool, bridgeConfigPath, bridgeScriptPath };
+module.exports = { startMcpServer, stopMcpServer, callTool, bridgeConfigPath, bridgeScriptPath, auditLog };
