@@ -193,15 +193,14 @@ async function restoreBackup({ destPath, zipPath }) {
   // folder could overwrite files anywhere the user can write. List entries
   // first and refuse the whole archive on the first unsafe path.
   const { isSafeArchiveEntry } = require('../validate.js');
-  try {
-    const entries = await listArchiveEntries(zipPath);
-    if (entries) {
-      const bad = entries.find(e => !isSafeArchiveEntry(e));
-      if (bad) return { ok: false, error: `Backup contains an unsafe path ("${bad}") — restore stopped for safety.` };
-    }
-  } catch {
-    // listing failed (unknown format?) — fall through to extraction errors below
-  }
+  let entries = null;
+  try { entries = await listArchiveEntries(zipPath); } catch { entries = null; }
+  // SECURITY (v3.0.0): if the archive format cannot be LISTED, we cannot run the zip-slip check, so
+  // we REFUSE rather than extract blind. Previously a null listing fell through and extracted
+  // whatever the tool decided — the one path where the guard could be bypassed with a crafted file.
+  if (!entries) return { ok: false, error: 'Could not read the backup archive to verify it is safe (unsupported or corrupt format) — restore stopped.' };
+  const bad = entries.find(e => !isSafeArchiveEntry(e));
+  if (bad) return { ok: false, error: `Backup contains an unsafe path ("${bad}") — restore stopped for safety.` };
   // try unzip first (handles both zip and tar.gz if bsdtar)
   const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);
   if (hasUnzip) {
@@ -242,13 +241,13 @@ async function extractArchive(archivePath, destDir) {
   // happily write absolute paths and `../` entries OUTSIDE destDir. List entries first and
   // refuse the whole archive on the first unsafe path — the same guard restoreBackup already uses.
   const { isSafeArchiveEntry } = require('../validate.js');
-  try {
-    const entries = await listArchiveEntries(archivePath);
-    if (entries) {
-      const bad = entries.find(e => !isSafeArchiveEntry(e));
-      if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
-    }
-  } catch {}
+  let entries = null;
+  try { entries = await listArchiveEntries(archivePath); } catch { entries = null; }
+  // SECURITY (v3.0.0): same rule as restoreBackup — an unlistable archive is REFUSED, never
+  // extracted blind (that was the one way the zip-slip guard could be sidestepped).
+  if (!entries) return { ok: false, error: 'Could not read the archive to verify it is safe (unsupported or corrupt format) — extraction stopped.' };
+  const bad = entries.find(e => !isSafeArchiveEntry(e));
+  if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
   const isZip = /\.zip$/i.test(archivePath);
   if (isZip) {
     const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);

@@ -57,6 +57,10 @@ stood since the Linux build first shipped. Docker, CI/CD and remote management a
   downloaded file against the registry's hash (sha512/sha256/sha1/md5) and DELETE it on a mismatch. A
   source that publishes no hash still installs (verification is skipped, never blocks). New helper
   `verifyFileHash` in `fs-utils.js` + `tests/hash-verify.test.js`.
+- **Backup/archive extraction now refuses an unlistable archive.** The zip-slip guard listed archive
+  entries first and, when the format could not be listed, fell through and extracted anyway — the one
+  path where the guard could be bypassed. `restoreBackup` and `extractArchive` (Linux) now REFUSE an
+  archive they cannot read/verify instead of extracting blind.
 - **Fixed: mods installed from the GUI landed in `plugins/`.** `market:install` did not accept the
   `mod`/`neoforge` kind, so a mod jar was written to `plugins/` where the mod loader never loads it
   (the MCP path was already correct). Now every mod loader maps to `mods/`.
