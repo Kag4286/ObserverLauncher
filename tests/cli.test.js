@@ -62,6 +62,18 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
     check('parseArgs bare flag', f.json === true);
   }
 
+  // 7b) templates + init local commands (Phase D).
+  {
+    const t = await cli.run(['templates', '--json'], { print: false });
+    check('templates --json lists templates', t.ok === true && Array.isArray(t.result) && t.result.length >= 3, JSON.stringify(t.result && t.result.length));
+    const i = await cli.run(['init', '--template', 'survival-5', '--json'], { print: false });
+    check('init --template --json returns a plan', i.ok === true && i.result && Array.isArray(i.result.steps) && i.result.steps.length > 0, JSON.stringify(i.result && i.result.steps && i.result.steps.length));
+    const bad = await cli.run(['init', '--template', 'nope'], { print: false });
+    check('init unknown template -> exit 2', bad.code === 2, JSON.stringify(bad));
+    const miss = await cli.run(['init'], { print: false });
+    check('init without --template -> exit 2', miss.code === 2);
+  }
+
   // 8) every COMMAND maps to a real registered tool (registry drift guard).
   {
     const { getTool } = require('../src/mcp/tools.js');

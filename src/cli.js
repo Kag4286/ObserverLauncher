@@ -11,6 +11,7 @@
 // Node-only, no dependencies. Exposes run(argv) so tests drive it in-process.
 const { createHeadless, initHeadless, stop } = require('./headless.js');
 const { getTool } = require('./mcp/tools.js');
+const { listTemplates, resolveTemplate, templatePlan } = require('./main/templates.js');
 const pkg = require('../package.json');
 
 // command -> { tool, needs, build(args) }. build() turns parsed flags into the tool's args object.
@@ -37,6 +38,8 @@ const USAGE = `ObserverLauncher CLI (observer) v${pkg.version}
 Usage: observer <command> [options]
 
 Commands:
+  templates  List server templates (survival-5, creative-build, modded-performance).
+  init       Print the step plan for a template: init --template <id>.
 ${Object.entries(COMMANDS).map(([n, c]) => `  ${n.padEnd(10)} ${c.desc}`).join('\n')}
 
 Options:
@@ -81,6 +84,27 @@ async function run(argv, { print = true } = {}) {
   if (flags.version) { log(pkg.version); return { ok: true, code: 0 }; }
   const cmdName = flags._[0];
   if (flags.help || !cmdName) { log(USAGE); return { ok: !cmdName || !!flags.help, code: cmdName || flags.help ? 0 : 2 }; }
+
+  // Local (non-tool) commands: templates + init. They need no backend boot.
+  if (cmdName === 'templates') {
+    const list = listTemplates();
+    if (flags.json) log(JSON.stringify(list));
+    else for (const t of list) log(`${t.id.padEnd(20)} ${t.name}  [${t.software} ${t.version}, ${t.memoryGB}GB]`);
+    return { ok: true, code: 0, result: list };
+  }
+  if (cmdName === 'init') {
+    const id = flags.template || flags._[1];
+    if (!id) { errlog('init requires --template <id>. Run `observer templates` to list ids.'); return { ok: false, code: 2, error: 'missing --template' }; }
+    if (!resolveTemplate(id)) { errlog(`Unknown template: ${id}. Run \`observer templates\`.`); return { ok: false, code: 2, error: `unknown template ${id}` }; }
+    const plan = templatePlan(id);
+    if (flags.json) log(JSON.stringify(plan));
+    else {
+      log(`Plan for template "${id}" (${plan.steps.length} steps):`);
+      for (const s of plan.steps) log(`  - ${s.step}: ${s.tool} ${JSON.stringify(s.args)}`);
+      log('\nExecute the steps with the matching MCP tools / wizard, or run with --json to script them.');
+    }
+    return { ok: true, code: 0, result: plan };
+  }
 
   const cmd = COMMANDS[cmdName];
   if (!cmd) { errlog(`Unknown command: ${cmdName}`); log(USAGE); return { ok: false, code: 2, error: `Unknown command: ${cmdName}` }; }
