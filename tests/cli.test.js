@@ -104,6 +104,28 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
     check('every CLI command maps to a registered tool', missing.length === 0, missing.join(', '));
   }
 
+  // 9) modpack verify (v3.2.0): local, no backend boot. Valid manifest + a loader-mismatch item.
+  {
+    const manifest = path.join(tmpData, 'modpack.json');
+    const resolved = path.join(tmpData, 'resolved.json');
+    fs.writeFileSync(manifest, JSON.stringify({ name: 'demo', version: '1.0.0', minecraft: '1.21.1', loader: 'neoforge', items: [{ id: 'jei' }, { id: 'fab', kind: 'mod' }] }));
+    fs.writeFileSync(resolved, JSON.stringify([
+      { id: 'jei', source: 'modrinth', kind: 'mod', gameVersions: ['1.21.1'], loaders: ['neoforge'] },
+      { id: 'fab', source: 'modrinth', kind: 'mod', gameVersions: ['1.21.1'], loaders: ['fabric'] },
+    ]));
+    const bad = await cli.run(['modpack', 'verify', manifest, '--resolved', resolved, '--json'], { print: false });
+    check('modpack verify: loader mismatch -> exit 1', bad.ok === false && bad.code === 1, JSON.stringify(bad.result && bad.result.summary));
+    check('modpack verify: report has a reject', bad.result && bad.result.rejected.some(r => r.id === 'fab' && r.reason === 'loader'));
+    const missing = await cli.run(['modpack', 'verify', path.join(tmpData, 'nope.json')], { print: false });
+    check('modpack verify: missing file -> exit 1', missing.ok === false && missing.code === 1);
+    const usage = await cli.run(['modpack', 'verify'], { print: false });
+    check('modpack verify: no file -> usage exit 2', usage.code === 2);
+    // --offline skips network resolution -> schema-only, so an unresolved manifest still verifies OK
+    // (no rejects because no metadata is known). This is the deterministic path for CI without network.
+    const offline = await cli.run(['modpack', 'verify', manifest, '--offline', '--json'], { print: false });
+    check('modpack verify --offline: schema-only ok', offline.ok === true && offline.result.summary.rejected === 0, JSON.stringify(offline.result && offline.result.summary));
+  }
+
   try { fs.rmSync(tmpData, { recursive: true, force: true }); } catch {}
   console.log(fail ? `\n${fail} check(s) failed.` : `\nAll cli checks passed (${pass}).`);
   process.exit(fail ? 1 : 0);

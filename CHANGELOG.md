@@ -10,6 +10,42 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [3.2.0] — UNRELEASED
+
+### Added — modpack CI/CD (static verify)
+- **`modpack.json` manifest schema + static verifier** (`src/main/modpack-manifest.js`, PURE). Validates the
+  manifest shape and cross-checks it against a target server using the EXISTING pure helpers
+  (`modpack-plan.js` + `server-compat.js`): schema errors, HARD loader/MC rejects, item-vs-item
+  conflicts, plan warnings, and missing declared jar dependencies. No network, no Electron — CI can run
+  it before anything is downloaded.
+- **Network resolution** (`src/main/modpack-resolve.js`, NEW): turns a manifest into RESOLVED items by
+  reusing the marketplace resolver (`resolveMarketDownload`) - the SAME code the GUI install and the MCP
+  `install_from_market` tool use. The per-item resolver is injectable, so tests run offline.
+- **`observer modpack verify <modpack.json>`** CLI command (local, no backend boot). By default it
+  RESOLVES each item over the network; `--resolved <file>` supplies a pre-resolved array, `--offline`
+  forces schema-only, `--server <mc/loader>` pins the target, `--strict` fails on a warning, `--json`
+  for scripts. An item that cannot be resolved is a FAILURE (never a silent pass).
+- **`.github/workflows/modpack-ci.yml`** — runs `modpack verify --strict` on every PR/push that touches
+  a `modpack.json` or the verifier. The expensive build + boot-smoke + publish half is a separate gated
+  job (label `e2e` / nightly).
+
+### Changed — code health (dedup)
+- **Removed copy-paste duplication in the renderer CSS.** The toast inline-action block
+  (`#toast{display:flex}` + `.toast-action` + `:hover` + `:active`) was repeated **7 times** in
+  `09-pulse.css`; the `2.2.0` breadcrumb/back-chip block (`.nsw2-crumb` + `.version-chip.version-back`)
+  was repeated **4 times** in `07-polish.css`; `.stat-ram dd` was declared twice in `03-overview.css`.
+  All are pure duplicate rules (identical text), so rendering is unchanged.
+- **De-duplicated the per-instance teardown in `src/main/server-lifecycle.js`.** The same 11-line
+  block (clear `serverProcess`/`monitoredPid`/`previousCpu`/`waitingForDone`/`currentSoftware`, clear
+  the poll + done-watchdog timers, reset `live`, set status stopped, push) was copied into BOTH the
+  process `'error'` and `'exit'` handlers. Extracted a local `teardown()` closure so the two paths
+  cannot drift; behaviour is identical.
+
+### Removed — dead i18n keys
+- Dropped two keys that no code referenced (verified: zero `t('...')` call sites outside the locale
+  files, and no dynamic key building): `toast.copiedCmd` (its text was a copy of `conn.fwCopiedLinux`,
+  which IS used) and `toast.runInTerminal`. Removed from all 7 locales — key count 889 -> 887.
+
 ## [3.1.0] — 2026-09-29
 
 ### Added — Docker

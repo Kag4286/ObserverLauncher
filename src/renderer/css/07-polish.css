@@ -70,21 +70,6 @@
 .nsw2-crumb b{color:var(--accent)}
 .version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
 .version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
-/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
-.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
-.nsw2-crumb b{color:var(--accent)}
-.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
-.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
-/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
-.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
-.nsw2-crumb b{color:var(--accent)}
-.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
-.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
-/* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
-.nsw2-crumb{display:block;width:100%;font:600 11px var(--font-mono);color:var(--text-dim);margin:2px 0 6px}
-.nsw2-crumb b{color:var(--accent)}
-.version-chip.version-back{border-style:solid;color:var(--accent);border-color:var(--accent);background:var(--accent-weak);font-weight:700}
-.version-chip.version-back:hover{background:var(--accent);color:var(--accent-ink)}
 .nsw-version-chips{min-height:38px;max-height:190px;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;padding-right:4px}
 /* KPI "?" click bubble */
 .kpi-help{cursor:pointer}

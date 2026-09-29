@@ -1,0 +1,62 @@
+# Static verification of a modpack.json on every PR/push that touches one (v3.2.0, CI/CD for
+# modpacks). The verifier resolves each item over the network (Phase C) and then runs the PURE checks
+# (src/main/modpack-manifest.js) so a bad loader/MC combo, a same-file collision or a missing declared
+# dependency is caught BEFORE any jar is downloaded. An item that cannot be resolved is a FAILURE.
+#
+# This is the CHEAP half of 3.2.0. The expensive half (build + boot smoke + publish) is a SEPARATE
+# gated job (label `e2e` / nightly) because a real Minecraft boot needs ~2-4 GB RAM + ~60s.
+name: Modpack verify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/modpack.json'
+      - 'src/main/modpack-manifest.js'
+      - 'src/main/modpack-resolve.js'
+      - 'src/main/marketplace.js'
+      - 'src/mcp/modpack-plan.js'
+      - '.github/workflows/modpack-ci.yml'
+  pull_request:
+    paths:
+      - '**/modpack.json'
+      - 'src/main/modpack-manifest.js'
+      - 'src/main/modpack-resolve.js'
+      - 'src/main/marketplace.js'
+      - 'src/mcp/modpack-plan.js'
+      - '.github/workflows/modpack-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Find every modpack.json in the repo and verify each one. --strict makes a WARNING fail too,
+      # so the CI gate is strict by default (a human can relax it locally).
+      - name: Verify modpack manifests
+        run: |
+          # Every modpack.json outside node_modules (git pathspec ** is unreliable).
+          mapfile -t manifests < <(find . -name modpack.json -not -path './node_modules/*' -not -path './.git/*')
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo 'No modpack.json found - nothing to verify.'
+            exit 0
+          fi
+          status=0
+          for m in "${manifests[@]}"; do
+            echo "::group::verify $m"
+            node src/cli.js modpack verify "$m" --strict || status=1
+            echo '::endgroup::'
+          done
+          exit $status

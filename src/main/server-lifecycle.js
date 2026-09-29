@@ -338,11 +338,9 @@ async function startServerInternal(ctx, settings) {
   // wrapped callback inherit the AsyncLocalStorage context, so nested timers stay pinned too.
   const inInst = (fn) => (...a) => ctx.runInInstance(instId, () => fn(...a));
 
-  ctx.serverProcess.on('error', inInst(err => {
-    clearInstanceProcess(ctx.runtimeInstanceId || instId);
-    closeRcon(ctx);
-    ctx.appendLog(`Could not launch the server process: ${err.message}`, 'error');
-    if (ctx.serverProcess !== startedProcess) return;
+  // Shared teardown for the error + exit handlers: clears every per-instance runtime field and
+  // repaints. Extracted so the two copies cannot drift out of sync (was an 11-line copy-paste).
+  const teardown = () => {
     ctx.serverProcess = null;
     ctx.monitoredPid = null;
     ctx.previousCpu = null;
@@ -354,6 +352,14 @@ async function startServerInternal(ctx, settings) {
     ctx.setServerStatus('stopped');
     ctx.send('server:live', ctx.live);
     ctx.pushFiles();
+  };
+
+  ctx.serverProcess.on('error', inInst(err => {
+    clearInstanceProcess(ctx.runtimeInstanceId || instId);
+    closeRcon(ctx);
+    ctx.appendLog(`Could not launch the server process: ${err.message}`, 'error');
+    if (ctx.serverProcess !== startedProcess) return;
+    teardown();
   }));
 
   const doneWatchdog = setTimeout(inInst(() => {
@@ -404,17 +410,7 @@ async function startServerInternal(ctx, settings) {
     ctx.appendLog(`Server stopped (code ${code ?? 'none'}, ${signal || 'normal'}).`, 'system');
     const wasManual = ctx.manualStop;
     ctx.manualStop = false;
-    ctx.serverProcess = null;
-    ctx.monitoredPid = null;
-    ctx.previousCpu = null;
-    ctx.waitingForDone = false;
-    ctx.currentSoftware = null;
-    clearInterval(ctx.autoPollTimer);
-    clearTimeout(doneWatchdog);
-    ctx.live = { tps: null, mspt: null, players: [] };
-    ctx.setServerStatus('stopped');
-    ctx.send('server:live', ctx.live);
-    ctx.pushFiles();
+    teardown();
     // SECURITY: never leave the public tunnel up once the server is down.
     try { require('./tunnel.js').stopTunnel(ctx); } catch {}
     handleAutoRestart(ctx, wasManual, code);

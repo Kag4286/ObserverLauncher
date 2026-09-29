@@ -45,7 +45,6 @@
 .srv-stats dd.ok{color:var(--success)} .srv-stats dd.warn{color:var(--warning)} .srv-stats dd.bad{color:var(--danger)}
 .stat-ram{margin-left:auto;border-left:1px solid var(--border);padding-left:22px;min-width:0}
 .stat-ram dd{display:flex;gap:6px;align-items:center}
-.stat-ram dd{display:flex;gap:6px;align-items:center}
 .stat-ram input{width:52px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 4px;color:var(--text);font:600 13px var(--font-mono);font-variant-numeric:tabular-nums;text-align:center;outline:0}
 .stat-ram input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
 .stat-ram input::-webkit-outer-spin-button,.stat-ram input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}

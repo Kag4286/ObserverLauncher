@@ -14,6 +14,7 @@ const { getTool } = require('./mcp/tools.js');
 const { listTemplates, resolveTemplate, templatePlan } = require('./main/templates.js');
 const { auditLog } = require('./mcp/server.js');
 const docker = require('./main/docker.js');
+const mm = require('./main/modpack-manifest.js');
 const fs = require('fs');
 const path = require('path');
 const pkg = require('../package.json');
@@ -45,6 +46,7 @@ Commands:
   templates  List server templates (survival-5, creative-build, modded-performance).
   init       Print the step plan for a template: init --template <id>.
   docker     Generate a Dockerfile + docker-compose.yml: docker create --type <t> [--ram 4G].
+  modpack    Verify a modpack.json: modpack verify <file> [--resolved <f>] [--offline] [--strict].
   set-folder Set the active instance's server folder: set-folder <path>.
 ${Object.entries(COMMANDS).map(([n, c]) => `  ${n.padEnd(10)} ${c.desc}`).join('\n')}
 
@@ -162,6 +164,61 @@ async function run(argv, { print = true, foreground = false } = {}) {
       else { log(`Generated Docker setup in ${outDir}/:`); for (const f of written) log('  ' + f); log(`\nNext: cd ${outDir} && docker compose up -d`); }
       return { ok: true, code: 0, result: { outDir, files: written } };
     } catch (e) { errlog(`Could not write the Docker files: ${e?.message || e}`); return { ok: false, code: 1, error: e?.message || String(e) }; }
+  }
+
+  // Local command: modpack verify -> validate a modpack.json against a target server (v3.2.0 CI/CD
+  // for modpacks). No backend boot. By default it RESOLVES each item over the network so the HARD
+  // loader/MC gate + conflict check see real metadata; `--offline` (or `--resolved <file>`) skips
+  // that. CI runs this on every PR so a bad loader/MC combo or a same-file collision is caught BEFORE
+  // anything is downloaded.
+  if (cmdName === 'modpack') {
+    const sub = flags._[1];
+    if (sub !== 'verify') { errlog('Usage: observer modpack verify <modpack.json> [--resolved <file>] [--offline] [--server <mc/loader>] [--strict] [--json]'); return { ok: false, code: 2, error: 'unknown modpack subcommand' }; }
+    const file = flags._[2] || flags.file;
+    if (!file) { errlog('Usage: observer modpack verify <modpack.json> [--resolved <file>] [--offline]'); return { ok: false, code: 2, error: 'missing manifest path' }; }
+    let manifest;
+    try { manifest = JSON.parse(fs.readFileSync(file, 'utf8')); }
+    catch (e) { errlog(`Could not read/parse ${file}: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
+    // Resolved-items source, in priority order:
+    //   1) --resolved <file>  : pre-resolved array (offline, reproducible).
+    //   2) --offline          : no resolution at all -> schema-only verify (the original behaviour).
+    //   3) default            : RESOLVE over the network (v3.2.0 Phase C) so the HARD loader/MC gate
+    //                           and the conflict check see real metadata. Resolution failures are
+    //                           reported as ERRORS (not a silent pass) - a bad pack must not verify.
+    let resolved = [];
+    let resolveErrors = [];
+    if (flags.resolved) {
+      try { const j = JSON.parse(fs.readFileSync(String(flags.resolved), 'utf8')); resolved = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : []); }
+      catch (e) { errlog(`Could not read/parse --resolved ${flags.resolved}: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
+    } else if (!flags.offline) {
+      try {
+        const { resolveManifest } = require('./main/modpack-resolve.js');
+        const r = await resolveManifest(manifest);
+        resolved = r.items;
+        resolveErrors = r.errors;
+      } catch (e) { errlog(`Resolution failed: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
+      for (const e of resolveErrors) errlog(`  UNRESOLVED ${e.source}:${e.id || '?'} — ${e.error}`);
+    }
+    // --server <mc/loader> pins the target when the manifest omits it (e.g. verify against a live folder).
+    let server = null;
+    if (flags.server) { const [mc, loader] = String(flags.server).split('/'); server = { mc: mc || null, loader: loader || null }; }
+    const report = mm.verifyManifest(manifest, resolved, server, { serverJava: flags.java ? Number(flags.java) : undefined });
+    // An item that could not be resolved is a FAILURE for CI: we cannot prove it is compatible.
+    if (resolveErrors.length) { report.resolveErrors = resolveErrors; report.ok = false; }
+    if (flags.json) log(JSON.stringify(report));
+    else {
+      log(`${manifest.name || file} v${manifest.version || '?'} — ${mm.summarizeReport(report)}`);
+      for (const e of report.schema.errors) log(`  SCHEMA ${e.path}: ${e.detail}`);
+      for (const r of report.rejected) log(`  REJECT ${r.source}:${r.id} (${r.reason}) — ${r.detail}`);
+      for (const c of report.conflicts) log(`  CONFLICT ${c.code}: ${c.detail}`);
+      for (const d of report.missingDependencies) log(`  MISSING ${d.modId} (needed by ${d.neededBy || '?'})`);
+      for (const w of report.warnings) log(`  WARN ${w.code}: ${w.detail}`);
+      for (const e of report.resolveErrors || []) log(`  UNRESOLVED ${e.source}:${e.id || '?'} — ${e.error}`);
+    }
+    // --strict: a warning is enough to fail (CI can opt in). Otherwise warnings pass.
+    const ok = report.ok && !(flags.strict && report.summary.warnings > 0);
+    if (!ok) errlog('modpack verify: FAILED');
+    return { ok, code: ok ? 0 : 1, result: report };
   }
 
   const cmd = COMMANDS[cmdName];
