@@ -58,6 +58,9 @@ function recordSpawnedProcess(ctx, serverPath) {
   const instanceId = ctx.inst();
   ctx.runtimeInstanceId = instanceId;
   setInstanceProcess(instanceId, { pid: proc.pid, processStartedAt: Date.now(), serverPath });
+  // v3.2.0 D4: record a persistent run-start so a crash that takes the launcher down with it can
+  // still be classified on the next boot. Guarded - stability tracking must never break a spawn.
+  try { require('./stability.js').noteStart(instanceId); } catch {}
   Promise.resolve(platform.getProcessInfo(proc.pid)).then(info => {
     if (info && info.startTimeMs && ctx.serverProcess === proc) {
       setInstanceProcess(instanceId, { pid: proc.pid, processStartedAt: info.startTimeMs, serverPath });
@@ -410,6 +413,15 @@ async function startServerInternal(ctx, settings) {
     ctx.appendLog(`Server stopped (code ${code ?? 'none'}, ${signal || 'normal'}).`, 'system');
     const wasManual = ctx.manualStop;
     ctx.manualStop = false;
+    // v3.2.0 D4: classify the run (stable if it survived long enough) and surface a rollback
+    // recommendation. Guarded - stability tracking must never break teardown. Acting on the decision
+    // (an actual deploy rollback) is deliberately left to the caller; this only persists + logs.
+    try {
+      const st = require('./stability.js');
+      const rec = st.noteExit(ctx.runtimeInstanceId || instId, { code });
+      const d = st.decideRollback(rec);
+      if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
+    } catch {}
     teardown();
     // SECURITY: never leave the public tunnel up once the server is down.
     try { require('./tunnel.js').stopTunnel(ctx); } catch {}

@@ -46,7 +46,7 @@ Commands:
   templates  List server templates (survival-5, creative-build, modded-performance).
   init       Print the step plan for a template: init --template <id>.
   docker     Generate a Dockerfile + docker-compose.yml: docker create --type <t> [--ram 4G].
-  modpack    Verify a modpack.json: modpack verify <file> [--resolved <f>] [--offline] [--strict].
+  modpack    Verify or build a modpack.json: modpack verify|build <file> [--resolved <f>] [--offline] [--out <dir>].
   set-folder Set the active instance's server folder: set-folder <path>.
 ${Object.entries(COMMANDS).map(([n, c]) => `  ${n.padEnd(10)} ${c.desc}`).join('\n')}
 
@@ -173,7 +173,7 @@ async function run(argv, { print = true, foreground = false } = {}) {
   // anything is downloaded.
   if (cmdName === 'modpack') {
     const sub = flags._[1];
-    if (sub !== 'verify') { errlog('Usage: observer modpack verify <modpack.json> [--resolved <file>] [--offline] [--server <mc/loader>] [--strict] [--json]'); return { ok: false, code: 2, error: 'unknown modpack subcommand' }; }
+    if (sub !== 'verify' && sub !== 'build') { errlog('Usage: observer modpack verify|build <modpack.json> [--resolved <file>] [--offline] [--server <mc/loader>] [--out <dir>] [--strict] [--json]'); return { ok: false, code: 2, error: 'unknown modpack subcommand' }; }
     const file = flags._[2] || flags.file;
     if (!file) { errlog('Usage: observer modpack verify <modpack.json> [--resolved <file>] [--offline]'); return { ok: false, code: 2, error: 'missing manifest path' }; }
     let manifest;
@@ -198,6 +198,24 @@ async function run(argv, { print = true, foreground = false } = {}) {
         resolveErrors = r.errors;
       } catch (e) { errlog(`Resolution failed: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
       for (const e of resolveErrors) errlog(`  UNRESOLVED ${e.source}:${e.id || '?'} — ${e.error}`);
+    }
+    // BUILD (v3.2.0 Phase D2): download the resolved items into --out <dir> (a fresh server folder).
+    // Refuses to run when resolution had errors - a partial pack is not a buildable artifact.
+    if (sub === 'build') {
+      const outDir = flags.out ? path.resolve(String(flags.out)) : null;
+      if (!outDir) { errlog('modpack build requires --out <dir>.'); return { ok: false, code: 2, error: 'missing --out' }; }
+      if (resolveErrors.length) { errlog(`modpack build: ${resolveErrors.length} item(s) could not be resolved - refusing to build a partial pack.`); return { ok: false, code: 1, error: 'unresolved items' }; }
+      try { fs.mkdirSync(outDir, { recursive: true }); } catch (e) { errlog(`Could not create ${outDir}: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
+      const { buildPack } = require('./main/modpack-build.js');
+      const result = await buildPack(outDir, resolved, { onProgress: (phase, d) => { if (!flags.json) log(`  ${phase} ${d.fileName}`); } });
+      if (flags.json) log(JSON.stringify(result));
+      else {
+        log(`Built ${result.installed.length}/${resolved.length} item(s) into ${outDir}`);
+        for (const s of result.skipped) log(`  SKIP ${s.id} (${s.reason})`);
+        for (const e of result.errors) log(`  ERROR ${e.id}: ${e.error}`);
+      }
+      if (!result.ok) errlog('modpack build: FAILED');
+      return { ok: result.ok, code: result.ok ? 0 : 1, result };
     }
     // --server <mc/loader> pins the target when the manifest omits it (e.g. verify against a live folder).
     let server = null;

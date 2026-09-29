@@ -25,9 +25,18 @@ All notable changes to ObserverLauncher are documented here. Format follows
   RESOLVES each item over the network; `--resolved <file>` supplies a pre-resolved array, `--offline`
   forces schema-only, `--server <mc/loader>` pins the target, `--strict` fails on a warning, `--json`
   for scripts. An item that cannot be resolved is a FAILURE (never a silent pass).
+- **`observer modpack build <file> --out <dir>`** (`src/main/modpack-build.js`) — assembles a resolved
+  pack into a server folder, reusing the existing download + hash-verify + SSRF-guard + manifest-entry
+  code paths (`planBuild` is pure; `buildPack` takes an injectable download/verify so tests run offline).
+  Refuses to build when resolution had errors.
+- **`scripts/modpack-boot-smoke.js`** — a Linux-gated end-to-end check: build a pack into a real server
+  folder, download a Paper jar, boot headless, wait for `Done (`, stop. Runs in a GATED CI job
+  (workflow_dispatch / nightly / PR label `e2e`) — not on every PR (a real boot needs ~1-2 GB + ~60s).
+- **Persistent run-stability + auto-rollback decision** (`src/main/stability.js`): records per-instance
+  run start/end to `stability.json` (separate from settings.json), classifies a run stable/unstable, and
+  recommends a rollback after N unstable runs in a row. Wired into the server lifecycle (guarded).
 - **`.github/workflows/modpack-ci.yml`** — runs `modpack verify --strict` on every PR/push that touches
-  a `modpack.json` or the verifier. The expensive build + boot-smoke + publish half is a separate gated
-  job (label `e2e` / nightly).
+  a `modpack.json` or the verifier; the boot-smoke job is gated.
 
 ### Changed — code health (dedup)
 - **Removed copy-paste duplication in the renderer CSS.** The toast inline-action block

@@ -124,6 +124,9 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
     // (no rejects because no metadata is known). This is the deterministic path for CI without network.
     const offline = await cli.run(['modpack', 'verify', manifest, '--offline', '--json'], { print: false });
     check('modpack verify --offline: schema-only ok', offline.ok === true && offline.result.summary.rejected === 0, JSON.stringify(offline.result && offline.result.summary));
+    // modpack build (v3.2.0 D2): missing --out is a usage error (checked before any network/disk).
+    const buildNoOut = await cli.run(['modpack', 'build', manifest, '--offline'], { print: false });
+    check('modpack build: no --out -> usage exit 2', buildNoOut.code === 2);
   }
 
   try { fs.rmSync(tmpData, { recursive: true, force: true }); } catch {}
