@@ -10,7 +10,23 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
-## [Unreleased] — 3.1.0 work in progress
+## [3.1.0] — UNRELEASED (polish/fix + Docker done; packaging/docs pending)
+
+### Added — Docker
+- **`observer docker create`** generates a runnable Docker setup (Dockerfile + docker-compose.yml +
+  .dockerignore + a short README) for a chosen server type. `src/main/docker.js` is a PURE generator
+  (strings only) so it is unit-testable without a Docker daemon.
+- The image bakes `eclipse-temurin:<n>-jre` (the in-container Java auto-installer is bypassed), copies
+  the app, runs `node src/headless.js`, `EXPOSE`s the port, and healthchecks with `observer status`.
+  compose mounts `./server` and `./data` (via `OBSERVER_DATA_DIR=/data`), maps the port and sets
+  `restart: unless-stopped`.
+- **Container-aware shutdown:** `src/headless.js` catches `SIGTERM`/`SIGINT`, gracefully stops the
+  server (up to 15s, then force-kills the process tree so the container can exit), then the tunnel and
+  MCP, and only then exits. A second signal exits immediately. Because the launcher is PID 1 in a
+  container, this is what stops the JVM from being orphaned instead of saved.
+- `docs/docker.md` — how to generate, run, mount and troubleshoot the container.
+- `tests/docker.test.js` (24 checks: option normalisation, Dockerfile/compose/dockerignore contract,
+  CLI write-out).
 
 ### Fixed
 - **CLI `--instance` was ignored.** `observer <cmd> --instance <id>` documented the flag but every

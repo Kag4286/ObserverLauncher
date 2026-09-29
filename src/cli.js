@@ -13,6 +13,9 @@ const { createHeadless, initHeadless, stop } = require('./headless.js');
 const { getTool } = require('./mcp/tools.js');
 const { listTemplates, resolveTemplate, templatePlan } = require('./main/templates.js');
 const { auditLog } = require('./mcp/server.js');
+const docker = require('./main/docker.js');
+const fs = require('fs');
+const path = require('path');
 const pkg = require('../package.json');
 
 // command -> { tool, needs, build(args) }. build() turns parsed flags into the tool's args object.
@@ -41,6 +44,7 @@ Usage: observer <command> [options]
 Commands:
   templates  List server templates (survival-5, creative-build, modded-performance).
   init       Print the step plan for a template: init --template <id>.
+  docker     Generate a Dockerfile + docker-compose.yml: docker create --type <t> [--ram 4G].
 ${Object.entries(COMMANDS).map(([n, c]) => `  ${n.padEnd(10)} ${c.desc}`).join('\n')}
 
 Options:
@@ -105,6 +109,27 @@ async function run(argv, { print = true } = {}) {
       log('\nExecute the steps with the matching MCP tools / wizard, or run with --json to script them.');
     }
     return { ok: true, code: 0, result: plan };
+  }
+
+  // Local command: docker create -> write a Dockerfile + compose + .dockerignore + README.
+  if (cmdName === 'docker') {
+    const sub = flags._[1];
+    if (sub !== 'create') { errlog('Usage: observer docker create --type <paper|fabric|...> [--version latest] [--ram 4] [--port 25565] [--mods a,b] [--out <dir>]'); return { ok: false, code: 2, error: 'unknown docker subcommand' }; }
+    const outDir = flags.out ? String(flags.out) : `docker-${flags.type || 'paper'}`;
+    const opts = { type: flags.type, version: flags.version, ram: flags.ram, port: flags.port, javaVersion: flags.java, mods: flags.mods ? String(flags.mods).split(',') : [] };
+    const norm = docker.normalizeOpts(opts);
+    try {
+      fs.mkdirSync(outDir, { recursive: true });
+      const written = [];
+      const write = (name, content) => { const p = path.join(outDir, name); fs.writeFileSync(p, content); written.push(name); };
+      write('Dockerfile', docker.dockerfile(opts));
+      write('docker-compose.yml', docker.composeFile(opts));
+      write('.dockerignore', docker.dockerignore());
+      write('README.docker.md', docker.readme(opts));
+      if (flags.json) log(JSON.stringify({ ok: true, outDir, type: norm.type, version: norm.version, ram: norm.ram, port: norm.port, files: written }));
+      else { log(`Generated Docker setup in ${outDir}/:`); for (const f of written) log('  ' + f); log(`\nNext: cd ${outDir} && docker compose up -d`); }
+      return { ok: true, code: 0, result: { outDir, files: written } };
+    } catch (e) { errlog(`Could not write the Docker files: ${e?.message || e}`); return { ok: false, code: 1, error: e?.message || String(e) }; }
   }
 
   const cmd = COMMANDS[cmdName];

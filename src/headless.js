@@ -94,8 +94,26 @@ async function start() {
   return rt;
 }
 
-// Graceful shutdown: stop the tunnel + MCP server. Safe to call when neither is running.
-function stop(ctx) {
+// Graceful shutdown: stop a running server, the tunnel and the MCP server. Safe to call when none
+// are running. Returns a promise (callers that do not await it still work — the work is best-effort).
+//
+// D3 (v3.1.0): in a container the launcher is PID 1, so Docker's SIGTERM arrives HERE — if we just
+// exited, the JVM child would be orphaned (and, as PID 1, this process is also the one that must
+// reap it). So we send the server a graceful `stop`, wait for it to exit, and only then resolve.
+async function stop(ctx) {
+  // Stop the server first (it can take up to ~15s to save and shut down).
+  try {
+    if (ctx.serverProcess && ctx.serverStatus !== 'stopped' && ctx.serverStatus !== 'stopping') {
+      ctx.manualStop = true;
+      try { clearTimeout(ctx.restartTimer); } catch {}
+      try { const { sendConsoleCommand } = require('./main/server-lifecycle.js'); await sendConsoleCommand(ctx, 'stop'); }
+      catch { try { if (ctx.serverProcess?.stdin?.writable) ctx.serverProcess.stdin.write('stop\r\n'); } catch {} }
+      const deadline = Date.now() + 15000;
+      while (ctx.serverProcess && Date.now() < deadline) await new Promise(r => setTimeout(r, 300));
+      // Still alive after 15s -> force-kill the tree so the container can exit.
+      if (ctx.serverProcess) { try { require('./main/kill.js').killTree(ctx.serverProcess.pid); } catch {} await new Promise(r => setTimeout(r, 500)); }
+    }
+  } catch {}
   try { stopTunnel(ctx); } catch {}
   try { if (typeof ctx.stopMcpServer === 'function') ctx.stopMcpServer(); } catch {}
 }
@@ -104,9 +122,14 @@ function stop(ctx) {
 if (require.main === module) {
   process.on('uncaughtException', err => { try { console.error('[headless] uncaughtException:', err); } catch {} });
   process.on('unhandledRejection', reason => { try { console.error('[headless] unhandledRejection:', reason); } catch {} });
-  const shutdown = (sig) => {
+  // Container/PID-1 aware: await the graceful stop (server -> tunnel -> MCP) before exiting so the
+  // JVM is shut down cleanly and reaped, not orphaned. A second signal forces an immediate exit.
+  let shuttingDown = false;
+  const shutdown = async (sig) => {
+    if (shuttingDown) { try { console.error('[headless] second signal — exiting now'); } catch {} process.exit(1); }
+    shuttingDown = true;
     try { console.error(`[headless] received ${sig}, shutting down…`); } catch {}
-    try { if (module.exports.__ctx) stop(module.exports.__ctx); } catch {}
+    try { if (module.exports.__ctx) await stop(module.exports.__ctx); } catch {}
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
