@@ -32,7 +32,10 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
   check('Dockerfile sets OBSERVER_DATA_DIR', /OBSERVER_DATA_DIR=\/data/.test(df));
   check('Dockerfile has a HEALTHCHECK', /HEALTHCHECK/.test(df));
   check('Dockerfile EXPOSEs the port', /EXPOSE 25566/.test(df));
-  check('Dockerfile installs nodejs + zip/unzip', /nodejs zip unzip/.test(df));
+  check('Dockerfile installs nodejs + npm + zip/unzip', /nodejs npm zip unzip/.test(df));
+  // Bug 1 guard: the image must install runtime deps, or players.js -> prismarine-nbt crash-loops.
+  check('Dockerfile runs npm ci --omit=dev', /npm ci --omit=dev/.test(df));
+  check('Dockerfile copies package files before the source', df.indexOf('COPY package.json') !== -1 && df.indexOf('COPY package.json') < df.indexOf('COPY . /app'));
 }
 
 // compose contract.
@@ -41,6 +44,7 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
   check('compose maps the port', /"25565:25565"/.test(c));
   check('compose mounts ./server and ./data', /- .\/server:\/server/.test(c) && /- .\/data:\/data/.test(c));
   check('compose sets OBSERVER_DATA_DIR env', /OBSERVER_DATA_DIR: \/data/.test(c));
+  check('compose sets OBSERVER_SERVER_DIR env (Bug 2)', /OBSERVER_SERVER_DIR: \/server/.test(c));
   check('compose restart policy', /restart: unless-stopped/.test(c));
   check('compose healthcheck uses the CLI', /src\/cli.js", "status/.test(c));
 }

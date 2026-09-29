@@ -105,6 +105,30 @@ process.env.OBSERVER_DATA_DIR = tmpData;
   try { headless.stop(rt.ctx); } catch (e) { stopThrew = e; }
   check('stop() is safe with nothing running', !stopThrew, stopThrew && stopThrew.message);
 
+  // Bug 2 (v3.1.0): headless auto-adopts a server folder when settings has none — OBSERVER_SERVER_DIR
+  // env, else /server. Without this a fresh container reported "no folder" and nothing could start.
+  {
+    const serverDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ol-srvdir-'));
+    const data2 = fs.mkdtempSync(path.join(os.tmpdir(), 'ol-data2-'));
+    const savedEnv = process.env.OBSERVER_DATA_DIR;
+    const savedSrv = process.env.OBSERVER_SERVER_DIR;
+    process.env.OBSERVER_DATA_DIR = data2;
+    process.env.OBSERVER_SERVER_DIR = serverDir;
+    try {
+      const rt2 = headless.createHeadless();
+      await headless.initHeadless(rt2.ctx);
+      check('headless auto-adopts OBSERVER_SERVER_DIR', rt2.ctx.currentServerPath === serverDir, rt2.ctx.currentServerPath);
+      const { loadSettings } = require('../src/main/settings.js');
+      check('adopted folder persisted to settings', loadSettings().serverPath === serverDir, loadSettings().serverPath);
+    } catch (e) { fail++; console.log('FAIL auto-adopt threw: ' + (e && e.stack ? e.stack : e)); }
+    finally {
+      if (savedEnv === undefined) delete process.env.OBSERVER_DATA_DIR; else process.env.OBSERVER_DATA_DIR = savedEnv;
+      if (savedSrv === undefined) delete process.env.OBSERVER_SERVER_DIR; else process.env.OBSERVER_SERVER_DIR = savedSrv;
+      try { fs.rmSync(serverDir, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(data2, { recursive: true, force: true }); } catch {}
+    }
+  }
+
   try { fs.rmSync(tmpData, { recursive: true, force: true }); } catch {}
   console.log(fail ? `\n${fail} check(s) failed.` : `\nAll headless checks passed (${pass}).`);
   process.exit(fail ? 1 : 0);

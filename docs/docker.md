@@ -65,11 +65,14 @@ observer docker create
 
 - **The container does not download a server jar on first boot.** Put one in `./server`, or create it
   from the desktop app's wizard first, then mount that folder.
-- **MCP stays loopback-only.** The MCP HTTP server binds `127.0.0.1` inside the container. To let an
-  AI client reach it, run the client on the same host and point it at the published port, or run the
-  bridge inside the same Docker network. Do **not** expose the MCP port to the internet — the
-  per-launch bearer token is the only gate, and it grants the full tool set (including destructive
-  tools).
+- **MCP stays loopback-only (and random-port).** The MCP HTTP server binds `127.0.0.1` on a RANDOM
+  port inside the container, so **publishing a port does not reach it**. To use MCP with a container,
+  run the bridge inside it: `docker exec -it <container> node src/mcp/bridge.js` (its token/config is
+  the volume file `./data/mcp-bridge.json`). Do **not** expose MCP to the internet — the per-launch
+  bearer token is the only gate and it grants the full tool set, including destructive tools.
+- **Server folder is auto-adopted.** `compose` sets `OBSERVER_SERVER_DIR=/server`, so a fresh data dir
+  (empty `serverPath`) adopts the mounted folder automatically. To point it elsewhere, either set
+  `OBSERVER_SERVER_DIR` or run `docker exec -it <container> node src/cli.js set-folder <path>`.
 - **Mods/plugins** are best installed with `observer install <id>` (or the desktop app) before
   packaging, since the generated compose file only records the requested list.
 - Memory: set `--ram` to leave headroom for the OS/container. `docker stats` shows real usage.

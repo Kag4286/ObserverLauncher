@@ -45,6 +45,7 @@ Commands:
   templates  List server templates (survival-5, creative-build, modded-performance).
   init       Print the step plan for a template: init --template <id>.
   docker     Generate a Dockerfile + docker-compose.yml: docker create --type <t> [--ram 4G].
+  set-folder Set the active instance's server folder: set-folder <path>.
 ${Object.entries(COMMANDS).map(([n, c]) => `  ${n.padEnd(10)} ${c.desc}`).join('\n')}
 
 Options:
@@ -109,6 +110,25 @@ async function run(argv, { print = true } = {}) {
       log('\nExecute the steps with the matching MCP tools / wizard, or run with --json to script them.');
     }
     return { ok: true, code: 0, result: plan };
+  }
+
+  // Local command: set-folder -> set THIS instance's server folder (the CLI equivalent of picking a
+  // folder in the GUI). Safe on the CLI because the person running it owns the machine — unlike MCP,
+  // which forbids serverPath by design. Needed for headless/Docker where there is no GUI to pick one.
+  if (cmdName === 'set-folder') {
+    const folder = flags._[1] || flags.path;
+    if (!folder) { errlog('Usage: observer set-folder <path> [--instance <id>]'); return { ok: false, code: 2, error: 'missing folder' }; }
+    let rt; try { rt = createHeadless(); await initHeadless(rt.ctx); } catch (e) { errlog(`Could not start the backend: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
+    try {
+      const abs = path.resolve(String(folder));
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) { errlog(`Not a folder: ${abs}`); return { ok: false, code: 1, error: 'not a folder' }; }
+      const { loadSettings, saveSettings } = require('./main/settings.js');
+      const s = loadSettings(); s.serverPath = abs; saveSettings(s);
+      if (flags.json) log(JSON.stringify({ ok: true, serverPath: abs }));
+      else log(`server folder set to ${abs}`);
+      return { ok: true, code: 0, result: { serverPath: abs } };
+    } catch (e) { errlog(`Could not set the folder: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
+    finally { try { stop(rt.ctx); } catch {} }
   }
 
   // Local command: docker create -> write a Dockerfile + compose + .dockerignore + README.

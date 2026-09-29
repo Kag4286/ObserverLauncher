@@ -13,6 +13,7 @@
 //   - createWindow / setupAutoUpdater / setupQuitHandler / protocol scheme registration
 //   - registerMcpConfirm + registerOrphanPrompt: they push GUI dialogs. Leaving ctx.onMcpConfirm
 //     undefined makes server.js's confirmOnGui auto-DENY write/destroy cleanly (no 60s hang).
+const fs = require('fs');
 const { createContext } = require('./main/context.js');
 const { createIpcShim } = require('./main/ipc-shim.js');
 const { dataDir } = require('./main/data-dir.js');
@@ -75,6 +76,24 @@ async function initHeadless(ctx) {
   try { cleanOrphanTmp(dataDir()); } catch {}
   try { ctx.seedInstances(); } catch {}
   try { ctx.currentServerPath = loadSettings().serverPath || ''; } catch {}
+  // Bug 2 fix (v3.1.0): in a container the server folder is a volume (/server) but a fresh data dir
+  // has an empty serverPath, so the launcher reported "no folder" and nothing could start — and the
+  // CLI had no way to set it (MCP forbids serverPath by design). Auto-adopt the mounted folder when
+  // settings is empty: OBSERVER_SERVER_DIR env, else /server if it exists as a directory.
+  try {
+    if (!ctx.currentServerPath) {
+      const candidate = process.env.OBSERVER_SERVER_DIR || '/server';
+      if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        ctx.currentServerPath = candidate;
+        ctx.appendLog(`Adopted server folder ${candidate} (no serverPath configured).`, 'system');
+      }
+    }
+  } catch {}
+  // Persist the adopted path so the CLI/`observer status` see it too (no-op when already set).
+  try {
+    const s = loadSettings();
+    if (ctx.currentServerPath && s.serverPath !== ctx.currentServerPath) { s.serverPath = ctx.currentServerPath; require('./main/settings.js').saveSettings(s); }
+  } catch {}
   try { ctx.watchServerFolder(); } catch {}
   try { ctx.javaInfo = await detectJava(loadSettings().javaPath || 'java'); } catch {}
   try { startMetrics(ctx); } catch {}

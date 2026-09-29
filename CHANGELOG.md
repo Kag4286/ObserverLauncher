@@ -24,7 +24,21 @@ All notable changes to ObserverLauncher are documented here. Format follows
   server (up to 15s, then force-kills the process tree so the container can exit), then the tunnel and
   MCP, and only then exits. A second signal exits immediately. Because the launcher is PID 1 in a
   container, this is what stops the JVM from being orphaned instead of saved.
-- `docs/docker.md` — how to generate, run, mount and troubleshoot the container.
+- `observer set-folder <path>` — set the active instance's server folder from the CLI (the GUI
+  equivalent; MCP forbids `serverPath` by design, so headless/Docker needs this). `docs/docker.md`.
+
+### Fixed — Docker (v3.1.0 review)
+- **The generated image did not install runtime dependencies.** `.dockerignore` excludes
+  `node_modules`, but `players.js` requires `prismarine-nbt` — so the container crash-looped with
+  `MODULE_NOT_FOUND` on boot. The Dockerfile now copies `package*.json` and runs `npm ci --omit=dev`
+  before copying the source (also better layer caching). Guarded by a test.
+- **A fresh container had no server folder and no way to set one.** The server folder is a volume
+  (`/server`) but an empty data dir has no `serverPath`, and neither the CLI nor MCP could set it, so
+  the launcher reported "no folder". Headless now auto-adopts `OBSERVER_SERVER_DIR` (or `/server` when
+  it exists) and persists it; `compose` sets `OBSERVER_SERVER_DIR=/server`; a new `observer set-folder`
+  command sets it explicitly.
+- **Healthcheck no longer boots a second backend every 30s** — it now checks that the PID-1 headless
+  process is alive (`/proc/1/cmdline`), which is cheap.
 - `tests/docker.test.js` (24 checks: option normalisation, Dockerfile/compose/dockerignore contract,
   CLI write-out).
 
