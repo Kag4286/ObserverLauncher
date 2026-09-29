@@ -17,9 +17,9 @@ All notable changes to ObserverLauncher are documented here. Format follows
   .dockerignore + a short README) for a chosen server type. `src/main/docker.js` is a PURE generator
   (strings only) so it is unit-testable without a Docker daemon.
 - The image bakes `eclipse-temurin:<n>-jre` (the in-container Java auto-installer is bypassed), copies
-  the app, runs `node src/headless.js`, `EXPOSE`s the port, and healthchecks with `observer status`.
-  compose mounts `./server` and `./data` (via `OBSERVER_DATA_DIR=/data`), maps the port and sets
-  `restart: unless-stopped`.
+  the app, runs `node src/headless.js`, `EXPOSE`s the port, and healthchecks cheaply (a PID-1 liveness
+  check — NOT a second CLI/backend). compose mounts `./server` and `./data` (via `OBSERVER_DATA_DIR=/data`,
+  `OBSERVER_SERVER_DIR=/server`), maps the port and sets `restart: unless-stopped`.
 - **Container-aware shutdown:** `src/headless.js` catches `SIGTERM`/`SIGINT`, gracefully stops the
   server (up to 15s, then force-kills the process tree so the container can exit), then the tunnel and
   MCP, and only then exits. A second signal exits immediately. Because the launcher is PID 1 in a
@@ -42,9 +42,16 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **`observer start` now runs in the foreground.** The JVM is a child of the CLI process, so exiting
   immediately would orphan the server (and, since `stop()` became async in 3.1.0, the old `finally`
   could tear down a server it had just started). In program mode `start` stays attached to the
-  terminal and forwards Ctrl+C/SIGTERM to a graceful stop; tests still return immediately.
-- `tests/docker.test.js` (24 checks: option normalisation, Dockerfile/compose/dockerignore contract,
-  CLI write-out).
+  terminal, forwards Ctrl+C/SIGTERM to a graceful stop, and returns if the server process exits on its
+  own; tests still return immediately.
+- **`observer set-folder` honours `--instance` and is audited.** It wrote to the ACTIVE instance
+  regardless of `--instance` (same class as the CLI `--instance` bug), and changing the server root
+  was not recorded. It now resolves the target instance (`saveSettingsFor`) and writes to the audit log.
+- **The modpack overrides-confirm step is shared, not duplicated.** `.mrpack` import had an inline
+  copy of the `copyOverridesWithConfirm` logic used by the CurseForge path; both now call the one
+  helper.
+- `tests/docker.test.js` (28 checks: option normalisation, Dockerfile/compose/dockerignore contract,
+  `npm ci`, auto-adopt env, cheap healthcheck, CLI write-out).
 
 ### Fixed
 - **CLI `--instance` was ignored.** `observer <cmd> --instance <id>` documented the flag but every
