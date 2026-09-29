@@ -46,7 +46,10 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
   check('compose sets OBSERVER_DATA_DIR env', /OBSERVER_DATA_DIR: \/data/.test(c));
   check('compose sets OBSERVER_SERVER_DIR env (Bug 2)', /OBSERVER_SERVER_DIR: \/server/.test(c));
   check('compose restart policy', /restart: unless-stopped/.test(c));
-  check('compose healthcheck uses the CLI', /src\/cli.js", "status/.test(c));
+  // v3.1.0 review: compose OVERRIDES the Dockerfile healthcheck, so it must use the cheap PID-1 check
+  // too (not the CLI, which booted a whole second backend every 30s).
+  check('compose healthcheck is the cheap /proc/1 check', /proc\/1\/cmdline/.test(c) && /headless\.js/.test(c));
+  check('compose healthcheck does NOT boot the CLI', !/cli\.js/.test(c));
 }
 
 // .dockerignore must exclude local data/server + secrets.

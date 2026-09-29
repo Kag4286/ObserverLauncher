@@ -122,13 +122,25 @@ async function run(argv, { print = true, foreground = false } = {}) {
     try {
       const abs = path.resolve(String(folder));
       if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) { errlog(`Not a folder: ${abs}`); return { ok: false, code: 1, error: 'not a folder' }; }
-      const { loadSettings, saveSettings } = require('./main/settings.js');
-      const s = loadSettings(); s.serverPath = abs; saveSettings(s);
+      // FIX (v3.1.0 review): honour --instance (same class as the P1 bug). Resolve the id and write
+      // the folder into THAT instance's settings (saveSettingsFor), not always the active one.
+      const { saveSettings, saveSettingsFor, resolveInstanceId } = require('./main/settings.js');
+      const flat = { serverPath: abs };
+      if (flags.instance) {
+        const resolved = resolveInstanceId(String(flags.instance));
+        if (!resolved) { errlog(`Unknown instance "${flags.instance}". Run \`observer list\`.`); return { ok: false, code: 2, error: `unknown instance ${flags.instance}` }; }
+        saveSettingsFor(resolved, { ...require('./main/settings.js').loadSettingsFor(resolved), ...flat });
+      } else {
+        saveSettings({ ...require('./main/settings.js').loadSettings(), ...flat });
+      }
+      // FIX (v3.1.0 review): this changes the root for every file operation — audit it (write tier),
+      // like every other CLI write/destroy action (P2).
+      try { auditLog('set_folder', 'write', { ok: true, serverPath: abs }); } catch {}
       if (flags.json) log(JSON.stringify({ ok: true, serverPath: abs }));
       else log(`server folder set to ${abs}`);
       return { ok: true, code: 0, result: { serverPath: abs } };
     } catch (e) { errlog(`Could not set the folder: ${e?.message || e}`); return { ok: false, code: 1, error: String(e) }; }
-    finally { try { stop(rt.ctx); } catch {} }
+    finally { try { await stop(rt.ctx); } catch {} }
   }
 
   // Local command: docker create -> write a Dockerfile + compose + .dockerignore + README.
@@ -196,10 +208,20 @@ async function run(argv, { print = true, foreground = false } = {}) {
     // without `foreground`, so they still return immediately.
     if (foreground && cmdName === 'start' && ok) {
       log('server running in the foreground — press Ctrl+C to stop.');
+      // Resolve on a signal (user stops it) OR when the server process exits on its own (crash /
+      // clean stop), so a dead JVM never leaves the terminal hanging with no message.
       await new Promise((resolve) => {
-        const onSig = async () => { try { await stop(rt.ctx); } catch {} resolve(); };
+        let done = false;
+        const finish = (why) => { if (done) return; done = true; clearInterval(poll); try { console.error(`[observer] ${why}`); } catch {} resolve(); };
+        const onSig = async () => { try { await stop(rt.ctx); } catch {} finish('stopped by signal.'); };
         process.once('SIGINT', onSig);
         process.once('SIGTERM', onSig);
+        // Poll ~1s: the server is gone once ctx.serverProcess is null AND status is stopped.
+        const poll = setInterval(() => {
+          try {
+            if (!rt.ctx.serverProcess && rt.ctx.serverStatus === 'stopped') finish('server process exited.');
+          } catch {}
+        }, 1000);
       });
     }
     return { ok, code: ok ? 0 : 1, result };

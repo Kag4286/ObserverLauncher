@@ -91,11 +91,14 @@ services:
       OBSERVER_DATA_DIR: /data
       OBSERVER_SERVER_DIR: /server
       OBSERVER_CONFIRM_MODE: auto-deny
+    # Cheap liveness check: confirm the PID-1 headless process is alive. Do NOT run the CLI status
+    # here — compose OVERRIDES the Dockerfile healthcheck, so the old form booted a whole second
+    # backend every 30s.
     healthcheck:
-      test: ["CMD", "node", "src/cli.js", "status"]
+      test: ["CMD-SHELL", "tr '\\0' ' ' </proc/1/cmdline | grep -q headless.js"]
       interval: 30s
       timeout: 10s
-      start_period: 30s
+      start_period: 20s
       retries: 3
 `;
 }

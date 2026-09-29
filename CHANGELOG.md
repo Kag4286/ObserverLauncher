@@ -10,7 +10,7 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
-## [3.1.0] — UNRELEASED (polish/fix + Docker done; packaging/docs pending)
+## [3.1.0] — 2026-09-29
 
 ### Added — Docker
 - **`observer docker create`** generates a runnable Docker setup (Dockerfile + docker-compose.yml +
