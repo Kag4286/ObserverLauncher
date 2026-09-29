@@ -12,7 +12,7 @@ ObserverLauncher handles the setup work around hosting: it downloads the server 
 
 > **Website:** [observerlauncher-site.kag4286.workers.dev](https://observerlauncher-site.kag4286.workers.dev) — an overview of the whole project, all seven languages, and the full changelog.
 
-> 3.0.0 added a headless mode, an `observer` command line, and MCP that runs without a window. 3.1.0 packages that as a **Docker** container. The GUI is unchanged and shares every line of backend code. Changes are listed in the [CHANGELOG](CHANGELOG.md).
+> 3.0.0 added a headless mode, an `observer` command line, and MCP that runs without a window. 3.1.0 packages that as a **Docker** container. 3.2.0 adds declarative `modpack.json` files with CI verification. The GUI is unchanged and shares every line of backend code. Changes are listed in the [CHANGELOG](CHANGELOG.md).
 
 [Install](#install) · [Quick start](#quick-start) · [Features](#features) · [Troubleshooting](#troubleshooting) · [Architecture](#architecture)
 
@@ -164,6 +164,9 @@ Plugins, players, backups and the world map are optional.
 ### Docker
 - Run the launcher headless in a container: `observer docker create --type fabric --ram 4` writes a Dockerfile + compose + volumes + healthcheck. See [Docker](#docker).
 
+### Modpack CI/CD
+- Describe a modpack in a `modpack.json` and verify it in CI: `observer modpack verify` catches a wrong loader/game version, a file collision or a missing dependency **before** anything downloads. `observer modpack build --out <dir>` assembles it. See [Modpack CI/CD](#modpack-cicd).
+
 ## MCP / AI integration
 
 ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 70 tools.
@@ -198,6 +201,32 @@ cd my-server && mkdir -p server data && docker compose up -d
 - MCP stays loopback-only on a random port inside the container — reach it with `docker exec -it <container> node src/mcp/bridge.js`, never by publishing the port.
 
 Full guide: [docs/docker.md](docs/docker.md).
+
+## Modpack CI/CD
+
+Since 3.2.0 a modpack can be a declarative, version-controlled `modpack.json` — and CI can prove it is consistent on every pull request, before a single gigabyte is downloaded.
+
+```json
+{ "name": "My Server Pack", "version": "1.0.0", "minecraft": "1.21.1", "loader": "neoforge",
+  "items": [ { "id": "jei", "kind": "mod", "source": "modrinth" } ] }
+```
+
+```bash
+# resolve each item, then check loader/MC, file collisions and missing deps
+observer modpack verify modpack.json
+
+# schema-only (no network)
+observer modpack verify modpack.json --offline
+
+# download the whole pack into a fresh server folder (allowed hosts only, hashes verified)
+observer modpack build modpack.json --out my-server
+```
+
+- `verify` resolves items through the same resolver the GUI/MCP install uses, so a pack is checked against what would actually be installed. An item that cannot be resolved is a **failure** — a pack we cannot prove compatible must not pass.
+- A GitHub Action (`.github/workflows/modpack-ci.yml`) runs `verify --strict` on any PR that touches a `modpack.json`. A separate, **gated** job builds the pack and boots a real server (manual / nightly / PR label `e2e`) because that needs ~1-2 GB RAM and ~60s.
+- The launcher also keeps a persistent per-run stability record, so a server that crashes early several times in a row gets a rollback recommendation in the Console.
+
+Full guide: [docs/modpack.md](docs/modpack.md).
 
 ## Supported server software
 
