@@ -82,7 +82,7 @@ function parseArgs(argv) {
 
 // Run one command. Returns { ok, code, result }. code is the process exit code (0 ok, 1 tool
 // failure, 2 usage error). Never throws — boot/run errors become { ok:false }.
-async function run(argv, { print = true } = {}) {
+async function run(argv, { print = true, foreground = false } = {}) {
   const flags = parseArgs(argv);
   const log = (...a) => { if (print) console.log(...a); };
   const errlog = (...a) => { if (print) console.error(...a); };
@@ -190,12 +190,26 @@ async function run(argv, { print = true } = {}) {
     if (flags.json) log(JSON.stringify(result));
     else printHuman(cmdName, result, log, errlog);
     const ok = !(result && result.ok === false);
+    // `start` FOREGROUND (v3.1.0): the JVM is a CHILD of this CLI process, so if the CLI exited the
+    // server would be orphaned (stdio broken). In program mode we keep the terminal attached, forward
+    // Ctrl+C/SIGTERM to a graceful stop, and only return once the server is down. Tests call run()
+    // without `foreground`, so they still return immediately.
+    if (foreground && cmdName === 'start' && ok) {
+      log('server running in the foreground — press Ctrl+C to stop.');
+      await new Promise((resolve) => {
+        const onSig = async () => { try { await stop(rt.ctx); } catch {} resolve(); };
+        process.once('SIGINT', onSig);
+        process.once('SIGTERM', onSig);
+      });
+    }
     return { ok, code: ok ? 0 : 1, result };
   } catch (e) {
     errlog(`Command failed: ${e?.message || e}`);
     return { ok: false, code: 1, error: e?.message || String(e) };
   } finally {
-    try { stop(rt.ctx); } catch {}
+    // Do NOT tear down a foreground `start` from the finally (the signal handler already stopped it);
+    // stop() is idempotent, but skipping keeps the intent clear.
+    if (!(foreground && cmdName === 'start')) { try { await stop(rt.ctx); } catch {} }
   }
 }
 
@@ -220,7 +234,10 @@ function printHuman(cmdName, result, log, errlog) {
 
 module.exports = { run, COMMANDS, parseArgs, USAGE };
 
-// Auto-run only as a program, not when required by a test.
+// Auto-run only as a program, not when required by a test. `start` runs in the foreground so the
+// terminal stays attached to the server (the JVM is this process's child).
 if (require.main === module) {
-  run(process.argv.slice(2)).then(r => process.exit(r.code)).catch(e => { console.error(e); process.exit(1); });
+  const argv = process.argv.slice(2);
+  const foreground = argv[0] === 'start';
+  run(argv, { foreground }).then(r => process.exit(r.code)).catch(e => { console.error(e); process.exit(1); });
 }

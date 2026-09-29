@@ -39,6 +39,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
   command sets it explicitly.
 - **Healthcheck no longer boots a second backend every 30s** — it now checks that the PID-1 headless
   process is alive (`/proc/1/cmdline`), which is cheap.
+- **`observer start` now runs in the foreground.** The JVM is a child of the CLI process, so exiting
+  immediately would orphan the server (and, since `stop()` became async in 3.1.0, the old `finally`
+  could tear down a server it had just started). In program mode `start` stays attached to the
+  terminal and forwards Ctrl+C/SIGTERM to a graceful stop; tests still return immediately.
 - `tests/docker.test.js` (24 checks: option normalisation, Dockerfile/compose/dockerignore contract,
   CLI write-out).
 
