@@ -12,6 +12,7 @@
 const { createHeadless, initHeadless, stop } = require('./headless.js');
 const { getTool } = require('./mcp/tools.js');
 const { listTemplates, resolveTemplate, templatePlan } = require('./main/templates.js');
+const { auditLog } = require('./mcp/server.js');
 const pkg = require('../package.json');
 
 // command -> { tool, needs, build(args) }. build() turns parsed flags into the tool's args object.
@@ -125,7 +126,22 @@ async function run(argv, { print = true } = {}) {
   try {
     const args = cmd.build ? cmd.build(flags) : {};
     if (flags.instance) args.instance = String(flags.instance);
-    const result = await tool.handler(rt.ctx, args);
+    // P1 (v3.1.0 fix): `--instance` must actually target that instance. tool.handler() reads
+    // per-instance ctx accessors via AsyncLocalStorage (ctx.inst()), so the handler MUST run inside
+    // runInInstance(targetId) — otherwise every command silently hit the ACTIVE instance (the flag
+    // was documented but ignored). Mirrors server.js callTool's instance resolution.
+    let runId = rt.ctx.activeInstanceId;
+    if (args.instance) {
+      const { resolveInstanceId } = require('./main/settings.js');
+      const resolved = resolveInstanceId(String(args.instance));
+      if (!resolved) { errlog(`Unknown instance "${args.instance}". Run \`observer list\`.`); return { ok: false, code: 2, error: `unknown instance ${args.instance}` }; }
+      runId = resolved;
+    }
+    const result = await rt.ctx.runInInstance(runId, () => tool.handler(rt.ctx, args));
+    // P2 (v3.1.0 fix): the CLI bypasses callTool, so write/destroy actions were never audit-logged
+    // — a `read_audit_log` after `observer stop`/`install` showed nothing, contradicting the audit
+    // story. Record them here (same auditLog server.js uses).
+    if (tool.risk !== 'read') { try { auditLog(cmd.tool, tool.risk, result); } catch {} }
     if (flags.json) log(JSON.stringify(result));
     else printHuman(cmdName, result, log, errlog);
     const ok = !(result && result.ok === false);
@@ -146,6 +162,14 @@ function printHuman(cmdName, result, log, errlog) {
   if (cmdName === 'status') { log(`status: ${d.status} — ${d.running ? 'running' : 'stopped'} (${d.serverPath || 'no folder'})`); return; }
   if (cmdName === 'list') { for (const i of d.instances || []) log(`${i.active ? '*' : ' '} ${i.id}  ${i.name || ''}  ${i.serverPath || ''}`); return; }
   if (cmdName === 'logs') { for (const l of d.lines || []) log(typeof l === 'string' ? l : (l.text || '')); return; }
+  // P3 (v3.1.0 polish): a bare 'ok' threw away the useful part of the result. Surface the file that
+  // was installed/backed up, or the resulting status, so one line of output is actually informative.
+  if (cmdName === 'install') { log(`installed ${d.name || d.filename || ''}${d.version ? ' (' + d.version + ')' : ''}`.trim()); return; }
+  if (cmdName === 'backup') { log(d.file ? `backup created: ${d.file}` : 'backup created'); return; }
+  if (cmdName === 'start') { log(`server ${d.status || 'starting'}`); return; }
+  if (cmdName === 'stop') { log(`server ${d.status || 'stopping'}`); return; }
+  if (cmdName === 'players') { const n = (d.online || d.players || []).length; log(`${n} online`); return; }
+  if (cmdName === 'doctor') { log(d.summary || 'health report ready (use --json for full output)'); return; }
   log('ok');
 }
 

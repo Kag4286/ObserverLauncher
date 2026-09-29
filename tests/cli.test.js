@@ -74,6 +74,29 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
     check('init without --template -> exit 2', miss.code === 2);
   }
 
+  // 7c) P1/P2 (v3.1.0): --instance resolution + write/destroy audit logging.
+  {
+    // Seed 2 instances so resolveInstanceId has something to resolve.
+    fs.writeFileSync(path.join(tmpData, 'settings.json'), JSON.stringify({
+      version: 4, instances: [
+        { id: 'alpha', name: 'Alpha', serverPath: path.join(tmpData, 'a') },
+        { id: 'beta', name: 'Beta', serverPath: path.join(tmpData, 'b') },
+      ], activeInstanceId: 'alpha',
+    }, null, 2));
+    const bad = await cli.run(['status', '--instance', 'nope', '--json'], { print: false });
+    check('P1: unknown --instance -> exit 2', bad.code === 2, JSON.stringify(bad));
+    const good = await cli.run(['status', '--instance', 'beta', '--json'], { print: false });
+    check('P1: valid --instance runs ok', good.ok === true && good.code === 0, JSON.stringify(good));
+
+    // P2: a write/destroy command (backup has no folder here -> ok:false) must still be AUDITED.
+    const auditFile = path.join(tmpData, 'mcp-audit.log');
+    try { fs.rmSync(auditFile, { force: true }); } catch {}
+    await cli.run(['backup', '--json'], { print: false });
+    let body = '';
+    try { body = fs.readFileSync(auditFile, 'utf8'); } catch {}
+    check('P2: CLI write command is written to the audit log', /create_backup/.test(body), body.slice(0, 120));
+  }
+
   // 8) every COMMAND maps to a real registered tool (registry drift guard).
   {
     const { getTool } = require('../src/mcp/tools.js');

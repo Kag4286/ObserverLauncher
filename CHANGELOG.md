@@ -10,6 +10,26 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [Unreleased] — 3.1.0 work in progress
+
+### Fixed
+- **CLI `--instance` was ignored.** `observer <cmd> --instance <id>` documented the flag but every
+  command ran against the ACTIVE instance — `tool.handler()` reads per-instance state via
+  AsyncLocalStorage, and the CLI never entered the target instance's scope. Now it resolves the id
+  (unknown -> exit 2) and runs the handler inside `ctx.runInInstance(id, ...)`, exactly like
+  `callTool`.
+- **CLI write/destroy actions were not audited.** The CLI bypasses `callTool`, so it also bypassed
+  `auditLog` — `read_audit_log` after `observer stop`/`install` showed nothing. The CLI now writes
+  write/destroy results to the audit log.
+
+### Changed
+- **CLI output is more useful.** `install` prints the installed file/version, `backup` the created
+  file, `start`/`stop` the resulting status, `players` the online count, instead of a bare `ok`.
+  (`--json` is unchanged.)
+- **`dataDir()` ensures the folder exists.** A non-existent `OBSERVER_DATA_DIR` (typo / unmounted
+  volume / Docker bind not created) now fails at the first write instead of later with a confusing
+  ENOENT; the per-platform default is created too. Memoized so the hot path pays no extra fs call.
+
 ## [3.0.0] — 2026-09-28
 
 **Headline: the launcher goes headless — a CLI, a no-window entry point, and MCP that runs without
