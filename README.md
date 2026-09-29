@@ -161,6 +161,9 @@ Plugins, players, backups and the world map are optional.
 ### MCP / AI integration
 - Acts as an MCP server so an AI client can read and control the server in natural language (70 tools). See [MCP / AI integration](#mcp--ai-integration).
 
+### Docker
+- Run the launcher headless in a container: `observer docker create --type fabric --ram 4` writes a Dockerfile + compose + volumes + healthcheck. See [Docker](#docker).
+
 ## MCP / AI integration
 
 ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 70 tools.
@@ -178,6 +181,23 @@ ObserverLauncher can act as an MCP server, letting an MCP client read and contro
 **Permissions.** Tools have three tiers. Read tools run freely. Write tools (install, edit files, send a command) ask for confirmation first, which *Auto-allow write tools* can skip. Destructive tools (stop, delete, restore, `safe_restart`) always ask and cannot be auto-approved. A Read-only mode setting blocks every write and destructive tool up front. A per-tool rate limit (60/min) prevents runaway loops, and every write and destroy call is written to an audit log.
 
 Nothing is exposed beyond `127.0.0.1`, and the token changes every launch.
+
+## Docker
+
+Since 3.1.0 you can package a headless server as a container. Generate the setup, then run it:
+
+```bash
+observer docker create --type fabric --ram 4 --port 25565 --out my-server
+cd my-server && mkdir -p server data && docker compose up -d
+```
+
+- The image bakes a JRE and runs `node src/headless.js` (the launcher is PID 1, the JVM is its child).
+- Your server folder and launcher data live in two volumes (`./server`, `./data`) so they survive rebuilds.
+- A fresh container auto-adopts `/server` as the server folder (`OBSERVER_SERVER_DIR`); `observer set-folder <path>` changes it.
+- On stop, the launcher shuts the server down gracefully (up to 15s, then force-kills) before exiting.
+- MCP stays loopback-only on a random port inside the container — reach it with `docker exec -it <container> node src/mcp/bridge.js`, never by publishing the port.
+
+Full guide: [docs/docker.md](docs/docker.md).
 
 ## Supported server software
 
