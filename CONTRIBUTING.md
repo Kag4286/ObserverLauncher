@@ -18,7 +18,8 @@ npm test         # unit/regression suite (node tests/run.js)
 npm run test:e2e # Playwright smoke tests against the real Electron app
 ```
 
-The app is plain Electron — **no bundler, no build step for development**. There are three layers:
+The app is plain Electron — **no bundler, no build step for development**. There are three layers,
+plus a window-less entry point that reuses the exact same backend:
 
 - **Main process** (`src/main.js`) — the Electron entry point. It is a thin composition root: it
   creates the shared state object and registers feature modules. Almost all logic lives in
@@ -32,7 +33,9 @@ The app is plain Electron — **no bundler, no build step for development**. The
     `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
     (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key),
     `server-compat.js`, `server-java.js`, `forge-versions.js`, `jar-read.js`, `mod-metadata.js`,
-    `secrets.js`.
+    `secrets.js`, `data-dir.js` (the ONE data-folder resolver), `ipc-shim.js` (a fake `ipcMain` so the
+    feature modules register without Electron), `templates.js` (server templates), `docker.js` (a pure
+    Dockerfile/compose generator).
   - `mcp/` — optional MCP/AI integration (see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang).
@@ -40,7 +43,16 @@ The app is plain Electron — **no bundler, no build step for development**. The
     dispatched by `index.js`).
 
   Each of these modules is a plain `require()`-able file with no dependency on a running window, so
-  it can be unit-tested in isolation.
+  it can be unit-tested in isolation. A module MUST NOT `require('electron')` at the top level — that
+  throws under plain Node and breaks the headless entry point. Require it lazily inside a GUI-only
+  path instead; `tests/headless-guard.test.js` fails the build if a top-level require reappears.
+
+- **Headless** (`src/headless.js` + `src/cli.js`) — the no-window entry point. `headless.js` builds
+  the same `ctx` + shim + feature modules with no `BrowserWindow`, `app.whenReady`, auto-updater,
+  `tex://` protocol or single-instance lock, then runs the backend init (Java detect, folder watcher,
+  metrics, auto-backup, scheduler) and starts the MCP server when enabled. `cli.js` is the `observer`
+  command (`status`, `start`, `stop`, `logs`, `backup`, `doctor`, `templates`, `docker create`, …) and
+  is `bin.observer`. Both must stay Electron-free (see the guard test above).
 
 - **MCP** (`src/mcp/`) — optional local-only AI integration. `tools.js` is the tool registry (name, risk tier, schema, handler): read tools run freely, write tools ask in-app, destructive always ask. `server.js` is a loopback HTTP server (127.0.0.1, random port, fresh token) started when enabled; `bridge.js` is a dependency-free stdio MCP server a client launches that forwards calls to the app (runs on the app's own binary via `ELECTRON_RUN_AS_NODE=1`, no system Node needed); `confirm.js` bridges write/destroy calls to the in-app dialog. `doctor.js` holds the Server-Doctor diagnostics — pure, testable helpers (console-log analysis, crash summarising, `server.properties` validation, the composite health check) with no Electron dependency. `repair.js` holds the Autonomous Doctor logic (crash-loop / RAM-pressure detection, the `propose_fix` repair planner, and the marketplace mod-name matching used by `apply_fix`); `modpack-plan.js` resolves candidate projects into an install plan with versions + required dependencies. Handlers reuse the same backend functions the IPC layer uses.
 
@@ -140,7 +152,9 @@ add a regression test with a synthesized NBT fixture (see
   literal durations in CSS goes up. See `docs/motion.md`.
 - **Run the tests** before opening a PR: `npm test`. The suite includes architecture guards
   (`tests/arch-*.test.js`) that check boot order, IPC channel parity, the atomic-write whitelist and
-  the per-instance accessors. `npm run test:e2e` runs the Playwright suite.
+  the per-instance accessors, plus `tests/headless-guard.test.js` (a ratchet: no top-level
+  `require('electron')` or `app.getPath('userData'|'temp')` outside `data-dir.js`). `npm run test:e2e`
+  runs the Playwright suite.
 - **Test on Windows** if you can — Windows and Linux are the currently supported platforms, and
   several code paths (`powershell.exe`, `cmd.exe`, `run.bat`) are Windows-specific.
 

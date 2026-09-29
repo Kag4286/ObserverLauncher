@@ -12,7 +12,7 @@ ObserverLauncher handles the setup work around hosting: it downloads the server 
 
 > **Website:** [observerlauncher-site.kag4286.workers.dev](https://observerlauncher-site.kag4286.workers.dev) — an overview of the whole project, all seven languages, and the full changelog.
 
-> 3.0.0 adds a headless mode, an `observer` command line, and MCP that runs without a window — the GUI is unchanged and shares every line of backend code. Changes are listed in the [CHANGELOG](CHANGELOG.md).
+> 3.0.0 added a headless mode, an `observer` command line, and MCP that runs without a window. 3.1.0 packages that as a **Docker** container. The GUI is unchanged and shares every line of backend code. Changes are listed in the [CHANGELOG](CHANGELOG.md).
 
 [Install](#install) · [Quick start](#quick-start) · [Features](#features) · [Troubleshooting](#troubleshooting) · [Architecture](#architecture)
 
@@ -22,12 +22,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-3.0.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-3.0.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-3.1.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-3.1.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-3.0.0.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-3.1.0.AppImage`, then run it. No root needed.
 
 From source:
 
@@ -341,6 +341,7 @@ HEADLESS  (src/headless.js + src/cli.js)  same backend, no window
   data-dir.js resolves the data folder (OBSERVER_DATA_DIR env -> userData -> platform default)
   ipc-shim.js is a fake ipcMain so feature modules register unchanged (ALS pinning preserved)
   headless.js registers every module + backend init; cli.js exposes the `observer` command
+  templates.js = server templates; docker.js = a pure Dockerfile/compose generator (3.1.0)
 ```
 
 - `src/main/context.js` holds the shared mutable state object (`ctx`) plus helpers such as `send`, `appendLog` and `setServerStatus`. Every status change goes through `setServerStatus`.
@@ -361,7 +362,7 @@ The unit suite covers boot state, editor safety rails, force-stop, input validat
 
 E2E boots the real app and drives real flows: a full tab and modal tour that must stay free of renderer errors, the Settings sub-tab glider, language switching, motion-level persistence across a reload, and, against a throwaway fixture server folder, the Content list, the file-browser and editor round-trip, and the Properties editor. The suite runs offline; boot skips the network version fetch and the real Java probe under `OBSERVER_E2E=1`.
 
-Since 3.0.0 the suite also covers the headless path: `data-dir` resolution, the IPC shim, the no-window entry point and CLI, the headless confirm policy, MCP over headless (`/health`), JSONL audit with rotation, and server templates — plus a ratchet (`tests/headless-guard.test.js`) that fails the build if the backend is re-welded to Electron.
+Since 3.0.0 the suite also covers the headless path: `data-dir` resolution, the IPC shim, the no-window entry point and CLI, the headless confirm policy, MCP over headless (`/health`), JSONL audit with rotation, and server templates — plus a ratchet (`tests/headless-guard.test.js`) that fails the build if the backend is re-welded to Electron. 3.1.0 adds the Docker generator tests (`tests/docker.test.js`).
 
 ### Build
 
@@ -392,7 +393,7 @@ ObserverLauncher/
 │   ├── main/            # Backend modules (see Architecture above)
 │   │   ├── adapters/    # Server software download resolvers
 │   │   ├── platform/    # Windows/Linux process, metrics, firewall
-│   │   └── data-dir.js / ipc-shim.js / templates.js  # headless support + server templates
+│   │   └── data-dir.js / ipc-shim.js / templates.js / docker.js  # headless support, templates, Docker
 │   └── renderer/        # UI
 │       ├── index.html   # Shell (loads css/*, locales/*, js/* in order)
 │       ├── js/          # Frontend per tab (00-core ... 13-bootcheck)
