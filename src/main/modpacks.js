@@ -156,37 +156,9 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
       installed++;
     }
     const overridesDir = path.join(extractDir, 'overrides');
-    if (fs.existsSync(overridesDir)) {
-      // List EVERY override that would replace an existing file (not just server.properties/eula.txt),
-      // so the user sees exactly what the pack is about to overwrite. `sensitive` (config the user
-      // edited by hand) gets a stronger warning; anything else is still listed for transparency.
-      const sensitiveSet = new Set(['server.properties', 'eula.txt']);
-      const clobbered = [];
-      const walk = (rel) => {
-        let entries; try { entries = fs.readdirSync(path.join(overridesDir, rel), { withFileTypes: true }); } catch { return; }
-        for (const e of entries) {
-          const r = rel ? `${rel}/${e.name}` : e.name;
-          if (e.isDirectory()) { walk(r); continue; }
-          if (fs.existsSync(path.join(ctx.currentServerPath, r))) clobbered.push(r);
-        }
-      };
-      walk('');
-      let proceed = true;
-      if (clobbered.length) {
-        const sensitiveHit = clobbered.filter(f => sensitiveSet.has(f));
-        const head = clobbered.slice(0, 8).join('\n');
-        const more = clobbered.length > 8 ? `\n…and ${clobbered.length - 8} more` : '';
-        const detail = head + more + (sensitiveHit.length ? '\n\n⚠ This includes server.properties/eula.txt you may have configured yourself.' : '');
-        const choice = await dialog.showMessageBox(ctx.win, {
-          type: 'warning', buttons: ['Cancel', 'Overwrite'], defaultId: 0, cancelId: 0,
-          title: 'Modpack will overwrite existing files',
-          message: `This modpack includes ${clobbered.length} file(s) that already exist in your server folder and would be replaced:`,
-          detail: detail + '\n\nOverwrite them?'
-        });
-        proceed = choice.response === 1;
-      }
-      if (proceed) fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });
-    }
+    // DRY (v3.1.0): use the SHARED overrides copy (same logic the CurseForge path uses) instead of a
+    // second inline copy. It lists every file that would be clobbered and confirms with the user.
+    await copyOverridesWithConfirm(ctx, overridesDir);
     return { ok: true, installed, skipped, name: index.name || 'Modpack', files: serverFiles(ctx.currentServerPath) };
   } catch (error) { return marketplaceError(error); }
   finally { try { if (tempZip) fs.rmSync(tempZip, { force: true }); if (extractDir) fs.rmSync(extractDir, { recursive: true, force: true }); } catch {} }
