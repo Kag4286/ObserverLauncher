@@ -31,9 +31,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      # REQUIRED: src/cli.js requires src/headless.js at module load, which transitively loads every
+      # feature module — including players.js's runtime dep (prismarine-nbt). Without node_modules
+      # the generate step dies with MODULE_NOT_FOUND (the exact trap that made 3.1.0's image
+      # crash-loop). Generating files still loads the whole CLI, so `npm ci` comes first.
+      - run: npm ci
+
       # Generate Dockerfile + docker-compose.yml + .dockerignore into the repo root (the CLI docker
-      # command is LOCAL — no backend boot, no npm install needed). .dockerignore then trims the
-      # build context (node_modules/tests/docs/etc.) exactly as a real user's build would.
+      # command is LOCAL — no backend boot). .dockerignore then trims the build context
+      # (node_modules/tests/docs/etc.) exactly as a real user's build would.
       - name: Generate the Docker setup
         run: node src/cli.js docker create --type paper --port 25565 --out .
 
