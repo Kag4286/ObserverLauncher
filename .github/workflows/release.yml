@@ -8,6 +8,8 @@ permissions:
   contents: write
 
 jobs:
+  # Builds the installers and creates the DRAFT release (electron-builder's default releaseType).
+  # The draft is intentional: review it, then publish manually so a broken build is never live.
   release:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -28,3 +30,29 @@ jobs:
         run: npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Attach the modpack artifact to the SAME release, AFTER the installers exist. This is a separate
+  # job in the SAME workflow on purpose: a second workflow that also published on the tag raced
+  # electron-builder and flipped the release to published while losing the installers. One tag -> one
+  # workflow -> one release. `gh release upload` only ATTACHES (never creates, never publishes), so the
+  # draft stays a draft until you publish it.
+  modpack-artifact:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build modpack artifacts
+        run: node scripts/modpack-publish.js --out dist
+
+      - name: Attach to the release (no create, no publish)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/*.tar.gz --repo "${GITHUB_REPOSITORY}" --clobber

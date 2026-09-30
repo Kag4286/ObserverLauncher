@@ -38,9 +38,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **`.github/workflows/modpack-ci.yml`** — runs `modpack verify --strict` on every PR/push that touches
   a `modpack.json` or the verifier; the boot-smoke job is gated.
 - **Modpack publish (D3)** — `scripts/modpack-publish.js` builds every `modpack.json` into a
-  distributable `.tar.gz` (a hand-rolled tar writer, so no `zip`/`tar` CLI dependency) and
-  `.github/workflows/modpack-publish.yml` attaches the archives to the tag's GitHub Release, next to
-  the app installers. Runs locally too: `node scripts/modpack-publish.js --out dist`.
+  distributable `.tar.gz` (a hand-rolled tar writer, so no `zip`/`tar` CLI dependency). A
+  `modpack-artifact` job in `.github/workflows/release.yml` ATTACHES the archives to the tag's GitHub
+  Release (via `gh release upload` — attach only, never create/publish, so the installer draft stays a
+  draft). Runs locally too: `node scripts/modpack-publish.js --out dist`.
 - **`examples/modpack.json`** — a real, resolvable example manifest (Paper + LuckPerms + ViaVersion)
   used to exercise verify/build/publish end to end.
 - **`.github/workflows/docker.yml`** — builds the GENERATED Docker image on every PR/push and requires
