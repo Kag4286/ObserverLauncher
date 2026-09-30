@@ -50,6 +50,23 @@ function parseCpuTime(raw) {
   return total;
 }
 
+// Breadth-first walk from rootPid collecting every descendant that isJava(pid) says is a java
+// process. getChildren(pid) yields that process's direct children. Shared by the /proc and ps
+// paths of findJavaDescendant so the two traversals cannot drift apart (gotcha #20).
+function collectJavaPids(rootPid, isJava, getChildren) {
+  const queue = [Number(rootPid)];
+  const visited = new Set();
+  const found = [];
+  while (queue.length) {
+    const cur = queue.shift();
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    if (isJava(cur)) found.push(cur);
+    for (const pid of getChildren(cur)) queue.push(pid);
+  }
+  return found;
+}
+
 // Walk /proc to find java descendant, or use ps
 async function findJavaDescendant(rootPid) {
   // Try reading /proc
@@ -64,21 +81,10 @@ async function findJavaDescendant(rootPid) {
         if (m) map.set(pid, { comm: m[1], ppid: Number(m[2]) });
       } catch {}
     }
-    // BFS from root
-    const queue = [Number(rootPid)];
-    const visited = new Set();
-    const candidates = [];
-    while (queue.length) {
-      const cur = queue.shift();
-      if (visited.has(cur)) continue;
-      visited.add(cur);
-      const node = map.get(cur);
-      if (node && /^java$/.test(node.comm)) candidates.push(cur);
-      // find children
-      for (const [pid, info] of map.entries()) {
-        if (info.ppid === cur) queue.push(pid);
-      }
-    }
+    // BFS from root (/proc map)
+    const isJava = (pid) => { const n = map.get(pid); return !!(n && /^java$/.test(n.comm)); };
+    const childrenOf = (pid) => { const a = []; for (const [p, info] of map.entries()) if (info.ppid === pid) a.push(p); return a; };
+    const candidates = collectJavaPids(rootPid, isJava, childrenOf);
     if (candidates.length) {
       // pick one with largest rss
       let best = candidates[0], bestRss = 0;
@@ -101,17 +107,9 @@ async function findJavaDescendant(rootPid) {
     return m ? { pid: Number(m[1]), ppid: Number(m[2]), comm: m[3] } : null;
   }).filter(Boolean);
   const map = new Map(lines.map(n => [n.pid, n]));
-  const queue = [Number(rootPid)];
-  const visited = new Set();
-  const cands = [];
-  while (queue.length) {
-    const cur = queue.shift();
-    if (visited.has(cur)) continue;
-    visited.add(cur);
-    const node = map.get(cur);
-    if (node && /^java$/.test(node.comm)) cands.push(cur);
-    for (const n of lines) if (n.ppid === cur) queue.push(n.pid);
-  }
+  const isJava = (pid) => { const n = map.get(pid); return !!(n && /^java$/.test(n.comm)); };
+  const childrenOf = (pid) => { const a = []; for (const n of lines) if (n.ppid === pid) a.push(n.pid); return a; };
+  const cands = collectJavaPids(rootPid, isJava, childrenOf);
   return cands[0] || null;
 }
 

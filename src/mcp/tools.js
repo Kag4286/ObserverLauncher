@@ -268,21 +268,29 @@ function assertEditable(aPath) {
   const ext = path.extname(String(aPath || '')).toLowerCase();
   if (!editor.ALLOWED.includes(ext)) throw new Error('Refused: "' + ext + '" is not an editable text type. Allowed: ' + editor.ALLOWED.join(', '));
 }
-async function tWriteFile(ctx, a) {
+// Resolve a.path against the server root and reject non-editable extensions in one place — shared
+// by tWriteFile + tEditFile so the two guard sequences cannot drift (gotcha #20). Returns the
+// absolute target path, or an { ok:false, error } object the caller returns unchanged.
+function resolveEditableTarget(ctx, aPath) {
   const root = needPath(ctx);
-  const target = safeTarget(root, a.path);
+  const target = safeTarget(root, aPath);
   if (!target) return { ok: false, error: 'Path outside the server folder.' };
-  assertEditable(a.path);
+  assertEditable(aPath);
+  return { ok: true, target };
+}
+async function tWriteFile(ctx, a) {
+  const rt = resolveEditableTarget(ctx, a.path);
+  if (!rt.ok) return rt;
+  const target = rt.target;
   if (String(a.content || '').length > 2 * 1024 * 1024) return { ok: false, error: 'Content too large (max 2 MB).' };
   const { writeFileAtomic } = require('../main/fs-utils.js');
   writeFileAtomic(target, String(a.content || ''));
   return { ok: true };
 }
 async function tEditFile(ctx, a) {
-  const root = needPath(ctx);
-  const target = safeTarget(root, a.path);
-  if (!target) return { ok: false, error: 'Path outside the server folder.' };
-  assertEditable(a.path);
+  const rt = resolveEditableTarget(ctx, a.path);
+  if (!rt.ok) return rt;
+  const target = rt.target;
   let txt; try { txt = fs.readFileSync(target, 'utf8'); } catch { return { ok: false, error: 'File not found.' }; }
   const oldS = String(a.oldString || ''), newS = String(a.newString || '');
   if (!oldS) return { ok: false, error: 'oldString is required.' };
@@ -600,15 +608,21 @@ async function tWhitelistPlayer(ctx, a) { needPath(ctx); return ok(await whiteli
 async function tBanPlayer(ctx, a) { needPath(ctx); return ok(await banToggle(ctx, { uuid: a.uuid || null, name: a.name, ban: a.ban !== false, reason: a.reason, ip: a.ip })); }
 
 // ---- DESTROY tools ----
-async function tStopServer(ctx) {
-  if (ctx.serverStatus === 'stopped' || ctx.serverStatus === 'stopping') return { ok: false, error: 'Server is not running.' };
-  if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
+// Graceful stop sequence shared by tStopServer + tStopInstance (gotcha #20): flip manualStop, cancel
+// any pending auto-restart, mark 'stopping', then RCON-first send `stop`. `label` is only used in the
+// not-running message ('Server' vs 'Instance'). Returns { ok:true } or { ok:false, error }.
+async function requestGracefulStop(ctx, label) {
+  if (ctx.serverStatus === 'stopped' || ctx.serverStatus === 'stopping') return { ok: false, error: `${label} is not running.` };
+  if (!ctx.serverProcess) return { ok: false, error: `${label} is not running.` };
   ctx.manualStop = true;
   clearTimeout(ctx.restartTimer);
   ctx.setServerStatus('stopping');
   // M12: RCON-first (works for an adopted / RCON-attached server whose stdin stub is null).
   try { await sendConsoleCommand(ctx, 'stop'); } catch {}
   return { ok: true };
+}
+async function tStopServer(ctx) {
+  return requestGracefulStop(ctx, 'Server');
 }
 async function tForceStopServer(ctx) { return ok(await forceStopServer(ctx)); }
 // ---- M11: multi-instance tools ----
@@ -670,13 +684,7 @@ async function tStopInstance(ctx, a) {
   const id = resolveInstanceId(String(a.instance || a.id || '').trim() || null);
   if (!id) return { ok: false, error: 'Unknown instance id.' };
   return await ctx.runInInstance(id, async () => {
-    if (ctx.serverStatus === 'stopped' || ctx.serverStatus === 'stopping') return { ok: false, error: 'Instance is not running.' };
-    if (!ctx.serverProcess) return { ok: false, error: 'Instance is not running.' };
-    ctx.manualStop = true;
-    clearTimeout(ctx.restartTimer);
-    ctx.setServerStatus('stopping');
-    try { await sendConsoleCommand(ctx, 'stop'); } catch {}
-    return { ok: true };
+    return requestGracefulStop(ctx, 'Instance');
   });
 }
 async function tDeleteContent(ctx, a) {

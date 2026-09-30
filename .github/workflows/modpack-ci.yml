@@ -78,10 +78,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Java 25: MC 26.1+ requires Java 25 - this job boots a real server.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
 
       - run: npm ci
 

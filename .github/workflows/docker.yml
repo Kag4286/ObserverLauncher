@@ -1,0 +1,56 @@
+# Docker image build + import smoke test (v3.2.0).
+#
+# WHY: 3.1.0 ALMOST shipped a container that crash-looped with MODULE_NOT_FOUND — the Dockerfile
+# never ran `npm ci` but .dockerignore excludes node_modules, so players.js's runtime dep
+# (prismarine-nbt) was missing inside the image. Unit tests passed (they run on the host with
+# node_modules present) and the dev machine had no Docker daemon, so nothing caught it. This job
+# builds the REAL generated image on CI and requires the headless entry point inside it, so that
+# class of bug can never regress silently again.
+#
+# The Dockerfile is GENERATED (`observer docker create`), so the job regenerates it at the repo root
+# first — that is what keeps CI honest about the artifact users actually get.
+name: Docker build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Generate Dockerfile + docker-compose.yml + .dockerignore into the repo root (the CLI docker
+      # command is LOCAL — no backend boot, no npm install needed). .dockerignore then trims the
+      # build context (node_modules/tests/docs/etc.) exactly as a real user's build would.
+      - name: Generate the Docker setup
+        run: node src/cli.js docker create --type paper --port 25565 --out .
+
+      # Build from the repo root: the generated Dockerfile does `COPY . /app`, so the context must
+      # contain the source tree + package.json.
+      - name: Build the image
+        run: docker build -t observerlauncher-ci .
+
+      # Import-smoke: require (not run) the headless entry point INSIDE the image. This loads every
+      # feature module transitively — a missing runtime dependency (the 3.1.0 bug) fails here with
+      # MODULE_NOT_FOUND instead of at container boot. `require` does not auto-boot (headless.js only
+      # boots when require.main === module), so this is fast and needs no server folder.
+      - name: Import headless.js inside the image
+        run: docker run --rm --entrypoint node observerlauncher-ci -e "require('/app/src/headless.js')"
+
+      # Confirm the entry point + healthcheck are intact (catches a Dockerfile edit that drops them).
+      - name: Assert ENTRYPOINT + HEALTHCHECK
+        run: |
+          docker image inspect observerlauncher-ci --format '{{json .Config.Entrypoint}}' | grep -q headless.js
+          docker image inspect observerlauncher-ci --format '{{json .Config.Healthcheck}}' | grep -q /proc/1/cmdline

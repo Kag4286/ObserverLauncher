@@ -62,10 +62,12 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Java 25: MC 26.1+ requires Java 25. This job boots a REAL Paper 26.2
+      # server, so it must run on the same major the jar demands.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
 
       - run: npm ci
 

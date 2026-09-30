@@ -287,6 +287,16 @@ async function removeInstancePrompt(inst){
   if(_path) toast(t('inst.removed',{n:inst.name||_path}),undefined,{label:t('toast.undo'),fn:async()=>{ try{ const a=await window.observer.instanceAdd({serverPath:_path}); if(a&&a.ok){ const s2=await window.observer.getState(); state={...state,...s2}; refreshUI(); toast(t('inst.added'),'success'); } }catch{} }});
 }
 // Switch the active instance: the backend re-seeds ctx and repoints the runtime folder, then we
+// Re-pull the full snapshot and repaint the console + chart for the ACTIVE instance. server:metrics
+// / server:log are gated in the main process, so without this a background instance's old lines
+// would stay on screen. Shared by switchInstance + addExistingInstance (gotcha #20).
+async function refreshFromState(){
+  try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
+  repaintConsole(state.logs);
+  rebuildSamples(state.metricsHistory);
+  refreshUI();
+}
+
 // re-pull the whole snapshot so console/metrics/files/settings all reflect the new instance.
 async function switchInstance(id){
   if(!id||id===state.activeInstanceId)return;
@@ -294,12 +304,7 @@ async function switchInstance(id){
   try{ r=await window.observer.instanceSwitch(id); }
   catch(e){ return toast(e?.message||'Could not switch instance.','error'); }
   if(!r||!r.ok)return toast((r&&r.error)||'Could not switch instance.','error');
-  try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
-  // Repaint the active instance's console + chart immediately (server:metrics/log are gated in
-  // the main process, so a background instance's old lines would otherwise stay on screen).
-  repaintConsole(state.logs);
-  rebuildSamples(state.metricsHistory);
-  refreshUI();
+  await refreshFromState();
 }
 // v2.0.0 Phase B: add an EXISTING server folder as a new instance, without the wizard. For users
 // who already have a server on disk and just want to manage it here. Creates a new instance, makes
@@ -315,10 +320,7 @@ async function addExistingInstance(folder){
   if(!add||!add.ok){ toast((add&&add.error)||'Could not add the folder.','error'); return null; }
   let sw; try{ sw=await window.observer.instanceSwitch(add.id); }catch(e){ toast(e?.message||'Could not switch to the new instance.','error'); return null; }
   if(!sw||!sw.ok){ toast((sw&&sw.error)||'Could not switch to the new instance.','error'); return null; }
-  try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
-  repaintConsole(state.logs);
-  rebuildSamples(state.metricsHistory);
-  refreshUI();
+  await refreshFromState();
   toast(t('inst.added'),'success');
   return add.id;
 }

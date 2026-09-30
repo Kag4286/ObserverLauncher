@@ -46,7 +46,11 @@ const cleanup = () => { try { fs.rmSync(root, { recursive: true, force: true });
     // 1) Download a real Paper jar via the SAME adapter the wizard uses (no Electron needed).
     const { downloadFillProject } = require('../src/main/adapters/papermc.js');
     const { download } = require('../src/main/http.js');
-    const dl = await downloadFillProject('paper', null); // newest STABLE build
+    // PIN a Java-matched version. The CI job installs JDK 25 (MC 26.1+ requires Java 25), and this
+    // smoke boots a REAL server, so the jar and the JDK must agree. Pin the newest stable
+    // (26.2 today) instead of `null` so a future Paper release that needs a newer Java cannot
+    // silently break this job - the pin is the contract; bump it together with the workflow JDK.
+    const dl = await downloadFillProject('paper', '26.2');
     check('resolved a Paper build', !!dl && !!dl.url, JSON.stringify(dl && dl.version));
     const jarPath = path.join(serverDir, dl.name);
     await download(dl.url, jarPath, null, null, { maxBytes: 1024 * 1024 * 1024 });

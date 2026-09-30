@@ -57,7 +57,9 @@ const cleanup = () => { try { fs.rmSync(root, { recursive: true, force: true });
     // 2) Download a real Paper jar into the SAME folder (the pack has none of its own).
     const { downloadFillProject } = require('../src/main/adapters/papermc.js');
     const { download } = require('../src/main/http.js');
-    const dl = await downloadFillProject('paper', null);
+    // PIN a Java-matched version (see linux-full-boot.js) - the CI job installs JDK 25 and MC 26.1+
+    // requires Java 25. Pin the newest stable so the jar and the JDK stay in lockstep.
+    const dl = await downloadFillProject('paper', '26.2');
     check('resolved a Paper build', !!dl && !!dl.url, JSON.stringify(dl && dl.version));
     await download(dl.url, path.join(serverDir, dl.name), null, null, { maxBytes: 1024 * 1024 * 1024 });
     check('downloaded the server jar', fs.existsSync(path.join(serverDir, dl.name)));

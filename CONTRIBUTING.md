@@ -35,7 +35,10 @@ plus a window-less entry point that reuses the exact same backend:
     `server-compat.js`, `server-java.js`, `forge-versions.js`, `jar-read.js`, `mod-metadata.js`,
     `secrets.js`, `data-dir.js` (the ONE data-folder resolver), `ipc-shim.js` (a fake `ipcMain` so the
     feature modules register without Electron), `templates.js` (server templates), `docker.js` (a pure
-    Dockerfile/compose generator).
+    Dockerfile/compose generator), `modpack-manifest.js` (modpack.json schema + static verifier),
+    `modpack-resolve.js` (manifest -> resolved items via the marketplace resolver), `modpack-build.js`
+    (resolved items -> a real server folder; pure `planBuild` + injectable `buildPack`), and
+    `stability.js` (persistent per-instance run records + the auto-rollback decision).
   - `mcp/` — optional MCP/AI integration (see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang).

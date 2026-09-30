@@ -256,6 +256,15 @@ async function adoptProcess(ctx, stored, deps) {
   return { ok: true, pid };
 }
 
+// Shared "server is now stopped" tail: clear the live readout, flip status, repaint live + files.
+// Called by the spawn teardown and the adopted-process watch so the two cannot drift (gotcha #20).
+function resetLiveToStopped(ctx) {
+  ctx.live = { tps: null, mspt: null, players: [] };
+  ctx.setServerStatus('stopped');
+  ctx.send('server:live', ctx.live);
+  ctx.pushFiles();
+}
+
 // Liveness poll for an adopted process (no 'exit' event is available for a foreign pid). When the
 // pid disappears, run the same cleanup the spawn exit handler would: stop status, clear the runtime
 // record, close RCON. Auto-restart is NOT applied to an adopted server (we did not start it).
@@ -277,10 +286,7 @@ function startAdoptedWatch(ctx, instId, pid, deps) {
       ctx.serverProcess = null;
       ctx.monitoredPid = null;
       ctx.previousCpu = null;
-      ctx.live = { tps: null, mspt: null, players: [] };
-      ctx.setServerStatus('stopped');
-      ctx.send('server:live', ctx.live);
-      ctx.pushFiles();
+      resetLiveToStopped(ctx);
     }).catch(() => {});
   }, 5000);
 }
@@ -351,10 +357,7 @@ async function startServerInternal(ctx, settings) {
     ctx.currentSoftware = null;
     clearInterval(ctx.autoPollTimer);
     clearTimeout(doneWatchdog);
-    ctx.live = { tps: null, mspt: null, players: [] };
-    ctx.setServerStatus('stopped');
-    ctx.send('server:live', ctx.live);
-    ctx.pushFiles();
+    resetLiveToStopped(ctx);
   };
 
   ctx.serverProcess.on('error', inInst(err => {

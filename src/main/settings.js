@@ -66,6 +66,16 @@ function flattenActive(s) {
   return out;
 }
 
+// Removes the per-instance keys AND the nested-store keys from a flat settings object, leaving
+// only global keys. Shared by nestInstances + saveSettingsFor so the two paths cannot drift
+// (gotcha #20). Mutates and returns `out` for convenience.
+function stripInstanceKeys(out) {
+  for (const k of PER_INSTANCE_KEYS) delete out[k];
+  delete out.instances;
+  delete out.activeInstanceId;
+  return out;
+}
+
 // Inverse of flattenActive: take the flat object a caller passed, write its per-instance
 // keys into the ACTIVE instance (or materialise a first one), and return the NESTED store.
 function nestInstances(flat) {
@@ -86,10 +96,7 @@ function nestInstances(flat) {
     const active = instances.find(i => i.id === activeInstanceId);
     if (active && !active.name) active.name = inst.serverPath ? path.basename(String(inst.serverPath)) : 'Server 1';
   }
-  const out = { ...defaultGlobal(), ...s };
-  for (const k of PER_INSTANCE_KEYS) delete out[k];
-  delete out.instances;
-  delete out.activeInstanceId;
+  const out = stripInstanceKeys({ ...defaultGlobal(), ...s });
   out.instances = instances;
   out.activeInstanceId = activeInstanceId;
   return { ...out, version: latestVersion };
@@ -266,10 +273,7 @@ function saveSettingsFor(instanceId, flat) {
   const inst = {};
   for (const k of PER_INSTANCE_KEYS) if (k in s) inst[k] = s[k];
   const next = instances.map(i => i.id === target.id ? { ...i, ...inst } : i);
-  const out = { ...defaultGlobal(), ...s };
-  for (const k of PER_INSTANCE_KEYS) delete out[k];
-  delete out.instances;
-  delete out.activeInstanceId;
+  const out = stripInstanceKeys({ ...defaultGlobal(), ...s });
   out.instances = next;
   out.activeInstanceId = raw.activeInstanceId || next[0].id;
   const encrypted = wrapStore({ ...out, version: latestVersion }, getSafeStorage());

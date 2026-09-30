@@ -37,6 +37,18 @@ All notable changes to ObserverLauncher are documented here. Format follows
   recommends a rollback after N unstable runs in a row. Wired into the server lifecycle (guarded).
 - **`.github/workflows/modpack-ci.yml`** — runs `modpack verify --strict` on every PR/push that touches
   a `modpack.json` or the verifier; the boot-smoke job is gated.
+- **Modpack publish (D3)** — `scripts/modpack-publish.js` builds every `modpack.json` into a
+  distributable `.tar.gz` (a hand-rolled tar writer, so no `zip`/`tar` CLI dependency) and
+  `.github/workflows/modpack-publish.yml` attaches the archives to the tag's GitHub Release, next to
+  the app installers. Runs locally too: `node scripts/modpack-publish.js --out dist`.
+- **`examples/modpack.json`** — a real, resolvable example manifest (Paper + LuckPerms + ViaVersion)
+  used to exercise verify/build/publish end to end.
+- **`.github/workflows/docker.yml`** — builds the GENERATED Docker image on every PR/push and requires
+  `src/headless.js` inside it, so the 3.1.0 "missing `npm ci` → MODULE_NOT_FOUND" class of bug can
+  never regress silently (it passed unit tests because node_modules existed on the host).
+- **`tests/no-dup.test.js`** — a source-level duplicate guard: fails when the same CSS (selector, body)
+  or a 4+ line JS block appears twice in one `src/` file. Caught and helped remove 7 real copy-paste
+  duplicates (see Changed below).
 
 ### Changed — code health (dedup)
 - **Removed copy-paste duplication in the renderer CSS.** The toast inline-action block
@@ -49,6 +61,12 @@ All notable changes to ObserverLauncher are documented here. Format follows
   the poll + done-watchdog timers, reset `live`, set status stopped, push) was copied into BOTH the
   process `'error'` and `'exit'` handlers. Extracted a local `teardown()` closure so the two paths
   cannot drift; behaviour is identical.
+- **Seven more copy-paste blocks extracted into shared helpers** (found by the new `tests/no-dup.test.js`
+  guard, all behaviour-identical): `collectJavaPids()` for the /proc + ps BFS walks
+  (`platform/linux.js`), `readChunkRaw()` for the sync/async chunk readers (`worldmap.js`),
+  `stripInstanceKeys()` (`settings.js`), `resolveEditableTarget()` for `tWriteFile`/`tEditFile`
+  (`mcp/tools.js`), `refreshFromState()` (`renderer/js/08-shell.js`), `resetLiveToStopped()`
+  (`server-lifecycle.js`), and `requestGracefulStop()` for `tStopServer`/`tStopInstance` (`mcp/tools.js`).
 
 ### Removed — dead i18n keys
 - Dropped two keys that no code referenced (verified: zero `t('...')` call sites outside the locale

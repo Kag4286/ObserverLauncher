@@ -1,0 +1,10 @@
+{
+  "name": "ObserverLauncher Starter Pack (Paper)",
+  "version": "1.0.0",
+  "minecraft": "1.21.1",
+  "loader": "paper",
+  "items": [
+    { "id": "luckperms", "kind": "plugin", "source": "modrinth", "version": "1.21.1" },
+    { "id": "viaversion", "kind": "plugin", "source": "modrinth", "version": "1.21.1" }
+  ]
+}

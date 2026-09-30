@@ -155,9 +155,11 @@ function scanExploredChunks(root, levelName, dim) {
   }
   return chunks;
 }
-// Synchronous twin of readChunkNbt — needed because scanExploredChunks is sync (its IPC handler
-// and the wiring test both call it without awaiting). Returns null when the chunk is unreadable.
-function readChunkNbtSync(fp, sectorOff) {
+// Reads a chunk's payload from a region file at sectorOff and inflates it (gzip / deflate / raw).
+// Opens + closes its own fd. Returns the raw NBT buffer, or null when the chunk is missing or
+// unreadable. Shared by the sync and async readers so the header parse and the compression branch
+// cannot drift apart (gotcha #20).
+function readChunkRaw(fp, sectorOff) {
   let fd;
   try {
     fd = fs.openSync(fp, 'r');
@@ -167,15 +169,22 @@ function readChunkNbtSync(fp, sectorOff) {
     if (len <= 0) return null;
     const comp = Buffer.alloc(len - 1);
     fs.readSync(fd, comp, 0, len - 1, sectorOff * 4096 + 5);
-    const raw = ct === 1 ? zlib.gunzipSync(comp) : ct === 2 ? zlib.inflateSync(comp) : comp;
-    // We only need the Status tag. nbt.parse is async, so it is useless inside this sync function —
-    // use parseUncompressed (synchronous) instead. Java-edition chunks are big-endian.
-    let parsed;
-    try { parsed = nbt.parseUncompressed(raw); }
-    catch { try { parsed = nbt.parseUncompressed(raw, 'little'); } catch { return null; } }
-    const s = nbt.simplify(parsed);
-    return { Status: s && s.Status };
+    return ct === 1 ? zlib.gunzipSync(comp) : ct === 2 ? zlib.inflateSync(comp) : comp;
   } catch { return null; } finally { try { if (fd) fs.closeSync(fd); } catch {} }
+}
+
+// Synchronous twin of readChunkNbt — needed because scanExploredChunks is sync (its IPC handler
+// and the wiring test both call it without awaiting). Returns null when the chunk is unreadable.
+function readChunkNbtSync(fp, sectorOff) {
+  const raw = readChunkRaw(fp, sectorOff);
+  if (!raw) return null;
+  // We only need the Status tag. nbt.parse is async, so it is useless inside this sync function —
+  // use parseUncompressed (synchronous) instead. Java-edition chunks are big-endian.
+  let parsed;
+  try { parsed = nbt.parseUncompressed(raw); }
+  catch { try { parsed = nbt.parseUncompressed(raw, 'little'); } catch { return null; } }
+  const s = nbt.simplify(parsed);
+  return { Status: s && s.Status };
 }
 
 // ============ REAL BIOME PREVIEW (1.18+ paletted containers) ============
@@ -272,18 +281,9 @@ function biomeGridFromSection(sec) {
   return grid;
 }
 function readChunkNbt(fp, sectorOff) {
-  let fd;
-  try {
-    fd = fs.openSync(fp, 'r');
-    const head = Buffer.alloc(5);
-    fs.readSync(fd, head, 0, 5, sectorOff * 4096);
-    const len = head.readUInt32BE(0), ct = head.readUInt8(4);
-    if (len <= 0) return null;
-    const comp = Buffer.alloc(len - 1);
-    fs.readSync(fd, comp, 0, len - 1, sectorOff * 4096 + 5);
-    const raw = ct === 1 ? zlib.gunzipSync(comp) : ct === 2 ? zlib.inflateSync(comp) : comp;
-    return nbt.parse(raw).then(p => nbt.simplify(p.parsed));
-  } catch { return null; } finally { try { if (fd) fs.closeSync(fd); } catch {} }
+  const raw = readChunkRaw(fp, sectorOff);
+  if (!raw) return null;
+  return nbt.parse(raw).then(p => nbt.simplify(p.parsed));
 }
 
 // Cache: region file path -> { mtime, [cx,cz] -> biome }. Avoids re-reading a region on every pan.
