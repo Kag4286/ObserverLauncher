@@ -138,6 +138,14 @@ add a regression test with a synthesized NBT fixture (see
   (`src/renderer/locales/en.js`).
 - **One concern per pull request.** A bug fix and a refactor in the same PR is harder to review and
   harder to revert if something breaks.
+- **No duplicated code — copy-paste is the #1 defect this project has had to clean up.** Before adding
+  a block, check whether an equivalent helper already exists (`scan_project`, or grep the symbol) and
+  reuse or extend it instead of writing a second copy. This applies to AI-assisted changes too: a model
+  will happily paste the same 10 lines into two functions, repeat a CSS rule 7 times, or copy a
+  `zip`/`tar` wrapper verbatim. After any multi-file change, scan for repeats and extract a shared
+  helper. When extracting, keep the behaviour byte-identical and re-run `npm test`.
+  A scan that false-positives on `@keyframes from/to` and `@media` overrides is expected — read each
+  hit before acting. (See `.agent/memory.md` gotcha 20 for the known benign repeats and the scan recipe.)
 - **Explain the "why", not just the "what"** in your PR description — especially for bug fixes. What
   was actually happening, and why did the old code produce that behavior?
 - **Keep IPC channel names stable.** `preload.js` and the renderer depend on the exact channel
