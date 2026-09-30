@@ -10,6 +10,23 @@ function exec(cmd, args, timeout = 10000) {
   });
 }
 
+// Shared spawn+timeout wrapper for the zip/tar archive tools (used by createBackup AND createArchive,
+// which had this block copied verbatim). Resolves { ok, error } - an early kill or a non-zero exit is
+// a failure, never a throw.
+function runArchiveTool(cmd, args, cwd, timeoutMs = 300000) {
+  return new Promise(resolve => {
+    const { spawn } = require('child_process');
+    const proc = spawn(cmd, args, { cwd });
+    let stderr = '';
+    let settled = false;
+    const done = v => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} done({ ok: false, error: `${cmd} timed out` }); }, timeoutMs);
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('error', err => done({ ok: false, error: err.message }));
+    proc.on('close', code => done(code === 0 ? { ok: true } : { ok: false, error: stderr || `${cmd} exited with ${code}` }));
+  });
+}
+
 // BUGFIX: `ps -o cputime=` can output [DD-]HH:MM:SS once a process has used more than
 // 24 hours of CPU time (common for a Minecraft server left running for days). The old
 // `split(':')` parser silently produced NaN and a permanent 0% CPU reading after that
@@ -174,17 +191,7 @@ async function createBackup({ serverPath, worlds, destZip }) {
   if (!hasZip && !hasTar) return { ok: false, error: 'Backup needs either "zip" or "tar" on this system — install one (e.g. sudo apt install zip) and try again.' };
   const cmd = hasZip ? 'zip' : 'tar';
   const args = hasZip ? ['-r', destZip, '--', ...safeWorlds] : ['-czf', destZip, '--', ...safeWorlds];
-  return new Promise(resolve => {
-    const { spawn } = require('child_process');
-    const proc = spawn(cmd, args, { cwd: serverPath });
-    let stderr = '';
-    let settled = false;
-    const done = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
-    const timer = setTimeout(() => { try { proc.kill(); } catch {} done({ ok: false, error: `${cmd} timed out` }); }, 300000);
-    proc.stderr.on('data', d => { stderr += d.toString(); });
-    proc.on('error', err => done({ ok: false, error: err.message }));
-    proc.on('close', code => done(code === 0 ? { ok: true } : { ok: false, error: stderr || `${cmd} exited with ${code}` }));
-  });
+  return runArchiveTool(cmd, args, serverPath);
 }
 
 async function restoreBackup({ destPath, zipPath }) {
@@ -264,15 +271,5 @@ async function createArchive(srcPath, destArchive) {
   const hasZip = await exec('which', ['zip']).then(r => r.ok);
   const args = hasZip ? ['-r', destArchive, '.'] : ['-czf', destArchive, '.'];
   const cmd = hasZip ? 'zip' : 'tar';
-  return new Promise(resolve => {
-    const { spawn } = require('child_process');
-    const proc = spawn(cmd, args, { cwd: srcPath });
-    let stderr = '';
-    let settled = false;
-    const done = v => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
-    const timer = setTimeout(() => { try { proc.kill(); } catch {} done({ ok: false, error: `${cmd} timed out` }); }, 300000);
-    proc.stderr.on('data', d => { stderr += d.toString(); });
-    proc.on('error', err => done({ ok: false, error: err.message }));
-    proc.on('close', code => done(code === 0 ? { ok: true } : { ok: false, error: stderr || `${cmd} exited with ${code}` }));
-  });
+  return runArchiveTool(cmd, args, srcPath);
 }
