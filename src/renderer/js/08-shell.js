@@ -292,9 +292,29 @@ async function removeInstancePrompt(inst){
 // would stay on screen. Shared by switchInstance + addExistingInstance (gotcha #20).
 async function refreshFromState(){
   try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
+  resetInstanceViews();
   repaintConsole(state.logs);
   rebuildSamples(state.metricsHistory);
   refreshUI();
+}
+// F1 (3.2.5): per-instance views must be dropped when the active instance changes, or they keep
+// showing the PREVIOUS instance's data - the editor held an open file whose Save would then write
+// into the NEW instance's folder (data corruption), and the properties panel kept the old server's
+// config. Close the editor back to the bays, forget its file state, and force a properties reload.
+function resetInstanceViews(){
+  try{
+    if(typeof edState!=='undefined' && edState){
+      // Always return to the bays and drop any open file / browsed tree (a stale tree points at the
+      // previous instance's folder). edState.files is repopulated lazily by openFileBrowser().
+      if(typeof edShow==='function') edShow('bays');
+      edState={...edState,rel:null,content:'',mtime:0,dirty:false,conflict:false,files:[],fbOpen:new Set()};
+    }
+    if(typeof propsDirty!=='undefined') propsDirty=false; // refreshUI reloads properties for the new instance
+    // If the World Map is the ACTIVE tab, reload it for the new instance (switchTab only reloads on
+    // entry, so staying on the tab would otherwise keep the previous world's seed/biomes).
+    const wmTab=document.getElementById('worldmap');
+    if(wmTab&&wmTab.classList.contains('active')&&typeof wmLoad==='function') wmLoad().catch(()=>{});
+  }catch{}
 }
 
 // re-pull the whole snapshot so console/metrics/files/settings all reflect the new instance.

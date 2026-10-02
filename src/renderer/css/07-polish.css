@@ -121,7 +121,8 @@
 .wm-goto-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .spacer{flex:1}
 .wm-main{display:grid;grid-template-columns:1fr 250px;min-height:0;position:relative}
-#wmCanvas{display:block;width:100%;height:min(58vh,560px);background:#0A0F14;cursor:crosshair}
+#wmCanvas{display:block;width:100%;height:min(58vh,560px);background:#0A0F14;cursor:crosshair;touch-action:none}
+.wm-zoom{display:inline-flex;gap:4px;align-items:center}
 /* Click inspector popup — anchored near the cursor, clamped into the map. */
 #wmPopup{position:absolute;z-index:5;min-width:170px;max-width:240px;background:var(--panel-raised);border:1px solid var(--border-strong);border-radius:var(--r);padding:10px 12px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
 .wm-pop-x{position:absolute;top:4px;right:8px;background:none;border:0;color:var(--text-dim);font-size:15px;cursor:pointer;padding:2px 4px}

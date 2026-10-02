@@ -50,6 +50,13 @@ try {
   ok('duplicate folder refused', dup.ok === false);
   ok('duplicate did not add', S.listInstances().instances.length === 2);
 
+  // F3 (3.2.5): a duplicate NAME is auto-suffixed, not rejected (names are display-only).
+  const dupName = S.addInstance({ name: 'Creative', serverPath: '/srv/Creative2' });
+  ok('F3: duplicate name auto-suffixed', dupName.ok === true && dupName.instance.name === 'Creative (2)');
+  const dupName2 = S.addInstance({ name: 'Creative', serverPath: '/srv/Creative3' });
+  ok('F3: third same name -> (3)', dupName2.ok === true && dupName2.instance.name === 'Creative (3)');
+  S.removeInstance(dupName.id); S.removeInstance(dupName2.id);
+
   // Switch to B.
   const sw = S.switchInstance(b.id);
   ok('switch to B ok', sw.ok === true);

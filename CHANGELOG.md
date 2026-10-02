@@ -10,6 +10,69 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [3.2.5] — 2026-10-02
+
+**Patch release: bug fixes + polish.** No new features. Fixes multi-instance UI leaks, a real
+world-map biome bug, hardens CI, and cleans up duplicated code.
+
+### Fixed — multi-instance
+- **Removing the ACTIVE instance could corrupt another instance's state.** `instances:remove` ran its
+  post-remove runtime writes inside the ALS scope of the DELETED instance, so `ctx.currentServerPath`
+  recreated a ghost entry and the new active instance never got its folder/watcher. Now wraps the work
+  in `ctx.runInInstance(newActiveId, ...)` (same fix `instances:switch` got in 2.2.0).
+- **Removing a RUNNING instance could orphan its server process.** The guard was renderer-only and only
+  for the active instance, so a BACKGROUND running instance could be removed -> its `serverProcess`
+  handle was lost -> orphaned Java. The backend now refuses to remove an instance whose
+  `serverStatus !== 'stopped'`.
+- **Duplicate instance names.** `addInstance` now auto-suffixes ('Creative' -> 'Creative (2)') instead
+  of allowing two instances with the same display name.
+- **Switching instance left the OLD instance's views on screen.** The Content editor kept the previous
+  instance's open file (Save would then write it into the NEW instance's folder), and the properties
+  panel kept the old config. New `resetInstanceViews()` closes the editor, reloads properties, and
+  reloads the World Map when its tab is active.
+
+### Fixed — World Map
+- **The End rendered with overworld colours.** `readBiomes()` trusted the biome palette of ANY chunk;
+  a chunk still mid-generation (status `minecraft:structure_starts` or similar) ships a PLACEHOLDER
+  `minecraft:plains` palette. On a real End world 128/400 chunks were still `structure_starts`, so the
+  map drew overworld colours. `readBiomes` now reads biome data only from `minecraft:full` chunks
+  (matching `scanExploredChunks`); extracted a pure `biomeFromChunk()` + regression test.
+- **Biome colour leaks across dimensions.** Colour/biome caches are now keyed by dimension
+  (`dim:cx,cz`) and fetched results stored under the dim captured at fetch time, so a late reply for
+  one dimension can never paint another.
+
+### Changed — performance
+- **World map pan/zoom** is rAF-coalesced (one draw per frame instead of hundreds).
+- **Terrain fill** skips redundant `ctx.fillStyle` sets.
+- **`wm.biomes`** and the colour cache are LRU-capped (no unbounded growth while panning).
+- **`scanExploredChunks`** caches by region-file signature (name+mtime+size) so the 45s live refresh
+  does not re-read every region file.
+- **Shared helpers extracted** to `00-core.js`: `rafCoalesce()`, `lruSet()` (used by editor + worldmap).
+
+### Added — polish
+- World Map: zoom +/- buttons and a 'Fit spawn' button; Pointer Events (`touch-action:none`) so touch
+  and pen pan/inspect work.
+
+### Fixed — CI
+- **Boot-smoke flake:** a transient PaperMC 503 used to FAIL the Linux boot jobs. `scripts/paper-fetch.js`
+  retries with backoff and SKIPs (exit 0) on a real outage; a 404/bad version still fails.
+- **Docker CI:** the workflow builds the generated image and requires `src/headless.js` inside it, so
+  the 3.1.0 'missing npm ci' crash-loop class can never regress. Also required `npm ci` before
+  `observer docker create` (the CLI loads every feature module at require time).
+- **Release workflow:** one tag = one workflow again. The standalone modpack-publish workflow raced
+  `release.yml` and published a release with no installers; its artifact job is now folded into
+  `release.yml` (attach-only).
+- Boot-smoke pins Paper '26.2' + JDK 25 (MC 26.1+ requires Java 25).
+
+### Changed — code health (dedup)
+- **`tests/no-dup.test.js` upgraded:** scans `src/` + `scripts/`, reports ALL hits per file, and adds a
+  cross-file check (6+ identical lines in 2+ files). It found 9 real cross-file duplicates:
+  `LOADER_FAMILY` (now imported from server-compat.js), 6 shared smoke-harness blocks (extracted to
+  `scripts/boot-harness.js`), and 2 composition-root register blocks (allowlisted - by design).
+
+### Fixed — docs
+- **CHANGELOG 2.2.0:** removed a `run.bat` Java note that was duplicated 6 times.
+
 ## [3.2.0] — 2026-09-29
 
 ### Added — modpack CI/CD (static verify)
@@ -545,6 +608,8 @@ version), Java version handling, and a console-spam bug. Plan + progress: docs/v
   `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
   resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
   snapshot / server:files / start validation / MCP status+diagnose)
+- **Overview shows Java need vs detected** ("needs Java 21, have 25") with a warning when Java is
+  newer than an old server can use.
 
 ### Fixed — MCP confirm dialog lost its buttons (GUI/UX)
 - **A long MCP confirmation dialog pushed Allow/Deny off-screen.** `assemble_modpack` (and any

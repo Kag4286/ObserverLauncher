@@ -123,6 +123,13 @@ async function withBusy(btn, fn){
   try{ return await fn(); }
   finally{ delete btn.dataset.busy; btn.disabled=false; btn.removeAttribute('aria-busy'); }
 }
+// CORE (3.2.5): rAF-coalesce a redraw so rapid events (pan/move/type) run it once per frame instead
+// of hundreds of times. Returns a scheduler bound to its own pending-flag slot. Lives in core because
+// both the editor (01b) and the world map (02) need it and neither loads before the other's caller.
+function rafCoalesce(fn){ let pending=0; return function(){ if(pending)return; pending=requestAnimationFrame(()=>{ pending=0; fn(); }); }; }
+// CORE (3.2.5): insert into a Map and evict the oldest entry (FIFO) once it exceeds max. Shared by the
+// world map's colour/biome/explored caches so the eviction rule cannot drift between them.
+function lruSet(map,key,val,max){ map.set(key,val); if(map.size>max)map.delete(map.keys().next().value); return map; }
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 function focusablesIn(root){ return [...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetParent!==null||el===document.activeElement); }
 let _trapRoot=null,_trapPrev=null;

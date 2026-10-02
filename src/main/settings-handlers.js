@@ -238,12 +238,29 @@ function registerSettings(ipcMain, ctx) {
   });
 
   ipcMain.handle('instances:remove', async (_, id) => {
-    const r = removeInstance(String(id || ''));
+    const target = String(id || '');
+    // F2 (defense in depth): refuse to remove an instance whose server is running. Removing it drops
+    // the id from settings, seedInstances rebuilds ctx.instances WITHOUT it, and the serverProcess
+    // handle is lost -> an orphaned Java process. The renderer also guards this, but only for the
+    // ACTIVE instance, so a background running instance could still be removed. Enforce it here.
+    const st = ctx.instances && ctx.instances.get(target);
+    if (st && st.serverStatus && st.serverStatus !== 'stopped') {
+      return { ok: false, error: 'Stop this instance\u2019s server before removing it.' };
+    }
+    const r = removeInstance(target);
     if (!r.ok) return r;
     try { ctx.seedInstances(); } catch {}
-    try { ctx.currentServerPath = loadSettings().serverPath || ''; } catch {}
-    try { ctx.watchServerFolder(); } catch {}
-    return { ok: true, activeInstanceId: ctx.activeInstanceId, instances: r.instances };
+    // F1 (mirror the 2.2.0 instances:switch fix): this handler still runs inside the ALS scope of the
+    // PREVIOUS active instance - which is the one just DELETED when the active instance was removed.
+    // Writing ctx.currentServerPath here would call instState() -> instances.get(deletedId) -> undefined
+    // -> RECREATE a ghost entry, and the NEW active instance would never get its folder/watcher.
+    // Re-enter the (possibly null -> 'default') new active instance before touching runtime state.
+    const targetId = ctx.activeInstanceId || 'default';
+    return await ctx.runInInstance(targetId, async () => {
+      try { ctx.currentServerPath = loadSettings().serverPath || ''; } catch {}
+      try { ctx.watchServerFolder(); } catch {}
+      return { ok: true, activeInstanceId: ctx.activeInstanceId, instances: r.instances };
+    });
   });
 
   ipcMain.handle('onboarding:complete', async () => {

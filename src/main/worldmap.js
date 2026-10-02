@@ -9,6 +9,10 @@ const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
 const { safeTarget, readJsonList, writeFileAtomic } = require('./fs-utils.js');
 
+// 3.2.5: insert into a Map and evict the oldest entry (FIFO) once it exceeds max. Shared by the
+// explored/biome region caches so the eviction rule is written once.
+function lruSet(map, key, val, max) { map.set(key, val); if (map.size > max) map.delete(map.keys().next().value); return map; }
+
 function longToBigInt(v) {
   if (typeof v === 'bigint') return v;
   if (Array.isArray(v)) return ((BigInt(v[0] | 0) & 0xFFFFFFFFn) << 32n) | (BigInt(v[1] | 0) & 0xFFFFFFFFn);
@@ -118,9 +122,31 @@ function getRegionDirs(root, levelName, dim) {
 // with Status 'minecraft:full'. Above FULL_SCAN_BUDGET chunks we skip the per-chunk parse (it
 // would block the main process for seconds) and fall back to the header-only approximation.
 const FULL_SCAN_BUDGET = 3000;
+// W5 (3.2.5): scanExploredChunks is called SYNCHRONOUSLY from an IPC handler, and the live-refresh
+// re-runs it every 45s. Reading + NBT-parsing every region file each time blocked the main process
+// on big worlds. Cache the result keyed by a cheap signature (region file names + mtime + size): if
+// nothing changed on disk, return the previous Set without re-reading. Region files only change when
+// the server saves, so in practice this skips almost every call.
+const exploredCache = new Map(); // key 'root|level|dim' -> { sig, chunks }
+function exploredSignature(dirs) {
+  const parts = [];
+  for (const dir of dirs) {
+    let files = [];
+    try { files = fs.readdirSync(dir).filter(f => /^r\.-?\d+\.-?\d+\.mca$/.test(f)).sort(); } catch { continue; }
+    for (const f of files) {
+      try { const st = fs.statSync(path.join(dir, f)); parts.push(f + ':' + st.mtimeMs + ':' + st.size); }
+      catch { parts.push(f + ':0:0'); }
+    }
+  }
+  return parts.join('|');
+}
 function scanExploredChunks(root, levelName, dim) {
-  const present = []; // [cx, cz, regionFile, sectorOffset]
   const dirs = getRegionDirs(root, levelName, dim);
+  const cacheKey = root + '|' + (levelName || 'world') + '|' + (dim || 'overworld');
+  const sig = exploredSignature(dirs);
+  const cached = exploredCache.get(cacheKey);
+  if (cached && cached.sig === sig) return cached.chunks;
+  const present = []; // [cx, cz, regionFile, sectorOffset]
   for (const dir of dirs) {
     let files = [];
     try { files = fs.readdirSync(dir).filter(f => /^r\.-?\d+\.-?\d+\.mca$/.test(f)); } catch { continue; }
@@ -146,6 +172,7 @@ function scanExploredChunks(root, levelName, dim) {
   const chunks = new Set();
   if (present.length > FULL_SCAN_BUDGET) {
     for (const [cx, cz] of present) chunks.add(cx + ',' + cz);
+    lruSet(exploredCache, cacheKey, { sig, chunks }, 8);
     return chunks;
   }
   // Small enough: verify each chunk actually finished generating.
@@ -153,6 +180,7 @@ function scanExploredChunks(root, levelName, dim) {
     const nbtData = readChunkNbtSync(fp, off);
     if (!nbtData || nbtData.Status === 'minecraft:full') chunks.add(cx + ',' + cz);
   }
+  lruSet(exploredCache, cacheKey, { sig, chunks }, 8);
   return chunks;
 }
 // Reads a chunk's payload from a region file at sectorOff and inflates it (gzip / deflate / raw).
@@ -289,6 +317,25 @@ function readChunkNbt(fp, sectorOff) {
 // Cache: region file path -> { mtime, [cx,cz] -> biome }. Avoids re-reading a region on every pan.
 const biomeRegionCache = new Map();
 
+// PURE: extract { biome, biomeGrid, relief } from a parsed chunk NBT object. Only a FULLY generated
+// chunk (Status 'minecraft:full') carries REAL biome data - an early-stage chunk ships a placeholder
+// palette (minecraft:plains) that must NOT be trusted (3.2.5 bugfix: The End rendered as overworld).
+// Split out so the status gate is unit-testable without a region file on disk.
+function biomeFromChunk(nbtData) {
+  let biome = null, biomeGrid = null, relief = null;
+  if (nbtData && nbtData.Status === 'minecraft:full') {
+    const secs = (nbtData.sections || []).slice().sort((a, b) => (a.Y | 0) - (b.Y | 0));
+    for (const sec of secs.reverse()) { const b = sectionBiome(sec); if (b) { biome = b; biomeGrid = biomeGridFromSection(sec); break; } }
+    const hm = nbtData.Heightmaps;
+    if (hm) {
+      const motion = unpackHeightmap(hm.MOTION_BLOCKING);
+      const ocean = unpackHeightmap(hm.OCEAN_FLOOR);
+      relief = downsampleHeights(motion, ocean, 4);
+    }
+  }
+  return { biome, biomeGrid, relief };
+}
+
 async function readBiomes(root, levelName, dim, rect) {
   if (!root || !rect) return { biomes: [] };
   const { cx0, cz0, cx1, cz1 } = rect;
@@ -307,8 +354,7 @@ async function readBiomes(root, levelName, dim, rect) {
         let entry = biomeRegionCache.get(key);
         if (!entry || entry.mtime !== stat.mtimeMs) {
           entry = { mtime: stat.mtimeMs, chunks: new Map(), header: null };
-          biomeRegionCache.set(key, entry);
-          if (biomeRegionCache.size > 64) { const k0 = biomeRegionCache.keys().next().value; biomeRegionCache.delete(k0); }
+          lruSet(biomeRegionCache, key, entry, 64);
         }
         // PERF: the 4 KB region header is read once per region and cached with the entry, so
         // repeated pans over the same region don't re-open + re-read it on every readBiomes call.
@@ -324,19 +370,11 @@ async function readBiomes(root, levelName, dim, rect) {
           const ck = cx + ',' + cz;
           if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) { const row = [cx, cz, rec.b]; if (rec.h) { row.push(rec.h, rec.w); if (rec.g) row.push(rec.g); } out.push(row); } continue; }
           const nbtData = await readChunkNbt(fp, v >>> 8);
-          let biome = null, biomeGrid = null, relief = null;
-          if (nbtData) {
-            const secs = (nbtData.sections || []).slice().sort((a, b) => (a.Y | 0) - (b.Y | 0));
-            for (const sec of secs.reverse()) { const b = sectionBiome(sec); if (b) { biome = b; biomeGrid = biomeGridFromSection(sec); break; } }
-            // Real heightmap (no extra I/O — already parsed). Gives the renderer actual terrain
-            // relief + water instead of the seed-noise approximation.
-            const hm = nbtData.Heightmaps;
-            if (hm) {
-              const motion = unpackHeightmap(hm.MOTION_BLOCKING);
-              const ocean = unpackHeightmap(hm.OCEAN_FLOOR);
-              relief = downsampleHeights(motion, ocean, 4);
-            }
-          }
+          // BUGFIX (3.2.5): only a FULLY generated chunk carries real biome data. An early-stage chunk
+          // (status 'minecraft:structure_starts' or similar) still ships a PLACEHOLDER biome palette
+          // (minecraft:plains) that was read as if real - so The End rendered with overworld colours.
+          // scanExploredChunks() already trusts only 'minecraft:full'; readBiomes must match.
+          const { biome, biomeGrid, relief } = biomeFromChunk(nbtData);
           const rec = { b: biome };
           if (relief) { rec.h = relief.heights; rec.w = relief.water; }
           if (biomeGrid) rec.g = biomeGrid;
@@ -389,4 +427,4 @@ function listDimensions(root, levelName) {
   return out;
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions };
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions };

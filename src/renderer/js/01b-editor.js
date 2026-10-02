@@ -212,8 +212,8 @@ function edHighlightSrc(code,ext){
   if(ext==='js')return edHlJs(code);
   return edEsc(code);
 }
-let edViewRaf=0;
-function edScheduleView(){if(edViewRaf)return;edViewRaf=requestAnimationFrame(()=>{edViewRaf=0;edRefreshView()})}
+// 3.2.5: rAF-coalesce via the shared core helper (was a local copy — same idiom as the world map).
+const edScheduleView=rafCoalesce(()=>edRefreshView());
 function edRefreshView(){
   const ta=$('#edText');
   const ext=(edState.rel||'').split('.').pop().toLowerCase();

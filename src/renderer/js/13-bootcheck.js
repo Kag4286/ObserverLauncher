@@ -25,6 +25,8 @@
   try { need('applyLocale', typeof applyLocale === 'function'); } catch { missing.push('applyLocale'); }     // 00-core
   try { need('confirmDialog', typeof confirmDialog === 'function'); } catch { missing.push('confirmDialog'); } // 00-core
   try { need('metricChart', typeof metricChart === 'function'); } catch { missing.push('metricChart'); }     // 00-core
+  try { need('rafCoalesce', typeof rafCoalesce === 'function'); } catch { missing.push('rafCoalesce'); }     // 00-core (3.2.5)
+  try { need('lruSet', typeof lruSet === 'function'); } catch { missing.push('lruSet'); }                     // 00-core (3.2.5)
   try { need('switchTab', typeof switchTab === 'function'); } catch { missing.push('switchTab'); }           // 08-shell
   try { need('refreshUI', typeof refreshUI === 'function'); } catch { missing.push('refreshUI'); }           // 07-overview
   try { need('openEd', typeof openEd === 'function'); } catch { missing.push('openEd'); }                     // 01b-editor

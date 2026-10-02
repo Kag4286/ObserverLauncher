@@ -40,5 +40,32 @@ function ok(name, cond) {
   const chunks = worldmap.scanExploredChunks('/no/such/dir/xyz', 'world', 'overworld');
   ok('scanExploredChunks missing dir -> empty set', chunks instanceof Set && chunks.size === 0);
 
+  // W5 (3.2.5): scanExploredChunks caches by region-file signature. Build a real world dir with one
+  // region file holding two populated chunk slots (>FULL_SCAN_BUDGET is not hit here, so it takes
+  // the NBT-verify path — a header-only chunk with no readable NBT still counts as "full").
+  const os = require('os');
+  const path = require('path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-wm-cache-'));
+  // getRegionDirs resolves overworld to <root>/<levelName>/region, so the region dir must be nested.
+  const regionDir = path.join(root, 'world', 'region');
+  fs.mkdirSync(regionDir, { recursive: true });
+  const header = Buffer.alloc(4096);
+  header.writeUInt32BE((2 << 8) | 1, 0);   // slot 0 -> chunk (0,0), sector 2
+  header.writeUInt32BE((3 << 8) | 1, 4);   // slot 1 -> chunk (1,0), sector 3
+  fs.writeFileSync(path.join(regionDir, 'r.0.0.mca'), header);
+
+  const c1 = worldmap.scanExploredChunks(root, 'world', 'overworld');
+  ok('W5: first scan finds chunks', c1 instanceof Set && c1.size === 2);
+  const c2 = worldmap.scanExploredChunks(root, 'world', 'overworld');
+  ok('W5: repeat scan returns the SAME cached Set', c2 === c1);
+
+  // Touch the region file (change mtime) -> the signature changes -> a fresh scan.
+  const rp = path.join(regionDir, 'r.0.0.mca');
+  const future = new Date(Date.now() + 5000);
+  fs.utimesSync(rp, future, future);
+  const c3 = worldmap.scanExploredChunks(root, 'world', 'overworld');
+  ok('W5: mtime change invalidates the cache (new Set)', c3 !== c1 && c3.size === 2);
+  fs.rmSync(root, { recursive: true, force: true });
+
   console.log(`\n${passed} passed, 0 failed`);
 })().catch((e) => { console.error('FAIL:', e.message); process.exit(1); });

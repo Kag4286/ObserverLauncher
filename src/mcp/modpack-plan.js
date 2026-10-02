@@ -8,6 +8,9 @@
 // Design rule: the AI chooses WHAT (ids/source/version) and this code decides HOW. The AI never
 // supplies a raw URL or hash — those are always resolved here from the registry.
 const path = require('path');
+// LOADER_FAMILY is defined ONCE in server-compat.js (the single source of truth for loader/MC
+// rules) and re-exported here so the two copies cannot drift (gotcha #20).
+const { LOADER_FAMILY } = require('../main/server-compat.js');
 
 // Where a given kind installs, relative to the server root. Mirrors the mapping the GUI
 // (marketplace.js market:install) and the MCP install tools already use, so nothing drifts.
@@ -16,16 +19,6 @@ function folderForKind(kind, levelName) {
   if (kind === 'mod' || kind === 'forge' || kind === 'fabric' || kind === 'neoforge') return 'mods';
   return 'plugins';
 }
-
-// Fabric and Quilt are interchangeable at the loader level; so are Forge/NeoForge only loosely —
-// we keep them distinct (NeoForge is not a drop-in for a Forge-only mod in general).
-const LOADER_FAMILY = {
-  paper: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'],
-  forge: ['forge'],
-  neoforge: ['neoforge'],
-  fabric: ['fabric', 'quilt'],
-  quilt: ['fabric', 'quilt'],
-};
 
 // Compatibility of one resolved item against the detected server.
 //   item:   { kind, gameVersions?: string[], loaders?: string[], env?: { server?: string } }

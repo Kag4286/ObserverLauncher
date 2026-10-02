@@ -207,9 +207,18 @@ function addInstance({ name, serverPath } = {}) {
     return { ok: false, error: 'That folder is already used by another instance.' };
   }
   const id = newInstanceId();
+  // F3: names are display-only (the id is the key), but two identical names are confusing in the
+  // rail/dropdown. Auto-suffix a duplicate instead of rejecting: 'Survival' -> 'Survival (2)'.
+  let baseName = String(name || '').trim() || (sp ? path.basename(sp) : '') || `Server ${instances.length + 1}`;
+  const taken = new Set(instances.map(i => String(i.name || '')));
+  if (taken.has(baseName)) {
+    let n = 2;
+    while (taken.has(`${baseName} (${n})`)) n++;
+    baseName = `${baseName} (${n})`;
+  }
   const inst = {
     ...defaultInstanceFields(), id,
-    name: String(name || '').trim() || (sp ? path.basename(sp) : '') || `Server ${instances.length + 1}`,
+    name: baseName,
     serverPath: sp,
   };
   instances.push(inst);
