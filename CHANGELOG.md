@@ -545,38 +545,6 @@ version), Java version handling, and a console-spam bug. Plan + progress: docs/v
   `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
   resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
   snapshot / server:files / start validation / MCP status+diagnose)
-- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
-  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
-  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
-  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
-  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
-  snapshot / server:files / start validation / MCP status+diagnose)
-- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
-  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
-  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
-  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
-  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
-  snapshot / server:files / start validation / MCP status+diagnose)
-- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
-  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
-  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
-  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
-  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
-  snapshot / server:files / start validation / MCP status+diagnose)
-- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
-  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
-  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
-  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
-  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
-  snapshot / server:files / start validation / MCP status+diagnose)
-- **Java for a jar-less server (NeoForge/Forge run.bat).** A server launched via `run.bat` has no
-  runnable jar, so the requirement was unknown and auto-install defaulted to Java 21 — wrong for old
-  Forge (1.16.5 needs Java 8). The launcher now reads the target Minecraft version from the server's
-  `libraries/` tree (`net/neoforged/neoforge/<ver>` or `net/minecraftforge/forge/<mc>-<ver>`) and
-  resolves the exact Java. (src/main/server-java.js, used by files:get / settings:get / instance
-  snapshot / server:files / start validation / MCP status+diagnose)
-- **Overview shows Java need vs detected** ("needs Java 21, have 25") with a warning when Java is
-  newer than an old server can use.
 
 ### Fixed — MCP confirm dialog lost its buttons (GUI/UX)
 - **A long MCP confirmation dialog pushed Allow/Deny off-screen.** `assemble_modpack` (and any
