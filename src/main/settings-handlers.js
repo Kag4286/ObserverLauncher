@@ -68,6 +68,13 @@ function registerSettings(ipcMain, ctx) {
           }
         } catch {}
         return { enabled: !!ctx.mcpServer, running, port: ctx.mcpPort || null, autoAllowWrite: !!settings.mcpAutoAllowWrite, config };
+      })(),
+      // 3.3.0 remote: friendly status + the addresses to show. Token is NOT sent here (it stays in
+      // the settings blob the UI copies only when the user asks); the raw settings already carry it.
+      remote: (() => {
+        const { remoteSnapshot, remoteAddresses } = require('./remote.js');
+        const snap = remoteSnapshot(settings);
+        return { ...snap, running: !!ctx.remotePort, port: ctx.remotePort || snap.port || null, addresses: remoteAddresses(ctx.remotePort || snap.port || 0) };
       })()
     };
   });
@@ -107,6 +114,19 @@ function registerSettings(ipcMain, ctx) {
     if (!['full', 'lite'].includes(merged.motionLevel)) merged.motionLevel = 'full';
     // CurseForge API key: trim + length-cap only. Never logged. Sent solely to api.curseforge.com.
     if (merged.curseforgeApiKey !== undefined) merged.curseforgeApiKey = String(merged.curseforgeApiKey || '').trim().slice(0, 64);
+    // 3.3.0 remote: a bad bind address used to fail silently at listen() time (only a log line).
+    // Validate BEFORE saving so the Settings screen can show a clear error. Blank = 127.0.0.1.
+    if (merged.remoteBind !== undefined) {
+      const b = String(merged.remoteBind || '').trim();
+      const { isSafeIp } = require('./validate.js');
+      if (b && b !== 'localhost' && !isSafeIp(b)) return { ok: false, error: 'Remote bind address must be a valid IP address (or blank to use 127.0.0.1).' };
+      merged.remoteBind = b;
+    }
+    // Remote port: clamp to a valid TCP port (0 = pick a free one).
+    if (merged.remotePort !== undefined) {
+      const p = Math.trunc(Number(merged.remotePort));
+      merged.remotePort = (Number.isFinite(p) && p >= 0 && p <= 65535) ? p : 0;
+    }
     // Normalize scheduleDays to NUMBERS (0=Sun..6=Sat) — the shape scheduler.shouldFire() compares
     // against now.getDay(). Accepts names too, so a name-based value can never silently never-fire.
     if (merged.scheduleDays !== undefined) {
@@ -139,6 +159,13 @@ function registerSettings(ipcMain, ctx) {
     if (nowMcp && !wasMcp && typeof ctx.startMcpServer === 'function') { try { ctx.startMcpServer(); } catch {} }
     else if (!nowMcp && wasMcp && typeof ctx.stopMcpServer === 'function') { try { ctx.stopMcpServer(); } catch {} }
     ctx.currentMcpEnabled = nowMcp;
+    // 3.3.0 remote toggle: same pattern as MCP. startRemoteServer generates a long-lived token on
+    // first enable and starts the loopback server; disabling stops it. No new IPC channel needed.
+    const wasRemote = !!ctx.currentRemoteEnabled;
+    const nowRemote = !!merged.remoteEnabled;
+    if (nowRemote && !wasRemote && typeof ctx.startRemoteServer === 'function') { try { await ctx.startRemoteServer(); } catch {} }
+    else if (!nowRemote && wasRemote && typeof ctx.stopRemoteServer === 'function') { try { ctx.stopRemoteServer(); } catch {} }
+    ctx.currentRemoteEnabled = nowRemote;
     // startMcpServer sets ctx.mcpPort from listen()'s async callback — wait briefly so the status
     // we return (and the UI shows) is accurate instead of a stale null "stopped".
     if (nowMcp) { for (let i = 0; i < 50 && !ctx.mcpPort; i++) await new Promise(r => setTimeout(r, 20)); }

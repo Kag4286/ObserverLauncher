@@ -65,8 +65,12 @@ function registerContent(ipcMain, ctx) {
     }
     const target = safeTarget(ctx.currentServerPath, path.join(folder, fileName));
     if (!target || !fs.existsSync(target)) return { ok: false, error: 'File not found.' };
+    // CB1 (v3.3.0): an unzipped datapack is a directory — unlinkSync throws on it. Detect the
+    // type first and remove a directory recursively (a file keeps the unlinkSync path).
+    let isDir = false;
+    try { isDir = fs.statSync(target).isDirectory(); } catch {}
     try {
-      fs.unlinkSync(target);
+      isDir ? fs.rmSync(target, { recursive: true, force: true }) : fs.unlinkSync(target);
     } catch {
       // BUGFIX (#8): on Windows a running server keeps plugin/mod jars open, so unlink
       // fails with EBUSY/EPERM. Return a clear error instead of rejecting the IPC,
@@ -74,6 +78,33 @@ function registerContent(ipcMain, ctx) {
       return { ok: false, error: `Could not delete ${fileName} — it may be locked by the running server. Stop the server and try again.` };
     }
     return { ok: true, files: serverFiles(ctx.currentServerPath) };
+  });
+
+  // CB6 (v3.3.0): enable/disable a content file by renaming <name> <-> <name>.disabled. Shared
+  // with the MCP toggle_content tool via content-ops.js so the naming + path logic cannot drift.
+  ipcMain.handle('content:toggle', async (_, { kind, fileName, action }) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const { toggleContent } = require('./content-ops.js');
+    const r = toggleContent(ctx.currentServerPath, kind || 'plugin', String(fileName || ''), action);
+    if (!r.ok) return r;
+    return { ok: true, from: r.from, to: r.to, files: serverFiles(ctx.currentServerPath) };
+  });
+
+  // CB4/CB5 (v3.3.0): update lifecycle in the GUI. Read-only check + a write that installs newer
+  // builds (backs up the old file). Update is refused while the server runs (Windows locks jars).
+  ipcMain.handle('content:updates', async () => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    try { const { checkUpdates } = require('./content-updates.js'); return await checkUpdates(ctx.currentServerPath); }
+    catch (e) { return { ok: false, error: e?.message || 'Could not check for updates.' }; }
+  });
+  ipcMain.handle('content:update', async (_, { names } = {}) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverProcess) return { ok: false, error: 'Stop the server before updating content - a running server locks its jars.' };
+    try {
+      const { applyUpdates } = require('./content-updates.js');
+      const r = await applyUpdates(ctx.currentServerPath, { names: Array.isArray(names) ? names : null });
+      return { ...r, files: serverFiles(ctx.currentServerPath) };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not update content.' }; }
   });
 
   ipcMain.handle('content:import', async (_, kind) => {

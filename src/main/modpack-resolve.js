@@ -38,6 +38,10 @@ async function resolveItem(item, resolve, levelName) {
     hashes: dl.hashes || null,
     size: dl.size || 0,
     version: dl.versionNumber || item.version || null,
+    // CB2 (v3.3.0): carry registry identity through so a build records it in the manifest.
+    projectId: dl.projectId || item.id || null,
+    versionId: dl.versionId || item.versionId || null,
+    gameVersion: dl.gameVersion || item.version || null,
     // The verifier's HARD gate needs these; the resolver already returns them for Modrinth/CurseForge.
     gameVersions: Array.isArray(dl.gameVersions) ? dl.gameVersions : [],
     loaders: Array.isArray(dl.loaders) ? dl.loaders : [],

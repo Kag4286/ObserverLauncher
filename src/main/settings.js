@@ -49,6 +49,9 @@ function defaultGlobal() {
     version: latestVersion,
     onboarded: false, locale: 'en',
     mcpEnabled: false, mcpAutoAllowWrite: false, mcpReadOnly: false,
+    // 3.3.0 remote management (Track A): OFF by default, read-only by default, no IP restriction by
+    // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
+    remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remotePort: 0, remoteBind: '',
     playitPath: '', motionLevel: 'full', curseforgeApiKey: '',
   };
 }
@@ -289,4 +292,4 @@ function saveSettingsFor(instanceId, flat) {
   writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
-module.exports = { settingsPath, backupPathV3, defaultMemoryGB, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, removeInstance };
+module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, removeInstance };

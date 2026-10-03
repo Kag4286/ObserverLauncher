@@ -5,7 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const ALLOWED = ['.json', '.txt', '.yml', '.yaml', '.toml', '.properties', '.mcmeta', '.cfg', '.conf', '.js', '.lang', '.csv', '.md'];
+// .mcfunction = datapack function files; .snbt = structure/NBT text files. Both are plain text and
+// are what most folder-based datapacks are made of, so the editor + MCP write/edit can touch them.
+const ALLOWED = ['.json', '.txt', '.yml', '.yaml', '.toml', '.properties', '.mcmeta', '.cfg', '.conf', '.js', '.lang', '.csv', '.md', '.mcfunction', '.snbt'];
 const MAX_VIEW = 8 * 1024 * 1024;   // 8 MB — beyond this we refuse to load at all
 const MAX_EDIT = 2 * 1024 * 1024;   // 2 MB — beyond this the file opens READ-ONLY
 const SKIP_DIRS = new Set(['libraries', 'cache', 'logs', 'versions', '.git', 'observerlauncher-backups']);

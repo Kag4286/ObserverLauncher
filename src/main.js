@@ -108,12 +108,17 @@ app.whenReady().then(async () => {
   try { const mcpOn = require('./main/settings.js').loadSettings().mcpEnabled; ctx.currentMcpEnabled = !!mcpOn; if (mcpOn) startMcpServer(ctx); } catch {}
   ctx.startMcpServer = () => startMcpServer(ctx);
   ctx.stopMcpServer = () => stopMcpServer(ctx);
+  // 3.3.0 remote management: same lifecycle hooks so settings:save can toggle it. Off unless enabled.
+  const remote = require('./main/remote.js');
+  ctx.startRemoteServer = async () => { try { await remote.startRemote(ctx); } catch (e) { try { ctx.appendLog('Remote start failed: ' + (e?.message || e), 'error'); } catch {} } };
+  ctx.stopRemoteServer = () => { try { remote.stopRemote(ctx); } catch {} };
+  try { const rOn = !!require('./main/settings.js').loadSettings().remoteEnabled; ctx.currentRemoteEnabled = rOn; if (rOn) ctx.startRemoteServer(); } catch {}
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 // Stop the MCP server and remove its bridge config on the way out, so a stale token/port file
 // never lingers to confuse the next launch.
-app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} });
+app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} });
 setupQuitHandler(ctx);
 
 // Exported for smoke tests (require without launching Electron windows).

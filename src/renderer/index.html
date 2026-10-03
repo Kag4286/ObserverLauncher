@@ -203,15 +203,17 @@
           </div>
           <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…"></div>
           <div class="content-toolbar-actions">
+            <button class="text-btn" id="contentCheckUpdates" data-i18n="cnt.checkUpdates">Check updates</button>
+            <span class="stat-pill" id="contentUpdatesPill" hidden></span>
             <button class="btn sm primary" id="contentImport" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button>
             <button class="text-btn" id="contentOpen" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button>
             <button class="text-btn" id="contentMarket" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button>
           </div>
         </div>
         <div class="content-listwrap">
-          <ul id="pluginsList" class="file-list content-list"></ul>
-          <ul id="modsList" class="file-list content-list" hidden></ul>
-          <ul id="datapacksList" class="file-list content-list" hidden></ul>
+          <ul id="pluginsList" class="file-list content-list" data-dk-kind="plugin"></ul>
+          <ul id="modsList" class="file-list content-list" data-dk-kind="mod" hidden></ul>
+          <ul id="datapacksList" class="file-list content-list" data-dk-kind="datapack" hidden></ul>
         </div>
         <div class="sec-note center" data-i18n="cnt.restart">New files load on the next server start — the launcher never hot-swaps content while running.</div>
         <div class="flat-grid2">
@@ -331,13 +333,18 @@
           <button class="btn sm primary" id="wmAdd" data-i18n="wm.add">+ Waypoint</button>
             </div>
             <div class="wm-main">
-              <canvas id="wmCanvas" width="800" height="520"></canvas>
+              <canvas id="wmCanvas" width="800" height="520" tabindex="0" role="application" aria-label="World map - arrow keys pan, +/- zoom, 0 fits spawn"></canvas>
               <aside class="wm-panel">
                 <div class="sec-head" style="margin-bottom:8px"><h3 data-i18n="wm.waypoints">Waypoints</h3><span class="spacer"></span><span class="prop-count" id="wmWpCount">0</span></div>
                 <div id="wmWpList" class="wm-wplist"></div>
                 <p class="field-hint" data-i18n="wm.wpHint">Click “+ Waypoint”, then click the map to place it. Click a row to jump.</p>
               </aside>
+              <div class="wm-mini"><canvas id="wmMini" width="160" height="160" aria-hidden="true"></canvas></div>
             </div>
+            <details class="wm-legend">
+              <summary data-i18n="wm.legend">Biome legend</summary>
+              <div class="wm-lg-grid" id="wmLgGrid"></div>
+            </details>
           </div>
         </section>
     <section id="properties" class="tab">
@@ -484,6 +491,17 @@
             <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="mcp.autoWrite">Auto-allow write tools</b><small data-i18n="mcp.autoWriteSub">Skip the confirmation for write tools. Destructive tools always ask.</small></div><label class="switch"><input type="checkbox" id="mcpAutoWriteInput"><span class="slider"></span></label></div>
             <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="mcp.readOnly">Read-only mode</b><small data-i18n="mcp.readOnlySub">Block all write and destructive tools — the AI can only inspect, never change, your server.</small></div><label class="switch"><input type="checkbox" id="mcpReadOnlyInput"><span class="slider"></span></label></div>
             <div class="input-row" style="margin-top:12px"><span class="hint" id="mcpStatus" data-i18n="mcp.stopped">Stopped</span><button type="button" class="btn secondary sm" id="mcpCopyConfig" style="margin-left:auto" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
+          </section>
+          <!-- Remote access (3.3.0): a loopback-only API for another device. Off by default. -->
+          <section class="flat-cell flat-span2 remote-section">
+            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="remote.title">Remote access</h3><small data-i18n="remote.sub">Check on this server from another device — no port forwarding.</small><span class="mcp-pill" id="remotePill" data-i18n="remote.stopped">Stopped</span></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="remote.enable">Enable remote access</b><small data-i18n="remote.enableSub">Starts a loopback-only server with a long-lived token. Reads only; never installs or deletes.</small></div><label class="switch"><input type="checkbox" id="remoteEnabledInput"><span class="slider"></span></label></div>
+            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="remote.readOnly">Read-only</b><small data-i18n="remote.readOnlySub">Block the one action endpoint. The API can only read.</small></div><label class="switch"><input type="checkbox" id="remoteReadOnlyInput"><span class="slider"></span></label></div>
+            <label class="set-field" style="margin-top:12px"><span data-i18n="remote.allow">Allowed IPs</span><input id="remoteAllowInput" placeholder="10.0.0.5, 192.168.1.*" spellcheck="false"><small class="field-hint" data-i18n="remote.allowSub"></small></label>
+            <label class="set-field" style="margin-top:12px"><span data-i18n="remote.port">Port</span><input id="remotePortInput" type="number" min="0" max="65535" value="0"><small class="field-hint" data-i18n="remote.portSub"></small></label>
+            <label class="set-field" style="margin-top:12px"><span data-i18n="remote.bind">Bind address</span><input id="remoteBindInput" placeholder="127.0.0.1" spellcheck="false"><small class="field-hint" data-i18n="remote.bindSub"></small></label>
+            <div class="input-row" style="margin-top:12px"><span class="hint" id="remoteStatus" data-i18n="remote.stopped">Stopped</span><button type="button" class="btn secondary sm" id="remoteOpenDoc" style="margin-left:auto" data-i18n="remote.doc">How to reach it from anywhere (Tailscale) →</button></div>
+            <div id="remoteAddresses" class="remote-addresses"></div>
           </section>
           <!-- Advanced JVM -->
           <details class="flat-cell flat-span2 set-advanced">

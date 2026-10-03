@@ -16,6 +16,25 @@ const CONTENT_META={
   datapack:{folder:'world/datapacks',ext:'zip'}
 };
 let contentKind='plugin';
+// CB4/CB5 (v3.3.0): content update state. { byFile:{name:{status,version,latestNumber}}, updates:N }.
+// Loaded lazily when the Content tab opens (or via the Check updates button); NEVER polled.
+async function loadContentUpdates(btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await window.observer.contentUpdates();
+    if(!r||!r.ok){state.contentUpdates=null;}
+    else{const byFile={};for(const it of (r.items||[]))byFile[it.fileName]=it;state.contentUpdates={byFile,updates:r.updates||0};}
+  }catch{state.contentUpdates=null}
+  if(btn)btn.disabled=false;
+  renderContentUpdatesPill();
+  refreshUI();
+}
+function renderContentUpdatesPill(){
+  const pill=$('#contentUpdatesPill');if(!pill)return;
+  const n=state.contentUpdates?state.contentUpdates.updates:0;
+  if(n>0){pill.hidden=false;pill.textContent=t('cnt.updatesAvailable',{n});pill.classList.add('accent')}
+  else{pill.hidden=true}
+}
 function jumpToMarket(kind){
   switchTab('marketplace');
   const map={plugin:'plugin',datapack:'datapack',mod:/forge|neoforge/i.test(state.files?.jar||'')?'forge':/fabric|quilt/i.test(state.files?.jar||'')?'fabric':'plugin'};
@@ -58,9 +77,21 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
     }
     return;
   }
-  node.innerHTML=files.map(x=>`<li data-name="${esc(x)}" title="${esc(x)}"><span class="file-name">${esc(x)}</span><button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`).join('');
+  const upd=(state.contentUpdates&&state.contentUpdates.byFile)||{};
+  node.innerHTML=files.map(x=>{
+    const off=/\.disabled$/i.test(x);
+    const info=upd[x]||null;
+    // version badge: shows the installed version, and "-> latest" when an update is available.
+    const ver=info&&info.version?`<span class="file-ver mono">${esc(info.version)}${info.status==='update'&&info.latestNumber?' → '+esc(info.latestNumber):''}</span>`:'';
+    const upBtn=(info&&info.status==='update'&&!off)?`<button class="text-btn" data-update-content="${esc(kind)}" data-update-file="${esc(x)}">${esc(t('cnt.update'))}</button>`:'';
+    return `<li data-name="${esc(x)}" class="${off?'is-disabled':''}" title="${esc(x)}"><span class="file-name">${esc(x)}</span>${ver}<button class="text-btn" data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}">${esc(t(off?'cnt.enable':'cnt.disable'))}</button>${upBtn}<button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`}).join('');
+  // CB6 (v3.3.0): enable/disable a content file (rename <name> <-> <name>.disabled). Cheap + reversible.
+  node.querySelectorAll('[data-toggle-content]').forEach(b=>b.onclick=async()=>{const r=await window.observer.toggleContent({kind,fileName:b.dataset.toggleFile});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI()});
+  // CB5 (v3.3.0): update one file to its newer build (backup first). Refused while the server runs.
+  node.querySelectorAll('[data-update-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.updateFile;if(!await confirmDialog({title:t('cnt.update'),body:t('cnt.confirmUpdate',{n:file}),ok:t('cnt.update')}))return;const r=await window.observer.contentUpdate({names:[file]});if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:file}),'error');state.files=r.files||state.files;await loadContentUpdates();toast(t('toast.updated',{n:file}),'success')});
   node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('toast.deleted',{n:file}),'success')})
 }
 // Wire the segmented switch + filter once (delegation-free: elements are static in index.html).
 $$('#contentSeg .seg').forEach(b=>b.onclick=()=>setContentKind(b.dataset.ckind));
 $('#contentFilter')?.addEventListener('input',filterContentList);
+$('#contentCheckUpdates')?.addEventListener('click',e=>loadContentUpdates(e.currentTarget));

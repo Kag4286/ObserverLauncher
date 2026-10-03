@@ -74,7 +74,17 @@ function serverFiles(root) {
   const datapackFolder = path.join(levelName, 'datapacks');
   const backupNames = fileNames('observerlauncher-backups').filter(x => /\.zip$/i.test(x)).sort().reverse();
   const backups = backupNames.map(name => { try { const st = fs.statSync(path.join(root, 'observerlauncher-backups', name)); return { name, size: st.size, mtime: st.mtimeMs }; } catch { return { name, size: 0, mtime: 0 }; } });
-  return { jar, launchScript, plugins: fileNames('plugins').filter(x => /\.jar$/i.test(x)), mods: fileNames('mods').filter(x => /\.jar$/i.test(x)), datapacks: fileNames(datapackFolder).filter(x => /\.(zip|jar)$/i.test(x)), datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties };
+  // CB1 (v3.3.0): an unzipped datapack is a DIRECTORY in <level-name>/datapacks. The old filter
+  // matched only .zip/.jar, so a folder datapack was invisible to the GUI + MCP. Include folders
+  // too (plugins/mods are always jars, so they are left alone).
+  // CB6 (v3.3.0): a DISABLED content file is <name>.jar.disabled — it must still be listed (else
+  // it becomes invisible and can never be re-enabled). The `(\.disabled)?` keeps disabled entries
+  // in the same arrays; consumers can tell them apart by the suffix.
+  const datapackEntries = [
+    ...fileNames(datapackFolder).filter(x => /\.(zip|jar)(\.disabled)?$/i.test(x)),
+    ...dirNames(datapackFolder),
+  ];
+  return { jar, launchScript, plugins: fileNames('plugins').filter(x => /\.jar(\.disabled)?$/i.test(x)), mods: fileNames('mods').filter(x => /\.jar(\.disabled)?$/i.test(x)), datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties };
 }
 function detectSoftware(info) {
   const name = String(info.jar || info.launchScript || '');

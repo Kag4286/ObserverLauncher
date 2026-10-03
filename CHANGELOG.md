@@ -10,6 +10,73 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [3.3.0] — 2026-10-03
+
+**Feature release: remote access + full content lifecycle + world-map performance.** Adds a
+loopback remote API (check on a server from another device, no port forwarding), turns plugin/mod/
+datapack management into a complete lifecycle (check for updates, update, enable/disable) across both
+the GUI and MCP, adds datapack tooling, and cuts World Map pan lag. No settings migration (schema v4).
+
+### Added — Remote access (Track A)
+- **A loopback-only remote API** (`src/main/remote.js`) so you can check on a running server from
+  another device — your phone, a laptop — without opening a router port. Off by default. A
+  long-lived bearer token (stored encrypted at rest via safeStorage) + a per-IP allowlist guard every
+  request; the only endpoints are read-ish (`/status`, `/console`, `/players`, `/instances`) plus a
+  single `/command` action that is BLOCKED while read-only (the default). **Never** exposes install
+  or delete. New `GET /health` (unauthenticated liveness). `?instance=<id>` (and `instance` in the
+  `/command` body) targets a specific server; omitted -> the active one.
+- **Tailscale-friendly**: docs describe `tailscale serve` (keeps the loopback bind, adds HTTPS) or a
+  direct Bind to the tailnet IP. The app never opens a port or ships TLS itself.
+- **Settings panel** (Remote access): enable, read-only toggle, allowed IPs (exact / `a.b.c.*` /
+  CIDR / IPv6), port, bind address, and the addresses to copy. 17 new i18n keys x7 locales.
+- `remoteBind`/`remotePort` are validated on save (`isSafeIp`, port 0..65535) so a bad value shows a
+  clear error instead of failing silently at listen() time.
+
+### Added — Content lifecycle (Track B)
+- **Update flow**: `check_updates` (read) compares the install manifest against the registry and
+  reports newer builds; `update_content` (write, one confirm per batch) installs them, backing up the
+  replaced file. The GUI Content tab now shows each file's version and an **Update** button, plus a
+  "Check updates" action and a count badge.
+- **Enable / disable**: `toggle_content` (write) renames `<name>.jar` <-> `<name>.jar.disabled` so a
+  plugin/mod/datapack can be turned off without deleting it. GUI button per row (strikethrough when
+  disabled). Disabled files still appear in the list so they can be re-enabled.
+- **Manifest v2**: installs now record `projectId`, `versionId`, `gameVersion` and the display
+  `version` (from Modrinth/Hangar/CurseForge) so an update can be traced. `update_content` accepts an
+  optional `version` to also move a mod to a new Minecraft version. `check_updates` reports Spigot
+  items as `manual` (Spigot has no version API).
+- **Datapack tooling**: `.mcfunction` and `.snbt` are now editable; `extract_datapack` (write) unzips
+  a `.zip` datapack into a folder (zip-slip guarded, flattens a single wrapper folder);
+  `validate_datapack` (read) checks `pack.mcmeta` `pack_format` against the server's Minecraft version
+  so a mismatch is caught before start (unknown versions report `unknown`, never a wrong 'ok').
+- **AI edits are recoverable**: `write_file`/`edit_file` now copy the previous file into
+  `observerlauncher-content-backups/` (bounded) before overwriting, matching what `player:save` and
+  `update_content` already did.
+- **Folder datapacks are visible + deletable** (were invisible: the listing only matched `.zip`/
+  `.jar`, and delete used `unlinkSync` which throws on a directory).
+
+### Changed — World Map performance
+- Terrain colours are cached (bounded, dim-keyed) instead of re-computed per cell every frame, and
+  same-colour cells are drawn as a single horizontal run (far fewer canvas calls) -> smoother panning.
+- The overview minimap redraws at most every 400ms (was every frame) and samples large worlds.
+- Biome/colour caches are released when you leave the World Map tab, cutting renderer memory.
+
+### Changed — other polish
+- The auto-poll sends the (expensive) TPS command with change-detection: every tick while TPS is
+  unknown or below 19.5, otherwise every 3rd tick. `list` still runs every 5s.
+- Removed ~67 dead locale keys (cosmetic).
+
+### Security / hardening
+- Remote `/command` validates through the shared `validate.isSafeConsoleCommand` (single line, max
+  2000 chars), and rejects browser-shaped requests (Origin/Host guard) like the MCP server does. The
+  MCP `send_console_command` tool now uses the same single validator instead of an inline copy.
+- update/delete/command content actions refuse while the server is running (a running server locks
+  its jars on Windows).
+
+### Notes
+- **No settings migration** — schema stays v4 (remote keys are plain global defaults).
+- New MCP tools: `check_updates`, `update_content`, `toggle_content`, `validate_datapack`,
+  `extract_datapack` (all added to both the live registry and the offline `STATIC_TOOLS`).
+
 ## [3.2.5] — 2026-10-02
 
 **Patch release: bug fixes + polish.** No new features. Fixes multi-instance UI leaks, a real

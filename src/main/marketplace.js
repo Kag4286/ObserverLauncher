@@ -107,6 +107,10 @@ async function resolveMarketDownload(item) {
     return {
       url: f.url, filename: f.filename, source: 'modrinth', size: f.size || 0,
       hashes: f.hashes || null,
+      // CB2 (v3.3.0): identity for the manifest so a later check_updates can re-query the registry.
+      projectId: item.id,
+      versionId: target.id || null,
+      gameVersion: item.version || (target.game_versions && target.game_versions[0]) || null,
       versionNumber: target.version_number || null,
       gameVersions: target.game_versions || [],
       loaders: target.loaders || [],
@@ -120,11 +124,11 @@ async function resolveMarketDownload(item) {
     const file = target?.downloads?.PAPER;
     if (!file) throw new Error('No Paper download was found for this Hangar project.');
     const hangarHashes = file.fileInfo?.sha256Hash ? { sha256: file.fileInfo.sha256Hash } : null;
-    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0, hashes: hangarHashes };
+    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0, hashes: hangarHashes, projectId: item.id, versionId: target?.id || null, gameVersion: item.version || null, versionNumber: target?.name || null };
   }
   if (item.source === 'spigot') {
     const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
-    return { url: `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`, filename: `${title}.jar`, source: 'spigot' };
+    return { url: `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`, filename: `${title}.jar`, source: 'spigot', projectId: item.id, versionId: null, gameVersion: item.version || null };
   }
   if (item.source === 'curseforge') {
     const headers = cfHeaders();
@@ -145,7 +149,7 @@ async function resolveMarketDownload(item) {
       const md5 = list.find(h => Number(h.algo) === 2)?.value;
       if (sha1 || md5) cfHashes = { ...(sha1 ? { sha1: String(sha1).toLowerCase() } : {}), ...(md5 ? { md5: String(md5).toLowerCase() } : {}) };
     } catch {}
-    return { url: inst.url, filename: file.fileName, source: 'curseforge', size: file.fileLength || 0, hashes: cfHashes, versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
+    return { url: inst.url, filename: file.fileName, source: 'curseforge', size: file.fileLength || 0, hashes: cfHashes, projectId: item.id, versionId: file.id != null ? String(file.id) : null, gameVersion: item.version || (file.gameVersions && file.gameVersions[0]) || null, versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
   }
   throw new Error('Unsupported marketplace source.');
 }
@@ -217,7 +221,7 @@ function registerMarketplace(ipcMain, ctx) {
       const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', neoforge: 'mods', mod: 'mods', datapack: path.join(levelName, 'datapacks') };
       const destDir = safeTarget(ctx.currentServerPath, destFolders[kind]);
       fs.mkdirSync(destDir, { recursive: true });
-      const { url, filename, hashes } = await resolveMarketDownload(item);
+      const { url, filename, hashes, projectId, versionId, gameVersion, versionNumber } = await resolveMarketDownload(item);
       // SECURITY (SSRF): the download URL comes from a remote registry API. Validate it is a public
       // http(s) host BEFORE fetching (same guard modpacks + the MCP install path already use), so a
       // crafted API entry pointing at file://, localhost or a private range can never be fetched.
@@ -230,7 +234,7 @@ function registerMarketplace(ipcMain, ctx) {
       const { verifyFileHash } = require('./fs-utils.js');
       const vh = verifyFileHash(dest, hashes);
       if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} return { ok: false, error: `${vh.error} The file was deleted — retry, or install manually from the project page.` }; }
-      recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, env: item.env || undefined, installedAt: new Date().toISOString() });
+      recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, env: item.env || undefined, projectId: projectId || item.id, versionId: versionId || undefined, gameVersion: gameVersion || undefined, version: versionNumber || undefined, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
     } catch (error) {
       // A CurseForge project whose author disabled third-party distribution returns no download URL.

@@ -139,6 +139,19 @@
 .wm-wpmain{flex:1;min-width:0}
 .wm-wpmain b{display:block;font:600 12px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm-wpmain small{font:500 9.5px var(--font-mono);color:var(--text-dim)}
+.wm-legend{border-top:1px solid var(--border);padding:10px 14px;background:var(--panel)}
+.wm-legend summary{cursor:pointer;font:600 11px var(--font-ui);color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase}
+.wm-legend summary:hover{color:var(--text)}
+.wm-lg-grid{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px}
+.wm-lg-chip{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--font-ui);color:var(--text-muted)}
+.wm-lg-chip i{width:11px;height:11px;border-radius:2px;flex-shrink:0;border:1px solid rgba(255,255,255,.12)}
+.wm-mini{position:absolute;right:12px;bottom:12px;width:160px;height:160px;background:rgba(10,15,20,.82);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;pointer-events:none;z-index:3}
+.content-list li.is-disabled .file-name{opacity:.5;text-decoration:line-through}
+.content-list li .file-ver{font:500 10.5px var(--font-mono);color:var(--text-dim);white-space:nowrap;flex-shrink:0}
+.remote-addresses{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.remote-addr{display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px}
+.remote-addr code{font:500 11px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:900px){.wm-mini{display:none}}
 @media(max-width:900px){.wm-main{grid-template-columns:1fr}.wm-panel{border-left:0;border-top:1px solid var(--border)}}
 /* ===== PLAYER INSPECTOR — TEXT-ONLY REDESIGN ===== */
 /* FIX: the element is class="modal wide player-modal". `.modal.wide` (specificity 0,2,0) in

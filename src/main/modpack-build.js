@@ -40,7 +40,7 @@ function planBuild(resolved, opts) {
     if (!dir) { skipped.push({ id: it.id, reason: 'unsupported-kind' }); continue; }
     if (!it.url) { skipped.push({ id: it.id, reason: 'no-url' }); continue; }
     if (!it.filename) { skipped.push({ id: it.id, reason: 'no-filename' }); continue; }
-    steps.push({ id: it.id, source: it.source, kind, dir, fileName: path.basename(it.filename), url: it.url, hashes: it.hashes || null });
+    steps.push({ id: it.id, source: it.source, kind, dir, fileName: path.basename(it.filename), url: it.url, hashes: it.hashes || null, projectId: it.projectId || null, versionId: it.versionId || null, gameVersion: it.gameVersion || null, version: it.version || null });
   }
   return { steps, skipped };
 }
@@ -75,7 +75,7 @@ async function buildPack(root, resolved, opts) {
       // SECURITY (supply-chain): verify against the registry hash before keeping the file.
       const vh = verify(dest, step.hashes);
       if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} out.errors.push({ id: step.id, error: vh.error }); continue; }
-      recordManifestEntry(root, { kind: step.kind, fileName: step.fileName, sourceUrl: step.url, source: step.source, installedAt: new Date().toISOString() });
+      recordManifestEntry(root, { kind: step.kind, fileName: step.fileName, sourceUrl: step.url, source: step.source, projectId: step.projectId || undefined, versionId: step.versionId || undefined, gameVersion: step.gameVersion || undefined, version: step.version || undefined, installedAt: new Date().toISOString() });
       out.installed.push({ id: step.id, fileName: step.fileName });
     } catch (e) {
       out.errors.push({ id: step.id, error: (e && e.message) || String(e) });

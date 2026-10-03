@@ -104,6 +104,9 @@ async function tListContent(ctx) {
       const jar = openJar(path.join(root, folder, name));
       const cls = classifyJar(jar.read, name);
       if (cls.loader) row.loader = cls.loader;
+      // CB3 (v3.3.0): surface the declared name + version so the AI/user sees real versions.
+      if (cls.version) row.version = cls.version;
+      if (cls.name) row.name = cls.name;
       // Priority: authoritative env (Fabric metadata) > Modrinth env from the install manifest >
       // weak jar hint (displayTest). A hint-only value is marked so callers know it may be wrong.
       let env = cls.env || manifestEnv[String(name).toLowerCase()] || null;
@@ -238,7 +241,8 @@ async function tStartServer(ctx) { return ok(await startServerInternal(ctx, load
 async function tSendCommand(ctx, a) {
   const cmd = String(a.command || '').trim();
   if (!cmd) return { ok: false, error: 'command is required.' };
-  if (cmd.length > 2000 || /[\r\n]/.test(cmd)) return { ok: false, error: 'Command must be single-line, max 2000 characters.' };
+  // Single source of truth (validate.js) - the same guard the remote /command endpoint uses.
+  if (!require('../main/validate.js').isSafeConsoleCommand(cmd)) return { ok: false, error: 'Command must be single-line, max 2000 characters.' };
   // M6: prefer RCON, stdin fallback (same helper the IPC path uses).
   return await sendConsoleCommand(ctx, cmd);
 }
@@ -278,12 +282,24 @@ function resolveEditableTarget(ctx, aPath) {
   assertEditable(aPath);
   return { ok: true, target };
 }
+// FEATURE (3.3.0): overwriting a file via write_file/edit_file is NOT undoable (unlike player:save
+// which backs up), so keep a bounded copy before an existing file is replaced. Same helper the
+// update path uses (observerlauncher-content-backups/ next to the file, newest 10 kept). Best-effort.
+function backupBeforeWrite(target) {
+  try {
+    if (!fs.existsSync(target)) return null;
+    const { writeContentBackup } = require('../main/content-updates.js');
+    writeContentBackup(path.dirname(target), target, path.basename(target));
+    return path.basename(target);
+  } catch { return null; }
+}
 async function tWriteFile(ctx, a) {
   const rt = resolveEditableTarget(ctx, a.path);
   if (!rt.ok) return rt;
   const target = rt.target;
   if (String(a.content || '').length > 2 * 1024 * 1024) return { ok: false, error: 'Content too large (max 2 MB).' };
   const { writeFileAtomic } = require('../main/fs-utils.js');
+  backupBeforeWrite(target);
   writeFileAtomic(target, String(a.content || ''));
   return { ok: true };
 }
@@ -296,6 +312,7 @@ async function tEditFile(ctx, a) {
   if (!oldS) return { ok: false, error: 'oldString is required.' };
   if (!txt.includes(oldS)) return { ok: false, error: 'oldString not found in file.' };
   const { writeFileAtomic } = require('../main/fs-utils.js');
+  backupBeforeWrite(target);
   writeFileAtomic(target, txt.replace(oldS, newS));
   return { ok: true };
 }
@@ -381,7 +398,7 @@ async function tInstallFromMarket(ctx, a) {
   // SECURITY (supply-chain): verify against the registry hash before keeping the file.
   const vh = verifyFileHash(dest, dl.hashes);
   if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} return { ok: false, error: `${vh.error} The file was deleted — retry, or install manually from the project page.` }; }
-  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, env: item.env || undefined, installedAt: new Date().toISOString() }); } catch {}
+  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, env: item.env || undefined, projectId: dl.projectId || item.id, versionId: dl.versionId || undefined, gameVersion: dl.gameVersion || undefined, version: dl.versionNumber || undefined, installedAt: new Date().toISOString() }); } catch {}
   return { ok: true, result: { name: dl.filename, files: serverFiles(root) } };
 }
 async function tInstallLocalJar(ctx, a) {
@@ -577,7 +594,7 @@ async function tAssembleModpack(ctx, a) {
       if (!dest) { results.push({ id: it.id, ok: false, error: 'Unsafe destination path.' }); failed++; continue; }
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
-      try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, env: it.env || undefined, installedAt: new Date().toISOString() }); } catch {}
+      try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, env: it.env || undefined, projectId: dl.projectId || it.id, versionId: dl.versionId || undefined, gameVersion: dl.gameVersion || undefined, version: dl.versionNumber || undefined, installedAt: new Date().toISOString() }); } catch {}
       createdFiles.push(path.relative(root, dest).replace(/\\/g, '/'));
       const warnings = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server).warnings;
       const row = { id: it.id, ok: true, name: dl.filename };
@@ -696,8 +713,76 @@ async function tDeleteContent(ctx, a) {
   const folder = kind === 'datapack' ? f.datapackFolder : kind === 'mod' ? 'mods' : 'plugins';
   const target = safeTarget(root, path.join(folder, name));
   if (!target || !fs.existsSync(target)) return { ok: false, error: 'File not found.' };
-  try { fs.unlinkSync(target); } catch (e) { return { ok: false, error: e.message }; }
+  // CB1 (v3.3.0): an unzipped datapack is a directory — unlinkSync throws EISDIR/EACCES on it.
+  // Detect the type FIRST and use rmSync(recursive) for a directory; a file still uses unlinkSync.
+  let isDir = false;
+  try { isDir = fs.statSync(target).isDirectory(); } catch {}
+  try { isDir ? fs.rmSync(target, { recursive: true, force: true }) : fs.unlinkSync(target); }
+  catch (e) { return { ok: false, error: e.message }; }
   return { ok: true, result: { files: serverFiles(root) } };
+}
+async function tToggleContent(ctx, a) {
+  const root = needPath(ctx);
+  const { toggleContent } = require('../main/content-ops.js');
+  const r = toggleContent(root, a.kind || 'plugin', String(a.name || ''), a.action);
+  if (!r.ok) return r;
+  return { ok: true, result: { from: r.from, to: r.to, files: serverFiles(root) } };
+}
+// 3.3.0: validate a datapack's pack.mcmeta against the server MC version (datapack.js is pure +
+// readJarEntry). Read-only.
+async function tValidateDatapack(ctx, a) {
+  const root = needPath(ctx);
+  const name = String(a.name || '');
+  if (!name || path.basename(name) !== name) return { ok: false, error: 'Invalid file name.' };
+  const levelName = serverFiles(root).properties['level-name'] || 'world';
+  const target = safeTarget(root, path.join(levelName, 'datapacks', name));
+  if (!target || !fs.existsSync(target)) return { ok: false, error: 'Datapack not found.' };
+  const isDir = fs.statSync(target).isDirectory();
+  const { readPackMeta, parsePackMeta, classifyFormat } = require('../main/datapack.js');
+  const kind = isDir ? 'folder' : 'zip';
+  const metaRaw = readPackMeta(target, isDir);
+  if (!metaRaw.ok) return { ok: true, result: { name, kind, level: 'unknown', note: metaRaw.error } };
+  const meta = parsePackMeta(metaRaw.text);
+  if (meta.error) return { ok: true, result: { name, kind, level: 'warn', note: meta.error } };
+  const { detectServerTarget } = require('../main/server-compat.js');
+  const mc = (detectServerTarget(root, serverFiles(root)) || {}).mc || null;
+  return { ok: true, result: { name, kind, mc, ...classifyFormat(meta, mc) } };
+}
+// 3.3.0: extract a .zip datapack into a folder (reuses platform.extractArchive, which has the
+// zip-slip guard). Useful because a folder datapack is easier to edit + load than a zip.
+async function tExtractDatapack(ctx, a) {
+  const root = needPath(ctx);
+  const name = String(a.name || '');
+  if (!name || path.basename(name) !== name) return { ok: false, error: 'Invalid file name.' };
+  if (!/\.zip$/i.test(name)) return { ok: false, error: 'Only a .zip datapack can be extracted.' };
+  const levelName = serverFiles(root).properties['level-name'] || 'world';
+  const folder = path.join(levelName, 'datapacks');
+  const zipAbs = safeTarget(root, path.join(folder, name));
+  if (!zipAbs || !fs.existsSync(zipAbs)) return { ok: false, error: 'Datapack .zip not found.' };
+  const destName = name.replace(/\.zip$/i, '');
+  const destAbs = safeTarget(root, path.join(folder, destName));
+  if (!destAbs) return { ok: false, error: 'Unsafe destination path.' };
+  if (fs.existsSync(destAbs)) return { ok: false, error: `A folder named ${destName} already exists.` };
+  const platform = require('../main/platform');
+  const tmp = path.join(tempDir(), 'ob-dp-' + Date.now());
+  try {
+    fs.mkdirSync(tmp, { recursive: true });
+    const r = await platform.extractArchive(zipAbs, tmp);
+    if (!r.ok) { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {} return { ok: false, error: r.error || 'Could not extract the datapack.' }; }
+    // A pack zip often wraps everything in ONE top folder - flatten that so pack.mcmeta + data/
+    // land directly in the new datapack folder, matching how a hand-made datapack looks.
+    let srcRoot = tmp;
+    const top = fs.readdirSync(tmp);
+    if (top.length === 1 && fs.statSync(path.join(tmp, top[0])).isDirectory()) srcRoot = path.join(tmp, top[0]);
+    fs.mkdirSync(destAbs, { recursive: true });
+    for (const e of fs.readdirSync(srcRoot)) fs.cpSync(path.join(srcRoot, e), path.join(destAbs, e), { recursive: true });
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+    if (a.removeZip) { try { fs.rmSync(zipAbs, { force: true }); } catch {} }
+    return { ok: true, result: { folder: destName, files: serverFiles(root) } };
+  } catch (e) {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+    return { ok: false, error: e?.message || 'Could not extract the datapack.' };
+  }
 }
 async function tDeleteBackup(ctx, a) {
   const { resolveBackupFile } = require('../main/backups.js');
@@ -715,6 +800,19 @@ async function tRestoreBackup(ctx, a) {
   return ok(r);
 }
 
+async function tCheckUpdates(ctx) {
+  const root = needPath(ctx);
+  const { checkUpdates } = require('../main/content-updates.js');
+  return await checkUpdates(root);
+}
+async function tUpdateContent(ctx, a) {
+  const root = needPath(ctx);
+  // SAFETY: replacing a jar while the server holds it open (Windows) fails and can leave TWO
+  // versions in the folder. Refuse while running, the same way player:save does.
+  if (ctx.serverProcess) return { ok: false, error: 'Stop the server before updating content - a running server locks its jars.' };
+  const { applyUpdates } = require('../main/content-updates.js');
+  return await applyUpdates(root, { names: Array.isArray(a.names) ? a.names : null, version: a.version ? String(a.version) : null });
+}
 async function tGetSchedule(ctx) {
   // M12: the TARGET instance's schedule, not the active one.
   const s = loadSettingsFor(ctx.inst());
@@ -1058,6 +1156,8 @@ const TOOLS = [
   { name: 'read_file', risk: 'read', description: 'Read a text file inside the server folder.', inputSchema: S({ path: STR('relative file path') }, ['path']), handler: tReadFile },
   { name: 'search_files', risk: 'read', description: 'Grep text files inside the server folder.', inputSchema: S({ query: STR('substring') }, ['query']), handler: tSearchFiles },
   { name: 'list_content', risk: 'read', description: 'Plugins, mods and datapacks (mods carry a loader flag + loaderMismatch when they do not match the server).', inputSchema: S(), handler: tListContent },
+  { name: 'check_updates', risk: 'read', description: 'Check the install manifest against the registry for newer builds of installed plugins/mods. Read-only.', inputSchema: S(), handler: tCheckUpdates },
+  { name: 'update_content', risk: 'write', description: 'Install newer builds over installed plugins/mods (backs up the replaced file). Pass names[] to limit to specific files; omit to update everything with an update. Pass version to also move to a new Minecraft version. One confirmation for the batch.', inputSchema: S({ names: { type: 'array', items: { type: 'string' }, description: 'file names to update (optional, default all)' }, version: STR('target Minecraft version, e.g. 1.21.4 (optional; default = the version each item was installed for)') }), handler: tUpdateContent },
   { name: 'check_mod_compat', risk: 'read', description: 'Pre-start scan of mods/: reports jars for the wrong loader, client-only mods, MISSING required dependencies (read from each jar metadata, incl. non-registry deps), and CONFLICTS (a declared type="incompatible" mod that is installed). Run before start_server to catch the crash chain early.', inputSchema: S(), handler: tCheckModCompat },
   { name: 'read_crash_report', risk: 'read', description: 'Read a crash-report from crash-reports/ (default newest; pass name). Path is confined to the server folder (unlike read_file, which is rooted at the project).', inputSchema: S({ name: STR('crash report file name (optional, default newest)') }), handler: tReadCrashReport },
   { name: 'get_properties', risk: 'read', description: 'Parsed server.properties.', inputSchema: S(), handler: tGetProperties },
@@ -1117,6 +1217,9 @@ const TOOLS = [
   { name: 'stop_server', risk: 'destroy', description: 'Gracefully stop the server.', inputSchema: S(), handler: tStopServer },
   { name: 'force_stop_server', risk: 'destroy', description: 'Kill the server process tree.', inputSchema: S(), handler: tForceStopServer },
   { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name') }, ['name']), handler: tDeleteContent },
+  { name: 'toggle_content', risk: 'write', description: 'Enable or disable a plugin/mod/datapack by renaming <name> <-> <name>.disabled (no data loss, unlike delete).', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name'), action: STR('enable|disable|toggle (default)') }, ['name']), handler: tToggleContent },
+  { name: 'validate_datapack', risk: 'read', description: "Check a datapack's pack.mcmeta pack_format against the server's Minecraft version so a mismatch (which fails to load or crashes) is caught before starting.", inputSchema: S({ name: STR('datapack folder or .zip name inside <world>/datapacks') }, ['name']), handler: tValidateDatapack },
+  { name: 'extract_datapack', risk: 'write', description: 'Extract a .zip datapack into a folder (folder datapacks are easier to edit + load). Safe: reuses the zip-slip guarded extractor.', inputSchema: S({ name: STR('.zip datapack file name'), removeZip: { type: 'boolean', description: 'delete the .zip after a successful extract (default false)' } }, ['name']), handler: tExtractDatapack },
   { name: 'delete_backup', risk: 'destroy', description: 'Delete a backup ZIP.', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tDeleteBackup },
   { name: 'restore_backup', risk: 'destroy', description: 'Restore a backup (overwrites worlds).', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tRestoreBackup },
   { name: 'apply_fix', risk: 'destroy', description: 'Autonomous Doctor: execute the actions from a propose_fix plan (change_port, install_dependency, tune_performance, restore_backup). Always requires confirmation. Pass the plan entries you showed the user.', inputSchema: S({ actions: { type: 'array', description: 'plan[] entries from propose_fix: [{action, args}]', items: { type: 'object' } } }, ['actions']), handler: tApplyFix },

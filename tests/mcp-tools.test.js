@@ -119,7 +119,9 @@ check('marketplace uses explicit loader', /const loaderGroup = explicit \|\|/.te
 // bridge.js offline list must name the SAME tools as the live registry. Parse the source instead of
 // require()-ing bridge.js (which attaches a stdin listener and would hang the test runner).
 const bridgeSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'mcp', 'bridge.js'), 'utf8');
-const staticNames = [...bridgeSrc.matchAll(/\['([a-z_]+)',\s*'/g)].map(m => m[1]);
+// Accept a single- OR double-quoted description (a description containing an apostrophe is
+// legitimately double-quoted; the old single-quote-only regex silently skipped those entries).
+const staticNames = [...bridgeSrc.matchAll(/\['([a-z_]+)',\s*['"]/g)].map(m => m[1]);
 const liveNames = TOOLS.map(t => t.name);
 const missingOffline = liveNames.filter(n => !staticNames.includes(n));
 const staleOffline = staticNames.filter(n => !liveNames.includes(n));

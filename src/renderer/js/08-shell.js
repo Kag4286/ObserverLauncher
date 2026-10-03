@@ -89,6 +89,8 @@ let _lastTab=null;
 function switchTab(tab){
   const _main=document.querySelector('.workspace main');
   if(_main&&_lastTab&&_lastTab!==tab)_tabScroll[_lastTab]=_main.scrollTop;
+  // RAM-1 (3.3.0): leaving the World Map releases its biome/colour caches (rebuilt lazily on reopen).
+  if(_lastTab==='worldmap'&&tab!=='worldmap'&&typeof wmClearCaches==='function'){try{wmClearCaches()}catch{}}
   _lastTab=tab;
   $$('.nav-item').forEach(b=>{ const on=b.dataset.tab===tab; b.classList.toggle('active',on); b.setAttribute('aria-current', on?'page':'false'); });
   // Direction-aware slide: forward in rail order slides from the right.
@@ -112,7 +114,7 @@ function switchTab(tab){
   // the hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
   if(tab==='overview')requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));
   if(tab==='players')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
-  if(tab==='content')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});
+  if(tab==='content'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates()}
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
   // hook switchTab itself: it evaluates before this file, so capturing
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
@@ -348,7 +350,7 @@ async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
 function renderRecentCommands(){const wrap=$('#recentCommands'),group=$('#recentCommandsGroup');if(!wrap||!group)return;if(!cmdHistory.length){group.hidden=true;return}group.hidden=false;wrap.innerHTML='';cmdHistory.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.title=c;b.onclick=()=>command(c);wrap.append(b)})}
-async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
+async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
 $$('.nav-item').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $('#nav')?.addEventListener('keydown', e=>{
   const items=[...$$('.nav-item')]; const idx=items.indexOf(document.activeElement);
@@ -410,7 +412,7 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
-  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp};propsDirty=false;markSettingsSaved();refreshUI();
+  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;markSettingsSaved();refreshUI();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });

@@ -50,7 +50,7 @@ function getTerrainColor(wx, wz, seedBig, dim) {
   return 'rgba(208,208,208,.97)';
 }
 
-let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null,biomes:new Map(),biomeReqSeq:0,biomeTimer:null,lastBiomeRect:'',biomeLoading:false,biomeTooWide:false,biomeTruncated:false};
+let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,dragWp:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null,biomes:new Map(),biomeReqSeq:0,biomeTimer:null,lastBiomeRect:'',biomeLoading:false,biomeTooWide:false,biomeTruncated:false,terrainCache:new Map(),miniAt:0};
 // REAL biome colours (terrain-map style). Keyed by exact biome id with family fallbacks, so a
 // brand-new biome still gets a sensible colour instead of grey. Slightly desaturated to sit on
 // the dark canvas without glowing.
@@ -259,9 +259,9 @@ async function wmLoad(){
   const f=wm.players[0]?wm.players[0].pos:wm.level.spawn;
   wm.cam={x:f.x,z:f.z};if(wm.zoom<0.1)wm.zoom=0.25;
   // A1: a reload must not keep stale biome colours from a previous world/session.
-  wm.biomes.clear();wmColorCache.clear();wm.lastBiomeRect='';wm.biomeTooWide=false;wm.biomeTruncated=false;
+  wmClearCaches();
   wmLoadChunks(wm.dim);
-  wmRenderList();wmDraw();
+  wmRenderList();wmRenderLegend();wmDraw();
   // C: at the default zoom the viewport spans tens of thousands of chunks, so the normal
   // biome fetch is skipped and spawn stays on the seed wash. Fetch a bounded block around
   // spawn so real biomes appear immediately.
@@ -276,6 +276,19 @@ function wmVisible(){
   for(const w of wm.waypoints)if(w.dim===wm.dim)list.push({type:'wp',...w});
   return list;
 }
+// WM-1 (3.3.0 perf): the seed-wash colour is a pure function of (dim, wx, wz). Panning re-computed
+// valueNoise+hash32 (8 Math.imul) for EVERY unloaded cell EVERY frame - the worst part of pan lag.
+// Cache it (bounded LRU), like wmChunkColors already caches real biome colours.
+function getTerrainColorCached(wx,wz){
+  const k=wm.dim+':'+wx+','+wz;
+  let c=wm.terrainCache.get(k);
+  if(c===undefined){ c=getTerrainColor(wx,wz,wm.seedBig,wm.dim); lruSet(wm.terrainCache,k,c,6000); }
+  return c;
+}
+// RAM-1 (3.3.0): release the world-map caches (real biomes + colour + terrain wash) when the tab is
+// left or the dim/world changes. These Maps are the biggest app-controlled chunk of renderer memory;
+// keeping them while the user is on another tab is pure waste. Rebuilt lazily on next open.
+function wmClearCaches(){ wm.biomes.clear(); wmColorCache.clear(); wm.terrainCache.clear(); wm.lastBiomeRect=''; wm.biomeTooWide=false; wm.biomeTruncated=false; }
 function wmDraw(){
   if(!wm.level)return; // no world loaded yet — nothing to draw (see wmVisible guard)
   const cv=$('#wmCanvas'),ctx=cv.getContext('2d');
@@ -358,23 +371,34 @@ function wmDraw(){
     // canvas state update even when it is identical, and a biome region is hundreds of same-colour
     // cells in a row. fillRect still runs per cell (that IS the draw); this only drops redundant
     // state sets. Pixel-identical output.
-    let lastCol=null;
-    for(let wz=z0;wz<z1;wz+=stepW)for(let wx=x0;wx<x1;wx+=stepW){
-      const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
-      if(wm.explored.size && !wm.explored.has(cx+','+cz))continue;
-      const[sx,sy]=toS(wx,wz);
-      const cols=wmChunkColors(cx+','+cz,cx,cz);
-      let col;
-      if(cols){
-        if(cols.length===16){
-          const lx=((wx%16)+16)%16, lz=((wz%16)+16)%16;
-          col=cols[Math.floor(lz/4)*4+Math.floor(lx/4)];
-        } else col=cols[0];
-      } else {
-        col=getTerrainColor(wx,wz,wm.seedBig,wm.dim);
+    // WM-1 (3.3.0 perf): draw each HORIZONTAL RUN of one colour as a single fillRect instead of one
+    // fillRect per cell. A biome region is hundreds of same-colour cells in a row, so this cuts the
+    // fillRect count by 10-100x. Positions use toS() only when a run starts (exact: toS is linear, so
+    // width = runW*stepW*zoom). getTerrainColorCached() replaces the per-cell noise re-compute.
+    let lastCol=null,runW=0,runSx=0,runSy=0;
+    // Exact footprint match: the old loop drew cell i at sx_0 + i*stepW*zoom with width cellPx, so a
+    // run of N cells spans (N-1)*stepW*zoom + cellPx (NOT N*stepW*zoom - that leaves gaps at far
+    // zoom-out where cellPx is rounded UP to 8).
+    const flushRun=()=>{ if(runW>0){ ctx.fillStyle=lastCol; ctx.fillRect(runSx,runSy,(runW-1)*stepW*wm.zoom+cellPx,cellPx); runW=0; } };
+    for(let wz=z0;wz<z1;wz+=stepW){
+      runW=0; lastCol=null;
+      for(let wx=x0;wx<x1;wx+=stepW){
+        const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
+        if(wm.explored.size && !wm.explored.has(cx+','+cz)){ flushRun(); lastCol=null; continue; }
+        const cols=wmChunkColors(cx+','+cz,cx,cz);
+        let col;
+        if(cols){
+          if(cols.length===16){
+            const lx=((wx%16)+16)%16, lz=((wz%16)+16)%16;
+            col=cols[Math.floor(lz/4)*4+Math.floor(lx/4)];
+          } else col=cols[0];
+        } else {
+          col=getTerrainColorCached(wx,wz);
+        }
+        if(col!==lastCol){ flushRun(); lastCol=col; const[sx,sy]=toS(wx,wz); runSx=sx; runSy=sy; runW=1; }
+        else runW++;
       }
-      if(col!==lastCol){ ctx.fillStyle=col; lastCol=col; }
-      ctx.fillRect(sx,sy,cellPx,cellPx);
+      flushRun();
     }
   }
   wmScheduleBiomes();
@@ -382,6 +406,7 @@ function wmDraw(){
   // "zoom in" note when the viewport is too wide / the backend hit its chunk cap.
   { const hint=wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null);
     if(hint){ ctx.fillStyle='rgba(232,244,248,.75)';ctx.font='600 10.5px "JetBrains Mono",monospace';ctx.fillText(hint,14,20); } }
+  wmDrawMini();
   // scale bar
   const px=step*wm.zoom;
   ctx.fillStyle='rgba(232,244,248,.7)';ctx.font='600 9.5px "JetBrains Mono",monospace';
@@ -408,13 +433,14 @@ function wmZoomBy(f){ wm.zoom=Math.max(0.02,Math.min(16,wm.zoom*f)); wmDraw(); }
 $('#wmZoomIn')?.addEventListener('click',()=>wmZoomBy(1.25));
 $('#wmZoomOut')?.addEventListener('click',()=>wmZoomBy(1/1.25));
 // Fit spawn: frame the spawn area (~256 blocks) and centre the camera on it.
-$('#wmFitSpawn')?.addEventListener('click',()=>{
+function wmFitSpawn(){
   const sp=(wm.level&&wm.level.spawn)||{x:0,z:0};
   const cv=$('#wmCanvas'); const span=Math.min(cv.clientWidth||800,cv.clientHeight||520);
   wm.zoom=Math.max(0.02,Math.min(16,span/512));
   wm.cam={x:sp.x,z:sp.z};
   wmDraw();
-});
+}
+$('#wmFitSpawn')?.addEventListener('click',wmFitSpawn);
 function wmRenderList(){
   const box=$('#wmWpList');const list=wm.waypoints;
   $('#wmWpCount').textContent=String(list.length);
@@ -423,6 +449,19 @@ function wmRenderList(){
   box.querySelectorAll('[data-wm-del]').forEach(b=>b.onclick=async()=>{wm.waypoints=wm.waypoints.filter(x=>x.id!==b.dataset.wmDel);await window.observer.worldmapSetWaypoints(wm.waypoints);wmRenderList();wmDraw()});
 }
 function wmSyncDimTabs(){$$('#wmDims .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.dim===wm.dim))}
+// W8: biome legend - a compact key of the colour families the map uses, per dimension. Colours
+// are the same representative swatches as BIOME_COLORS/getTerrainColor, so the key always matches
+// what is on screen. Rebuilt on load + whenever the dimension changes.
+const WM_LEGEND={
+  overworld:[['water','#2E5A8A'],['plains','#6FA84E'],['forest','#3F7A3A'],['desert','#D8C77A'],['snow','#D7DCE0'],['mountain','#8A8A7E'],['swamp','#5A6B45']],
+  nether:[['nether','#7A3B33']],
+  end:[['end','#C9C29A']]
+};
+function wmRenderLegend(){
+  const box=$('#wmLgGrid');if(!box)return;
+  const rows=WM_LEGEND[wm.dim]||WM_LEGEND.overworld;
+  box.innerHTML=rows.map(([k,c])=>`<span class="wm-lg-chip"><i style="background:${c}"></i>${esc(t('wm.lg.'+k))}</span>`).join('');
+}
 // FEATURE: click-to-inspect — click a marker for a popup with exact coords +
 // Copy; click empty map for that point's coords. (Hover already shows coords
 // in #wmCoord; the popup persists so you can copy/keep it while panning.)
@@ -500,9 +539,10 @@ $('#wmCopySeed').onclick=async()=>{if(!wm.level)return;try{await navigator.clipb
 // fetch from the OLD dimension, or its response lands after the switch and paints old-dimension
 // biome colours into the new one. Bump the request seq + cancel the debounce timer so a late reply
 // is dropped (the seq check in wmScheduleBiomes/wmPrefetchBiomes discards stale responses).
-$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{wm.dim=c.dataset.dim;clearTimeout(wm.biomeTimer);wm.biomeReqSeq++;wm.biomeLoading=false;wm.biomes.clear();wmColorCache.clear();wm.lastBiomeRect='';wm.biomeTooWide=false;wm.biomeTruncated=false;wm.explored=new Set();wm.exploredDim=null;wmSyncDimTabs();wmLoadChunks(wm.dim);wmDraw()});
+$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{wm.dim=c.dataset.dim;clearTimeout(wm.biomeTimer);wm.biomeReqSeq++;wm.biomeLoading=false;wmClearCaches();wm.explored=new Set();wm.exploredDim=null;wmSyncDimTabs();wmRenderLegend();wmLoadChunks(wm.dim);wmDraw()});
 $('#wmAdd').onclick=()=>{wm.addMode=!wm.addMode;$('#wmAdd').classList.toggle('active',wm.addMode)};
 async function wmLoadChunks(dim){
+  if(!dim)dim=wm.dim; // defensive: default to the ACTIVE dim so an undefined caller can't null wm.exploredDim
   try{
     const r=await window.observer.worldmapChunks(dim);
     if(r&&r.ok&&r.dim===dim){wm.explored=new Set(r.chunks);wm.exploredDim=dim;wmDraw()}
@@ -528,11 +568,32 @@ $('#wmExport').onclick=()=>{
   // pointer type; hover coords still update for a mouse (pointermove without a pressed button).
   cv.addEventListener('pointerdown',e=>{
     if(e.button!==0&&e.pointerType==='mouse')return; // left button / any touch or pen
+    try{cv.focus({preventScroll:true})}catch{} // W8: focus the canvas so keyboard pan/zoom works
+    // W8: grabbing a waypoint marker DRAGS it instead of panning. Only a marker in the current
+    // dimension, and never in add mode (there a click places a NEW waypoint). Hit test is the
+    // same 14px radius as click-to-inspect, done newest-first so overlapping pins pick the top one.
+    if(!wm.addMode&&wm.level){
+      const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+      const wps=wm.waypoints.filter(w=>w.dim===wm.dim);
+      for(let i=wps.length-1;i>=0;i--){
+        const[sx,sy]=wmToScreen(wps[i].x,wps[i].z);
+        if(Math.hypot(px-sx,py-sy)<=14){wm.dragWp=wps[i];downPos=null;try{cv.setPointerCapture(e.pointerId)}catch{};wmHidePopup();return}
+      }
+    }
     dragging=true;lx=e.clientX;ly=e.clientY;downPos={x:e.clientX,y:e.clientY};
     try{cv.setPointerCapture(e.pointerId)}catch{}
     wmHidePopup();
   });
   cv.addEventListener('pointerup',e=>{
+    if(wm.dragWp){
+      wm.dragWp=null;
+      try{cv.releasePointerCapture(e.pointerId)}catch{}
+      // Persist the moved waypoint; refresh the side list so its coords update. No toast - the
+      // marker visibly moved and a toast per drag would be noisy.
+      window.observer.worldmapSetWaypoints(wm.waypoints).catch(()=>{});
+      wmRenderList();
+      return;
+    }
     if(!dragging)return;
     dragging=false;
     try{cv.releasePointerCapture(e.pointerId)}catch{}
@@ -551,12 +612,13 @@ $('#wmExport').onclick=()=>{
     }
     wmMapClick(e.clientX-r.left,e.clientY-r.top,x,z);
   });
-  cv.addEventListener('pointercancel',()=>{dragging=false;downPos=null});
+  cv.addEventListener('pointercancel',()=>{dragging=false;downPos=null;wm.dragWp=null});
   cv.addEventListener('pointermove',e=>{
     const r=cv.getBoundingClientRect();
     const wx=Math.round((e.clientX-r.left-WM_CX())/wm.zoom+wm.cam.x);
     const wz=Math.round((e.clientY-r.top-WM_CY())/wm.zoom+wm.cam.z);
     $('#wmCoord').textContent=wx+' '+wz;
+    if(wm.dragWp){wm.dragWp.x=wx;wm.dragWp.z=wz;wmDrawSoon();return}
     if(!dragging)return;
     wm.cam.x-=(e.clientX-lx)/wm.zoom;wm.cam.z-=(e.clientY-ly)/wm.zoom;
     lx=e.clientX;ly=e.clientY;wmDrawSoon();
@@ -572,10 +634,68 @@ $('#wmExport').onclick=()=>{
   },{passive:false});
   // W6: the old separate 'click' handler is GONE - pointerup now owns click-to-inspect and
   // add-waypoint. Keeping both would fire the action twice (pointerup AND the synthetic click).
+  // W8: keyboard pan/zoom - canvas has tabindex=0 (index.html) so arrows move the camera,
+  // +/- zoom, 0 fits spawn. Skips when a modifier is held so it never fights browser shortcuts.
+  cv.addEventListener('keydown',e=>{
+    if(e.ctrlKey||e.metaKey||e.altKey)return;
+    const pan=80/wm.zoom;
+    switch(e.key){
+      case 'ArrowLeft':  wm.cam.x-=pan; break;
+      case 'ArrowRight': wm.cam.x+=pan; break;
+      case 'ArrowUp':    wm.cam.z-=pan; break;
+      case 'ArrowDown':  wm.cam.z+=pan; break;
+      case '+': case '=': wmZoomBy(1.25);   e.preventDefault(); return;
+      case '-': case '_': wmZoomBy(1/1.25); e.preventDefault(); return;
+      case '0': wmFitSpawn(); e.preventDefault(); return;
+      default: return;
+    }
+    e.preventDefault();
+    wmDrawSoon();
+  });
   new ResizeObserver(()=>wmDraw()).observe(cv);
 })();
 function WM_CX(){return ($('#wmCanvas').clientWidth||800)/2}
 function WM_CY(){return ($('#wmCanvas').clientHeight||520)/2}
+// W8: overview minimap - a small fixed canvas showing explored chunks + the current viewport
+// rectangle, so panning a large world keeps a sense of where you are. Pointer-events:none
+// (CSS) so it never steals a map drag; redrawn from wmDraw so it always matches the main view.
+const WM_MINI_PX=160;
+// WM-2 (3.3.0 perf): two fixes. (1) Throttle: the minimap redraws at most every 400ms instead of
+// on EVERY pan frame (force:true for explicit redraws). (2) One pass instead of two: split+parse the
+// explored set ONCE, keep the bbox, and draw a SAMPLED subset (stride) rather than a hard 4000 cap
+// that just skipped the tail. Much cheaper on a big world.
+function wmDrawMini(force){
+  const cv=$('#wmMini');if(!cv||!wm.level)return;
+  const now=Date.now(); if(!force&&now-(wm.miniAt||0)<400)return; wm.miniAt=now;
+  const ctx=cv.getContext('2d'),S=WM_MINI_PX,dpr=devicePixelRatio||1;
+  if(cv.width!==S*dpr){cv.width=S*dpr;cv.height=S*dpr}
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,S,S);
+  // World extent: explored chunk bounds unioned with the current viewport (so the rect is always
+  // on the minimap). No explored data -> a fixed window around the camera.
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  const size=wm.explored.size, stride=size>4000?Math.ceil(size/4000):1;
+  const pts=[]; let idx=0;
+  for(const k of wm.explored){
+    const p=k.split(','),ax=Number(p[0]),az=Number(p[1]);
+    if(!isFinite(ax)||!isFinite(az))continue;
+    if(ax<minX)minX=ax;if(ax>maxX)maxX=ax;if(az<minZ)minZ=az;if(az>maxZ)maxZ=az;
+    if(idx++%stride===0)pts.push([ax,az]);
+  }
+  const vw=((($('#wmCanvas').clientWidth||800))/2)/wm.zoom,vh=((($('#wmCanvas').clientHeight||520))/2)/wm.zoom;
+  minX=Math.min(minX,wm.cam.x-vw);maxX=Math.max(maxX,wm.cam.x+vw);
+  minZ=Math.min(minZ,wm.cam.z-vh);maxZ=Math.max(maxZ,wm.cam.z+vh);
+  if(!isFinite(minX)){minX=wm.cam.x-1000;maxX=wm.cam.x+1000;minZ=wm.cam.z-1000;maxZ=wm.cam.z+1000}
+  const span=Math.max(maxX-minX,maxZ-minZ,32)*1.12,midX=(minX+maxX)/2,midZ=(minZ+maxZ)/2;
+  const toM=(wx,wz)=>[(wx-(midX-span/2))/span*S,(wz-(midZ-span/2))/span*S];
+  const dot=Math.max(1,(16/span)*S);
+  ctx.fillStyle='rgba(0,229,255,.28)';
+  for(const[ax,az]of pts){const[sx,sy]=toM(ax*16+8,az*16+8);if(sx<0||sx>S||sy<0||sy>S)continue;ctx.fillRect(sx,sy,dot,dot)}
+  for(const m of wmVisible()){const[sx,sy]=toM(m.x,m.z);ctx.fillStyle=m.color;ctx.beginPath();ctx.arc(sx,sy,1.8,0,7);ctx.fill()}
+  const[vx0,vy0]=toM(wm.cam.x-vw,wm.cam.z-vh),[vx1,vy1]=toM(wm.cam.x+vw,wm.cam.z+vh);
+  ctx.strokeStyle='rgba(232,244,248,.85)';ctx.lineWidth=1;
+  ctx.strokeRect(vx0,vy0,Math.max(2,vx1-vx0),Math.max(2,vy1-vy0));
+}
 // external-change watcher: auto-reload when clean, conflict banner when dirty
 window.observer.onEditorExternal(r=>{
   if($('#fileEditor').hidden||!edState.rel)return;

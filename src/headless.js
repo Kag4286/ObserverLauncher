@@ -66,6 +66,10 @@ function createHeadless() {
   // Wire the MCP toggle the same way main.js does, so settings:save can start/stop it.
   ctx.startMcpServer = () => startMcpServer(ctx);
   ctx.stopMcpServer = () => stopMcpServer(ctx);
+  // 3.3.0 remote management (headless is the natural host: a VPS with no window). Same hooks.
+  const remote = require('./main/remote.js');
+  ctx.startRemoteServer = async () => { try { await remote.startRemote(ctx); } catch (e) { try { ctx.appendLog('Remote start failed: ' + (e?.message || e), 'error'); } catch {} } };
+  ctx.stopRemoteServer = () => { try { remote.stopRemote(ctx); } catch {} };
 
   return { ctx, shim, ipcWrap };
 }
@@ -109,6 +113,9 @@ async function start() {
     const mcpOn = !!loadSettings().mcpEnabled;
     rt.ctx.currentMcpEnabled = mcpOn;
     if (mcpOn) startMcpServer(rt.ctx);
+    const rOn = !!loadSettings().remoteEnabled;
+    rt.ctx.currentRemoteEnabled = rOn;
+    if (rOn) await rt.ctx.startRemoteServer();
   } catch {}
   return rt;
 }
@@ -135,6 +142,7 @@ async function stop(ctx) {
   } catch {}
   try { stopTunnel(ctx); } catch {}
   try { if (typeof ctx.stopMcpServer === 'function') ctx.stopMcpServer(); } catch {}
+  try { if (typeof ctx.stopRemoteServer === 'function') ctx.stopRemoteServer(); } catch {}
 }
 
 // Only auto-boot when run as a program (`node src/headless.js`), NOT when required by a test.

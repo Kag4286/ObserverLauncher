@@ -45,12 +45,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-3.2.5-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-3.2.5.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-3.3.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-3.3.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-3.2.5.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-3.3.0.AppImage`, then run it. No root needed.
 
 Running from source needs Node.js 18 or newer:
 
@@ -312,7 +312,9 @@ Full guide: [docs/docker.md](docs/docker.md).
 
 ### MCP / AI integration
 
-ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with 70 tools.
+ObserverLauncher can act as an MCP server, letting an MCP client read and control your server in natural language, with more than 70 tools.
+
+**Content lifecycle.** The AI can check for newer builds (`check_updates`), install them (`update_content`, one confirmation per batch, old file backed up), and enable/disable a plugin/mod/datapack without deleting it (`toggle_content`). It can also inspect a datapack (`validate_datapack` checks `pack.mcmeta` against the server version) and unzip a `.zip` datapack into a folder (`extract_datapack`). Writes through `write_file`/`edit_file` keep a backup of the previous file so a change is recoverable.
 
 **Modpack builder.** The AI can search the marketplace, then `plan_modpack` turns candidates into an install plan with exact versions, per-item compatibility warnings, and required Modrinth dependencies. After you approve it, `assemble_modpack` installs the list in one confirmation and reports each item. The AI only picks ids; versions, URLs and hashes are resolved by the app from the registry.
 
@@ -323,6 +325,10 @@ ObserverLauncher can act as an MCP server, letting an MCP client read and contro
 **Headless:** with no GUI, write and destructive tools are refused by default and written to the audit log. Set `OBSERVER_CONFIRM_MODE=allowlist` and `OBSERVER_CONFIRM_ALLOW=tool_a,tool_b` to allow specific ones for automation. When MCP is on, the loopback server also answers an unauthenticated `GET /health` (`{ok, uptime, version}`) for container health checks; every tool route still needs the bearer token.
 
 **Connect a client:** click **Copy MCP config** and paste it into your client's MCP settings. The launcher runs the bridge with its own binary (`ELECTRON_RUN_AS_NODE=1`), so Node.js is not required.
+
+### Remote access (check on a server from another device)
+
+Settings → **Advanced** → **Remote access** (off by default) starts a small **loopback-only** HTTP server so you can check on a running server from another device without opening a router port. It reads status, console and players; the single write-ish endpoint (`POST /command`) is blocked while Read-only is on (the default). It **never** exposes install or delete. A long-lived token (encrypted at rest) and an optional IP allowlist guard every request. Reach it from anywhere with **Tailscale** (`tailscale serve`) or by setting a Bind address; the app never opens a port or ships TLS itself. Multi-instance: add `?instance=<id>` to any read or `GET /instances` to list ids. Full guide: [docs/remote.md](docs/remote.md).
 
 **Permissions.** Tools have three tiers. Read tools run freely. Write tools (install, edit files, send a command) ask for confirmation first, which *Auto-allow write tools* can skip. Destructive tools (stop, delete, restore, `safe_restart`) always ask and cannot be auto-approved. A Read-only mode setting blocks every write and destructive tool up front. A per-tool rate limit (60/min) prevents runaway loops, and every write and destroy call is written to an audit log.
 

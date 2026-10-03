@@ -64,6 +64,47 @@ function parseFabricDependencies(json) {
   return deps;
 }
 
+// CB3 (v3.3.0): the display name + version a mod/plugin jar DECLARES, so list_content can show a
+// real version instead of a bare filename (the prerequisite for update checks). Pure parsers.
+// FIRST [mods] / [[mods]] block of a (neo)forge mods.toml.
+function parseTomlModInfo(toml) {
+  const out = { modId: null, name: null, version: null };
+  let inMods = false; const body = [];
+  for (const raw of String(toml || '').split(/\r?\n/)) {
+    if (/^\s*\[\[?\s*mods\s*\]\]?\s*$/i.test(raw)) { inMods = true; continue; }
+    if (/^\s*\[/.test(raw)) { if (inMods) break; continue; }
+    if (inMods) body.push(raw);
+  }
+  const text = body.join('\n');
+  const pick = re => { const m = text.match(re); return m ? m[1].replace(/^["']|["']$/g, '').trim() : null; };
+  out.modId = pick(/modId\s*=\s*["']([^"']+)["']/i);
+  out.version = pick(/version\s*=\s*["']([^"']+)["']/i);
+  out.name = pick(/displayName\s*=\s*["']([^"']+)["']/i);
+  return out;
+}
+// CB3: name + version from a bukkit/spigot plugin.yml (simple `key: value` lines).
+function parsePluginYml(yml) {
+  const out = { name: null, version: null };
+  for (const raw of String(yml || '').split(/\r?\n/)) {
+    const m = raw.match(/^\s*(name|version)\s*:\s*(.+?)\s*$/i);
+    if (!m) continue;
+    const v = m[2].replace(/^["']|["']$/g, '').trim();
+    if (m[1].toLowerCase() === 'name' && !out.name) out.name = v;
+    if (m[1].toLowerCase() === 'version' && !out.version) out.version = v;
+  }
+  return out;
+}
+// CB3: Implementation-Title / Implementation-Version from a MANIFEST.MF.
+function parseManifestMf(mf) {
+  const out = { name: null, version: null };
+  const text = String(mf || '');
+  const t = text.match(/^Implementation-Title\s*:\s*(.+)$/im);
+  const v = text.match(/^Implementation-Version\s*:\s*(.+)$/im);
+  if (t) out.name = t[1].trim();
+  if (v) out.version = v[1].trim();
+  return out;
+}
+
 // Environment: Fabric declares obj.environment; NeoForge uses [[mods]] displayTest = 'IGNORE_SERVER_VERSION' etc.
 function fabricEnv(json) {
   const e = String((json && json.environment) || '').toLowerCase();
@@ -128,12 +169,22 @@ function loaderFromFilename(name) {
 // `fileName` (optional) is used only to derive a modId when the descriptor is unreadable/missing.
 // Returns { loader, env, modId, dependencies:[{modId, mandatory, versionRange}] } — loader null if unknown.
 function classifyJar(read, fileName) {
-  const out = { loader: null, env: null, envHint: null, modId: null, dependencies: [] };
+  const out = { loader: null, env: null, envHint: null, modId: null, name: null, version: null, dependencies: [] };
   const finish = () => {
     if (!out.modId) out.modId = modIdFromFilename(fileName);
     // loader from the FILE NAME is a guess (a jar may be multi-loader or misnamed), so flag it —
     // callers must NOT treat a guessed loader as an authoritative mismatch.
     if (!out.loader) { out.loader = loaderFromFilename(fileName); if (out.loader) out.loaderGuessed = true; }
+    // CB3 (v3.3.0): a plugin with no mods.toml/fabric.mod.json still declares name + version in
+    // plugin.yml (bukkit/spigot/paper) or the jar manifest. Fill them in as a fallback.
+    if (!out.version || !out.name) {
+      const yml = read('plugin.yml');
+      if (yml && yml.ok) { const p = parsePluginYml(yml.content); out.name = out.name || p.name; out.version = out.version || p.version; }
+    }
+    if (!out.version || !out.name) {
+      const mf = read('META-INF/MANIFEST.MF');
+      if (mf && mf.ok) { const p = parseManifestMf(mf.content); out.name = out.name || p.name; out.version = out.version || p.version; }
+    }
     return out;
   };
   const neo = read('META-INF/neoforge.mods.toml');
@@ -141,6 +192,9 @@ function classifyJar(read, fileName) {
     out.loader = 'neoforge';
     const mid = String(neo.content).match(/modId\s*=\s*["']([^"']+)["']/i);
     if (mid) out.modId = mid[1];
+    const ni = parseTomlModInfo(neo.content);
+    if (ni.modId) out.modId = ni.modId;
+    out.name = ni.name || null; out.version = ni.version || null;
     out.dependencies = parseTomlDependencies(neo.content);
     // displayTest is a WEAK side hint (it primarily controls the version-mismatch warning):
     //   IGNORE_SERVER_VERSION / IGNORE_ALL_VERSION -> the mod does not need to be on the server.
@@ -154,6 +208,9 @@ function classifyJar(read, fileName) {
     out.loader = 'forge';
     const mid = String(forge.content).match(/modId\s*=\s*["']([^"']+)["']/i);
     if (mid) out.modId = mid[1];
+    const fi = parseTomlModInfo(forge.content);
+    if (fi.modId) out.modId = fi.modId;
+    out.name = fi.name || null; out.version = fi.version || null;
     out.dependencies = parseTomlDependencies(forge.content);
     return finish();
   }
@@ -163,6 +220,7 @@ function classifyJar(read, fileName) {
     try {
       const j = JSON.parse(fab.content);
       out.modId = j.id || null;
+      out.name = j.name || null; out.version = j.version || null;
       out.env = normalizeEnv(null, fabricEnv(j));
       out.dependencies = parseFabricDependencies(j);
     } catch { /* malformed json -> keep empty deps */ }
@@ -174,4 +232,4 @@ function classifyJar(read, fileName) {
   return finish();
 }
 
-module.exports = { parseTomlDependencies, parseFabricDependencies, classifyJar, fabricEnv, normalizeEnv, modIdFromFilename, loaderFromFilename };
+module.exports = { parseTomlDependencies, parseFabricDependencies, classifyJar, fabricEnv, normalizeEnv, modIdFromFilename, loaderFromFilename, parseTomlModInfo, parsePluginYml, parseManifestMf };
