@@ -55,6 +55,17 @@ async function gotoTab(win, tab) {
   await win.locator(`#${tab}`).waitFor({ state: 'visible' });
 }
 
+// Pick a value on a <select> that may have been enhanced into a custom dropdown (00-dropdown.js
+// hides the native select with .ol-select-native, so Playwright's selectOption() can no longer see
+// it). Set the value directly and fire a bubbling 'change' — exactly what the custom dropdown does
+// when an option is clicked, and what the app's own onchange handlers listen for.
+async function selectByValue(win, selector, value) {
+  await win.locator(selector).evaluate((el, v) => {
+    el.value = v;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
 // Create a throwaway "server" folder with the files the Content / Editor / Properties /
 // World Map tabs read, so those flows can be driven without a real Minecraft server or
 // any network access. Returns the absolute path (also usable as settings.serverPath).
@@ -83,4 +94,4 @@ function cleanupFixture(root) {
   try { fs.rmSync(root, { recursive: true, force: true }); } catch {}
 }
 
-module.exports = { launchApp, closeApp, getRendererErrors, gotoTab, makeFixtureServer, cleanupFixture };
+module.exports = { launchApp, closeApp, getRendererErrors, gotoTab, selectByValue, makeFixtureServer, cleanupFixture };

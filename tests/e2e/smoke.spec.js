@@ -1,7 +1,7 @@
 // E2E smoke tests for the renderer. These launch the real Electron app (isolated user-data
 // dir) and assert the UI boots and the main tabs render. Run with `npm run test:e2e`.
 const { test, expect } = require('@playwright/test');
-const { launchApp, closeApp } = require('./helpers');
+const { launchApp, closeApp, selectByValue } = require('./helpers');
 
 // A fresh user-data dir means onboarding is not completed, so the welcome modal shows first.
 // Dismiss it so the tabs are reachable (the modal covers the app).
@@ -44,7 +44,7 @@ test('World Map and Settings tabs open', async () => {
 
 test('language switch updates the UI strings', async () => {
   await win.locator('.nav-item[data-tab="settings"]').click();
-  await win.locator('#languageSelect').selectOption('vi');
+  await selectByValue(win, '#languageSelect', 'vi');
   await expect(win.locator('#pageTitle')).toHaveText(/Cài đặt/i);
-  await win.locator('#languageSelect').selectOption('en');
+  await selectByValue(win, '#languageSelect', 'en');
 });

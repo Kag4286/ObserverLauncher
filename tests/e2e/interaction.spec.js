@@ -6,7 +6,7 @@
 // Run with `npm run test:e2e`. One shared app instance (workers:1) keeps the suite fast;
 // tests reset any state they change.
 const { test, expect } = require('@playwright/test');
-const { launchApp, closeApp, getRendererErrors, gotoTab, makeFixtureServer, cleanupFixture } = require('./helpers');
+const { launchApp, closeApp, getRendererErrors, gotoTab, selectByValue, makeFixtureServer, cleanupFixture } = require('./helpers');
 
 let app, win, userDataDir, ctx, fixtureRoot;
 
@@ -80,7 +80,7 @@ test('Settings category nav toggles panes and sizes the glider', async () => {
 
 test('language switch re-derives the JS-owned page title when changing tabs', async () => {
   await gotoTab(win, 'settings');
-  await win.locator('#languageSelect').selectOption('vi');
+  await selectByValue(win, '#languageSelect', 'vi');
 
   const titleSettings = await win.locator('#pageTitle').innerText();
   await gotoTab(win, 'console');
@@ -94,12 +94,12 @@ test('language switch re-derives the JS-owned page title when changing tabs', as
 
   // #languageSelect only exists on the Settings tab, so switch back before resetting.
   await gotoTab(win, 'settings');
-  await win.locator('#languageSelect').selectOption('en');
+  await selectByValue(win, '#languageSelect', 'en');
 });
 
 test('changing motion level to Lite persists across a renderer reload', async () => {
   await gotoTab(win, 'settings');
-  await win.locator('#motionLevelSelect').selectOption('lite');
+  await selectByValue(win, '#motionLevelSelect', 'lite');
   await win.locator('#saveSettings').click();
   await win.waitForTimeout(400); // let settings:save write settings.json
 
@@ -108,7 +108,7 @@ test('changing motion level to Lite persists across a renderer reload', async ()
 
   // Reset to the default (Full) so later tests see the stock UI.
   await gotoTab(win, 'settings');
-  await win.locator('#motionLevelSelect').selectOption('full');
+  await selectByValue(win, '#motionLevelSelect', 'full');
   await win.locator('#saveSettings').click();
   await win.waitForTimeout(400);
 });
