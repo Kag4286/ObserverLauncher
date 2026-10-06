@@ -217,8 +217,9 @@ function startMcpServer(ctx) {
     // (localhost CSRF / DNS-rebinding): the token already blocks it, but rejecting browser-shaped
     // requests up front removes the attack surface entirely. Non-IP Host values are rebinding.
     if (req.headers['origin']) { res.writeHead(403); return res.end('forbidden'); }
-    const host = String(req.headers['host'] || '').split(':')[0];
-    if (host && host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]' && host !== '::1') {
+    // BUGFIX: use hostFromHeader so an IPv6 Host ('[::1]:8080') is not mis-split to '['.
+    const host = require('../main/validate.js').hostFromHeader(req.headers['host']);
+    if (host && host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') {
       res.writeHead(403); return res.end('forbidden');
     }
     // C2 (v3.0.0): UNAUTHENTICATED /health for container/orchestrator healthchecks (Docker 3.1.0).

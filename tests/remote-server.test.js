@@ -98,6 +98,12 @@ const get = (url, headers) => fetch(url, { headers: headers || {} }).then(async 
   ck('wildcard bind: hostname Host -> 403', (await rawGet(wp, 'evil.example.com', 'Bearer t')) === 403);
   wb.close();
 
+  // BUGFIX regression: an IPv6 loopback Host ('[::1]:port') must NOT be mis-split to '[' (was 403).
+  const lo = createRemoteServer({ token: 't', allow: [], readOnly: true, handlers: { status: async () => ({ ok: 1 }) } });
+  const lp = await lo.listen();
+  ck('ipv6 loopback Host -> 200', (await rawGet(lp, `[::1]:${lp}`, 'Bearer t')) === 200);
+  lo.close();
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

@@ -83,7 +83,8 @@ function createRemoteServer(opts) {
     // SECURITY: reject browser-shaped requests up front (localhost CSRF / DNS-rebinding), same
     // defense-in-depth as the MCP server. The real remote client sends no Origin and connects by IP.
     if (req.headers['origin']) { res.writeHead(403); return res.end('forbidden'); }
-    const hostHdr = String(req.headers['host'] || '').split(':')[0];
+    // BUGFIX: hostFromHeader handles an IPv6 Host ('[::1]:8080') that split(':')[0] would break.
+    const hostHdr = require('./validate.js').hostFromHeader(req.headers['host']);
     // BUGFIX: when the user binds to 0.0.0.0 ("expose directly"), the real client still sends
     // Host: <the actual IP>, never '0.0.0.0' — so the old exact-match guard 403'd EVERY request.
     // A wildcard bind means "accept any local interface", so allow any IP-LITERAL host (still reject

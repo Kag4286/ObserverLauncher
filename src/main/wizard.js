@@ -201,9 +201,19 @@ function registerWizard(ipcMain, ctx) {
   });
 
   // Cancel a wizard download in progress (the AbortController created in wizard:create).
+  // ALSO kill a running BuildTools compile: the abort only stops the download, but Spigot's
+  // BuildTools is a spawned Java process that would otherwise keep compiling (heavy CPU) after the
+  // user pressed Cancel. Mirrors the quit-path killTree in app-lifecycle.js.
   ipcMain.handle('wizard:cancel', async () => {
-    if (ctx.wizardAbort) { try { ctx.wizardAbort.abort(); } catch {} return { ok: true }; }
-    return { ok: false, error: 'No wizard download is running.' };
+    let stopped = false;
+    if (ctx.buildProcess) {
+      try { require('./kill.js').killTree(ctx.buildProcess.pid); } catch {}
+      ctx.buildProcess = null;
+      ctx.appendLog('BuildTools was cancelled — the Spigot build was stopped.', 'system');
+      stopped = true;
+    }
+    if (ctx.wizardAbort) { try { ctx.wizardAbort.abort(); } catch {} stopped = true; }
+    return stopped ? { ok: true } : { ok: false, error: 'No wizard download is running.' };
   });
 
   // D3 (v3.0.0): server templates for the wizard's template picker. PURE (src/main/templates.js) —

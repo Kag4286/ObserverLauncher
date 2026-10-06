@@ -210,8 +210,13 @@ function registerMarketplace(ipcMain, ctx) {
   // for a PAGE of ids so the search itself stays instant: the renderer shows the rows first, then
   // calls this once and patches the cards in place as data arrives. Optimised: a bounded concurrency
   // pool (5 in flight) + two in-memory caches (resource, author) so re-searching/paging is free.
+  // Bounded (LRU-ish) caches: these hold icon URLs / base64 data + author names across the whole
+  // app session, so an unbounded Map would grow on every marketplace browse. Cap at 200 entries and
+  // drop the oldest (Map preserves insertion order) when full.
+  const SPIGOT_CACHE_MAX = 200;
   const spigotResCache = new Map();    // id -> { icon, authorId }
   const spigotAuthorCache = new Map(); // authorId -> name | null
+  const lruSet = (map, key, val) => { if (map.has(key)) map.delete(key); map.set(key, val); if (map.size > SPIGOT_CACHE_MAX) map.delete(map.keys().next().value); };
   async function poolMap(items, limit, fn) {
     const out = new Array(items.length);
     let next = 0;
@@ -232,7 +237,7 @@ function registerMarketplace(ipcMain, ctx) {
           if(raw){ const s = String(raw); icon = s.startsWith('http') ? s : 'https://www.spigotmc.org/' + s.replace(/^\/+/, ''); }
           else if(ic && ic.data) icon = 'data:image/png;base64,' + String(ic.data);
           r = { icon, authorId: (d && d.author && d.author.id != null) ? String(d.author.id) : null };
-          spigotResCache.set(id, r);
+          lruSet(spigotResCache, id, r);
         }
         let author = null;
         if (r.authorId) {
@@ -240,7 +245,7 @@ function registerMarketplace(ipcMain, ctx) {
           else {
             try { const a = await json(`https://api.spiget.org/v2/authors/${encodeURIComponent(r.authorId)}`); author = (a && a.name) || null; }
             catch { author = null; }
-            spigotAuthorCache.set(r.authorId, author);
+            lruSet(spigotAuthorCache, r.authorId, author);
           }
         }
         return { id, icon: r.icon, author };

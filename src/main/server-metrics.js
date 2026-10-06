@@ -128,6 +128,10 @@ function startMetrics(ctx) {
   ctx.sampleTimer = setInterval(async () => {
     // Snapshot the ids first: seedInstances may replace ctx.instances mid-tick.
     const ids = [...ctx.instances.keys()];
+    // Evict counters for instances that were removed, so the map cannot grow forever when the
+    // user adds/removes instances repeatedly. (When there are NO instances we fall back to one
+    // synthetic id below, so only evict when the real set is non-empty.)
+    if (ids.length) { const live = new Set(ids); for (const k of states.keys()) if (!live.has(k)) states.delete(k); }
     if (!ids.length) ids.push(ctx.inst());
     for (const id of ids) {
       const st = stateOf(id);

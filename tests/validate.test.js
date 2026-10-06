@@ -9,6 +9,7 @@ const {
   isSafeArchiveEntry,
   isSafeWorldName,
   isSafeUuid,
+  hostFromHeader,
 } = require('../src/main/validate.js');
 
 let passed = 0;
@@ -80,5 +81,15 @@ ok('uuid short rejected', isSafeUuid('abc') === false);
 ok('uuid empty rejected', isSafeUuid('') === false);
 ok('uuid null rejected', isSafeUuid(null) === false);
 ok('uuid non-hex rejected', isSafeUuid('zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz') === false);
+
+// hostFromHeader: the Host-header host parser (MCP + remote guards).
+ok('host: plain ipv4', hostFromHeader('127.0.0.1') === '127.0.0.1');
+ok('host: ipv4 with port', hostFromHeader('127.0.0.1:8080') === '127.0.0.1');
+ok('host: localhost', hostFromHeader('localhost:8000') === 'localhost');
+ok('host: ipv6 literal with port', hostFromHeader('[::1]:8080') === '::1');
+ok('host: ipv6 literal no port', hostFromHeader('[::1]') === '::1');
+ok('host: hostname', hostFromHeader('evil.example.com') === 'evil.example.com');
+ok('host: empty', hostFromHeader('') === '');
+ok('host: null -> empty', hostFromHeader(null) === '');
 
 console.log(`\n${passed} passed, 0 failed`);

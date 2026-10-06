@@ -117,9 +117,21 @@ function isSafeIp(ip) {
   return false;
 }
 
+// Extract the hostname from an HTTP Host header WITHOUT the naive split(':')[0] trap: an IPv6
+// literal arrives as '[::1]:8080', where split(':')[0] yields '[' (wrong). Strip the port first,
+// then the surrounding brackets for IPv6. Returns '' when absent.
+function hostFromHeader(hostHeader) {
+  let h = String(hostHeader || '').trim();
+  if (!h) return '';
+  if (h.startsWith('[')) { const end = h.indexOf(']'); return end >= 0 ? h.slice(1, end) : h.slice(1); }
+  const colon = h.indexOf(':');
+  return colon >= 0 ? h.slice(0, colon) : h;
+}
+
 module.exports = {
   isValidPort,
   isSafeIp,
+  hostFromHeader,
   isSafePlayerName,
   isSafeReason,
   isSafeConsoleCommand,
