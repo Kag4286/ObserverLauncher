@@ -13,10 +13,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
 ## [4.0.0] — 2026-10-06
 
 **Major GUI/UX redesign + MCP hardening.** v4.0.0 is a visual and UX reset of the whole launcher
-(new design system, docs/DESIGN.md) plus the MCP install-safety fixes that landed first.
+(new design system, DESIGN.md) plus the MCP install-safety fixes that landed first.
 
 ### Added — design system + redesign (v4.0.0)
-- **`docs/DESIGN.md`** — the executable design system: color/type/shape/depth/spacing tokens, a token
+- **`DESIGN.md`** — the executable design system: color/type/shape/depth/spacing tokens, a token
   migration map, motion contract, i18n contract, a component catalogue, and per-tab specs.
 - **New token layer** in `01-tokens.css`: warm near-black surfaces, an **emerald brand**
   (`--brand #22C55E`, replaced the old cyan identity), soft radii (`--r-xs`..`--r-xl`), an 8px spacing
