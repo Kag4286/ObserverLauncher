@@ -95,3 +95,106 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
 $$('#contentSeg .seg').forEach(b=>b.onclick=()=>setContentKind(b.dataset.ckind));
 $('#contentFilter')?.addEventListener('input',filterContentList);
 $('#contentCheckUpdates')?.addEventListener('click',e=>loadContentUpdates(e.currentTarget));
+
+// ============ v4.0.0 CONTENT UX: reveal + right-click ============
+// The three lists share a delegation root so a row can be revealed in the OS file manager
+// (double-click) or given a context menu (right-click) without re-binding per render.
+const CONTENT_LIST_SEL='#pluginsList,#modsList,#datapacksList';
+function contentRelPath(li){
+  const list=li.closest('ul');
+  const kind=(list&&list.dataset.dkKind)||'plugin';
+  const name=li.dataset.name;
+  if(!name)return null;
+  const folder=CONTENT_META[kind]?CONTENT_META[kind].folder:'plugins';
+  return { rel:folder+'/'+name, name, kind };
+}
+$$(CONTENT_LIST_SEL).forEach(list=>{
+  // Double-click a row -> show the file in Explorer/Finder (highlighted).
+  list.addEventListener('dblclick',e=>{
+    const li=e.target.closest('li[data-name]');if(!li)return;
+    const p=contentRelPath(li);if(!p)return;
+    window.observer.revealFiles(p.rel);
+  });
+  // Right-click a row -> a small context menu with the same actions the row already exposes.
+  list.addEventListener('contextmenu',e=>{
+    const li=e.target.closest('li[data-name]');if(!li)return;
+    const p=contentRelPath(li);if(!p)return;
+    e.preventDefault();
+    openContentMenu(e.clientX,e.clientY,p,li);
+  });
+});
+function closeContentMenu(){const m=$('#contentCtx');if(m)m.remove()}
+function openContentMenu(x,y,p,li){
+  closeContentMenu();
+  const off=li.classList.contains('is-disabled');
+  const info=(state.contentUpdates&&state.contentUpdates.byFile&&state.contentUpdates.byFile[p.name])||null;
+  const hasUpdate=info&&info.status==='update'&&!off;
+  const menu=document.createElement('div');
+  menu.id='contentCtx';menu.className='ctx-menu';menu.setAttribute('role','menu');
+  // Each entry: [label, action, extraClass]. Actions reuse the row's OWN buttons so every guard
+  // (confirm dialogs, running-server checks) stays in ONE place — never re-implemented here.
+  const entries=[
+    [t('cnt.reveal'),()=>window.observer.revealFiles(p.rel),''],
+    hasUpdate?[t('cnt.update'),()=>li.querySelector('[data-update-content]')?.click(),'']:null,
+    [t(off?'cnt.enable':'cnt.disable'),()=>li.querySelector('[data-toggle-content]')?.click(),''],
+    [t('cnt.delete'),()=>li.querySelector('[data-delete-content]')?.click(),'danger'],
+  ].filter(Boolean);
+  entries.forEach(([label,fn,cls])=>{
+    const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;if(cls)b.className=cls;
+    b.onclick=()=>{closeContentMenu();fn();};
+    menu.appendChild(b);
+  });
+  // Keep it on-screen.
+  menu.style.left=Math.min(x,innerWidth-200)+'px';
+  menu.style.top=Math.min(y,innerHeight-160)+'px';
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('pointerdown',closeContentMenu,{once:true}),0);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeContentMenu()});
+// ============ v4.0.0 dropdown menus (+ Add / More) ============
+// WHY a portal: a menu inside the scrollable <main> gets CLIPPED, and position:fixed inside an
+// animated/transformed ancestor is anchored wrong. So on open the menu-body is MOVED to
+// <body> (position:fixed against the viewport), placed under its button, and moved back on close.
+// The menu-body gets PORTALED to <body>, so after that it is no longer a descendant of d — cache the
+// references once (else querySelector would return null after opening and the menu could never close).
+function menuParts(d){
+  if(!d._mBtn) d._mBtn = d.querySelector('.menu-summary');
+  if(!d._mBody) d._mBody = d.querySelector('.menu-body');
+  return { body: d._mBody, btn: d._mBtn };
+}
+function closeMenu(d){
+  const { body, btn } = menuParts(d);
+  if(!body || body.hidden) return;
+  body.hidden = true;
+  if(btn) btn.setAttribute('aria-expanded','false');
+  if(body.parentElement === document.body) d.appendChild(body); // move home
+}
+function closeMenus(except){ $$('.menu').forEach(d=>{ if(d!==except) closeMenu(d); }); }
+function openMenu(d){
+  const { body, btn } = menuParts(d);
+  if(!body || !btn || !body.hidden) return;
+  closeMenus(d);
+  document.body.appendChild(body); // PORTAL: escape any clipping ancestor
+  body.hidden = false;
+  btn.setAttribute('aria-expanded','true');
+  const r = btn.getBoundingClientRect();
+  const w = body.offsetWidth || 210, h = body.offsetHeight || 120;
+  body.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  body.style.top  = (r.bottom + 6 + h > innerHeight ? r.top - h - 6 : r.bottom + 6) + 'px';
+}
+$$('.menu').forEach(d=>{
+  const { btn } = menuParts(d);
+  if(!btn) return;
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const { body } = menuParts(d);
+    if(body && body.hidden) openMenu(d); else closeMenu(d);
+  });
+});
+// Close on outside click, Escape, scroll or resize.
+// The menu-body is portaled to <body>, so an item click no longer matches .menu — exclude it too,
+// or the pointerdown would close the menu before the item's click fires.
+document.addEventListener('pointerdown',e=>{ if(!e.target.closest('.menu') && !e.target.closest('.menu-body')) closeMenus(null); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeMenus(null); });
+window.addEventListener('resize',()=>closeMenus(null));
+window.addEventListener('scroll',()=>closeMenus(null),true);

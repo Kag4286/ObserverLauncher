@@ -84,6 +84,20 @@ const get = (url, headers) => fetch(url, { headers: headers || {} }).then(async 
   ck('IP outside allowlist -> 403', ar.status === 403);
   al.close();
 
+  // BUGFIX regression: a 0.0.0.0 (wildcard) bind must accept a request whose Host is the REAL IP
+  // (a client never sends Host: 0.0.0.0). A hostname Host must still be rejected (DNS-rebinding).
+  // NOTE: fetch() silently DROPS a Host header (forbidden header) so we use a raw http request.
+  const http = require('http');
+  const rawGet = (port, hostHeader, authHeader) => new Promise(res => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/status', method: 'GET', headers: { host: hostHeader, authorization: authHeader } }, r => { r.resume(); r.on('end', () => res(r.statusCode)); });
+    req.on('error', () => res(0)); req.end();
+  });
+  const wb = createRemoteServer({ token: 't', allow: [], readOnly: true, bind: '0.0.0.0', handlers: { status: async () => ({ ok: 1 }) } });
+  const wp = await wb.listen();
+  ck('wildcard bind: real-IP Host -> 200', (await rawGet(wp, `192.168.1.5:${wp}`, 'Bearer t')) === 200);
+  ck('wildcard bind: hostname Host -> 403', (await rawGet(wp, 'evil.example.com', 'Bearer t')) === 403);
+  wb.close();
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

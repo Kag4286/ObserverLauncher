@@ -1,6 +1,8 @@
 // js/07-overview.js — split from app.js (lines 999-1126); classic script, load in numeric order.
 // Overview + Performance + Settings panels rendering.
 let uptimeStart=null;
+// v4.0.0: the Overview connect panel auto-opens once per server run (see refreshUI).
+let ovConnectAutoOpened=false;
 // BUGFIX: the server.properties / velocity.toml editors used to be re-rendered on EVERY refreshUI()
 // call (each incoming server:files / server:state event — a whitelist toggle, start/stop, etc.),
 // silently wiping whatever the user had typed but not applied yet. While this flag is set, refreshUI
@@ -44,7 +46,7 @@ function renderPerfDiagnostics(){
   n.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>command(b.dataset.command));
   n.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));
 }
-function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';const cfk=$('#cfKeyInput');if(cfk)cfk.value=s.curseforgeApiKey||'';if($('#autoTunnelInput'))$('#autoTunnelInput').checked=!!s.autoTunnel;const ml=$('#motionLevelSelect');if(ml)ml.value=s.motionLevel||'full';applyMotionLevel(s.motionLevel||'full');if($('#autoTunnelQuick'))$('#autoTunnelQuick').checked=!!s.autoTunnel;$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;if($('#backupRetentionInput'))$('#backupRetentionInput').value=s.backupRetention??10;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);syncRemoteFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=`Your system has about ${state.systemMemoryGB} GB of RAM. When set, JVM args override the two memory fields above.`;$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():'Your Minecraft server';$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):t('ov.hintNone')))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
+function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';const cfk=$('#cfKeyInput');if(cfk)cfk.value=s.curseforgeApiKey||'';if($('#autoTunnelInput'))$('#autoTunnelInput').checked=!!s.autoTunnel;const ml=$('#motionLevelSelect');if(ml)ml.value=s.motionLevel||'full';applyMotionLevel(s.motionLevel||'full');if($('#autoCheckUpdatesInput'))$('#autoCheckUpdatesInput').checked=s.autoCheckUpdates!==false;if($('#autoTunnelQuick'))$('#autoTunnelQuick').checked=!!s.autoTunnel;$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;if($('#backupRetentionInput'))$('#backupRetentionInput').value=s.backupRetention??10;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);syncRemoteFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=`Your system has about ${state.systemMemoryGB} GB of RAM. When set, JVM args override the two memory fields above.`;$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():'Your Minecraft server';$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):t('ov.hintNone')))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
   const proxy=isProxyServer();$('#eulaStatus').textContent=proxy?t('ov.eulaProxy'):(state.eulaAccepted?t('set.eulaOk').replace('✓ ',''):t('ov.eulaPending'));
   $('#worldsProxyNotice').hidden=!proxy;$('#playersProxyNotice').hidden=!proxy;
   $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
@@ -120,6 +122,17 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   // escape hatch when graceful Stop hangs or was already requested.
   const forceBtn=$('#forceStopBtn');if(forceBtn)forceBtn.disabled=state.status==='stopped';
   if(welcomeCard) welcomeCard.classList.toggle('needs-attention', !hasFolder || !hasJar);
+  // v4.0.0 Overview hero: ONE obvious action in the hero (DESIGN.md 15). No folder -> Choose/Create;
+  // a folder -> Start (stopped) or Open console (running). The top-bar Start is the permanent
+  // control; the hero button reuses it (single start path, like perfStartBtn).
+  const heroStart=$('#heroStartBtn'), heroConsole=$('#heroConsoleBtn'), heroChoose=$('#chooseFolder'), heroCreate=$('#welcomeCreateBtn');
+  if(heroChoose)heroChoose.hidden=hasFolder; if(heroCreate)heroCreate.hidden=hasFolder;
+  if(heroStart){heroStart.hidden=!hasFolder||state.status!=='stopped'; heroStart.disabled=!canStart; heroStart.title=(startBtn&&startBtn.title)||'';}
+  if(heroConsole)heroConsole.hidden=!hasFolder||!(state.status==='running'||state.status==='starting'||state.status==='stopping');
+  // Connect panel auto-opens ONCE when the server starts so the LAN address is right there to share;
+  // the user can then collapse it and we never force it back open.
+  const cp=$('#connectPanel');
+  if(cp){ if(state.running&&hasFolder&&!ovConnectAutoOpened){cp.open=true;ovConnectAutoOpened=true} else if(!state.running){ovConnectAutoOpened=false} }
   // UX (1.1.0): a brand-new user with no folder gets a clean Overview — just the
   // hero + one choice (Choose / Create). Charts, quick actions and the connect/tunnel
   // panels are hidden until a server folder exists, so an empty first screen never
@@ -201,12 +214,17 @@ function syncMcpFields(s){
   if(st){st.textContent=m.running?t('mcp.running',{p:m.port}):t('mcp.stopped');st.style.color=m.running?'var(--success)':'var(--text-dim)'}
   const pill=$('#mcpPill');
   if(pill){pill.textContent=m.running?t('mcp.live'):t('mcp.off');pill.className='mcp-pill'+(m.running?' on':'')}
+  const prev=$('#mcpConfigPreview');
+  if(prev)prev.textContent=mcpConfigText();
 }
-$('#mcpCopyConfig')?.addEventListener('click',async()=>{
+// The MCP client config JSON — shared by the copy buttons + the in-app preview.
+function mcpConfigText(){
   const c=(state.mcp&&state.mcp.config)||{command:'<path-to-ObserverLauncher>',args:['<userData>/mcp/bridge.js'],env:{ELECTRON_RUN_AS_NODE:'1',OBSERVER_MCP_USERDATA:'<userData>'}};
-  const cfg={mcpServers:{observerlauncher:c}};
-  try{await navigator.clipboard.writeText(JSON.stringify(cfg,null,2));toast(t('mcp.copied'),'success')}catch{toast('Copy failed','error')}
-});
+  return JSON.stringify({mcpServers:{observerlauncher:c}},null,2);
+}
+async function copyMcpConfig(){try{await navigator.clipboard.writeText(mcpConfigText());toast(t('mcp.copied'),'success')}catch{toast('Copy failed','error')}}
+$('#mcpCopyConfig')?.addEventListener('click',copyMcpConfig);
+$('#mcpCopyConfig2')?.addEventListener('click',copyMcpConfig);
 // 3.3.0 remote access: reflect the toggles + show live status and the addresses to copy.
 function syncRemoteFields(s){
   s=s||state.settings||{};
@@ -220,7 +238,18 @@ function syncRemoteFields(s){
   if(st){st.textContent=m.running?t('remote.running',{p:m.port}):t('remote.stopped');st.style.color=m.running?'var(--success)':'var(--text-dim)'}
   const pill=$('#remotePill');if(pill){pill.textContent=m.running?t('mcp.live'):t('mcp.off');pill.className='mcp-pill'+(m.running?' on':'')}
   renderRemoteAddresses(m);
+  updateRemoteWildWarn();
 }
+// v4.0.0: warn when bound off-loopback with an EMPTY allowlist (token-only protection).
+function updateRemoteWildWarn(){
+  const w=$('#remoteWildWarn');if(!w)return;
+  const en=$('#remoteEnabledInput');const bind=String($('#remoteBindInput')?.value||'').trim();
+  const allow=String($('#remoteAllowInput')?.value||'').trim();
+  const offLoop=bind && bind!=='127.0.0.1' && bind!=='localhost' && bind!=='::1';
+  w.hidden=!(en&&en.checked&&offLoop&&!allow);
+}
+// Live-update the warning as the user edits enable / bind / allow (wired once).
+['remoteEnabledInput','remoteBindInput','remoteAllowInput'].forEach(id=>{const el=$('#'+id);if(el&&!el._wildWired){el._wildWired=true;el.addEventListener('input',updateRemoteWildWarn);el.addEventListener('change',updateRemoteWildWarn);}});
 function renderRemoteAddresses(m){
   const box=$('#remoteAddresses');if(!box)return;
   const addrs=(m&&m.addresses)||[];
@@ -247,11 +276,11 @@ $$('.backup-chip-row .filter-chip').forEach(chip=>chip.onclick=()=>{
   $('#autoBackupMinutesInput').value=v;syncBackupChips(Number(v));
 });
 $('#autoBackupCustomInput')?.addEventListener('input',()=>{$('#autoBackupMinutesInput').value=Number($('#autoBackupCustomInput').value)||0});
-function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),curseforgeApiKey:($('#cfKeyInput')?.value||'').trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,remoteEnabled:$('#remoteEnabledInput')?.checked||false,remoteReadOnly:$('#remoteReadOnlyInput')?.checked||false,remoteAllow:($('#remoteAllowInput')?.value||'').trim(),remotePort:Number($('#remotePortInput')?.value)||0,remoteBind:($('#remoteBindInput')?.value||'').trim(),motionLevel:$('#motionLevelSelect')?.value||'full',locale:$('#languageSelect').value}}
+function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),curseforgeApiKey:($('#cfKeyInput')?.value||'').trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,remoteEnabled:$('#remoteEnabledInput')?.checked||false,remoteReadOnly:$('#remoteReadOnlyInput')?.checked||false,remoteAllow:($('#remoteAllowInput')?.value||'').trim(),remotePort:Number($('#remotePortInput')?.value)||0,remoteBind:($('#remoteBindInput')?.value||'').trim(),motionLevel:$('#motionLevelSelect')?.value||'full',autoCheckUpdates:$('#autoCheckUpdatesInput')?.checked!==false,locale:$('#languageSelect').value}}
 // Launcher settings polish: an "unsaved changes" dot on Apply, a folder health line and a live
 // preview of the exact command line the launcher will run for this server.
 let settingsDirty=false;
-function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty)}
+function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
 function markSettingsSaved(){settingsDirty=false;updateApplyDirty()}
 // 2.2.0 (Java D): fill the 'Installed runtimes' pick-list from java:list. Hidden with 0-1 runtimes.
 let _javaRuntimes=null;
@@ -281,23 +310,14 @@ function renderJvmPreview(){
 (function(){
   const seg=$('#settingsSeg'); if(!seg) return;
   const btns=[...seg.querySelectorAll('.seg-switch-btn')];
-  const glider=seg.querySelector('.seg-switch-glider');
   const panes=[...document.querySelectorAll('#settings .set-pane')];
-  // BUGFIX: the Settings tab is display:none until the user opens it, so at boot
-  // the buttons measure 0px — the glider got width:0 and never showed until a click.
-  // Guard against zero-size writes, and re-measure whenever the switch becomes
-  // visible/laid-out (ResizeObserver fires when the hidden tab is shown).
-  function move(btn){ if(!glider||!btn) return; const w=btn.offsetWidth; if(!w) return; glider.style.left=btn.offsetLeft+'px'; glider.style.width=w+'px'; }
-  function current(){ return btns.find(b=>b.classList.contains('active'))||btns[0]; }
+  // v4.0.0: no JS glider any more — the active state is pure CSS (.settings-nav .seg-switch-btn.active),
+  // so it can never mis-measure on a hidden tab. Switching a pane plays a short entrance animation.
   function selectView(view){
     btns.forEach(b=>{const on=b.dataset.setView===view;b.classList.toggle('active',on);b.setAttribute('aria-selected',on?'true':'false')});
-    panes.forEach(p=>{const on=p.dataset.setPane===view;p.hidden=!on});
-    move(btns.find(b=>b.dataset.setView===view));
+    panes.forEach(p=>{const on=p.dataset.setPane===view;p.hidden=!on;if(on){p.classList.remove('pane-in');void p.offsetWidth;p.classList.add('pane-in')}});
   }
   btns.forEach(b=>b.addEventListener('click',()=>selectView(b.dataset.setView)));
-  window.addEventListener('resize',()=>move(current()));
-  if(typeof ResizeObserver==='function'){ new ResizeObserver(()=>move(current())).observe(seg); }
-  requestAnimationFrame(()=>move(current()));
 })();
 (function(){
   const sec=$('#settings');if(!sec)return;

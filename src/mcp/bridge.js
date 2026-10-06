@@ -207,7 +207,7 @@ const STATIC_TOOLS = [
   ['set_schedule', 'Set the server schedule.'],
   ['kick_player', 'Kick an online player.'],
   ['search_modpacks', 'Search Modrinth for installable modpacks.'],
-  ['install_from_market', 'Install a plugin/mod/datapack/modpack from Modrinth, Hangar or Spigot.'],
+  ['install_from_market', 'Install a plugin/mod/datapack/modpack from Modrinth, Hangar, Spigot or CurseForge. Refuses a loader/MC mismatch or a downgrade unless force/allowDowngrade.'],
   ['install_local_jar', 'Copy a local .jar into plugins/mods.'],
   ['import_modpack_path', 'Import a .mrpack from a local path.'],
   ['export_modpack', 'Export current setup to a .mrpack at a path.'],

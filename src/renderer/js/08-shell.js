@@ -425,6 +425,9 @@ $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value
 // Performance tab: offline banner CTA reuses the main Start button so there is
 // exactly one start path (same guards, same toasts, no duplicated logic).
 $('#perfStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
+// v4.0.0 Overview hero: reuse the single Start path; Open console jumps to the console tab.
+$('#heroStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
+$('#heroConsoleBtn')?.addEventListener('click',()=>switchTab('console'));
 // Properties tab (search/filter/save) moved to 10-properties.js.
 $('#createBackup').onclick=()=>withBusy($('#createBackup'),async()=>{if(!await confirmDialog({title:t('wld.backupsT'),body:t('toast.confirmBackup'),ok:t('wld.create')}))return;const r=await window.observer.createBackup();if(r.ok){state.files=r.files;refreshUI();toast(`Backup created: ${r.name}`)}else toast(r.error)});
 // Marketplace state moved to 11-market.js.

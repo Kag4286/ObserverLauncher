@@ -28,6 +28,21 @@ function registerContent(ipcMain, ctx) {
     return true;
   });
 
+  // v4.0.0 UX: reveal a file/dir IN the OS file manager (Explorer/Finder highlights it).
+  // Unlike files:open (which launches the default app for a file), this shows the containing
+  // folder with the item selected — the natural "where is this on disk?" action. Path is
+  // confined to the server root via safeTarget; a plain folder opens directly.
+  ipcMain.handle('files:reveal', async (_, relative) => {
+    const target = safeTarget(ctx.currentServerPath, relative);
+    if (!target || !fs.existsSync(target)) return { ok: false };
+    try {
+      const { shell } = require('electron'); // GUI-only
+      if (fs.statSync(target).isDirectory()) await shell.openPath(target);
+      else shell.showItemInFolder(target);
+      return { ok: true };
+    } catch { return { ok: false }; }
+  });
+
   ipcMain.handle('properties:save', async (_, props) => {
     if (!ctx.currentServerPath) return { ok: false };
     // SECURITY: cap the total size so a runaway/oversized payload can't write a huge file.

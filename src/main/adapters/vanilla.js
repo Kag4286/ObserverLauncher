@@ -7,7 +7,9 @@ const { json } = require('../http.js');
 // caller (main.js) is responsible for the actual download() call and the IPC response shape.
 async function resolve(version) {
   const manifest = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
-  const targetVersion = version || manifest.latest.release;
+  // Treat the literal 'latest' the same as empty so callers can always pass 'latest' (the renderer
+  // falls back to that word before the version list has finished loading).
+  const targetVersion = (!version || version === 'latest') ? manifest.latest.release : version;
   const entry = manifest.versions.find(v => v.id === targetVersion);
   if (!entry) throw new Error(`Could not find Minecraft version "${targetVersion}".`);
   const versionMeta = await json(entry.url);

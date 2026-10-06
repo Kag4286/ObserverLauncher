@@ -184,7 +184,20 @@ async function readPlayerData(root, uuid, name) {
     const offhandItem = raw.find(x => x.Slot === -106); offhand = offhandItem ? stackOf(offhandItem) : null;
   }
   const enderChest = (simple.EnderItems || simple.ender_items || []).map(x => ({ slot: x.Slot, ...stackOf(x) }));
-  return { file, parsed, type: parsed.type, data: { health: simple.Health ?? null, food: simple.foodLevel ?? null, saturation: simple.foodSaturationLevel ?? null, xpLevel: simple.XpLevel ?? 0, xpTotal: simple.XpTotal ?? 0, gameType: simple.playerGameType ?? 0, dimension: simple.Dimension ?? 'unknown', pos: simple.Pos || [], inventory: mainInventory, armor, offhand, enderChest } };
+  // v4.0.0: active potion/status effects live in the NBT `active_effects` list (Id / Amplifier / Duration).
+  const effects = (simple.active_effects || simple.ActiveEffects || []).map(e => ({
+    name: e.Id ?? e.id ?? e.Name ?? 'unknown',
+    amplifier: e.Amplifier ?? e.amplifier ?? 0,
+    duration: e.Duration ?? e.duration ?? 0,
+  }));
+  // v4.0.0: per-player statistics live in <world>/stats/<uuid>.json (a Minecraft stats JSON keyed by
+  // category, e.g. minecraft:custom -> { minecraft:deaths: N }). Read defensively; missing -> {}.
+  let stats = {};
+  try {
+    const statsFile = path.join(path.dirname(file), '..', 'stats', `${path.basename(file).replace(/\.dat$/, '')}.json`);
+    if (fs.existsSync(statsFile)) stats = JSON.parse(fs.readFileSync(statsFile, 'utf8')) || {};
+  } catch { stats = {}; }
+  return { file, parsed, type: parsed.type, data: { health: simple.Health ?? null, food: simple.foodLevel ?? null, saturation: simple.foodSaturationLevel ?? null, xpLevel: simple.XpLevel ?? 0, xpTotal: simple.XpTotal ?? 0, gameType: simple.playerGameType ?? 0, dimension: simple.Dimension ?? 'unknown', pos: simple.Pos || [], inventory: mainInventory, armor, offhand, enderChest, effects, stats } };
 }
 function parseServerLine(text, live, send) {
   // Strip Minecraft color codes (§a) AND ANSI escape codes (\u001b[31m etc.) that servers/plugins inject.

@@ -5,19 +5,10 @@
 .modal{width:min(560px,100%);background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;position:relative;box-shadow:0 18px 40px rgba(0,0,0,.5)}
 .modal.wide{width:min(720px,100%)}
 #newServerModal .modal.wide{width:min(1020px,96%);max-height:94vh;overflow:auto}
-#newServerModal .modal.wide .nsw-card{padding:18px 18px 16px;min-height:160px}
-#newServerModal .modal.wide .nsw-card b{font-size:16px}
-#newServerModal .modal.wide .nsw-card span{font-size:12.5px;line-height:1.4}
-#newServerModal .modal.wide .nsw-card small{font-size:11px}
-#newServerModal .modal.wide .nsw-head{padding-bottom:14px}
-#newServerModal .modal.wide .nsw-intro h2{font-size:20px}
-#newServerModal .modal.wide .nsw-intro p{font-size:12px}
 .modal-close{position:absolute;top:10px;right:10px;border:0;background:transparent;color:var(--text-muted);font-size:20px;cursor:pointer}
 .onboarding-choices{display:grid;gap:10px;margin-top:14px} .onboarding-choice{border:1px solid var(--border);background:var(--panel-raised);border-radius:var(--r);padding:12px;text-align:left;cursor:pointer;display:grid;gap:4px}
 .onboarding-choice:hover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset} .onboarding-choice b{display:flex;gap:8px;align-items:center}
-.nsw-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px} .nsw-dots{display:flex;gap:6px} .nsw-dot{width:8px;height:8px;border-radius:50%;background:var(--border)} .nsw-dot.active{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)} .nsw-dot.done{background:var(--success)}
-.nsw-step{display:none} .nsw-step.active{display:block;animation:fadeIn .14s var(--ease)} .nsw-tabs{display:flex;gap:6px;margin:10px 0} .nsw-tab{padding:7px 12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);border-radius:999px;cursor:pointer} .nsw-tab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.nsw-software-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px} .nsw-card{border:1px solid var(--border);background:var(--panel-raised);border-radius:var(--r);padding:12px;text-align:left;cursor:pointer} .nsw-card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset} .nsw-card b{display:flex;gap:8px;align-items:center}
+.nsw-step{display:none} .nsw-step.active{display:block;animation:fadeIn .14s var(--ease)}
 .nsw-actions{display:flex;justify-content:space-between;margin-top:14px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel-raised);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:999px;font:500 12px var(--font-ui);opacity:0;pointer-events:none;transition:opacity .14s;z-index:60}
 #toast.show{opacity:1} #toast.success{border-color:var(--success);color:var(--success)} #toast.error{border-color:var(--danger);color:var(--danger)}
@@ -52,29 +43,69 @@
 .seg-switch-btn{position:relative;z-index:1;background:none;border:0;cursor:pointer;padding:7px 22px;border-radius:999px;font:600 12.5px var(--font-ui);color:var(--text-dim);transition:color .18s var(--ease-out)}
 .seg-switch-btn:hover{color:var(--text-muted)}
 .seg-switch-btn.active{color:var(--accent-ink)}
-.seg-switch-glider{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:0;border-radius:999px;background:var(--accent);box-shadow:0 0 14px var(--accent-weak);transition:left .26s var(--ease-spring),width .26s var(--ease-spring)}
 .set-pane[hidden]{display:none}
-@media (prefers-reduced-motion: reduce){.seg-switch-glider{transition:none}}
+/* ============ v4.0.0 SETTINGS: category nav + content (was a long scroll + Basic/Advanced seg) ============ */
+.settings-layout{display:grid;grid-template-columns:220px 1fr;gap:var(--space-6);padding:var(--space-5) var(--space-5) var(--space-8);align-items:start}
+.settings-nav{position:sticky;top:var(--space-4);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm)}
+.settings-content{min-width:0;display:flex;flex-direction:column;gap:var(--space-3)}
+/* The nav reuses .seg-switch-btn but is now a VERTICAL list; the glider tracks top/height (JS). */
+.settings-nav .seg-switch-btn{display:flex;align-items:center;padding:11px 14px;border-radius:var(--r-xs);font:600 13px var(--font-ui);color:var(--text-muted);text-align:left;transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
+.settings-nav .seg-switch-btn:hover{color:var(--text);background:var(--surface-2)}
+/* v4.0.0: active state is pure CSS (no JS glider to mis-measure on a hidden tab). */
+.settings-nav .seg-switch-btn.active{color:var(--brand-ink);background:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+.settings-nav .seg-switch-btn.active:hover{background:var(--brand);color:var(--brand-ink)}
+/* Pane switch plays a short rise-in (JS re-adds .pane-in on each switch). */
+.set-pane.pane-in{animation:panelIn var(--dur-modal) var(--ease-out) both}
+@media (prefers-reduced-motion:reduce){.set-pane.pane-in{animation:none}}
+/* Content sections sit flat on the canvas (the old #settings .flat-grid2 rules no longer apply). */
+.settings-content .flat-cell{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:var(--space-5)}
+.settings-content .flat-cell+.flat-cell{margin-top:0}
+/* v4.0.0 Integrations: a light group heading (no box) separates Share / Connect, per DESIGN 2.1. */
+.set-group-head{margin:var(--space-2) 0 0;font:700 11px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+/* v4.0.0: an advanced <details> is a VISIBLE disclosure bar (border + surface bg + brand chevron),
+   so a collapsed section never reads as a static label users skip. Same pattern as .connect-advanced. */
+.set-fold{margin-top:var(--space-3)}
+.set-fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:var(--space-3);font:600 13px var(--font-ui);color:var(--text);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.set-fold>summary::-webkit-details-marker{display:none}
+.set-fold>summary:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.set-fold[open]>summary{border-radius:var(--r-sm) var(--r-sm) 0 0;border-bottom-color:transparent}
+.set-fold>summary .set-chevron{color:var(--brand);font-size:13px}
+.set-fold[open] .set-chevron{transform:rotate(90deg)}
+.set-fold>summary~*{margin-left:var(--space-4);margin-right:var(--space-4)}
+.set-fold>summary+*{margin-top:var(--space-3)}
+.set-fold>summary~*:last-child{margin-bottom:var(--space-4)}
+/* v4.0.0: <details> folds ease open (same pattern as .ov-adv / connect panel). */
+.set-fold{interpolate-size:allow-keywords}
+.set-fold::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
+.set-fold[open]::details-content{block-size:auto}
+.set-fold[open]>summary~*{animation:panelIn var(--dur-modal) var(--ease-out) both}
+@media (prefers-reduced-motion:reduce){.set-fold::details-content{transition:none}.set-fold[open]>summary~*{animation:none}}
+/* v4.0.0: MCP / AI settings pane (own category). Guide steps + config preview + risk tiers. */
+.mcp-steps{margin:var(--space-2) 0 0;padding-left:18px;display:flex;flex-direction:column;gap:var(--space-2)}
+.mcp-steps li{font:500 12.5px var(--font-ui);color:var(--text-muted);line-height:1.5}
+.mcp-cfg{margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-2);align-items:flex-start}
+.mcp-cfg-pre{margin:0;width:100%;max-height:160px;overflow:auto;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:var(--space-3);font:11.5px var(--font-mono);color:var(--text-2);white-space:pre}
+.mcp-tier{display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3) 0}
+.mcp-tier+.mcp-tier{border-top:1px solid var(--border)}
+.mcp-tier-info b{display:block;font:600 12.5px var(--font-ui)}
+.mcp-tier-info small{display:block;margin-top:3px;font:500 11px var(--font-ui);color:var(--text-muted);line-height:1.45}
+.settings-content .set-advanced{padding:0;overflow:hidden}
+/* v4.0.0: "Install Java" was a full-width green bar that dominated the section. Keep it a normal
+   (but primary, so still obvious) button — auto width, not stretched. */
+#settings .btn.wide{width:auto;align-self:flex-start;justify-content:center}
+.settings-content .set-advanced>summary{margin:0;padding:var(--space-4) var(--space-5)}
+#settings .sec-head h3::before{content:none} /* drop the old auto-numbering (nav replaces it) */
+@media(max-width:820px){.settings-layout{grid-template-columns:1fr}.settings-nav{position:static;flex-direction:row;flex-wrap:wrap}}
 /* Settings tab: single vertical column (no more staggered 2-col grid), each section numbered
    for a clear reading order. Scoped to #settings so the Content tab's grid is untouched. */
-#settings .flat-grid2{grid-template-columns:1fr;counter-reset:setgrp}
-#settings .flat-grid2 > .flat-cell{counter-increment:setgrp}
-/* Collapsed <details> sections (Schedule, Updates) don't show a number, so they
-   must not advance the counter either — otherwise the next visible section jumps
-   (e.g. Reliability 04 -> MCP 07). */
-#settings .flat-grid2 > details.flat-cell{counter-increment:none}
-#settings .flat-cell .sec-head h3::before{content:counter(setgrp,decimal-leading-zero);font:700 10px var(--font-mono);letter-spacing:.12em;color:var(--accent-dim);margin-right:9px}
-/* Group headers inside Settings (1.1.0): Setup / Personal / Automation / Advanced.
-   Full-width sticky-free labels that break the long single column into scannable
-   clusters — the tab was 'a mixed pot' of 8 equal sections before. */
-#settings .flat-grid2 > .set-group{grid-column:1/-1;padding:16px 18px 6px;font:700 10px var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);background:var(--panel)}
-#settings .flat-grid2 > .set-group:first-child{padding-top:12px}
-/* Settings: de-emphasise the section subtitle so the numbered h3 leads the eye. */
-#settings .flat-cell .sec-head small{color:var(--text-dim);font-weight:500;opacity:.85}
+/* v4.0.0: the old counter-based section numbering + .set-group headers were removed — the category
+   nav replaces them (see .settings-nav / .settings-content above). */
 /* Settings tab: keep the header (and its Apply button) pinned while scrolling. A sticky child
    is neutralised by an overflow:hidden ancestor, so the wrapper switches to visible here and
    the header supplies its own top rounding to keep the card corners clean. */
-#settings .flat-wrap{overflow:visible}
+/* v4.0.0: drop the outer box — content cards sit directly on the canvas (was box-in-box). */
+#settings .flat-wrap{overflow:visible;background:transparent;border:0;border-radius:0}
+#settings .settings-layout{padding-top:var(--space-2)}
 #settings .flat-head{position:sticky;top:0;z-index:6;border-radius:var(--r) var(--r) 0 0;box-shadow:0 6px 16px rgba(0,0,0,.28)}
 .flat-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;background:var(--panel-raised);border-bottom:1px solid var(--border)}
 .flat-head-id{display:flex;gap:13px;align-items:center;min-width:0}
@@ -123,24 +154,19 @@
 .wld-none span{font:500 11px var(--font-ui);max-width:320px;line-height:1.5}
 
 .wld-tools{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
-.bk-timeline{position:relative;display:flex;flex-direction:column;padding-left:22px;max-height:430px;overflow:auto}
-.bk-timeline::before{content:'';position:absolute;left:26px;top:14px;bottom:14px;width:1.5px;background:var(--border)}
-.bk-row{position:relative;display:flex;gap:10px;align-items:center;padding:9px 8px 9px 10px;border-bottom:1px solid var(--border);transition:background .1s}
-.bk-row:last-child{border-bottom:0}
-.bk-row:hover{background:var(--panel-hover)}
-.bk-row.latest{box-shadow:inset 2px 0 0 var(--success)}
-.bk-dot{position:absolute;left:-19px;width:9px;height:9px;border-radius:50%;background:var(--border-strong);border:2px solid var(--panel);z-index:1}
-.bk-row.latest .bk-dot{background:var(--success);box-shadow:0 0 8px var(--success)}
+/* v4.0.0 backup timeline: flat rows (no timeline spine), latest row gets a brand rail. */
+.bk-timeline{display:flex;flex-direction:column;gap:var(--space-2);max-height:520px;overflow:auto}
+.bk-row{position:relative;display:flex;gap:var(--space-3);align-items:center;padding:var(--space-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.bk-row:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.bk-row.latest{border-color:var(--brand-soft);box-shadow:inset 3px 0 0 var(--brand)}
+.bk-dot{width:10px;height:10px;border-radius:50%;background:var(--border-strong);flex-shrink:0}
+.bk-row.latest .bk-dot{background:var(--brand);box-shadow:0 0 8px var(--brand-glow)}
 .bk-main{flex:1;min-width:0}
-.bk-main b{display:block;font:600 12px var(--font-ui)}
-.bk-main small{display:block;font:500 9.5px var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bk-flag{font:700 8.5px var(--font-mono);letter-spacing:.12em;color:var(--success);font-style:normal;flex-shrink:0}
-.bk-size{font:600 10.5px var(--font-mono);color:var(--text-muted);flex-shrink:0}
-.bk-actions{display:flex;gap:5px;flex-shrink:0}
-.backup-empty{padding:26px 14px;text-align:center;color:var(--text-muted)}
-.backup-empty-icon{display:block;font-size:18px;color:var(--accent-dim);margin-bottom:6px}
-.backup-empty b{color:var(--text);display:block;margin-bottom:4px;font-size:12.5px}
-.backup-empty span{font:500 11px var(--font-ui)}
+.bk-main b{display:block;font:600 13px var(--font-ui);color:var(--text)}
+.bk-main small{display:block;font:500 10px var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-flag{font:700 9px var(--font-mono);letter-spacing:.1em;color:var(--brand);background:var(--brand-soft);border:1px solid var(--brand-soft);border-radius:999px;padding:2px 8px;font-style:normal;flex-shrink:0}
+.bk-size{font:600 11px var(--font-mono);color:var(--text-muted);flex-shrink:0}
+.bk-actions{display:flex;gap:6px;flex-shrink:0}
 
 /* ---------- LAUNCHER SETTINGS (flat sections) ---------- */
 .set-row-input{display:flex;gap:8px}
@@ -154,6 +180,8 @@
 .set-field input{background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:10px 12px;color:var(--text);font:12px var(--font-mono)}
 .set-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .set-toggle{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:7px 0}
+/* v4.0.0: consistent vertical rhythm inside a card (replaces the old inline margin-top:12px). */
+.set-pane .set-toggle+.set-toggle,.set-pane .set-toggle+.set-field,.set-pane .set-field+.set-field,.set-pane .set-toggle+.input-row,.set-pane .set-field+.input-row{margin-top:12px}
 .set-toggle-info{min-width:0}
 .set-toggle-info b{display:block;font:600 12.5px var(--font-ui)}
 .set-toggle-info small{display:block;margin-top:3px;font:500 11px var(--font-ui);color:var(--text-muted);line-height:1.45}
@@ -173,7 +201,7 @@
 .set-progress-label{margin-top:6px;font:500 10.5px var(--font-mono);color:var(--text-muted)}
 #settings .java-notice{margin:0 0 4px}
 .set-advanced{border:0}
-.set-advanced>summary{list-style:none;display:flex;gap:10px;align-items:center;cursor:pointer;margin:-14px -18px;padding:12px 18px}
+.set-advanced>summary{list-style:none;display:flex;gap:10px;align-items:center;cursor:pointer;margin:0;padding:14px 18px}
 .set-advanced>summary::-webkit-details-marker{display:none}
 .set-advanced>summary:hover{background:var(--panel-hover)}
 .set-advanced>summary h3{font-size:12.5px;margin:0}
@@ -181,7 +209,7 @@
 .set-advanced>summary>img{width:22px;height:22px;}
 .set-chevron{margin-left:auto;color:var(--text-dim);transition:transform .15s var(--ease)}
 details[open].set-advanced .set-chevron{transform:rotate(90deg)}
-.set-adv-body{padding-top:12px;margin-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.set-adv-body{padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
 /* Reliability: was 2 columns, but the auto-backup block (chips + custom + retention)
    is wide and wrapped badly in a half-width column ('Keep auto-backups' broke over 2
    lines, the hint over 3). One full-width column per setting reads cleanly. */
@@ -244,8 +272,16 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 @media(max-width:900px){.properties-grid{grid-template-columns:1fr}}
 
 /* ---------- LAUNCHER SETTINGS polish ---------- */
+/* v4.0.0: make "unsaved changes" IMPOSSIBLE to miss — a labelled warning pill next to Apply,
+   plus a pulsing glow on the button (users were skipping the tiny corner dot). */
+.settings-apply{display:flex;align-items:center;gap:var(--space-3)}
+.apply-dirty-hint{font:600 12px var(--font-ui);color:var(--warning);white-space:nowrap}
+.apply-dirty-hint::before{content:'●';margin-right:6px;font-size:10px;vertical-align:middle}
 #saveSettings{position:relative}
-#saveSettings.dirty::after{content:'';position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:var(--warning);box-shadow:0 0 6px var(--warning)}
+#saveSettings.dirty{box-shadow:0 0 0 2px var(--warning-weak),0 0 18px rgba(255,200,87,.35);animation:applyPulse calc(var(--dur-pulse) * 1.4) var(--ease-out) infinite}
+@keyframes applyPulse{0%,100%{box-shadow:0 0 0 2px var(--warning-weak),0 0 14px rgba(255,200,87,.25)}50%{box-shadow:0 0 0 2px var(--warning),0 0 26px rgba(255,200,87,.5)}}
+@media (prefers-reduced-motion:reduce){#saveSettings.dirty{animation:none;box-shadow:0 0 0 2px var(--warning)}}
+html.motion-lite #saveSettings.dirty{animation:none;box-shadow:0 0 0 2px var(--warning)}
 .folder-status{display:block;margin-top:8px}
 .folder-status.ok{color:var(--success)}
 .jvm-preview{margin-top:10px;padding:10px 12px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);font:11px/1.7 var(--font-mono);color:var(--text-muted);word-break:break-all}
@@ -258,7 +294,7 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .im-head-main{flex:1;min-width:0}
 .im-head h2{font-size:17px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .im-head p{font:500 11px var(--font-mono);margin:0}
-.im-kind{flex-shrink:0;font:700 9px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(0,229,255,.35);border-radius:999px;padding:4px 10px;background:var(--accent-weak)}
+.im-kind{flex-shrink:0;font:700 9px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(34,197,94,.35);border-radius:999px;padding:4px 10px;background:var(--accent-weak)}
 .im-desc{font-size:12px;line-height:1.5;margin:10px 0 2px;max-height:52px;overflow:hidden}
 .im-section{margin-top:14px}
 .im-section>.eyebrow{margin-bottom:8px}
@@ -286,7 +322,7 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .ed-head{gap:12px}
 .ed-path{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
 .ed-path b{font:600 12px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ed-ext{font:700 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(0,229,255,.3);border-radius:var(--r-sm);padding:3px 7px;background:var(--accent-weak);flex-shrink:0}
+.ed-ext{font:700 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(34,197,94,.3);border-radius:var(--r-sm);padding:3px 7px;background:var(--accent-weak);flex-shrink:0}
 .ed-dot{color:var(--warning);font-size:14px;line-height:1;animation:imPop .3s var(--ease-spring) both}
 .ed-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap}
 .ed-banners{padding:10px 16px 0;display:flex;flex-direction:column;gap:8px}
@@ -299,7 +335,7 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .ed-highlight{pointer-events:none;color:var(--text);background:transparent}
 .ed-highlight.wrap-on,.ed-text.wrap-on{white-space:pre-wrap;word-break:break-word}
 .ed-text{background:transparent;color:transparent;caret-color:var(--text);resize:none;outline:none;width:100%;height:100%}
-.ed-text::selection{background:rgba(0,229,255,.25)}
+.ed-text::selection{background:rgba(34,197,94,.25)}
 .ed-text[readonly]{cursor:default}
 .ed-text[readonly]~*{}
 .ed-status{display:flex;justify-content:space-between;gap:12px;padding:9px 16px;font:500 10.5px var(--font-mono);color:var(--text-dim);background:rgba(255,255,255,.01)}
@@ -318,17 +354,43 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 /* Content entry strip — prominent, impossible to miss */
 .ed-entry{display:flex;gap:14px;align-items:center;padding:13px 18px;margin-bottom:12px;background:linear-gradient(120deg,var(--panel-raised),var(--panel) 60%);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);cursor:pointer;transition:border-color .12s,transform .12s,box-shadow .12s}
 .ed-entry:hover,.ed-entry:focus-visible{border-color:var(--accent);transform:translateX(2px);box-shadow:0 6px 18px rgba(0,0,0,.25);outline:none}
-.ed-entry-icon{font:700 14px var(--font-mono);color:var(--accent);width:40px;height:40px;display:grid;place-items:center;background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);border-radius:var(--r-sm);flex-shrink:0}
+.ed-entry-icon{font:700 14px var(--font-mono);color:var(--accent);width:40px;height:40px;display:grid;place-items:center;background:var(--accent-weak);border:1px solid rgba(34,197,94,.25);border-radius:var(--r-sm);flex-shrink:0}
 .ed-entry-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .ed-entry-main b{font:600 13px var(--font-ui)}
 .ed-entry-main span{font:500 11.5px var(--font-ui);color:var(--text-muted)}
 .ed-entry-arrow{color:var(--accent);font-size:18px;transition:transform .12s var(--ease)}
 .ed-entry:hover .ed-entry-arrow,.ed-entry:focus-visible .ed-entry-arrow{transform:translateX(4px)}
-#fbList .fb-row{display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
-#fbList .fb-row:hover{background:var(--panel-hover);box-shadow:inset 2px 0 0 var(--accent)}
+#fbList .fb-row{display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--dur-micro) var(--ease-out)}
+#fbList .fb-row:hover{background:var(--surface-3);box-shadow:inset 2px 0 0 var(--brand)}
+/* Editor views (browser / code editor) rise in when opened, matching the tab panel entrance. */
+#fileBrowser:not([hidden]),#fileEditor:not([hidden]){animation:panelIn var(--dur-modal) var(--ease-out) both}
+/* Folder OPEN reveal: only the rows that a just-expanded folder exposes slide out (like a card
+   opening), instead of a whole-list stagger re-running on every render (which read as 'loading').
+   JS marks those rows with .fb-reveal for one render only. */
+#fbList .fb-row.fb-reveal{animation:fbReveal var(--dur-tab) var(--ease-out) both}
+@keyframes fbReveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#fileBrowser:not([hidden]),#fileEditor:not([hidden]),#fbList .fb-row.fb-reveal{animation:none}}
+html.motion-lite #fileBrowser:not([hidden]),html.motion-lite #fileEditor:not([hidden]),html.motion-lite #fbList .fb-row.fb-reveal{animation:none}
 #fbList .fb-row .file-name{flex:1;min-width:0}
 #fbList .fb-row .fb-size{font:600 10px var(--font-mono);color:var(--text-dim);flex-shrink:0}
 #fbList .fb-row .file-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* v4.0.0 type badges: a small fixed chip so files/folders/types read at a glance. */
+#fbList .fb-ico{flex-shrink:0;width:26px;height:22px;display:grid;place-items:center;border-radius:var(--r-xs);font:700 9px var(--font-mono);letter-spacing:.02em;background:var(--surface-3);color:var(--text-muted);border:1px solid var(--border)}
+#fbList .fb-ico-dir{width:22px;height:22px;background:transparent;border:0;position:relative}
+#fbList .fb-ico-dir::before{content:'';width:14px;height:11px;background:var(--brand-soft);border:1.5px solid var(--brand);border-radius:2px;position:absolute;top:7px}
+#fbList .fb-ico-dir::after{content:'';width:6px;height:3px;background:var(--brand);border-radius:2px 2px 0 0;position:absolute;top:4px;left:4px}
+#fbList .fb-row.fb-dir .file-name{color:var(--text);font-weight:600}
+#fbList .fb-ico-json{background:var(--warning-weak);color:var(--warning);border-color:var(--warning-weak)}
+#fbList .fb-ico-yml{background:#8fb8ff22;color:var(--info);border-color:#8fb8ff33}
+#fbList .fb-ico-toml{background:#ff7aa822;color:var(--pink);border-color:#ff7aa833}
+#fbList .fb-ico-cfg{background:var(--surface-3);color:var(--text-2);border-color:var(--border)}
+#fbList .fb-ico-fn{background:var(--brand-soft);color:var(--brand);border-color:var(--brand-soft)}
+#fbList .fb-ico-txt{background:var(--surface-3);color:var(--text-muted);border-color:var(--border)}
+#fbList .fb-ico-log{background:var(--surface-3);color:var(--text-dim);border-color:var(--border)}
+#fbList .fb-ico-jar{background:#ffb86b22;color:var(--orange);border-color:#ffb86b33}
+#fbList .fb-ico-zip{background:#9b8cff22;color:var(--violet);border-color:#9b8cff33}
+#fbList .fb-ico-off{background:var(--danger-weak);color:var(--danger);border-color:var(--danger-weak)}
+#fbList .fb-ico-gen{background:var(--surface-3);color:var(--text-dim);border-color:var(--border)}
 /* Folder rows: a caret + folder name; the size column shows the file count. */
 #fbList .fb-dir{font-weight:600}
 #fbList .fb-dir .fb-caret{width:14px;flex-shrink:0;color:var(--accent-dim);font-size:11px;text-align:center}
@@ -346,7 +408,7 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 @keyframes imSectionIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes imCellIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes imPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}
-@keyframes imPulse{0%,100%{box-shadow:0 0 0 0 var(--accent-weak)}50%{box-shadow:0 0 0 5px rgba(0,229,255,0)}}
+@keyframes imPulse{0%,100%{box-shadow:0 0 0 0 var(--accent-weak)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}
 /* Container enter comes from the universal overlay fade (08-motion.css); keep only the inner
    section stagger so the dialog still 'assembles'. */
 #installModal .im-section{animation:imSectionIn .3s var(--ease) both}
@@ -415,7 +477,7 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
    stay pinned and always visible. */
 .confirm-modal{width:min(440px,100%);padding:0;max-height:calc(100vh - 36px);display:flex;flex-direction:column}
 .confirm-head{display:flex;gap:12px;align-items:center;padding:16px 18px 0;flex-shrink:0}
-.confirm-ico{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);color:var(--accent);font:700 16px var(--font-mono)}
+.confirm-ico{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;background:var(--accent-weak);border:1px solid rgba(34,197,94,.25);color:var(--accent);font:700 16px var(--font-mono)}
 .confirm-ico.danger{background:var(--danger-weak);border-color:rgba(255,59,92,.3);color:var(--danger)}
 .confirm-head h2{font-size:16px}
 .confirm-body{margin:12px 18px 0;color:var(--text-muted);font:500 13px var(--font-ui);line-height:1.55;flex:1 1 auto;min-height:0;overflow:auto;overflow-wrap:anywhere}

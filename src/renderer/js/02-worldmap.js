@@ -310,7 +310,7 @@ function wmDraw(){
   const startWZ=Math.floor(wm.cam.z-H/2/wm.zoom/step)*step,endWZ=wm.cam.z+H/2/wm.zoom;
   for(let z=startWZ;z<=endWZ;z+=step){const[,sy]=toS(0,z);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke()}
   // axes
-  ctx.strokeStyle='rgba(0,229,255,.25)';ctx.lineWidth=1.5;
+  ctx.strokeStyle='rgba(34,197,94,.25)';ctx.lineWidth=1.5;
   const[ax]=toS(0,0);ctx.beginPath();ctx.moveTo(ax,0);ctx.lineTo(ax,H);ctx.stroke();
   const[,ay]=toS(0,0);ctx.beginPath();ctx.moveTo(0,ay);ctx.lineTo(W,ay);ctx.stroke();
   // markers
@@ -689,7 +689,7 @@ function wmDrawMini(force){
   const span=Math.max(maxX-minX,maxZ-minZ,32)*1.12,midX=(minX+maxX)/2,midZ=(minZ+maxZ)/2;
   const toM=(wx,wz)=>[(wx-(midX-span/2))/span*S,(wz-(midZ-span/2))/span*S];
   const dot=Math.max(1,(16/span)*S);
-  ctx.fillStyle='rgba(0,229,255,.28)';
+  ctx.fillStyle='rgba(34,197,94,.28)';
   for(const[ax,az]of pts){const[sx,sy]=toM(ax*16+8,az*16+8);if(sx<0||sx>S||sy<0||sy>S)continue;ctx.fillRect(sx,sy,dot,dot)}
   for(const m of wmVisible()){const[sx,sy]=toM(m.x,m.z);ctx.fillStyle=m.color;ctx.beginPath();ctx.arc(sx,sy,1.8,0,7);ctx.fill()}
   const[vx0,vy0]=toM(wm.cam.x-vw,wm.cam.z-vh),[vx1,vy1]=toM(wm.cam.x+vw,wm.cam.z+vh);

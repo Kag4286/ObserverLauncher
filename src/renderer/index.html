@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"><link rel="stylesheet" href="css/09-pulse.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="assets/fonts/fonts.css"><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"><link rel="stylesheet" href="css/09-pulse.css"><link rel="stylesheet" href="css/10-dropdown.css"></head>
 <body>
 <!-- BOOT SEQUENCE (1.3.0): a ~1.1s 'signal acquisition' on launch — hairline draws, rail items
      slide in, one ping, gone. Click anywhere to skip. Never blocks interaction after it ends. -->
@@ -73,9 +73,14 @@
           <div class="hero-id">
             <b id="serverName">Your Minecraft server</b>
             <p class="hero-sub"><span class="status-pill"><i class="metric-hero-dot status-dot st-offline" id="heroDot" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i><strong id="metricStatus">Offline</strong></span><span id="serverHint">Select your server folder to get started — or create a new one from scratch.</span></p>
-            <p class="hero-meta"><small id="eulaStatus">EULA status unknown</small><span class="srv-sep" aria-hidden="true">·</span><span class="srv-uptime"><span data-i18n="ov.uptime">SESSION UPTIME</span> <b id="heroUptime">—</b></span></p>
+            <p class="hero-meta"><small id="eulaStatus">EULA status unknown</small></p>
           </div>
-          <div class="welcome-actions"><button class="btn secondary" id="chooseFolder" data-i18n="ov.choose">Choose folder</button><button class="btn primary" id="welcomeCreateBtn" data-i18n="ov.create">Create new server</button></div>
+          <div class="welcome-actions">
+            <button class="btn secondary" id="chooseFolder" data-i18n="ov.choose">Choose folder</button>
+            <button class="btn secondary" id="welcomeCreateBtn" data-i18n="ov.create">Create new server</button>
+            <button class="btn primary" id="heroStartBtn" data-i18n="top.start">Start server</button>
+            <button class="btn secondary" id="heroConsoleBtn" data-i18n="ov.openConsole" hidden>Open console</button>
+          </div>
         </div>
         <ul class="hero-steps" id="setupSteps" aria-label="Setup checklist" hidden></ul>
       </div>
@@ -83,9 +88,10 @@
         <span id="javaWarnText" style="flex:1;min-width:200px"></span>
         <button class="btn sm primary" id="javaFixBtn" data-i18n="ov.fixJava">Install Java now</button>
       </div>
-      <article class="panel glass activity"><div class="panel-head"><div><h3 data-i18n="ov.quickTitle">Quick actions</h3><p data-i18n="ov.quickSub">Common server tasks</p></div></div><div class="quick-strip"><button class="quick" data-command="say Server maintenance tools are ready."><span data-i18n="ov.broadcast">Broadcast message</span></button><button class="quick" data-open="plugins"><span data-i18n="ov.managePlugins">Manage plugins / mods</span></button><button class="quick" data-open="world"><span data-i18n="ov.openWorld">Open world folder</span></button><button class="quick" data-tab-jump="properties"><span data-i18n="ov.editProps">Edit server properties</span></button></div></article>
-      <article class="panel glass connect-panel" id="connectPanel">
-        <div class="panel-head"><div><h3 data-i18n="conn.title">How friends can join</h3><p data-i18n="conn.sub">Share one of these addresses so others can connect.</p></div><button class="text-btn" id="refreshConnectInfo" data-i18n="conn.refresh">Refresh</button></div>
+      <details class="panel glass connect-panel" id="connectPanel">
+        <summary class="connect-summary"><span data-i18n="conn.title">How friends can join</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
+        <div class="connect-body">
+        <div class="panel-head"><div><p data-i18n="conn.sub">Share one of these addresses so others can connect.</p></div><button class="text-btn" id="refreshConnectInfo" data-i18n="conn.refresh">Refresh</button></div>
         <div class="connect-grid tuner">
           <div class="connect-channel">
             <div class="connect-channel-head"><span class="connect-dot dot-lan" aria-hidden="true"></span><span data-i18n="conn.local">Same WiFi / network</span></div>
@@ -123,25 +129,26 @@
           </div>
           </div>
         </details>
-      </article>
-      <article class="panel glass ov-stats-panel">
-        <div class="ov-stats-live">
-          <p class="ov-stats-cap" data-i18n="ov.liveNow">Live now</p>
-          <dl class="srv-stats">
-            <div title="Live player list when running"><dt data-i18n="ov.players">PLAYERS ONLINE</dt><dd id="playerCount">—</dd></div>
-            <div><dt>TPS</dt><dd id="tps">—</dd></div>
-            <div title="Java process usage"><dt data-i18n="ov.cpu">SERVER CPU</dt><dd id="overviewCpu">—</dd></div>
-            <div title="Actually used right now"><dt data-i18n="ov.ram">SERVER RAM</dt><dd id="serverRam">—</dd></div>
-            <div class="ov-spark-cell"><dt>TPS · CPU</dt><dd><canvas id="ovSpark" class="ov-spark" width="240" height="40" aria-hidden="true"></canvas></dd></div>
-          </dl>
         </div>
-        <div class="ov-ram-box">
-          <div class="ov-ram-info"><b data-i18n="ov.limit">ALLOCATE RAM (GB)</b><small data-i18n="ov.limitHint">Restart the server to apply a new allocation</small></div>
-          <div class="ov-ram-controls">
-            <input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn primary sm" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button>
+      </details>
+      <!-- v4.0.0: RAM + JVM back on Overview (launch-critical, discoverable) as a collapsing panel. -->
+      <details class="panel glass ov-adv" id="ovAdvanced">
+        <summary class="ov-adv-summary"><span data-i18n="set.memJvmT">Memory &amp; JVM</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
+        <div class="ov-adv-body">
+          <div class="ov-ram-box">
+            <div class="ov-ram-info"><b data-i18n="ov.limit">ALLOCATE RAM (GB)</b><small data-i18n="ov.limitHint">Restart the server to apply a new allocation</small></div>
+            <div class="ov-ram-controls">
+              <input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn primary sm" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button>
+            </div>
           </div>
+          <details class="set-fold">
+            <summary><span data-i18n="set.advT">Advanced — JVM arguments</span><span class="set-chevron">▸</span></summary>
+            <div class="set-row-input mono"><input id="jvmArgsInput" spellcheck="false" placeholder="-Xms4G -Xmx6G -XX:+UseG1GC ..."><button type="button" class="btn secondary" id="applyAikarFlags" data-i18n="set.aikar">Use Aikar's flags</button></div>
+            <div class="jvm-preview" id="jvmPreview" hidden></div>
+            <small id="systemRamHint" class="field-hint" data-i18n="set.advHint">When set, this overrides the two memory fields. Use it for any allocation and Java flags.</small>
+          </details>
         </div>
-      </article>
+      </details>
     </section>
     
     <section id="console" class="tab"><div class="console-layout"><article class="panel glass terminal"><div class="terminal-head"><div class="terminal-title"><span class="live-dot" id="consoleLiveDot"></span><div><h3 data-i18n="con.title">Server console</h3><p data-i18n="con.sub">Live output — auto-scrolls when you're at the bottom</p></div></div><div class="terminal-actions"><span class="live-label" id="consoleLiveLabel">Offline</span><button class="text-btn" id="exportConsole" data-i18n="con.export">Export</button><button class="text-btn" id="clearConsole" data-i18n="con.clear">Clear</button></div></div>      <div class="log-toolbar"><div class="log-search"><input id="logSearch" type="search" autocomplete="off" data-i18n-placeholder="con.searchPh" placeholder="Search logs…" aria-label="Search logs"><button type="button" class="text-btn log-search-clear" id="logSearchClear" hidden aria-label="Clear search">×</button></div><div class="log-filters" role="group" aria-label="Log filters"><button class="filter-chip active" data-log-filter="all" aria-pressed="true" data-i18n="con.filterAll">All</button><button class="filter-chip" data-log-filter="warn" aria-pressed="false" data-i18n="con.filterWarn">Warnings</button><button class="filter-chip" data-log-filter="error" aria-pressed="false" data-i18n="con.filterError">Errors</button><button class="filter-chip" data-log-filter="command" aria-pressed="false" data-i18n="con.filterCmd">Commands</button></div><span class="log-hint" data-i18n="con.tip">Tip: press ↑ / ↓ for history • Ctrl+L clear</span></div><div class="log-wrap"><div id="logOutput" class="log-output" role="log" aria-live="polite" aria-atomic="false" tabindex="0" aria-label="Server console output"><div class="log-empty" id="logEmpty"><b data-i18n="con.empty">No output yet</b><span data-i18n="con.emptySub">Start the server to see logs. You can also try the shortcuts on the right →</span></div></div><button class="log-jump" id="logJump" hidden aria-label="Jump to latest output">↓ New output</button></div><form id="commandForm" class="command-row" aria-label="Send console command"><span class="prompt" aria-hidden="true">›</span><input id="commandInput" autocomplete="off" placeholder="Type a command and hit Enter — e.g. list, say Hello" data-i18n-placeholder="con.placeholder" aria-label="Console command input"><button class="btn primary" data-i18n="con.send" aria-label="Send command">Send</button></form></article><aside class="panel glass command-help"><div class="help-head"><h3 data-i18n="con.shortcuts">Quick commands</h3><p data-i18n="con.asideSub">Click to send — no typing needed</p></div><div class="command-group"><p class="command-group-label" data-i18n="con.diagnostics">Diagnostics</p><div class="help-cards"><button data-command="list"><b>list</b><span data-i18n="con.listDesc">Who's online</span></button><button data-command="tps"><b>tps</b><span data-i18n="con.tpsDesc">Tick health</span></button><button data-command="spark healthreport"><b>spark</b><span data-i18n="con.sparkDesc">Health report</span></button></div></div><div class="command-group" id="recentCommandsGroup" hidden><p class="command-group-label">Recent</p><div id="recentCommands" class="recent-commands"></div></div><p class="help-note" data-i18n="con.note">Commands go to your local server only. Nothing leaves this PC.</p></aside></div></section>
@@ -151,12 +158,13 @@
         <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/person.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.players">ROSTER</p><h2 data-i18n="ply.title">Players</h2><p class="sub" data-i18n="ply.sub">Manage online, offline, whitelisted and banned — works even while stopped.</p></div></div>
         <div class="tab-head-actions"><span class="roster-count" id="rosterCount">— players</span><button class="btn secondary sm" id="refreshPlayersBtn" data-i18n="ply.refresh">Refresh list</button></div>
       </header>
-      <article class="roster-panel">
-        <div class="roster-toolbar"><div class="player-filters" role="group" aria-label="Player filters"><button class="filter-chip active" data-player-filter="online" aria-pressed="true" data-i18n="ply.filterOnline">Online</button><button class="filter-chip" data-player-filter="offline" aria-pressed="false" data-i18n="ply.filterOffline">Offline</button><button class="filter-chip" data-player-filter="whitelist" aria-pressed="false" data-i18n="ply.filterWhitelist">Whitelisted</button><button class="filter-chip" data-player-filter="banned" aria-pressed="false" data-i18n="ply.filterBanned">Banned</button><button class="filter-chip" data-player-filter="ops" aria-pressed="false" data-i18n="ply.filterOps">Operators</button><button class="filter-chip" data-player-filter="all" aria-pressed="false" data-i18n="ply.filterAll">All</button></div><div class="roster-search"><input id="playerSearch" data-i18n-placeholder="ply.searchPh" placeholder="Search player…" aria-label="Search players" autocomplete="off"><span aria-hidden="true">⌕</span></div></div>
-        <div class="player-manual-row" role="group" aria-label="Quick player actions"><span class="manual-kicker" data-i18n="ply.quick">QUICK ACTION</span><input id="playerActionName" data-i18n-placeholder="ply.namePh" placeholder="Player name — e.g. Notch" aria-label="Player name for quick action" autocomplete="off"><div class="manual-btns"><button class="btn secondary" id="manualOpBtn" aria-label="Make player operator" data-i18n="ply.op">OP</button><button class="btn secondary" id="manualWhitelistBtn" aria-label="Whitelist player" data-i18n="ply.whitelist">Whitelist</button><button class="btn danger" id="manualBanBtn" aria-label="Ban player" data-i18n="ply.ban">Ban</button><button class="btn danger" id="manualKickBtn" aria-label="Kick player" data-i18n="ply.kick">Kick</button></div></div>
-        <div id="playersList" class="players-table" role="list" aria-label="Players list"></div>
-        <div id="playersPager" class="player-pager" hidden><button class="btn secondary" id="playersPrevPage" aria-label="Previous page" data-i18n="mkt.prev">← Previous</button><span id="playersPageLabel" aria-live="polite">Page 1</span><button class="btn secondary" id="playersNextPage" aria-label="Next page" data-i18n="mkt.next">Next →</button></div>
-      </article>
+      <div class="roster-toolbar"><div class="player-filters" role="group" aria-label="Player filters"><button class="filter-chip active" data-player-filter="online" aria-pressed="true" data-i18n="ply.filterOnline">Online</button><button class="filter-chip" data-player-filter="offline" aria-pressed="false" data-i18n="ply.filterOffline">Offline</button><button class="filter-chip" data-player-filter="whitelist" aria-pressed="false" data-i18n="ply.filterWhitelist">Whitelisted</button><button class="filter-chip" data-player-filter="banned" aria-pressed="false" data-i18n="ply.filterBanned">Banned</button><button class="filter-chip" data-player-filter="ops" aria-pressed="false" data-i18n="ply.filterOps">Operators</button><button class="filter-chip" data-player-filter="all" aria-pressed="false" data-i18n="ply.filterAll">All</button></div><div class="roster-search"><input id="playerSearch" data-i18n-placeholder="ply.searchPh" placeholder="Search player…" aria-label="Search players" autocomplete="off"><span aria-hidden="true">⌕</span></div></div>
+      <div id="playersList" class="players-table" role="list" aria-label="Players list"></div>
+      <div id="playersPager" class="player-pager" hidden><button class="btn secondary" id="playersPrevPage" aria-label="Previous page" data-i18n="mkt.prev">← Previous</button><span id="playersPageLabel" aria-live="polite">Page 1</span><button class="btn secondary" id="playersNextPage" aria-label="Next page" data-i18n="mkt.next">Next →</button></div>
+      <details class="player-manual" id="playerManual">
+        <summary class="player-manual-summary"><span data-i18n="ply.quick">Manage by name</span></summary>
+        <div class="player-manual-row" role="group" aria-label="Quick player actions"><input id="playerActionName" data-i18n-placeholder="ply.namePh" placeholder="Player name — e.g. Notch" aria-label="Player name for quick action" autocomplete="off"><div class="manual-btns"><button class="btn secondary sm" id="manualOpBtn" aria-label="Make player operator" data-i18n="ply.op">OP</button><button class="btn secondary sm" id="manualWhitelistBtn" aria-label="Whitelist player" data-i18n="ply.whitelist">Whitelist</button><button class="btn danger sm" id="manualBanBtn" aria-label="Ban player" data-i18n="ply.ban">Ban</button><button class="btn danger sm" id="manualKickBtn" aria-label="Kick player" data-i18n="ply.kick">Kick</button></div></div>
+      </details>
     </section>
     <section id="performance" class="tab">
       <header class="tab-head">
@@ -168,46 +176,48 @@
         <span data-i18n="perf.offlineNote">Server is off — start it to see live numbers.</span>
         <button class="btn primary sm" id="perfStartBtn" data-i18n="top.start">Start server</button>
       </div>
-      <div class="perf-kpis">
-        <article class="perf-kpi glass"><div class="kpi-head"><span>TPS</span><span class="kpi-help" data-i18n-title="perf.help.tps" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfTpsBadge">—</span></div><strong id="perfTps">—</strong><div class="kpi-bar"><i id="perfTpsBar" style="width:0%"></i></div></article>
-        <article class="perf-kpi glass"><div class="kpi-head"><span>MSPT</span><span class="kpi-help" data-i18n-title="perf.help.mspt" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfMsptBadge">—</span></div><strong id="perfMspt">—</strong><div class="kpi-bar mspt"><i id="perfMsptBar" style="width:0%"></i></div></article>
-        <article class="perf-kpi glass"><div class="kpi-head"><span data-i18n="perf.serverCpu">SERVER CPU</span><span class="kpi-help" data-i18n-title="perf.help.cpu" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfCpuBadge">—</span></div><strong id="perfCpu">—</strong><div class="kpi-bar cpu"><i id="perfCpuBar" style="width:0%"></i></div></article>
-        <article class="perf-kpi glass"><div class="kpi-head"><span data-i18n="perf.serverRam">SERVER RAM</span><span class="kpi-help" data-i18n-title="perf.help.ram" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfRamBadge">—</span></div><strong id="perfServerRam">—</strong><div class="kpi-bar ram"><i id="perfRamBar" style="width:0%"></i></div></article>
+      <div class="perf-stats">
+        <div class="perf-stat"><div class="kpi-head"><span>TPS</span><span class="kpi-help" data-i18n-title="perf.help.tps" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfTpsBadge">—</span></div><strong id="perfTps">—</strong><div class="kpi-bar"><i id="perfTpsBar" style="width:0%"></i></div></div>
+        <div class="perf-stat"><div class="kpi-head"><span>MSPT</span><span class="kpi-help" data-i18n-title="perf.help.mspt" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfMsptBadge">—</span></div><strong id="perfMspt">—</strong><div class="kpi-bar mspt"><i id="perfMsptBar" style="width:0%"></i></div></div>
+        <div class="perf-stat"><div class="kpi-head"><span data-i18n="perf.serverCpu">SERVER CPU</span><span class="kpi-help" data-i18n-title="perf.help.cpu" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfCpuBadge">—</span></div><strong id="perfCpu">—</strong><div class="kpi-bar cpu"><i id="perfCpuBar" style="width:0%"></i></div></div>
+        <div class="perf-stat"><div class="kpi-head"><span data-i18n="perf.serverRam">SERVER RAM</span><span class="kpi-help" data-i18n-title="perf.help.ram" tabindex="0" role="note" aria-label="Help">?</span><span class="kpi-badge" id="perfRamBadge">—</span></div><strong id="perfServerRam">—</strong><div class="kpi-bar ram"><i id="perfRamBar" style="width:0%"></i></div></div>
       </div>
-      <div class="perf-main">
-        <article class="panel glass perf-chart"><div class="chart-head"><h3 data-i18n="perf.tickHead">Tick</h3><button class="text-btn" data-command="tps" data-i18n="perf.requestTps">Refresh</button></div><div class="chart-wrap"><canvas id="perfTickChart" width="1000" height="280"></canvas><div class="chart-empty" id="tickChartEmpty"><b data-i18n="perf.noTick">No data yet</b><span data-i18n="perf.noTickSub">Start the server to see live stats.</span></div></div><div class="chart-legend"><span><i class="legend-tps"></i> TPS</span><span><i class="legend-danger"></i> MSPT</span></div></article>
-        <article class="panel glass perf-chart"><div class="chart-head"><h3 data-i18n="perf.resHead">CPU &amp; RAM</h3><span class="chart-live" id="resourceLiveBadge">● LIVE</span></div><div class="chart-wrap"><canvas id="perfResourceChart" width="1000" height="280"></canvas><div class="chart-empty" id="resourceChartEmpty"><b data-i18n="perf.noRes">No data yet</b><span data-i18n="perf.noResSub">Start the server to see live stats.</span></div></div><div class="chart-legend"><span><i class="legend-cpu"></i> CPU</span><span><i class="legend-ram"></i> RAM</span></div><div hidden aria-hidden="true"><span id="perfLauncherMem">—</span><span id="appMemory">—</span></div></article>
+      <div class="perf-charts">
+        <article class="perf-chart"><div class="chart-head"><h3 data-i18n="perf.tickHead">Tick</h3><button class="text-btn" data-command="tps" data-i18n="perf.requestTps">Refresh</button></div><div class="chart-wrap"><canvas id="perfTickChart" width="1000" height="280"></canvas><div class="chart-empty" id="tickChartEmpty"><b data-i18n="perf.noTick">No data yet</b><span data-i18n="perf.noTickSub">Start the server to see live stats.</span></div></div><div class="chart-legend"><span><i class="legend-tps"></i> TPS</span><span><i class="legend-danger"></i> MSPT</span></div></article>
+        <article class="perf-chart"><div class="chart-head"><h3 data-i18n="perf.resHead">CPU &amp; RAM</h3><span class="chart-live" id="resourceLiveBadge">● LIVE</span></div><div class="chart-wrap"><canvas id="perfResourceChart" width="1000" height="280"></canvas><div class="chart-empty" id="resourceChartEmpty"><b data-i18n="perf.noRes">No data yet</b><span data-i18n="perf.noResSub">Start the server to see live stats.</span></div></div><div class="chart-legend"><span><i class="legend-cpu"></i> CPU</span><span><i class="legend-ram"></i> RAM</span></div><div hidden aria-hidden="true"><span id="perfLauncherMem">—</span><span id="appMemory">—</span></div></article>
       </div>
-      <details class="perf-details glass"><summary data-i18n="perf.details">Details &amp; tools</summary><div class="perf-diagnostics" id="perfDiagnostics"></div></details>
+      <details class="perf-details"><summary data-i18n="perf.details">Details &amp; tools</summary><div class="perf-diagnostics" id="perfDiagnostics"></div></details>
     </section>
     <section id="content" class="tab">
       <header class="tab-head">
         <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/funnel.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.contentBay">CONTENT BAY</p><h2 data-i18n="cnt.title">Content library</h2><p class="sub" data-i18n="cnt.sub">Plugins, mods and datapacks — files live inside your server folder.</p></div></div>
-        <div class="flat-stats">
-          <div class="flat-stat"><b id="contentPluginsCount">0</b><small data-i18n="cnt.plugins">PLUGINS</small></div>
-          <div class="flat-stat"><b id="contentModsCount">0</b><small data-i18n="cnt.mods">MODS</small></div>
-          <div class="flat-stat accent"><b id="contentDatapacksCount">0</b><small data-i18n="cnt.datapacks">DATAPACKS</small></div>
-        </div>
       </header>
-      <div class="ed-entry" id="edBrowse" role="button" tabindex="0">
-        <span class="ed-entry-icon">{&nbsp;}</span>
-        <div class="ed-entry-main"><b data-i18n="ed.entryT">Edit config &amp; text files</b><span data-i18n-html="ed.entryD">spigot.yml, plugin configs, whitelist.json — edit them right here, safely.</span></div>
-        <span class="ed-entry-arrow">→</span>
-      </div>
       <div class="flat-wrap" id="contentBays">
         <div class="content-toolbar">
           <div class="content-seg" id="contentSeg" role="tablist" aria-label="Content type">
-            <button type="button" class="seg active" data-ckind="plugin" data-i18n="cnt.plugins">Plugins</button>
-            <button type="button" class="seg" data-ckind="mod" data-i18n="cnt.mods">Mods</button>
-            <button type="button" class="seg" data-ckind="datapack" data-i18n="cnt.datapacks">Datapacks</button>
+            <button type="button" class="seg active" data-ckind="plugin"><span data-i18n="cnt.plugins">Plugins</span><b class="seg-count" id="contentPluginsCount">0</b></button>
+            <button type="button" class="seg" data-ckind="mod"><span data-i18n="cnt.mods">Mods</span><b class="seg-count" id="contentModsCount">0</b></button>
+            <button type="button" class="seg" data-ckind="datapack"><span data-i18n="cnt.datapacks">Datapacks</span><b class="seg-count" id="contentDatapacksCount">0</b></button>
           </div>
           <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…"></div>
           <div class="content-toolbar-actions">
-            <button class="text-btn" id="contentCheckUpdates" data-i18n="cnt.checkUpdates">Check updates</button>
             <span class="stat-pill" id="contentUpdatesPill" hidden></span>
-            <button class="btn sm primary" id="contentImport" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button>
-            <button class="text-btn" id="contentOpen" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button>
-            <button class="text-btn" id="contentMarket" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button>
+            <button class="btn sm edit-files-btn" id="edBrowse" data-i18n-title="ed.entryT" title="Edit config &amp; text files"><span class="ef-icon">{&nbsp;}</span> <span data-i18n="cnt.editFiles">Edit files</span></button>
+            <div class="menu" id="addMenu">
+              <button type="button" class="btn sm primary menu-summary" aria-expanded="false" data-i18n="cnt.add">+ Add</button>
+              <div class="menu-body" hidden>
+                <button type="button" id="contentImport" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button>
+                <button type="button" id="contentMarket" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button>
+              </div>
+            </div>
+            <div class="menu" id="moreMenu">
+              <button type="button" class="btn sm secondary menu-summary" aria-expanded="false" aria-label="More" data-i18n-title="cnt.more" title="More">⋯</button>
+              <div class="menu-body" hidden>
+                <button type="button" id="contentCheckUpdates" data-i18n="cnt.checkUpdates">Check updates</button>
+                <button type="button" id="contentOpen" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button>
+                <button type="button" data-open="." data-i18n="cnt.openServer">Open server folder ↗</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="content-listwrap">
@@ -216,18 +226,21 @@
           <ul id="datapacksList" class="file-list content-list" data-dk-kind="datapack" hidden></ul>
         </div>
         <div class="sec-note center" data-i18n="cnt.restart">New files load on the next server start — the launcher never hot-swaps content while running.</div>
-        <div class="flat-grid2">
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/modrinth.svg" alt=""><h3 data-i18n="cnt.modpackT">Import a modpack</h3></div>
-            <p class="cell-sub" data-i18n-html="cnt.modpackD">Pick a standard Modrinth <code>.mrpack</code> — mods and configs are installed automatically, with compatibility checks and per-file progress.</p>
-            <button class="btn secondary sm" id="importModpack" data-i18n="cnt.modpackT">Import .mrpack</button>
-          </section>
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/observer.png" alt=""><h3 data-i18n="cnt.shareT">Share your setup</h3></div>
-            <p class="cell-sub" data-i18n-html="cnt.shareD">Export everything installed via the Marketplace into a standard <code>.mrpack</code> friends can import into their own server.</p>
-            <button class="btn secondary sm" id="exportModpack" data-i18n="cnt.shareT">Export .mrpack</button>
-          </section>
-        </div>
+        <details class="modpack-tools" id="modpackTools">
+          <summary class="modpack-tools-summary"><span class="mp-tools-ico" aria-hidden="true">◫</span><span data-i18n="cnt.modpackTools">Modpack tools</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
+          <div class="modpack-tools-body">
+            <section class="flat-cell">
+              <div class="sec-head"><img src="./assets/icons/modrinth.svg" alt=""><h3 data-i18n="cnt.modpackT">Import a modpack</h3></div>
+              <p class="cell-sub" data-i18n-html="cnt.modpackD">Pick a standard Modrinth <code>.mrpack</code> — mods and configs are installed automatically, with compatibility checks and per-file progress.</p>
+              <button class="btn secondary sm" id="importModpack" data-i18n="cnt.modpackT">Import .mrpack</button>
+            </section>
+            <section class="flat-cell">
+              <div class="sec-head"><img src="./assets/icons/observer.png" alt=""><h3 data-i18n="cnt.shareT">Share your setup</h3></div>
+              <p class="cell-sub" data-i18n-html="cnt.shareD">Export everything installed via the Marketplace into a standard <code>.mrpack</code> friends can import into their own server.</p>
+              <button class="btn secondary sm" id="exportModpack" data-i18n="cnt.shareT">Export .mrpack</button>
+            </section>
+          </div>
+        </details>
       </div>
       <div id="fileBrowser" class="flat-wrap" hidden>
         <header class="flat-head">
@@ -275,12 +288,11 @@
       <div class="market-toolbar">
         <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" hidden>CurseForge</button></div>
         <input type="hidden" id="marketSource" value="modrinth">
-        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="forge" data-i18n="mkt.forgeType">Forge / NeoForge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
-        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion"><option value="">All versions</option></select></label>
-        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="forge" data-i18n="mkt.forgeType">Forge / NeoForge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select"><option value="">All versions</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort" class="ol-select"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
       </div>
-      <div id="marketChips" class="market-chips" hidden></div>
-      <div id="marketStatus" class="market-status" data-i18n="mkt.searching">Loading popular results…</div>
+      <div id="marketStatus" class="market-status" hidden></div>
       <div id="marketResults" class="market-results"></div>
       <div id="marketPager" class="market-pager" hidden><button class="btn secondary" id="marketPrev" data-i18n="mkt.prev">← Previous</button><span id="marketPageLabel">Page 1</span><button class="btn secondary" id="marketNext" data-i18n="mkt.next">Next →</button></div>
     </section>
@@ -288,21 +300,17 @@
       <div id="worldsProxyNotice" class="proxy-notice" hidden data-i18n-html="wld.proxyNotice">This server is a <b>proxy (Velocity)</b> — it doesn't have worlds or backups of its own. Manage worlds on the backend servers it connects to instead.</div>
       <header class="tab-head">
         <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/cube.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.storage">STORAGE</p><h2 data-i18n="wld.title">Worlds &amp; backups</h2><p class="sub" data-i18n="wld.sub">World folders and ZIP snapshots — stored locally inside your server folder.</p></div></div>
-        <div class="flat-stats">
-          <div class="flat-stat"><b id="worldsCountPill">0</b><small>WORLDS</small></div>
-          <div class="flat-stat accent"><b id="backupsCountPill">0</b><small>BACKUPS</small></div>
-        </div>
       </header>
-      <section class="wld-section">
-        <div class="sec-head-v2"><span class="sec-ico"><img src="./assets/icons/ui/cube.svg" alt=""></span><div><h3 data-i18n="wld.foldersT">World folders</h3><p class="sub" data-i18n-html="wld.foldersHint">from <code>level-name</code></p></div><span class="spacer"></span><button class="btn sm secondary" data-open="." data-i18n="wld.serverFolder">Server folder ↗</button></div>
+      <section class="section wld-worlds">
+        <div class="section-head"><div><h3><span data-i18n="wld.foldersT">World folders</span> <span class="badge" id="worldsCountPill">0</span></h3><p class="sub" data-i18n-html="wld.foldersHint">from <code>level-name</code></p></div><button class="btn sm secondary" data-open="." data-i18n="wld.serverFolder">Server folder ↗</button></div>
         <div id="worldsList" class="wld-list"></div>
-        <div class="sec-note" data-i18n-html="wld.note">Folders live on disk — change <code>level-name</code> in Server properties to switch worlds.</div>
+        <p class="sec-note" data-i18n-html="wld.note">Folders live on disk — change <code>level-name</code> in Server properties to switch worlds.</p>
       </section>
-      <section class="wld-section">
-        <div class="sec-head-v2"><span class="sec-ico"><img src="./assets/icons/ui/coin.svg" alt=""></span><div><h3 data-i18n="wld.backupsT">Backups</h3><p class="sub" data-i18n-html="wld.backupsHint"><code>save-off</code> safe</p></div><span class="spacer"></span><button class="btn sm primary" id="createBackup" data-i18n="wld.create">+ Create backup</button></div>
-        <div class="wld-tools"><div id="autoBackupStatus" class="auto-backup-status"></div><div id="backupsTotal" class="backups-total"></div></div>
+      <section class="section wld-backups">
+        <div class="section-head"><div><h3><span data-i18n="wld.backupsT">Backups</span> <span class="badge" id="backupsCountPill">0</span></h3><p class="sub" data-i18n-html="wld.backupsHint"><code>save-off</code> safe · <span id="autoBackupStatus" class="auto-backup-status"></span></p></div><button class="btn sm primary" id="createBackup" data-i18n="wld.create">+ Create backup</button></div>
+        <div class="backups-total" id="backupsTotal" hidden></div>
         <div id="backupsList" class="bk-timeline"></div>
-        <div class="backup-empty" id="backupEmpty" hidden><span class="backup-empty-icon">◈</span><b data-i18n="wld.noBackups">No backups yet</b><span data-i18n-html="wld.noBackupsSub">Create your first snapshot — the server is saved (<code>save-all</code>) before the zip starts.</span></div>
+        <div class="empty" id="backupEmpty" hidden><span class="empty-icon">◈</span><b data-i18n="wld.noBackups">No backups yet</b><span data-i18n-html="wld.noBackupsSub">Create your first snapshot — the server is saved (<code>save-all</code>) before the zip starts.</span><button class="btn sm primary" data-create-backup data-i18n="wld.create">+ Create backup</button></div>
       </section>
     </section>
         <section id="worldmap" class="tab">
@@ -374,17 +382,21 @@
       <div class="flat-wrap">
         <header class="tab-head" id="settingsHead">
           <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" data-i18n="set.sub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
-          <button class="btn primary" id="saveSettings" data-i18n="set.apply">Apply settings</button>
+          <div class="settings-apply"><span class="apply-dirty-hint" id="applyDirtyHint" hidden data-i18n="set.unsaved">Unsaved changes</span><button class="btn primary" id="saveSettings" data-i18n="set.apply">Apply settings</button></div>
         </header>
-        <div class="seg-switch" id="settingsSeg" role="tablist" aria-label="Settings sections">
-          <button type="button" class="seg-switch-btn active" data-set-view="basic" role="tab" aria-selected="true" data-i18n="set.tabBasic">Basic</button>
-          <button type="button" class="seg-switch-btn" data-set-view="advanced" role="tab" aria-selected="false" data-i18n="set.tabAdvanced">Advanced</button>
-          <span class="seg-switch-glider" aria-hidden="true"></span>
-        </div>
-        <div class="flat-grid2 set-pane" data-set-pane="basic">
-          <div class="set-group" data-i18n="set.grpSetup">Setup</div>
+        <div class="settings-layout">
+          <nav class="settings-nav" id="settingsSeg" role="tablist" aria-label="Settings sections">
+            <button type="button" class="seg-switch-btn active" data-set-view="setup" role="tab" aria-selected="true" data-i18n="set.catSetup">Setup</button>
+            <button type="button" class="seg-switch-btn" data-set-view="personal" role="tab" aria-selected="false" data-i18n="set.catPersonal">Personal</button>
+            <button type="button" class="seg-switch-btn" data-set-view="automation" role="tab" aria-selected="false" data-i18n="set.catAutomation">Automation</button>
+            <button type="button" class="seg-switch-btn" data-set-view="integrations" role="tab" aria-selected="false" data-i18n="set.catIntegrations">Integrations</button>
+            <button type="button" class="seg-switch-btn" data-set-view="ai" role="tab" aria-selected="false" data-i18n="set.catAi">AI</button>
+            <button type="button" class="seg-switch-btn" data-set-view="advanced" role="tab" aria-selected="false" data-i18n="set.catAdvanced">Advanced</button>
+          </nav>
+          <div class="settings-content">
+          <div class="set-pane" data-set-pane="setup">
           <!-- Server folder -->
-          <section class="flat-cell flat-span2">
+          <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.folderT">Server folder</h3><small data-i18n="set.folderD">the one directory this launcher manages</small></div>
             <div class="set-row-input"><input id="serverFolderInput" data-i18n-placeholder="set.folderPh" placeholder="Choose your server directory — e.g. Documents\ObserverLauncher Servers" aria-label="Server folder"><button class="btn secondary" id="browseBtn" data-i18n="set.browse">Choose &amp; load</button></div>
             <small id="folderStatus" class="field-hint folder-status"></small>
@@ -394,24 +406,26 @@
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gem.svg" alt=""><h3 data-i18n="set.javaT">Java runtime</h3><small data-i18n="set.javaD">detection &amp; one-click install</small></div>
             <div id="javaNotice" class="java-notice"></div>
-            <label class="set-field" id="javaPickRow" hidden><span data-i18n="set.javaPick">Installed runtimes</span><select id="javaPickSelect" class="launcher-select"></select></label>
+            <label class="set-field" id="javaPickRow" hidden><span data-i18n="set.javaPick">Installed runtimes</span><select id="javaPickSelect" class="launcher-select ol-select"></select></label>
             <label class="set-field"><span data-i18n="set.javaPath">Executable path</span><input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false"></label>
             <button type="button" class="btn primary wide" id="javaAutoInstall" hidden data-i18n="set.autoInstallJava">Install Java automatically (no admin rights needed)</button>
             <div id="javaProgress" class="set-progress" hidden><div class="set-progress-track"><div class="set-progress-fill" id="javaProgressFill"></div></div><div class="set-progress-label" id="javaProgressLabel">Starting download…</div></div>
           </section>
-          <div class="set-group" data-i18n="set.grpPersonal">Personal</div>
+          </div>
+          <div class="set-pane" data-set-pane="personal" hidden>
           <!-- Preferences -->
-          <section class="flat-cell flat-span2">
+          <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/person.svg" alt=""><h3 data-i18n="set.prefT">Preferences</h3><small data-i18n="set.prefD">personal, per-PC</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.language">Language</b><small data-i18n="set.languageSub">Interface language — applies immediately.</small></div><select id="languageSelect" class="launcher-select"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.language">Language</b><small data-i18n="set.languageSub">Interface language — applies immediately.</small></div><select id="languageSelect" class="launcher-select ol-select"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
             <hr class="set-hr">
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.motion">Interface animation</b><small data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</small></div><select id="motionLevelSelect" class="launcher-select"><option value="full" data-i18n="set.motionFull">Full (default)</option><option value="lite" data-i18n="set.motionLite">Lite (less motion)</option></select></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.motion">Interface animation</b><small data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</small></div><select id="motionLevelSelect" class="launcher-select ol-select"><option value="full" data-i18n="set.motionFull">Full (default)</option><option value="lite" data-i18n="set.motionLite">Lite (less motion)</option></select></div>
             <hr class="set-hr">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.guide">Welcome guide</b><small data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</small></div><button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button></div>
           </section>
-          <div class="set-group" data-i18n="set.grpAutomation">Automation</div>
+          </div>
+          <div class="set-pane" data-set-pane="automation" hidden>
           <!-- Reliability -->
-          <section class="flat-cell flat-span2">
+          <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/shield.svg" alt=""><h3 data-i18n="set.relT">Reliability</h3><small data-i18n="set.relD">auto-restart on crash • scheduled backups</small></div>
             <div class="rel-grid">
               <div>
@@ -437,29 +451,8 @@
               </div>
             </div>
           </section>
-        </div>
-        <div class="flat-grid2 set-pane" data-set-pane="advanced" hidden>
-          <!-- Internet tunnel (path/host settings are for power users) -->
-          <section class="flat-cell flat-span2">
-            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.tunnelT">Internet tunnel</h3><small data-i18n="set.tunnelD">share your server online with Playit</small></div>
-            <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
-            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
-          </section>
-          <!-- Q2: Tunnel overview — every instance + its public address at a glance. Pure renderer:
-               reads state.instances (id/name/tunnelAddress/autoTunnel) + state.instanceStatus for
-               the dots. Hidden until there are 2+ instances so the single-server UI is unchanged. -->
-          <section class="flat-cell flat-span2" id="tunnelOverviewSection" hidden>
-            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="tun.ovT">Tunnel overview</h3><small data-i18n="tun.ovD">your public addresses, one row per server</small></div>
-            <div id="tunnelOverview" class="tun-ov"></div>
-          </section>
-          <!-- CurseForge (advanced): an API key the USER supplies; the app never bundles or shares one. -->
-          <section class="flat-cell flat-span2">
-            <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.cfT">CurseForge</h3><small data-i18n="set.cfD">search the CurseForge catalogue (optional)</small></div>
-            <label class="set-field"><span data-i18n="set.cfKey">CurseForge API key</span><div class="set-path-row"><input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off"><button type="button" class="btn secondary sm" id="cfKeyGet" data-i18n="set.cfKeyGet">Get a key</button></div></label>
-            <small class="field-hint" data-i18n="set.cfKeySub">Stored only on this PC and sent only to api.curseforge.com. The launcher does not bundle a key. Mods whose author blocks third-party downloads can't be auto-installed — open their page instead.</small>
-          </section>
-          <!-- Schedule (collapsed — set-and-forget) -->
-          <details class="flat-cell flat-span2 set-advanced">
+          <!-- Schedule moved into Automation -->
+          <details class="flat-cell set-advanced">
             <summary><img src="./assets/icons/ui/clock.svg" alt=""><h3 data-i18n="sch.title">Schedule</h3><small data-i18n="sch.sub">Start and stop the server automatically at set times</small><span class="set-chevron">▸</span></summary>
             <div class="set-adv-body">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="sch.enable">Enable scheduler</b><small data-i18n="sch.enableSub">Uses this PC's local clock. If the computer is asleep at the scheduled time, the action is skipped.</small></div><label class="switch"><input type="checkbox" id="scheduleEnabledInput"><span class="slider"></span></label></div>
@@ -474,44 +467,85 @@
             <div id="scheduleNext" class="field-hint" hidden></div>
             </div>
           </details>
-          <!-- Updates (collapsed — set-and-forget) -->
-          <details class="flat-cell flat-span2 set-advanced">
-            <summary><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small><span class="set-chevron">▸</span></summary>
-            <div class="set-adv-body">
-              <div class="set-row-input">
-                <button type="button" class="btn secondary" id="checkUpdateBtn" data-i18n="upd.check">Check for updates</button>
-                <span id="updateStatus" class="field-hint"></span>
-              </div>
+          </div>
+          <div class="set-pane" data-set-pane="integrations" hidden>
+          <!-- v4.0.0: Integrations split into 2 labelled groups (Share / Connect); advanced
+               fields folded into <details> so the pane reads as 4 calm switches for beginners. -->
+          <p class="set-group-head" data-i18n="set.grpShare">Share your server</p>
+          <!-- Internet tunnel (path/host settings are for power users) -->
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.tunnelT">Internet tunnel</h3><small data-i18n="set.tunnelD">share your server online with Playit</small></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
+            <details class="set-fold">
+              <summary><span data-i18n="set.adv">Advanced</span><span class="set-chevron">▸</span></summary>
+              <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
+            </details>
+            <!-- v4.0.0: tunnel overview folded into this card (was a separate 5th card) — hidden until 2+ instances. -->
+            <div id="tunnelOverviewSection" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+              <small class="field-hint" data-i18n="tun.ovD" style="display:block;margin-bottom:8px">your public addresses, one row per server</small>
+              <div id="tunnelOverview" class="tun-ov"></div>
             </div>
-          </details>
-          <!-- MCP / AI -->
-          <section class="flat-cell flat-span2 mcp-section">
-            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="mcp.title">MCP / AI integration</h3><small data-i18n="mcp.sub">Let an MCP client read and control your server</small><span class="mcp-pill" id="mcpPill" data-i18n="mcp.stopped">Stopped</span></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.enable">Enable MCP server</b><small data-i18n="mcp.enableSub">Starts a local-only (127.0.0.1) server with a fresh token each launch. The app must stay open.</small></div><label class="switch"><input type="checkbox" id="mcpEnabledInput"><span class="slider"></span></label></div>
-            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="mcp.autoWrite">Auto-allow write tools</b><small data-i18n="mcp.autoWriteSub">Skip the confirmation for write tools. Destructive tools always ask.</small></div><label class="switch"><input type="checkbox" id="mcpAutoWriteInput"><span class="slider"></span></label></div>
-            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="mcp.readOnly">Read-only mode</b><small data-i18n="mcp.readOnlySub">Block all write and destructive tools — the AI can only inspect, never change, your server.</small></div><label class="switch"><input type="checkbox" id="mcpReadOnlyInput"><span class="slider"></span></label></div>
-            <div class="input-row" style="margin-top:12px"><span class="hint" id="mcpStatus" data-i18n="mcp.stopped">Stopped</span><button type="button" class="btn secondary sm" id="mcpCopyConfig" style="margin-left:auto" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
           </section>
           <!-- Remote access (3.3.0): a loopback-only API for another device. Off by default. -->
           <section class="flat-cell flat-span2 remote-section">
             <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="remote.title">Remote access</h3><small data-i18n="remote.sub">Check on this server from another device — no port forwarding.</small><span class="mcp-pill" id="remotePill" data-i18n="remote.stopped">Stopped</span></div>
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="remote.enable">Enable remote access</b><small data-i18n="remote.enableSub">Starts a loopback-only server with a long-lived token. Reads only; never installs or deletes.</small></div><label class="switch"><input type="checkbox" id="remoteEnabledInput"><span class="slider"></span></label></div>
-            <div class="set-toggle" style="margin-top:12px"><div class="set-toggle-info"><b data-i18n="remote.readOnly">Read-only</b><small data-i18n="remote.readOnlySub">Block the one action endpoint. The API can only read.</small></div><label class="switch"><input type="checkbox" id="remoteReadOnlyInput"><span class="slider"></span></label></div>
-            <label class="set-field" style="margin-top:12px"><span data-i18n="remote.allow">Allowed IPs</span><input id="remoteAllowInput" placeholder="10.0.0.5, 192.168.1.*" spellcheck="false"><small class="field-hint" data-i18n="remote.allowSub"></small></label>
-            <label class="set-field" style="margin-top:12px"><span data-i18n="remote.port">Port</span><input id="remotePortInput" type="number" min="0" max="65535" value="0"><small class="field-hint" data-i18n="remote.portSub"></small></label>
-            <label class="set-field" style="margin-top:12px"><span data-i18n="remote.bind">Bind address</span><input id="remoteBindInput" placeholder="127.0.0.1" spellcheck="false"><small class="field-hint" data-i18n="remote.bindSub"></small></label>
-            <div class="input-row" style="margin-top:12px"><span class="hint" id="remoteStatus" data-i18n="remote.stopped">Stopped</span><button type="button" class="btn secondary sm" id="remoteOpenDoc" style="margin-left:auto" data-i18n="remote.doc">How to reach it from anywhere (Tailscale) →</button></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="remote.readOnly">Read-only</b><small data-i18n="remote.readOnlySub">Block the one action endpoint. The API can only read.</small></div><label class="switch"><input type="checkbox" id="remoteReadOnlyInput"><span class="slider"></span></label></div>
+            <details class="set-fold">
+              <summary><span data-i18n="set.netAdv">Advanced network</span><span class="set-chevron">▸</span></summary>
+              <label class="set-field"><span data-i18n="remote.allow">Allowed IPs</span><input id="remoteAllowInput" placeholder="10.0.0.5, 192.168.1.*" spellcheck="false"><small class="field-hint" data-i18n="remote.allowSub"></small></label>
+              <label class="set-field"><span data-i18n="remote.port">Port</span><input id="remotePortInput" type="number" min="0" max="65535" value="0"><small class="field-hint" data-i18n="remote.portSub"></small></label>
+              <label class="set-field"><span data-i18n="remote.bind">Bind address</span><input id="remoteBindInput" placeholder="127.0.0.1" spellcheck="false"><small class="field-hint" data-i18n="remote.bindSub"></small></label>
+            </details>
+            <div class="input-row"><span class="hint" id="remoteStatus" data-i18n="remote.stopped">Stopped</span><button type="button" class="btn secondary sm" id="remoteOpenDoc" style="margin-left:auto" data-i18n="remote.doc">How to reach it from anywhere (Tailscale) →</button></div>
             <div id="remoteAddresses" class="remote-addresses"></div>
+            <!-- v4.0.0: warn when the remote API is bound off-loopback with NO IP allowlist, so any
+                 host on the network can reach it (token-only). -->
+            <p class="proxy-notice" id="remoteWildWarn" hidden data-i18n="remote.wildWarn">The bind address is not 127.0.0.1 and the IP allowlist is empty — any device on this network can reach the remote API (only the token protects it). Set an allowlist, or bind 127.0.0.1 and use Tailscale.</p>
           </section>
-          <!-- Advanced JVM -->
-          <details class="flat-cell flat-span2 set-advanced">
-            <summary><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.advT">Advanced — JVM arguments</h3><small data-i18n="set.advD">power users · overrides the RAM sliders on Overview</small><span class="set-chevron">▸</span></summary>
-            <div class="set-adv-body">
-              <div class="set-row-input mono"><input id="jvmArgsInput" spellcheck="false" placeholder="-Xms4G -Xmx6G -XX:+UseG1GC ..."><button type="button" class="btn secondary" id="applyAikarFlags" data-i18n="set.aikar">Use Aikar's flags</button></div>
-              <div class="jvm-preview" id="jvmPreview" hidden></div>
-              <small id="systemRamHint" class="field-hint" data-i18n="set.advHint">When set, this overrides the two memory fields. Use it for any allocation and Java flags.</small>
-            </div>
-          </details>
+          <p class="set-group-head" data-i18n="set.grpTools">Connect tools</p>
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.cfT">CurseForge</h3><small data-i18n="set.cfD">search the CurseForge catalogue (optional)</small></div>
+            <label class="set-field"><span data-i18n="set.cfKey">CurseForge API key</span><div class="set-path-row"><input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off"><button type="button" class="btn secondary sm" id="cfKeyGet" data-i18n="set.cfKeyGet">Get a key</button></div></label>
+            <small class="field-hint" data-i18n="set.cfKeySub">Stored only on this PC and sent only to api.curseforge.com. The launcher does not bundle a key. Mods whose author blocks third-party downloads can't be auto-installed — open their page instead.</small>
+          </section>
+          </div>
+          <!-- v4.0.0: MCP / AI gets its own Settings category (the launcher's headline feature). -->
+          <div class="set-pane" data-set-pane="ai" hidden>
+          <section class="flat-cell mcp-section">
+            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="mcp.title">MCP / AI integration</h3><small data-i18n="mcp.sub">Let an MCP client read and control your server</small><span class="mcp-pill" id="mcpPill" data-i18n="mcp.stopped">Stopped</span></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.enable">Enable MCP server</b><small data-i18n="mcp.enableSub">Starts a local-only (127.0.0.1) server with a fresh token each launch. The app must stay open.</small></div><label class="switch"><input type="checkbox" id="mcpEnabledInput"><span class="slider"></span></label></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.autoWrite">Auto-allow write tools</b><small data-i18n="mcp.autoWriteSub">Skip the confirmation for write tools. Destructive tools always ask.</small></div><label class="switch"><input type="checkbox" id="mcpAutoWriteInput"><span class="slider"></span></label></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.readOnly">Read-only mode</b><small data-i18n="mcp.readOnlySub">Block all write and destructive tools — the AI can only inspect, never change, your server.</small></div><label class="switch"><input type="checkbox" id="mcpReadOnlyInput"><span class="slider"></span></label></div>
+            <div class="input-row"><span class="hint" id="mcpStatus" data-i18n="mcp.stopped">Stopped</span><button type="button" class="btn secondary sm" id="mcpCopyConfig" style="margin-left:auto" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
+          </section>
+          <!-- How to connect (end-user guide) -->
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/book.svg" alt=""><h3 data-i18n="mcp.guideT">Connect an AI client</h3><small data-i18n="mcp.guideD">3 steps</small></div>
+            <ol class="mcp-steps">
+              <li data-i18n="mcp.step1">Turn on the MCP server above — a fresh local address is created each launch.</li>
+              <li data-i18n="mcp.step2">Click "Copy MCP config" — this JSON belongs in your AI client's MCP settings.</li>
+              <li data-i18n="mcp.step3">Paste it into Claude Desktop, Cursor, or any MCP client, then restart that app.</li>
+            </ol>
+            <div class="mcp-cfg"><pre id="mcpConfigPreview" class="mcp-cfg-pre"></pre><button type="button" class="btn secondary sm" id="mcpCopyConfig2" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
+          </section>
+          <!-- What the AI can do (advanced/dev) -->
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/shield.svg" alt=""><h3 data-i18n="mcp.capT">What the AI can do</h3><small data-i18n="mcp.capD">three permission tiers</small></div>
+            <div class="mcp-tier"><span class="badge ok" data-i18n="mcp.riskRead">read</span><div class="mcp-tier-info"><b data-i18n="mcp.capRead">Read — always allowed</b><small data-i18n="mcp.capReadD">Server status, console, players, worlds and metrics.</small></div></div>
+            <div class="mcp-tier"><span class="badge warn" data-i18n="mcp.riskWrite">write</span><div class="mcp-tier-info"><b data-i18n="mcp.capWrite">Write — asked once</b><small data-i18n="mcp.capWriteD">Install content, edit files, send console commands. Skipped when auto-allow is on.</small></div></div>
+            <div class="mcp-tier"><span class="badge bad" data-i18n="mcp.riskDestroy">destroy</span><div class="mcp-tier-info"><b data-i18n="mcp.capDestroy">Destructive — always asks</b><small data-i18n="mcp.capDestroyD">Delete backups/content, stop the server. Can never be auto-allowed.</small></div></div>
+          </section>
+          </div>
+          <div class="set-pane" data-set-pane="advanced" hidden>
+          <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="upd.autoCheck">Check for updates on startup</b><small data-i18n="upd.autoCheckSub">Looks for a new version when the app opens. You can always check manually below.</small></div><label class="switch"><input type="checkbox" id="autoCheckUpdatesInput"><span class="slider"></span></label></div>
+            <div class="input-row"><span class="hint" id="updateStatus"></span><button type="button" class="btn secondary sm" id="checkUpdateBtn" style="margin-left:auto" data-i18n="upd.check">Check for updates</button></div>
+          </section>
+          </div>
+          </div>
         </div>
       </div>
     </section>
@@ -524,17 +558,27 @@
     <div id="playerInspector">
       <div id="playerDataEmpty" class="workspace-empty" hidden><svg class="empty-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><h3>Couldn't load player data</h3><p id="playerDataError" class="text-muted">Pick a player with saved data to inspect their equipment, inventory, ender chest and stats.</p></div>
       <div id="playerDataForm" hidden>
-        <div class="inspect-header"><img id="inspectAvatar" class="inspect-avatar" alt=""><div class="inspect-title"><div class="inspect-name-row"><b id="inspectName">Player</b><span class="inspect-badge" id="inspectState" data-i18n="pd.stateOffline">Offline data</span></div><span id="inspectDim">unknown dimension</span><small id="inspectUuid" class="inspect-uuid" title="Click to copy full UUID">UUID: —</small></div></div>
+        <div class="inspect-header"><img id="inspectAvatar" class="inspect-avatar" alt=""><div class="inspect-title"><div class="inspect-name-row"><b id="inspectName">Player</b><span class="inspect-badge" id="inspectState" data-i18n="pd.stateOffline">Offline data</span><span class="inspect-badges" id="inspectBadges"></span></div><span id="inspectDim">unknown dimension</span><span id="inspectPos" class="inspect-pos" hidden></span><small id="inspectUuid" class="inspect-uuid" title="Click to copy full UUID">UUID: —</small></div></div>
         <div class="inspect-tabs" role="tablist">
           <button type="button" class="inspect-tab active" data-pd-tab="overview" role="tab" data-i18n="pd.tabOverview">Overview</button>
+          <button type="button" class="inspect-tab" data-pd-tab="inventory" role="tab" data-i18n="pd.tabInventory">Inventory</button>
+          <button type="button" class="inspect-tab" data-pd-tab="stats" role="tab" data-i18n="pd.tabStats">Stats</button>
           <button type="button" class="inspect-tab" data-pd-tab="live" role="tab" data-i18n="pd.tabLive">Live actions</button>
-          <button type="button" class="inspect-tab" data-pd-tab="offline" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
+          <button type="button" class="inspect-tab" data-pd-tab="edit" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
         </div>
         <div class="inspect-panel active" id="pdPanelOverview">
         <div class="inspect-readout" id="pdReadout"></div>
         <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="text-list"></div></div>
-        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><span class="inv-count" id="invCount">0 / 36</span><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory"><label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="invSort" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="inventoryList" class="text-list"></div></div>
-        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="text-list"></div></div>
+        <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
+        </div>
+        <div class="inspect-panel" id="pdPanelInventory">
+        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div><div id="hotbarList" class="text-list"></div></div>
+        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><span class="inv-count" id="invCount">0 / 36</span><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory"><label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="invSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="inventoryList" class="text-list"></div></div>
+        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="text-list"></div></div>
+        </div>
+        <div class="inspect-panel" id="pdPanelStats">
+        <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>
+        <div class="pd-stats-grid" id="pdStatsGrid"><div class="inv-empty"><b data-i18n="pd.loadingStats">Loading stats…</b><span data-i18n="pd.loadingStatsSub">Reading the player's saved statistics.</span></div></div>
         </div>
         <div class="inspect-panel" id="pdPanelLive">
           <div class="inspect-note" data-i18n="pd.liveNote">Live actions run as server commands and work while the server is running — the player must be online.</div>
@@ -542,6 +586,7 @@
             <div class="pd-live-cell"><label><span data-i18n="pd.gamemode">Gamemode</span><select id="liveGameType"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select></label><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div>
             <div class="pd-live-cell"><label><span data-i18n="pd.xp">XP level</span><input id="liveXp" type="number" min="0" max="2000000"></label><button type="button" class="btn primary sm" data-live-cmd="xp">Set</button></div>
             <div class="pd-live-cell"><label><span data-i18n="pd.giveItem">Give item (id)</span><input id="liveGiveId" placeholder="minecraft:diamond"></label><label><span data-i18n="pd.giveCount">Count</span><input id="liveGiveCount" type="number" min="1" max="6400" value="1"></label><button type="button" class="btn primary sm" data-live-cmd="give">Give</button></div>
+            <div class="pd-live-cell"><label><span data-i18n="pd.teleport">Teleport (X Y Z)</span><input id="liveTp" placeholder="100 64 -200"></label><button type="button" class="btn primary sm" data-live-cmd="tp">Teleport</button></div>
             <div class="pd-live-cell actions">
               <button type="button" class="btn secondary sm" data-live-cmd="heal" data-i18n="pd.heal">Heal</button>
               <button type="button" class="btn secondary sm" data-live-cmd="feed" data-i18n="pd.feed">Feed</button>
@@ -550,7 +595,7 @@
             </div>
           </div>
         </div>
-        <div class="inspect-panel" id="pdPanelOffline">
+        <div class="inspect-panel" id="pdPanelEdit">
         <div class="inspect-note">Stop the server before editing saved data. A backup of the original <code>.dat</code> is saved automatically. While the server is running, use the Live actions tab instead.</div>
         <div class="inspect-stats"><label><span data-i18n="pd.health">Health</span><input id="pdHealth" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.food">Food</span><input id="pdFood" type="number" min="0" max="20" placeholder="0–20"></label><label><span data-i18n="pd.saturation">Saturation</span><input id="pdSaturation" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.xp">XP level</span><input id="pdXpLevel" type="number" min="0"></label><label><span data-i18n="pd.totalXp">Total XP</span><input id="pdXpTotal" type="number" min="0"></label><label><span data-i18n="pd.gamemode">Gamemode</span><select id="pdGameType"><option value="0">Survival</option><option value="1">Creative</option><option value="2">Adventure</option><option value="3">Spectator</option></select></label></div>
         <label class="inspect-check"><input id="pdClearInventory" type="checkbox"><span data-i18n="pd.clearInv">Clear inventory, armor and offhand (Ender chest untouched)</span></label>
@@ -586,7 +631,6 @@
           <li class="nsw2-step" data-dot="4"><i>04</i><div><b data-i18n="nsw.rail3">Memory</b><small id="nswRailSub3">4 GB</small></div></li>
           <li class="nsw2-step" data-dot="5"><i>05</i><div><b data-i18n="nsw.rail4">Review</b><small>Create</small></div></li>
         </ol>
-        <label class="set-check nsw2-tech"><input type="checkbox" id="nswShowTech"><span data-i18n="nsw.tech">Show technical details</span></label>
       </aside>
 
       <div class="nsw2-main">
@@ -605,33 +649,43 @@
         <!-- STEP 2 · SOFTWARE -->
         <div class="nsw-step" data-step="2">
           <h2 data-i18n="nsw.softwareT">What kind of server?</h2>
-          <p class="text-muted nsw2-lead">Beginners: <b>Vanilla</b> (simplest) or <b>Paper</b> (plugins). The rest are for mods, proxies or big servers.</p>
+          <p class="text-muted nsw2-lead" data-i18n-html="nsw.softwareLead">Beginners: <b>Vanilla</b> (simplest) or <b>Paper</b> (plugins). The rest are for mods, proxies or big servers.</p>
           <div class="nsw2-templates" id="nswTemplates" hidden>
             <p class="eyebrow nsw2-group" data-i18n="nsw.tplTitle">Start from a template</p>
             <div class="nsw2-grid" id="nswTemplateChips"></div>
           </div>
           <div id="nswCards" class="nsw2-cards">
+            <small class="nsw2-hintbar" data-i18n="nsw.pickHint">New here? Pick <b>Vanilla</b> for plain survival or <b>Paper</b> if you want plugins. Tap the ⓘ on any card to learn what it is.</small>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpStart">Start here</p>
             <div class="nsw2-grid">
-              <button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
-              <button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
-              <button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
-              <button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Leaf</b><span data-i18n="nsw.desc.leaf">Paper fork focused on tick speed while keeping vanilla behaviour.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
-              <button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
-              <button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button>
-              <button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button>
-              <button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
-              <button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button>
-              <button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button>
+              <div class="nsw2-cardwrap"><button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="vanilla" aria-label="About Vanilla">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
             </div>
-            <small class="card-tech field-hint" hidden data-i18n="nsw.techHint">Selections are saved per run of the wizard; hover states show the exact download source used by the launcher.</small>
+            <p class="eyebrow nsw2-group" data-i18n="nsw.grpPlugin">Plugin servers</p>
+            <div class="nsw2-grid">
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="purpur" aria-label="About Purpur">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Leaf</b><span data-i18n="nsw.desc.leaf">Paper fork focused on tick speed while keeping vanilla behaviour.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="leaf" aria-label="About Leaf">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="folia" aria-label="About Folia">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button><button type="button" class="nsw-info" data-info="spigot" aria-label="About Spigot">i</button></div>
+            </div>
+            <p class="eyebrow nsw2-group" data-i18n="nsw.grpModded">Modded servers</p>
+            <div class="nsw2-grid">
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="fabric" aria-label="About Fabric">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="neoforge" aria-label="About NeoForge">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="forge" aria-label="About Forge">i</button></div>
+            </div>
+            <p class="eyebrow nsw2-group" data-i18n="nsw.grpProxy">Proxy (advanced)</p>
+            <div class="nsw2-grid">
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="velocity" aria-label="About Velocity">i</button></div>
+            </div>
           </div>
+          <div id="nswInfoPop" class="nsw-info-pop" hidden role="dialog" aria-label="Software details"></div>
         </div>
 
         <!-- STEP 3 · VERSION -->
         <div class="nsw-step" data-step="3">
           <h2 data-i18n="nsw.versionT">Which Minecraft version?</h2>
-          <p class="text-muted nsw2-lead" id="nswVersionLead">Keep <b>Latest</b> unless a mod or plugin page demands an older release.</p>
+          <p class="text-muted nsw2-lead" id="nswVersionLead" data-i18n-html="nsw.versionLead">Keep <b>Latest</b> unless a mod or plugin page demands an older release.</p>
           <p class="text-muted nsw2-lead" id="nswMcFirstLead" hidden data-i18n="nsw.mcFirstLead">Forge/NeoForge build for a specific Minecraft version: pick the Minecraft version first, then a build.</p>
           <div class="nsw-version-cards" id="nswVersionCards">
             <label class="nsw-radio-card active"><input type="radio" name="nswVersionMode" value="latest" checked><div><b data-i18n="nsw.latest">Use the latest version</b><span id="nswLatestLabel" data-i18n="nsw.latestSub">Resolving latest…</span></div><span class="radio-dot"></span></label>
@@ -666,17 +720,18 @@
         <!-- STEP 5 · REVIEW -->
         <div class="nsw-step" data-step="5">
           <h2 data-i18n="nsw.reviewT">Review &amp; create</h2>
-          <p class="text-muted nsw2-lead">Everything is editable — go Back any time before creating.</p>
+          <p class="text-muted nsw2-lead" data-i18n="nsw.reviewLead">Everything is editable — go Back any time before creating.</p>
+          <div class="nsw-tpl-banner" id="nswTplBanner" hidden></div>
           <div class="nsw-summary" id="nswSummary"></div>
           <small class="field-hint nsw2-review-note">The Minecraft EULA is accepted automatically on first start (can be changed in Settings).</small>
-          <p class="proxy-notice" id="nswSpigotHint" hidden>Spigot needs <b>Git</b> installed (BuildTools compiles from source) — missing Git fails the build after ~5 min.</p>
+          <p class="proxy-notice" id="nswSpigotHint" hidden data-i18n-html="nsw.spigotHint">Spigot needs <b>Git</b> installed (BuildTools compiles from source) — missing Git fails the build after ~5 min.</p>
           <div class="nsw-progress set-progress" id="nswProgress" hidden>
             <div class="set-progress-track"><div class="set-progress-fill indeterminate" id="nswProgressFill"></div></div>
             <div class="nsw-progress-row"><span class="set-progress-label" id="nswProgressLabel">Starting download…</span><button class="btn sm danger-ghost" id="nswCancel" data-i18n="nsw.cancel">Cancel</button></div>
           </div>
         </div>
 
-        <div class="nsw-actions"><button class="btn secondary" id="nswBack" hidden>Back</button><span class="nsw-actions-spacer"></span><button class="btn primary" id="nswNext">Next</button></div>
+        <div class="nsw-actions"><button class="btn secondary" id="nswBack" hidden data-i18n="nsw.back">Back</button><span class="nsw-actions-spacer"></span><button class="btn primary" id="nswNext">Next</button></div>
       </div>
     </div>
   </div>
@@ -727,7 +782,7 @@
       </div>
       <div class="im-section" id="imVersionSection">
         <p class="eyebrow" data-i18n="im.version">VERSION</p>
-        <select id="imVersion" class="launcher-select" aria-label="Version"></select>
+        <select id="imVersion" class="launcher-select ol-select" aria-label="Version"></select>
       </div>
       <div class="im-section" id="imDepsSection" hidden>
         <p class="eyebrow" data-i18n="im.depsT">DEPENDENCIES</p>
@@ -752,4 +807,4 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>

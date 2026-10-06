@@ -2,41 +2,38 @@
 // Players tab: roster, badges, inspector, OP/whitelist/ban.
 // TEXT-ONLY item display — no textures, just readable labels. Keeps the same IDs so save logic is untouched.
 function itemLabel(id){return String(id||'').replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||t('ply.unknownItem')}
+// v4.0.0: config-driven grid so hotbar (0-8) / main inventory (9-35) / ender chest (0-26)
+// share one renderer. base = first slot index, slots = how many.
+const GRID_CFG={
+  '#hotbarList':{slots:9,base:0,count:'#hotbarCount',bar:null,getQ:()=>'',getShow:()=>invShowEmpty,getSort:()=>invSortBy},
+  '#inventoryList':{slots:27,base:9,count:'#invCount',bar:'#invBar',getQ:()=>invSearchQuery,getShow:()=>invShowEmpty,getSort:()=>invSortBy},
+  '#enderChestList':{slots:27,base:0,count:'#ecCount',bar:'#ecBar',getQ:()=>ecSearchQuery,getShow:()=>ecShowEmpty,getSort:()=>ecSortBy},
+};
 function renderItemGrid(id,items){
   const n=$(id);if(!n)return;
-  const isInv=id==='#inventoryList';
-  const q=(isInv?invSearchQuery:ecSearchQuery).trim().toLowerCase();
-  const showEmpty=isInv?invShowEmpty:ecShowEmpty;
-  const sortBy=isInv?invSortBy:ecSortBy;
-  const raw=(items||[]).filter(x=>x.id&&x.id!=='minecraft:air');
-  const totalSlots=isInv?36:27;
+  const cfg=GRID_CFG[id];if(!cfg)return;
+  const q=String(cfg.getQ()||'').trim().toLowerCase();
+  const showEmpty=cfg.getShow();
+  const sortBy=cfg.getSort();
+  const raw=(items||[]).filter(x=>x&&x.id&&x.id!=='minecraft:air'&&x.slot>=cfg.base&&x.slot<cfg.base+cfg.slots);
+  const totalSlots=cfg.slots;
   const used=raw.length;
-  // summary header is handled by caller via #invCount / #ecCount — keep in sync
-  const countEl=isInv?$('#invCount'):$('#ecCount');
-  if(countEl) countEl.textContent=`${used} / ${totalSlots}`;
-  const bar=isInv?$('#invBar'):$('#ecBar');
-  if(bar) bar.style.width=`${Math.round(used/totalSlots*100)}%`;
-  if(!used && !showEmpty){n.innerHTML=`<div class="inv-empty"><b data-i18n="pd.emptyInv">Inventory is empty</b><span data-i18n="pd.emptyInvSub">No items in this inventory. Use the world to collect items.</span></div>`;return}
-  // build full slot map (0..35 or 0..26) for showEmpty, else only used
-  let list=[];
+  const countEl=$(cfg.count); if(countEl) countEl.textContent=`${used} / ${totalSlots}`;
+  const bar=cfg.bar?$(cfg.bar):null; if(bar) bar.style.width=`${Math.round(used/totalSlots*100)}%`;
+  if(!used && !showEmpty){n.innerHTML=`<div class="inv-empty"><b>${esc(t('pd.emptyInv'))}</b><span>${esc(t('pd.emptyInvSub'))}</span></div>`;return}
+  let list;
   if(showEmpty){
     const bySlot=new Map(raw.map(x=>[x.slot,x]));
-    for(let s=0;s<totalSlots;s++){
-      const it=bySlot.get(s);
-      if(it) list.push(it);
-      else list.push({slot:s, id:null, count:0, empty:true});
-    }
-  } else {
-    list=[...raw];
-  }
+    list=[];
+    for(let s=cfg.base;s<cfg.base+totalSlots;s++){const it=bySlot.get(s);list.push(it||{slot:s,id:null,count:0,empty:true})}
+  }else{list=[...raw]}
   if(q) list=list.filter(x=>!x.empty && String(x.id).toLowerCase().includes(q));
-  // sort
   if(sortBy==='name') list.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
   else if(sortBy==='count') list.sort((a,b)=>(b.count||0)-(a.count||0));
   else list.sort((a,b)=>a.slot-b.slot);
   if(!list.length){n.innerHTML=`<div class="inv-empty"><b>${esc(t('pd.noMatch'))}</b><span>${esc(t('pd.noMatchSub'))}</span></div>`;return}
   n.innerHTML=list.map((x,i)=>{
-    if(x.empty) return `<div class="inv-row empty" style="animation-delay:${i*18}ms"><span class="slot">#${x.slot}</span><span class="item-name muted">${t('ply.emptySlot')}</span><span class="count"></span></div>`;
+    if(x.empty) return `<div class="inv-row empty" style="animation-delay:${i*18}ms"><span class="slot">#${x.slot}</span><span class="item-name muted">${esc(t('ply.emptySlot'))}</span><span class="count"></span></div>`;
     const label=itemLabel(x.id);
     return `<div class="inv-row" style="animation-delay:${i*18}ms" title="${esc(label)} — ${esc(x.id)}"><span class="slot">#${x.slot}</span><span class="item-name">${esc(label)}</span><span class="count">×${x.count}</span></div>`;
   }).join('');
@@ -150,6 +147,41 @@ function renderPdReadout(d,isOnline){
   ];
   el.innerHTML=rows.map(([k,v,c])=>`<div class="pd-ro"><span>${esc(k)}</span><b class="${c}">${esc(String(v))}</b></div>`).join('');
 }
+// v4.0.0: header badges (OP / WL / banned) from the roster model, so the inspector shows role at a glance.
+function renderPdBadges(name){
+  const el=$('#inspectBadges');if(!el)return;
+  const all=buildPlayerRows();
+  const p=all.find(x=>String(x.name).toLowerCase()===String(name).toLowerCase())||{};
+  el.innerHTML=badgeHtml(p);
+}
+// v4.0.0: active effects (from NBT). Empty when the player has none.
+function renderPdEffects(effects){
+  const sec=$('#pdEffectsSec'),list=$('#pdEffectsList');if(!list)return;
+  const arr=effects||[];
+  if(!arr.length){if(sec)sec.hidden=true;return}
+  if(sec)sec.hidden=false;
+  const cnt=$('#pdEffectsCount');if(cnt)cnt.textContent=`${arr.length} active`;
+  list.innerHTML=arr.map((e,i)=>`<div class="inv-row" style="animation-delay:${i*18}ms"><span class="slot">${esc((e.name||'?').replace(/^minecraft:/,''))}</span><span class="item-name">${esc(e.name||'')}</span><span class="count">${e.amplifier!==undefined?`Lv ${(e.amplifier||0)+1}`:''}${e.duration?` · ${Math.round(e.duration/20)}s`:''}</span></div>`).join('');
+}
+// v4.0.0: Stats tab — pulled from the world save stats (see backend). Hidden-friendly when missing.
+// v4.0.0: Stats tab. The saved stats JSON is {stats:{ 'minecraft:custom':{ 'minecraft:deaths':N, ... }}}.
+// We surface the 'custom' category (the human-interest numbers) as labelled rows; unknown keys get a
+// cleaned-up label. Playtime/deaths/kills/walk are highlighted first.
+const STAT_ORDER=['minecraft:play_time','minecraft:walk_one_cm','minecraft:deaths','minecraft:mob_kills','minecraft:player_kills','minecraft:jump','minecraft:damage_dealt','minecraft:blocks_mined'];
+function statLabel(k){return String(k).replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
+function fmtStat(k,v){
+  if(k==='minecraft:play_time'||k==='minecraft:play_one_minute') return `${Math.round((v/20)/60)} min`;
+  if(k==='minecraft:walk_one_cm'||k.endsWith('_one_cm')) return `${(v/100).toFixed(0)} m`;
+  return String(v);
+}
+function renderPdStats(stats){
+  const g=$('#pdStatsGrid');if(!g)return;
+  const custom=(stats&&stats.stats&&stats.stats['minecraft:custom'])||null;
+  if(!custom||!Object.keys(custom).length){g.innerHTML=`<div class="inv-empty"><b>${esc(t('pd.noStats'))}</b><span>${esc(t('pd.noStatsSub'))}</span></div>`;return}
+  const keys=Object.keys(custom);
+  const ordered=[...STAT_ORDER.filter(k=>k in custom),...keys.filter(k=>!STAT_ORDER.includes(k))].slice(0,24);
+  g.innerHTML=ordered.map((k,i)=>`<div class="pd-stat" style="animation-delay:${i*20}ms"><span>${esc(statLabel(k))}</span><b>${esc(fmtStat(k,custom[k]))}</b></div>`).join('');
+}
 async function pdLiveAction(action){
   const name=selectedPlayer?.name;if(!name)return;
   if(!state.running)return toast(t('pd.needServer'),'error');
@@ -161,6 +193,7 @@ async function pdLiveAction(action){
   else if(action==='feed'){send(`effect give ${name} minecraft:saturation 1 10 true`)}
   else if(action==='clear'){if(await confirmDialog({title:t('pd.clearInvBtn'),body:t('pd.confirmClear',{n:name}),ok:t('pd.clearInvBtn'),danger:true}))send(`clear ${name}`)}
   else if(action==='kick'){if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))send(`kick ${name}`)}
+  else if(action==='tp'){const parts=String($('#liveTp').value||'').trim().split(/\s+/).map(Number);if(parts.length<3||parts.some(n=>!Number.isFinite(n)))return toast(t('pd.badCoords'),'error');send(`tp ${name} ${parts[0]} ${parts[1]} ${parts[2]}`)}
 }
 $$('.inspect-tab').forEach(b=>b.onclick=()=>pdSetTab(b.dataset.pdTab));
 $('#pdPanelLive')?.addEventListener('click',e=>{const b=e.target.closest('[data-live-cmd]');if(b&&!b.disabled)pdLiveAction(b.dataset.liveCmd)});
@@ -192,11 +225,17 @@ async function openPlayerInspector(uuid,name){
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
   $('#inspectAvatar').src=`https://mc-heads.net/avatar/${encodeURIComponent(uuid)}/44`;
   $('#inspectName').textContent=name;$('#inspectDim').textContent=d.dimension||t('ply.unknownDim');
+  renderPdBadges(name);
+  const posEl=$('#inspectPos');
+  if(posEl){const p=d.pos||[];if(p.length>=3){posEl.hidden=false;posEl.textContent=`X ${Math.round(p[0])}  Y ${Math.round(p[1])}  Z ${Math.round(p[2])}`}else{posEl.hidden=true}}
   renderPdReadout(d,isOnline);
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.title=`${uuid} — ${t('ply.copyUuidHint')}`; uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
   $('#pdHealth').value=d.health??'';$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation??'';$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
-  renderEquipment(d.armor,d.offhand);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);
+  renderEquipment(d.armor,d.offhand);
+  renderItemGrid('#hotbarList',d.inventory);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);
+  renderPdEffects(d.effects);
+  renderPdStats(d.stats);
 }
 $('#playersList').addEventListener('click',async e=>{
   const btn=e.target.closest('[data-row-action]');if(!btn||btn.disabled)return;
@@ -209,7 +248,11 @@ $('#playersList').addEventListener('click',async e=>{
   if(action==='kick')return withBusy(btn,async()=>{const bad=playerNameError(name);if(bad)return toast(bad);if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))command(`kick ${name}`)});
   if(action==='inspect')openPlayerInspector(uuid,name);
 });
-$('#invSearch')?.addEventListener('input',e=>{invSearchQuery=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#invShowEmpty')?.addEventListener('change',e=>{invShowEmpty=e.target.checked;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#invSort')?.addEventListener('change',e=>{invSortBy=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});$('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#playerInspectClose').onclick=closePlayerInspectModal;
+$('#invSearch')?.addEventListener('input',e=>{invSearchQuery=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});
+// v4.0.0: the hotbar shares invShowEmpty + invSort, so a change re-renders both grids.
+const rerenderInv=()=>{renderItemGrid('#hotbarList',lastInspectData?.inventory||[]);renderItemGrid('#inventoryList',lastInspectData?.inventory||[])};
+$('#invShowEmpty')?.addEventListener('change',e=>{invShowEmpty=e.target.checked;rerenderInv()});
+$('#invSort')?.addEventListener('change',e=>{invSortBy=e.target.value;rerenderInv()});$('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#playerInspectClose').onclick=closePlayerInspectModal;
 $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
   playerFilter=b.dataset.playerFilter;playerPage=0;
   $$('[data-player-filter]').forEach(x=>{ const on=x===b; x.classList.toggle('active',on); x.setAttribute('aria-pressed', on?'true':'false'); });

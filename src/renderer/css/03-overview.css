@@ -2,11 +2,13 @@
 /* overview hero, tabs, console, performance. */
 /* OVERVIEW — hero (redesign): identity + problems-only checklist + stats.
    One status signal (dot lives INSIDE the pill), no duplicated indicators. */
-.hero{display:flex;flex-direction:column;gap:0;padding:20px 24px 18px}
-.hero-top{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.hero-id{flex:2 1 280px;min-width:0;display:flex;flex-direction:column;gap:8px}
-.hero-id>b{font-size:20px;font-weight:700;letter-spacing:-.015em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hero-sub{margin:0;display:flex;align-items:center;gap:12px;min-width:0;font-size:13px;color:var(--text-muted)}
+.hero{display:flex;flex-direction:column;gap:0;padding:var(--space-6) var(--space-7) var(--space-5);border-radius:var(--r-lg);transition:box-shadow var(--dur-modal) var(--ease-out)}
+/* Alive ≠ loading: a running server gets a soft static ring, never a spinner (DESIGN.md 10.2). */
+.hero.is-running{box-shadow:0 0 0 1px var(--instance-accent),0 0 34px var(--brand-soft)}
+.hero-top{display:flex;align-items:flex-start;gap:var(--space-5);flex-wrap:wrap}
+.hero-id{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:var(--space-2)}
+.hero-id>b{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-sub{margin:0;display:flex;align-items:center;gap:var(--space-3);min-width:0;font-size:14px;color:var(--text-muted)}
 .hero-sub #serverHint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .status-pill{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;border:1px solid var(--border-strong);border-radius:999px;padding:4px 11px 4px 8px;background:var(--field)}
 .status-pill .metric-hero-dot.status-dot{width:12px;height:12px;min-width:12px}
@@ -17,14 +19,22 @@
 .status-pill .sd-core{width:8px;height:8px}
 .status-pill strong{font:700 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
 .status-pill strong.ok{color:var(--success)} .status-pill strong.warn{color:var(--warning)} .status-pill strong.bad{color:var(--danger)}
-.hero-meta{margin:0;display:none;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
-.hero.is-running .hero-meta{display:flex}
+.hero-meta{margin:0;display:flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
 .hero-meta small{font-size:11px}
-.srv-sep{color:var(--border-strong);font-size:11px}
-.srv-uptime{font-size:9.5px;letter-spacing:.1em;white-space:nowrap}
-.srv-uptime b{color:var(--text);font-size:12px;font-variant-numeric:tabular-nums;letter-spacing:0}
-.hero .welcome-actions{display:flex;gap:8px;flex:0 0 auto;margin-left:auto}
-.hero.needs-attention{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
+.hero .welcome-actions{display:flex;gap:var(--space-2);flex:0 0 auto;margin-left:auto;align-self:center;flex-wrap:wrap}
+.hero .welcome-actions .btn{padding:10px 16px;font-size:13.5px}
+.hero.needs-attention{border-color:var(--warning);box-shadow:0 0 0 2px var(--warning-weak)}
+/* Collapsing panels: the connect panel + the RAM/JVM panel (v4.0.0: RAM+JVM live on Overview). */
+.ov-adv,.connect-panel{padding:0}
+.ov-adv-summary,.connect-summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-4) var(--space-5);font:600 14px var(--font-ui);color:var(--text-muted)}
+.ov-adv-summary::-webkit-details-marker,.connect-summary::-webkit-details-marker{display:none}
+.ov-adv-summary:hover,.connect-summary:hover{color:var(--text)}
+.connect-summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-4) var(--space-5);font:600 14px var(--font-ui);color:var(--text-muted)}
+.connect-summary::-webkit-details-marker{display:none}
+.connect-summary:hover{color:var(--text)}
+.ov-adv-chevron{color:var(--text-dim);font-family:var(--font-mono);transition:transform var(--dur-fast) var(--ease-out)}
+.ov-adv[open] .ov-adv-chevron,.connect-panel[open] .ov-adv-chevron{transform:rotate(90deg)}
+.connect-body{padding:0 var(--space-5) var(--space-5)}
 /* Setup checklist: rendered ONLY when something needs attention. */
 .hero-steps{list-style:none;margin:14px 0 0;padding:12px 0 0;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .hero-steps li{margin:0;padding:0}
@@ -53,8 +63,27 @@
 /* Legacy hooks kept for JS compat (welcomeCard toggle). */
 .welcome-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
 @media(max-width:1100px){.hero .welcome-actions{margin-left:0}.srv-stats{flex-wrap:wrap;gap:14px 0}.srv-stats>div{flex:1 1 22%;min-width:0;padding:0 12px}.srv-stats>div:first-child{padding-left:0}.stat-ram{margin-left:0;border-left:0;padding-left:12px}}
+/* ============ v4.0.0 OVERVIEW MOTION (DESIGN.md 10) ============ */
+/* Hero entrance: rises + fades when the tab becomes active, same language as the row stagger. */
+@keyframes heroIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.tab.active .hero{animation:heroIn var(--dur-slow) var(--ease-out) both}
+/* Alive ≠ loading: a running server breathes with a very slow, static-feeling glow (never a spinner). */
+@keyframes heroBreath{0%,100%{box-shadow:0 0 0 1px var(--instance-accent),0 0 26px var(--brand-soft)}50%{box-shadow:0 0 0 1px var(--instance-accent),0 0 40px var(--brand-glow)}}
+.hero.is-running{animation:heroBreath calc(var(--dur-pulse) * 3.4) var(--ease-out) infinite}
+/* Collapsible panels ease open/close (Chromium 131+ interpolate-size). */
+.ov-adv,.connect-panel{interpolate-size:allow-keywords}
+.ov-adv::details-content,.connect-panel::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
+.ov-adv[open]::details-content,.connect-panel[open]::details-content{block-size:auto}
+.ov-adv .ov-adv-body,.connect-panel .connect-body{animation:heroIn var(--dur-modal) var(--ease-out) both}
+.ov-adv-body{padding:0 var(--space-5) var(--space-5)}
+.ov-adv-body .ov-ram-box{border-top:1px solid var(--border);border-radius:0;padding:var(--space-4) 0 0;background:transparent}
+.ov-adv-body .set-fold{margin-top:var(--space-4)}
+@media (prefers-reduced-motion:reduce){.tab.active .hero,.hero.is-running{animation:none!important}}
+html.motion-lite .tab.active .hero{animation:none}
+html.motion-lite .hero.is-running{animation:none;box-shadow:0 0 0 1px var(--instance-accent)}
+
 /* First-run declutter: before a folder is chosen, only the hero CTA shows. */
-#overview:not(.has-server) .ov-stats-panel,
+#overview:not(.has-server) .ov-adv,
 #overview:not(.has-server) .chart-panel,
 #overview:not(.has-server) #connectPanel,
 #overview:not(.has-server) #javaWarnBanner{display:none}
@@ -114,12 +143,16 @@
 .connect-channel-actions{display:flex;gap:8px;margin-top:10px} .connect-channel-actions .btn{flex:1;padding:8px 12px;font-size:12px}
 /* PUBLIC TUNNEL (Playit) — share the server to the internet without port forwarding. */
 .tunnel-box{margin-top:14px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);padding:12px 14px;background:var(--panel)}
-.connect-advanced{margin-top:10px}
-.connect-advanced>summary{cursor:pointer;font:600 11.5px var(--font-ui);color:var(--text-dim);list-style:none;padding:4px 0}
+.connect-advanced{margin-top:12px}
+/* v4.0.0: make this a VISIBLE disclosure bar, not a dim 11.5px line users skip over. */
+.connect-advanced>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--space-3);font:600 13.5px var(--font-ui);color:var(--text);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
 .connect-advanced>summary::-webkit-details-marker{display:none}
-.connect-advanced>summary::before{content:'▸ ';color:var(--accent)}
-.connect-advanced[open]>summary::before{content:'▾ '}
-.connect-advanced p{margin:10px 0;line-height:1.55}
+.connect-advanced>summary::before{content:'▸';color:var(--brand);font-family:var(--font-mono);font-size:13px;transition:transform var(--dur-fast) var(--ease-out)}
+.connect-advanced[open]>summary::before{transform:rotate(90deg)}
+.connect-advanced>summary:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.connect-advanced[open]>summary{border-radius:var(--r-sm) var(--r-sm) 0 0;border-bottom-color:transparent}
+.connect-advanced p{margin:var(--space-4) var(--space-4) var(--space-3);line-height:1.55}
+.connect-advanced .btn{margin:0 var(--space-4) var(--space-4)}
 .tunnel-help{display:inline-block;margin-left:6px}
 .tunnel-help>summary{cursor:pointer;font:600 11.5px var(--font-ui);color:var(--accent);list-style:none}
 .tunnel-help>summary::-webkit-details-marker{display:none}
@@ -129,8 +162,9 @@
 .chart-wrap{position:relative}
 .chart-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:13px;color:var(--text-dim);background:var(--panel);border-radius:var(--r);pointer-events:none}
 .chart-empty-overlay[hidden]{display:none}
-.wm-perf-note{font-size:11.5px;line-height:1.5;color:var(--warning);border-left:3px solid var(--warning);background:var(--field);border-radius:var(--r-sm);padding:8px 12px;margin:0 0 12px}
-.wm-modded-note{font-size:11.5px;line-height:1.5;color:var(--text-dim);border-left:3px solid var(--accent);background:var(--field);border-radius:var(--r-sm);padding:8px 12px;margin:0 0 12px}
+/* v4.0.0: the perf note is a HINT, not an alarm — quiet text with a subtle left mark (DESIGN.md 17.8). */
+.wm-perf-note{font-size:11.5px;line-height:1.5;color:var(--text-muted);border-left:2px solid var(--border-strong);background:var(--field);border-radius:var(--r-xs);padding:8px 12px;margin:0 0 12px}
+.wm-modded-note{font-size:11.5px;line-height:1.5;color:var(--text-muted);border-left:2px solid var(--brand);background:var(--field);border-radius:var(--r-xs);padding:8px 12px;margin:0 0 12px}
 .wm-modded-note[hidden]{display:none}
 /* Collapsible tunnel box (1.1.0): was fully expanded and dominated the Home view.
    Now it's a <details> — the head row is the toggle, body hidden until opened. */
@@ -202,7 +236,7 @@
 .log-line{padding:1px 0 1px 10px;border-left:2px solid transparent;white-space:pre-wrap;word-break:break-all;position:relative;animation:logLineIn .15s var(--ease-out)}
 .log-line[data-level="error"]{color:var(--danger);border-left-color:var(--danger)}
 .log-line[data-level="warn"]{color:var(--warning);border-left-color:var(--warning)}
-.log-line[data-level="command"]{color:var(--accent);border-left-color:var(--accent);background:rgba(0,229,255,.03)}
+.log-line[data-level="command"]{color:var(--accent);border-left-color:var(--accent);background:rgba(34,197,94,.05)}
 .log-line[data-level="system"]{color:var(--success);border-left-color:var(--success)}
 .log-line[data-level="info"]{color:var(--text-muted)}
 .log-line .time{color:var(--text-dim);opacity:.7;margin-right:8px;user-select:none;font-size:10px}
@@ -218,13 +252,13 @@
    landing in a receiver. A ::before overlay (NOT a filter — filter promotes a GPU layer and kills
    subpixel text AA). One-shot per line; ends at opacity 0. */
 .log-line.sweep::before{content:'';position:absolute;left:0;top:0;bottom:0;width:100%;pointer-events:none;
-  background:linear-gradient(90deg, rgba(0,229,255,.16), transparent 60%);
+  background:linear-gradient(90deg, rgba(34,197,94,.16), transparent 60%);
   transform:scaleX(0);transform-origin:left;opacity:0;
   animation:logSweep .5s var(--ease-out) both}
 @keyframes logSweep{0%{transform:scaleX(0);opacity:1}60%{transform:scaleX(1);opacity:.5}100%{transform:scaleX(1);opacity:0}}
 .log-line.sweep[data-level="error"]::before{background:linear-gradient(90deg, rgba(255,59,92,.20), transparent 60%)}
 .log-line.sweep[data-level="warn"]::before{background:linear-gradient(90deg, rgba(255,210,63,.18), transparent 60%)}
-.log-line.sweep[data-level="command"]::before{background:linear-gradient(90deg, rgba(0,229,255,.22), transparent 60%)}
+.log-line.sweep[data-level="command"]::before{background:linear-gradient(90deg, rgba(34,197,94,.22), transparent 60%)}
 .log-jump{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);border:1px solid var(--border-strong);background:var(--panel-raised);color:var(--text);border-radius:3px;padding:6px 12px;font:600 11px var(--font-ui);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 .command-row{display:flex;gap:8px;align-items:center;background:var(--field);border:1px solid var(--border-strong);border-radius:3px;padding:0 8px 0 10px;height:36px;flex-shrink:0;margin:0 14px 14px}
 .command-row .prompt{font:700 15px var(--font-mono);color:var(--accent)}
@@ -257,37 +291,40 @@
 .perf-status-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
 .perf-status .btn{margin-left:auto;flex-shrink:0}
 #performance.is-live .perf-status{display:none}
-/* KPI cards: label + one big number + quiet bar. No paragraphs. Help (?) keeps the explanation. */
-.perf-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.perf-kpi{padding:16px;border-radius:4px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
-.perf-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:.6}
-.perf-kpi:nth-child(2)::before{background:var(--danger)} .perf-kpi:nth-child(3)::before{background:var(--warning)} .perf-kpi:nth-child(4)::before{background:var(--success)}
+/* v4.0.0: KPI numbers live in ONE calm surface divided by hairlines (was 4 neon-topped cards). */
+.perf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.perf-stat{padding:var(--space-4) var(--space-5);display:flex;flex-direction:column;gap:var(--space-2);border-left:1px solid var(--border)}
+.perf-stat:first-child{border-left:0}
 .kpi-head{display:flex;align-items:center;gap:8px;font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-dim)}
 .kpi-help{width:16px;height:16px;display:inline-grid;place-items:center;border:1px solid var(--border);border-radius:50%;font:700 10px var(--font-ui);color:var(--text-dim);cursor:help;flex-shrink:0}
-.kpi-help:hover{border-color:var(--accent);color:var(--accent)}
+.kpi-help:hover{border-color:var(--brand);color:var(--brand)}
 .kpi-badge{margin-left:auto;font:700 10px var(--font-mono);padding:3px 7px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-muted)}
-.kpi-badge.ok{color:var(--success);border-color:rgba(0,229,160,.25);background:var(--success-weak)} .kpi-badge.warn{color:var(--warning);border-color:rgba(255,210,63,.25);background:var(--warning-weak)} .kpi-badge.bad{color:var(--danger);border-color:rgba(255,59,92,.25);background:var(--danger-weak)}
-.perf-kpi strong{font:700 30px var(--font-mono);letter-spacing:-.02em;margin:2px 0;font-variant-numeric:tabular-nums}
-.kpi-bar{height:4px;background:var(--field);border:1px solid var(--border);border-radius:999px;overflow:hidden}
-.kpi-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s var(--ease)}
+.kpi-badge.ok{color:var(--success);border-color:var(--success-weak);background:var(--success-weak)} .kpi-badge.warn{color:var(--warning);border-color:var(--warning-weak);background:var(--warning-weak)} .kpi-badge.bad{color:var(--danger);border-color:var(--danger-weak);background:var(--danger-weak)}
+.perf-stat strong{font:700 32px var(--font-mono);letter-spacing:-.02em;margin:0;font-variant-numeric:tabular-nums}
+/* Thin 3px bar (was 4px + border) — quieter, still glanceable. */
+.kpi-bar{height:3px;background:var(--field);border-radius:999px;overflow:hidden}
+.kpi-bar i{display:block;height:100%;width:0;background:var(--brand);transition:width var(--dur-slow) var(--ease-out)}
 .kpi-bar.mspt i{background:var(--danger)} .kpi-bar.cpu i{background:var(--warning)} .kpi-bar.ram i{background:var(--success)}
 /* Dim the numbers while stopped so "—" reads as resting, not broken. */
-#performance:not(.is-live) .perf-kpi strong{color:var(--text-dim)}
-#performance:not(.is-live) .perf-kpi .kpi-bar{opacity:.5}
-/* Charts: title + one quiet action. Legends are dots only. */
-.perf-main{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.perf-chart{display:flex;flex-direction:column;flex:1;padding:14px 14px 12px}
-.chart-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)}
-.chart-head h3{font-size:13px;margin:0}
-.chart-wrap{position:relative;flex:1;min-height:200px}
-.chart-wrap canvas{position:relative;z-index:1}
-.chart-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center;background:var(--field);border:1px solid var(--border);border-radius:4px;z-index:2}
-.chart-empty b{font:700 13px var(--font-ui);color:var(--text)} .chart-empty span{font:500 11.5px var(--font-ui);color:var(--text-muted)}
+#performance:not(.is-live) .perf-stat strong{color:var(--text-dim)}
+#performance:not(.is-live) .perf-stat .kpi-bar{opacity:.5}
+/* Charts: ONE surface, two columns split by a vertical hairline (was 2 separate glass cards). */
+.perf-charts{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.perf-chart{display:flex;flex-direction:column;padding:var(--space-4) var(--space-5);min-width:0}
+.perf-chart+.perf-chart{border-left:1px solid var(--border)}
+.chart-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:var(--space-3);margin-bottom:var(--space-3);border-bottom:1px solid var(--border)}
+.chart-head h3{font-size:14px;margin:0}
+.chart-wrap{position:relative;flex:1;min-height:200px;min-width:0}
+/* width:100% so the canvas follows its grid track instead of forcing its 1000px attribute width on
+   the track (a canvas without this makes the sibling column collapse). JS re-measures on draw. */
+.chart-wrap canvas{position:relative;z-index:1;width:100%;height:100%;display:block}
+.chart-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);z-index:2}
+.chart-empty b{font:700 13px var(--font-ui);color:var(--text)} .chart-empty span{font:500 12px var(--font-ui);color:var(--text-muted)}
 .chart-empty[hidden]{display:none!important}
-.chart-legend{display:flex;gap:14px;margin-top:10px;font:500 10.5px var(--font-mono);color:var(--text-muted)}
-.chart-live{font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--success);border:1px solid rgba(0,229,160,.2);background:var(--success-weak);padding:4px 8px;border-radius:999px;flex-shrink:0}
+.chart-legend{display:flex;gap:14px;margin-top:10px;font:500 11px var(--font-mono);color:var(--text-muted)}
+.chart-live{font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--success);border:1px solid var(--success-weak);background:var(--success-weak);padding:4px 8px;border-radius:999px;flex-shrink:0}
 /* Details disclosure: advanced tools hidden until asked for. */
-.perf-details{border:1px solid var(--border);border-radius:4px;background:var(--panel);padding:0}
+.perf-details{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);padding:0}
 .perf-details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:12px 16px;font:600 12.5px var(--font-ui);color:var(--text-muted)}
 .perf-details>summary::-webkit-details-marker{display:none}
 .perf-details>summary::before{content:'▸';color:var(--accent);font-family:var(--font-mono)}
@@ -301,4 +338,4 @@
 .diag-badge{margin-left:auto;font:700 10px var(--font-mono);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-muted);flex-shrink:0}
 .diag-badge.ok{color:var(--success);border-color:rgba(0,229,160,.25);background:var(--success-weak)}
 .diag-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-@media(max-width:1000px){.perf-kpis{grid-template-columns:1fr 1fr} .perf-main{grid-template-columns:1fr}}
+@media(max-width:1000px){.perf-stats{grid-template-columns:1fr 1fr}.perf-stat:nth-child(odd){border-left:0}.perf-stat:nth-child(3),.perf-stat:nth-child(4){border-top:1px solid var(--border)}.perf-charts{grid-template-columns:1fr}.perf-chart+.perf-chart{border-left:0;border-top:1px solid var(--border)}}

@@ -5,8 +5,9 @@ function renderWorlds(worlds){
   if(!worlds.length){
     n.innerHTML=`<div class="wld-none"><img src="./assets/icons/ui/grid.svg" alt=""><div><b>${t('wld.noneT')}</b><span>${t('wld.noneS')}</span></div><button class="btn secondary sm" data-open-world=".">${t('wld.openFolder')} ↗</button></div>`;
   } else {
-    const kindOf=x=>/_the_end$/i.test(x)?{tag:t('wld.tagEnd'),icon:'grid'}:/_nether$/i.test(x)?{tag:t('wld.tagNether'),icon:'shield'}:{tag:t('wld.tagOverworld'),icon:'cube'};
-    n.innerHTML=worlds.map(x=>{const k=kindOf(x);return `<div class="wld-row" title="${esc(x)}"><img class="wld-row-icon" src="./assets/icons/ui/${k.icon}.svg" alt=""><div class="wld-row-main"><b>${esc(x)}</b><small>${k.tag}</small></div><button class="text-btn" data-open-world="${esc(x)}">${t('wld.open')}</button></div>`}).join('');
+    const kindOf=x=>/_the_end$/i.test(x)?{tag:t('wld.tagEnd'),cls:'end'}:/_nether$/i.test(x)?{tag:t('wld.tagNether'),cls:'nether'}:{tag:t('wld.tagOverworld'),cls:'over'};
+    // v4.0.0: entity cards (DESIGN.md 16) instead of the old text row — consistent with Players.
+    n.innerHTML=worlds.map(x=>{const k=kindOf(x);return `<div class="entity-card wld-card" title="${esc(x)}"><span class="entity-avatar accent">◫</span><div class="entity-body"><div class="entity-title">${esc(x)}</div><div class="entity-meta"><span class="badge wld-tag-${k.cls}">${esc(k.tag)}</span></div></div><div class="entity-actions"><button class="btn sm secondary" data-open-world="${esc(x)}">${t('wld.open')}</button></div></div>`}).join('');
   }
   $$('[data-open-world]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.openWorld));
   const wc=$('#worldsCountPill'); if(wc) wc.textContent=String(worlds.length);
@@ -22,3 +23,5 @@ function renderBackups(items){
   $$('[data-restore]').forEach(b=>b.onclick=async()=>{if(!await confirmDialog({title:t('wld.restore'),body:t('toast.confirmRestore',{n:b.dataset.restore}),ok:t('wld.restore')}))return;const r=await window.observer.restoreBackup(b.dataset.restore);if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t('toast.backupRestored'))});
   $$('[data-delete]').forEach(b=>b.onclick=async()=>{if(!await confirmDialog({title:t('wld.delete'),body:t('wld.confirmDelete'),ok:t('wld.delete'),danger:true}))return;const r=await window.observer.deleteBackup(b.dataset.delete);if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t('toast.backupDeleted'))});
 }
+// The empty state's own Create button routes to the same handler as the header one.
+$$('[data-create-backup]').forEach(b=>b.onclick=()=>$('#createBackup')?.click());

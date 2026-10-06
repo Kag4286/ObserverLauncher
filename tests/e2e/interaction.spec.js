@@ -63,18 +63,18 @@ test('renderer stays error-free across all tabs and a modal open/close', async (
   expect(getRendererErrors(ctx)).toEqual([]);
 });
 
-test('Settings Basic/Advanced switch toggles panes and sizes the glider', async () => {
+test('Settings category nav toggles panes and sizes the glider', async () => {
   await gotoTab(win, 'settings');
 
+  // v4.0.0: 5 categories (setup/personal/automation/integrations/advanced) instead of Basic/Advanced.
   await win.locator('#settingsSeg .seg-switch-btn[data-set-view="advanced"]').click();
   await expect(win.locator('#settings .set-pane[data-set-pane="advanced"]')).toBeVisible();
-  await expect(win.locator('#settings .set-pane[data-set-pane="basic"]')).toBeHidden();
-  // Regression: the glider measured 0px while the Settings tab was hidden; it must be sized now.
-  const advW = await win.locator('#settingsSeg .seg-switch-glider').evaluate(el => el.offsetWidth);
-  expect(advW).toBeGreaterThan(0);
+  await expect(win.locator('#settings .set-pane[data-set-pane="setup"]')).toBeHidden();
+  // v4.0.0: no JS glider any more — the active nav button carries a CSS background instead.
+  await expect(win.locator('#settingsSeg .seg-switch-btn[data-set-view="advanced"]')).toHaveClass(/active/);
 
-  await win.locator('#settingsSeg .seg-switch-btn[data-set-view="basic"]').click();
-  await expect(win.locator('#settings .set-pane[data-set-pane="basic"]')).toBeVisible();
+  await win.locator('#settingsSeg .seg-switch-btn[data-set-view="setup"]').click();
+  await expect(win.locator('#settings .set-pane[data-set-pane="setup"]')).toBeVisible();
   await expect(win.locator('#settings .set-pane[data-set-pane="advanced"]')).toBeHidden();
 });
 

@@ -43,7 +43,10 @@ function setupAutoUpdater(ctx, ipcMain) {
   // silently did nothing — the button stayed on "Checking…" forever. Surface it to the renderer.
   autoUpdater.on('error', err => ctx.send('app:update-error', { message: err?.message || String(err) }));
   // Only check automatically when actually packaged — electron-updater has no app-update.yml in dev.
-  if (app.isPackaged) autoUpdater.checkForUpdates().catch(err => ctx.send('app:update-error', { message: err?.message || String(err) }));
+  // 4.0.0: honour the "check on startup" setting (default ON); the manual button still works either way.
+  let autoCheck = true;
+  try { autoCheck = loadSettings().autoCheckUpdates !== false; } catch {}
+  if (app.isPackaged && autoCheck) autoUpdater.checkForUpdates().catch(err => ctx.send('app:update-error', { message: err?.message || String(err) }));
 
   // Every handler resolves {ok:false} instead of rejecting, so the renderer's await never throws
   // an unhandled rejection and the UI can always show a reason.

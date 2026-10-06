@@ -17,6 +17,8 @@ const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'
 // config steps are shown as a plan the user can act on after creation. Loaded once from the main
 // process (templates:list) and cached. Degrades silently when the IPC is unavailable.
 let nswTemplates=null;
+// v4.0.0: set when a template pre-filled the wizard -> shown as a banner on the Review step.
+let nswTplBanner=null;
 async function loadNswTemplates(){
   const box=$('#nswTemplates'),chips=$('#nswTemplateChips');
   if(!box||!chips)return;
@@ -34,16 +36,27 @@ $('#nswTemplateChips')?.addEventListener('click',async e=>{
   const b=e.target.closest('[data-template]');if(!b)return;
   const id=b.dataset.template;
   const tp=(nswTemplates||[]).find(x=>x.id===id);if(!tp)return;
-  // Pre-fill software + memory from the template, then let the user continue through the wizard.
+  // v4.0.0: a template pre-fills software + VERSION + memory, so jump straight to Review with a
+  // banner instead of making the user walk through steps that are already answered.
   nsw.software=tp.software;
   nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
   nswMc=null;
   $$('[data-software]').forEach(x=>x.classList.toggle('active',x.dataset.software===tp.software));
+  // version: 'latest' -> latest mode; a pinned version -> specific mode + input pre-filled.
+  const pin=(tp.version&&tp.version!=='latest')?String(tp.version):null;
+  $$('input[name="nswVersionMode"]').forEach(r=>r.checked=r.value===(pin?'specific':'latest'));
+  $$('.nsw-radio-card').forEach(c=>c.classList.toggle('active', c.querySelector('input')?.checked));
+  $('#nswVersionPicker').hidden=!pin;
+  $('#nswVersionInput').disabled=!pin;
+  $('#nswVersionInput').value=pin||'';$('#nswVersionClear').hidden=!pin;
+  $('#nswLatestLabel').textContent=t('nsw.resolvingLatest');
   const mem=Math.max(1,Math.min(64,Number(tp.memoryGB)||4));
   const sl=$('#nswMemorySlider'); if(sl){sl.value=mem;const mv=$('#nswMemoryValue');if(mv)mv.textContent=String(mem);nswUpdateMemory()}
-  // Surface the template's plan (plugins + config) so the user knows what to install afterwards.
-  try{const pr=await window.observer.templatesPlan(id);if(pr&&pr.ok&&pr.plan&&pr.plan.steps){const extra=pr.plan.steps.filter(s=>s.step==='install_content').length;toast(t('nsw.tplApplied',{n:tp.name,m:mem,x:extra}),'success');}}catch{}
-  nsw.step=3;nswRender();
+  let extra=0;
+  try{const pr=await window.observer.templatesPlan(id);if(pr&&pr.ok&&pr.plan&&pr.plan.steps){extra=pr.plan.steps.filter(s=>s.step==='install_content').length}}catch{}
+  // Banner on the Review step so the user knows it is pre-filled and can just Create (or Back to edit).
+  nswTplBanner={name:tp.name,extra};
+  nsw.step=5;nswRender();
 });
 async function loadNswVersions(software){
   // BUGFIX (2.2.0): re-entering step 3 for the same software returned early WITHOUT repainting the
@@ -62,8 +75,11 @@ async function loadNswVersions(software){
   nswVersions.loading=false;
   if(!r||!r.ok){nswVersions.failed=true;nswVersions.error=r?.error||t('nsw.apiFail');}
   else{nswVersions.list=r.versions||[];nswVersions.latest=r.latest||null;nswVersions.raw=!!r.raw;nswVersions.note=r.note||'';nswVersions.annotated=Array.isArray(r.annotated)?r.annotated:[];nswVersions.stableLatest=r.stableLatest||null;nswVersions.status=Array.isArray(r.status)?r.status:[];}
+  _nswChipsAnimPending=true; // fresh list -> animate once
   renderNswChips($('#nswVersionInput')?.value.trim()||'');
-  $('#nswLatestLabel').textContent=nswVersions.latest?`${t('nsw.latest')}: ${nswVersions.latest}`:'';
+  // BUGFIX: this used to prefix the resolved version with t('nsw.latest') ("Use the latest version"),
+  // which duplicated the card's own <b> title. Show just the version number now.
+  $('#nswLatestLabel').textContent=nswVersions.latest?`v${nswVersions.latest}`:'';
   const mode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
   if(nswVersions.latest&&mode!=='specific')checkNswJava(isMcFirst()?nswMc:nswVersions.latest);
 }
@@ -89,8 +105,13 @@ function buildsForMc(mc){
     for(let i=0;i<Math.max(x.length,y.length);i++){const d=(y[i]||0)-(x[i]||0);if(d)return d;}return 0;
   });
 }
+// v4.0.0: only run the chip entrance stagger when a FRESH list loads — not on every filter
+// keystroke or step repaint (that replayed the animation and looked like 'loading' jitter).
+let _nswChipsAnimPending=false;
+function chipDelay(i){ return _nswChipsAnimPending ? ` style="animation-delay:${Math.min(i*18,400)}ms"` : ''; }
 function renderNswChips(filter){
   const box=$('#nswVersionChips');if(!box)return;
+  const anim=_nswChipsAnimPending;_nswChipsAnimPending=false;
   if(nswVersions.loading){box.innerHTML=`<span class="nsw2-chiploading">${t('nsw.loadingVersions')}</span>`;return}
   if(nswVersions.failed){box.innerHTML=`<span class="nsw2-chiploading">${esc(nswVersions.error)} — ${t('nsw.typeManually')}</span>`;return}
   // 2.2.0 NeoForge/Forge (option a): pick Minecraft FIRST, then a build for that MC.
@@ -98,7 +119,7 @@ function renderNswChips(filter){
     if(!nswMc){
       const choices=mcChoices().filter(c=>!filter||c.mc.toLowerCase().includes(filter.toLowerCase()));
       box.innerHTML=choices.length
-        ? choices.map(c=>`<button class="version-chip" data-mc="${esc(c.mc)}"${c.stable?'':' data-soft="1"'}>${esc(c.mc)}${c.stable?'':' <em class="nsw2-tag warn">beta</em>'}</button>`).join('')
+        ? choices.map((c,i)=>`<button class="version-chip"${chipDelay(i)} data-mc="${esc(c.mc)}"${c.stable?'':' data-soft="1"'}>${esc(c.mc)}${c.stable?'':' <em class="nsw2-tag warn">beta</em>'}</button>`).join('')
         : `<span class="nsw2-chiploading">${t('nsw.noMatches')}</span>`;
       return;
     }
@@ -108,7 +129,7 @@ function renderNswChips(filter){
     const back=`<button type="button" class="version-chip version-back" data-mc-back="1">← ${esc(t('nsw.changeMc'))}</button>`;
     const crumb=`<span class="nsw2-crumb">${esc(t('nsw.mcLabel'))}: <b>${esc(nswMc)}</b></span>`;
     const chips=list.length
-      ? list.map(b=>`<button class="version-chip" data-version="${esc(b.v)}"${b.stable?'':' data-soft="1"'}>${esc(b.v)}${b.stable?'':' <em class="nsw2-tag warn">beta</em>'}</button>`).join('')
+      ? list.map((b,i)=>`<button class="version-chip"${chipDelay(i)} data-version="${esc(b.v)}"${b.stable?'':' data-soft="1"'}>${esc(b.v)}${b.stable?'':' <em class="nsw2-tag warn">beta</em>'}</button>`).join('')
       : `<span class="nsw2-chiploading">${t('nsw.noBuilds')}</span>`;
     box.innerHTML=back+crumb+chips;
     return;
@@ -120,12 +141,37 @@ function renderNswChips(filter){
   // (vanilla/fabric/purpur/leaf) has no status -> every chip is normal.
   const statusMap=new Map((nswVersions.status||[]).map(s=>[s.version,s]));
   if(!list.length){box.innerHTML=`<span class="nsw2-chiploading">${t('nsw.noMatches')}</span>`;return}
-  box.innerHTML=list.map(v=>{
+  box.innerHTML=list.map((v,i)=>{
     const st=statusMap.get(v);
     const soft=st&&st.stable===false;
     const tag=soft?` <em class="nsw2-tag warn">${esc((st.channel||'beta').toLowerCase())}</em>`:(st&&st.stable?'':'');
-    return `<button class="version-chip" data-version="${esc(v)}"${soft?' data-soft="1"':''}>${esc(v)}${tag}</button>`;
+    return `<button class="version-chip"${chipDelay(i)} data-version="${esc(v)}"${soft?' data-soft="1"':''}>${esc(v)}${tag}</button>`;
   }).join('');
+}
+// v4.0.0: the old single-line validation text is now a COLOURED STATUS BADGE (ok / pending / warn /
+// bad) with a clickable "Use <v>" suggestion, so the user can see at a glance whether the typed
+// version is valid, still loading, or plainly not in the official list for this software.
+function versionStatus(v){
+  if(!v)return null;
+  if(nswVersions.loading)return {cls:'pending',text:t('nsw.checkingList')};
+  if(nswVersions.failed)return {cls:'pending',text:t('nsw.listUnavailable')};
+  if(v==='latest')return null;
+  const sw=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
+  if(nswVersions.list.includes(v))return {cls:'ok',text:t('nsw.available',{v,s:sw})};
+  const near=nswVersions.list.find(x=>x.startsWith(v));
+  return near?{cls:'warn',text:t('nsw.didYouMean',{v,n:near}),suggest:near}:{cls:'bad',text:t('nsw.notInList',{v,s:sw})};
+}
+function setVersionHint(txt){const el=$('#nswVersionInfo');if(!el)return;el.className='nsw-version-info';el.textContent=txt||'';}
+function renderVersionStatus(v){
+  const el=$('#nswVersionInfo');if(!el)return;
+  const st=versionStatus(v);
+  if(!st){setVersionHint(v?'':t('nsw.pickChip'));return}
+  el.className='nsw-version-info vstat '+st.cls;
+  // the badge already shows a coloured dot via ::before, so strip the redundant leading ✗/✓/⚠ icon.
+  const txt=String(st.text).replace(/^[✗✓⚠]\s*/,'');
+  el.innerHTML=`<span class="vstat-text">${esc(txt)}</span>${st.suggest?`<button type="button" class="vstat-use" data-use="${esc(st.suggest)}">${esc(t('nsw.useIt',{v:st.suggest}))}</button>`:''}`;
+  const ub=el.querySelector('[data-use]');
+  if(ub)ub.onclick=()=>{const s=ub.dataset.use;$('#nswVersionInput').value=s;$('#nswVersionClear').hidden=false;renderNswChips(s);renderVersionStatus(s);checkNswJava(s);nswRender();};
 }
 function nswValidateVersion(v){
   if(!v)return'';
@@ -202,6 +248,9 @@ function nswRender(){
     nswUpdateMemory();
   }
   if(nsw.step===5){
+    // v4.0.0: show a template banner + it also carries the plan step count (plugins/mod config).
+    const tb=$('#nswTplBanner');
+    if(tb){if(nswTplBanner){tb.hidden=false;tb.innerHTML=`<b>${esc(t('nsw.tplBannerT',{n:nswTplBanner.name}))}</b><span>${esc(t('nsw.tplBannerD',{x:nswTplBanner.extra}))}</span>`}else{tb.hidden=true;tb.innerHTML=''}}
     const memory=$('#nswMemorySlider').value;
     // P2d (2.2.0): the review shows the download source + where it lands + Java readiness, so the
     // user knows what is about to happen before pressing Create.
@@ -234,6 +283,49 @@ $$('[data-software]').forEach(c=>c.onclick=()=>{
   if(nsw.step===3)loadNswVersions(nsw.software);
   nswRender();
 });
+// v4.0.0 W1: per-software info in a popover (the ⓘ on each card). Explains what Leaf/NeoForge/…
+// actually is + links the OFFICIAL source, so nobody has to search the web. URLs are not i18n.
+const NSW_INFO={
+  vanilla:{url:'https://www.minecraft.net/en-us/download/server',for:'nsw.inf.vanilla',b:['nsw.inf.vanilla.b1','nsw.inf.vanilla.b2']},
+  paper:{url:'https://papermc.io/',for:'nsw.inf.paper',b:['nsw.inf.paper.b1','nsw.inf.paper.b2']},
+  purpur:{url:'https://purpurmc.org/',for:'nsw.inf.purpur',b:['nsw.inf.purpur.b1','nsw.inf.purpur.b2']},
+  leaf:{url:'https://www.leafmc.one/',for:'nsw.inf.leaf',b:['nsw.inf.leaf.b1','nsw.inf.leaf.b2']},
+  folia:{url:'https://papermc.io/software/folia',for:'nsw.inf.folia',b:['nsw.inf.folia.b1','nsw.inf.folia.b2']},
+  spigot:{url:'https://www.spigotmc.org/',for:'nsw.inf.spigot',b:['nsw.inf.spigot.b1','nsw.inf.spigot.b2']},
+  fabric:{url:'https://fabricmc.net/',for:'nsw.inf.fabric',b:['nsw.inf.fabric.b1','nsw.inf.fabric.b2']},
+  neoforge:{url:'https://neoforged.net/',for:'nsw.inf.neoforge',b:['nsw.inf.neoforge.b1','nsw.inf.neoforge.b2']},
+  forge:{url:'https://files.minecraftforge.net/',for:'nsw.inf.forge',b:['nsw.inf.forge.b1','nsw.inf.forge.b2']},
+  velocity:{url:'https://papermc.io/software/velocity',for:'nsw.inf.velocity',b:['nsw.inf.velocity.b1','nsw.inf.velocity.b2']},
+};
+function nswCloseInfo(){const pop=$('#nswInfoPop');if(pop)pop.hidden=true;_nswInfoAnchor=null}
+// A position:fixed popover drifts when the wizard body scrolls — close it instead.
+window.addEventListener('resize',nswCloseInfo);
+document.addEventListener('scroll',()=>{const pop=$('#nswInfoPop');if(pop&&!pop.hidden)nswCloseInfo()},true);
+function nswShowInfo(id,anchor){
+  const pop=$('#nswInfoPop');if(!pop)return;
+  const info=NSW_INFO[id];const wrap=anchor.closest('.nsw2-cardwrap');
+  if(!info||!wrap){pop.hidden=true;return}
+  const label=NSW_SOFTWARE_LABEL[id]||id;
+  pop.innerHTML=`<h4>${esc(label)}</h4><p>${esc(t(info.for))}</p><ul>${info.b.map(k=>`<li>${esc(t(k))}</li>`).join('')}</ul><button type="button" class="nsw-info-link" data-info-url="${esc(info.url)}">${esc(t('nsw.infoOfficial'))} ↗</button>`;
+  // PORTAL to <body> + position:fixed under the i button (escapes the .nsw2-main scroll clip).
+  document.body.appendChild(pop);
+  const r=anchor.getBoundingClientRect();
+  pop.hidden=false;
+  const pw=pop.offsetWidth,ph=pop.offsetHeight;
+  let left=Math.max(8,Math.min(r.right-pw,window.innerWidth-pw-8));
+  let top=r.bottom+6; if(top+ph>window.innerHeight-8)top=Math.max(8,r.top-ph-6);
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  pop.querySelector('[data-info-url]')?.addEventListener('click',()=>window.observer.marketOpenExternal(info.url));
+}
+let _nswInfoAnchor=null;
+$$('.nsw-info').forEach(b=>b.onclick=e=>{
+  e.stopPropagation();
+  const pop=$('#nswInfoPop');
+  const open=pop&&!pop.hidden&&_nswInfoAnchor===b;
+  if(open){nswCloseInfo()}else{_nswInfoAnchor=b;nswShowInfo(b.dataset.info,b)}
+});
+// Click anywhere else closes the info popover.
+document.addEventListener('click',e=>{const pop=$('#nswInfoPop');if(pop&&!pop.hidden&&!e.target.closest('.nsw-info')&&!e.target.closest('#nswInfoPop'))nswCloseInfo()});
 $$('input[name="nswVersionMode"]').forEach(r=>r.onchange=()=>{
   const isSpecific=$$('input[name="nswVersionMode"]').find(x=>x.checked)?.value==='specific';
   $('#nswVersionInput').disabled=!isSpecific;
@@ -252,7 +344,7 @@ $('#nswVersionChips').addEventListener('click',e=>{
     $('#nswVersionInput').value='';
     $('#nswVersionClear').hidden=true;
     renderNswChips('');
-    $('#nswVersionInfo').textContent=t('nsw.pickMc');
+    setVersionHint(t('nsw.pickMc'));
     nswRender();
     return;
   }
@@ -262,7 +354,7 @@ $('#nswVersionChips').addEventListener('click',e=>{
     $('#nswVersionInput').value='';
     $('#nswVersionClear').hidden=true;
     renderNswChips('');
-    $('#nswVersionInfo').textContent=t('nsw.pickBuild',{mc:nswMc});
+    setVersionHint(t('nsw.pickBuild',{mc:nswMc}));
     nswRender();
     return;
   }
@@ -272,7 +364,7 @@ $('#nswVersionChips').addEventListener('click',e=>{
   $$('input[name="nswVersionMode"]').forEach(r=>r.checked=r.value==='specific');
   $('#nswVersionInput').disabled=false;
   $$('.nsw-radio-card').forEach(c=>c.classList.toggle('active', c.querySelector('input')?.checked));
-  $('#nswVersionInfo').textContent=nswValidateVersion(v);
+  renderVersionStatus(v);
   checkNswJava(v);
   nswRender();
 });
@@ -280,8 +372,7 @@ const debouncedNswValidate=debounce(()=>{
   const v=$('#nswVersionInput').value.trim();
   $('#nswVersionClear').hidden=!v;
   renderNswChips(v);
-  const info=$('#nswVersionInfo');
-  if(info)info.textContent=v?nswValidateVersion(v):t('nsw.pickChip');
+  renderVersionStatus(v);
   checkNswJava(v);
   nswRender();
 },250);
@@ -290,7 +381,7 @@ $('#nswVersionClear')?.addEventListener('click',()=>{
   $('#nswVersionInput').value='';
   $('#nswVersionClear').hidden=true;
   renderNswChips('');
-  $('#nswVersionInfo').textContent=t('nsw.pickChip');
+  setVersionHint(t('nsw.pickChip'));
   $('#nswVersionInput').focus();
 });
 // Memory step: one updater drives the big readout, slider fill, preset chips and the rail.
@@ -306,7 +397,6 @@ function nswUpdateMemory(){
 }
 $$('.nsw2-mempresets .filter-chip').forEach(b=>b.onclick=()=>{$('#nswMemorySlider').value=b.dataset.mem;nswUpdateMemory()});
 $('#nswMemorySlider').addEventListener('input',nswUpdateMemory);
-$('#nswShowTech')?.addEventListener('change', e=>{ const show=e.target.checked; $$('.card-tech').forEach(el=> el.hidden=!show); });
 $('#nswBack').onclick=()=>{nsw.step=Math.max(1,nsw.step-1);nswRender()};
 $('#nswCancel').onclick=async()=>{
   const btn=$('#nswCancel');btn.disabled=true;
@@ -443,8 +533,10 @@ function openNewServerWizard(folder){
   nsw={step:1,software:'vanilla',folder:folder||''};
   nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
   nswMc=null;
+  nswTplBanner=null;
   nswJava={version:'',java:null,exact:false};
   const jc=$('#nswJavaCheck');if(jc)jc.hidden=true;
+  const _tb=$('#nswTplBanner');if(_tb){_tb.hidden=true;_tb.innerHTML=''}
   $$('[data-software]').forEach(x=>x.classList.toggle('active',x.dataset.software==='vanilla'));
   $('#nswVersionInput').disabled=true;
   $$('input[name="nswVersionMode"]').forEach(r=>r.checked=r.value==='latest');

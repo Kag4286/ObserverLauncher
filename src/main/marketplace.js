@@ -67,12 +67,36 @@ async function searchMarket(opts) {
     const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updatedAt' : '-stars';
     const data = await json(`https://hangar.papermc.io/api/v1/projects?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&sort=${encodeURIComponent(order)}`);
     const rows = data.result || data.projects || [];
-    return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, version })) };
+    // BUGFIX (v4.0.0): Hangar hits carry an avatarUrl (often root-relative) — without mapping it to
+    // `icon`, the renderer fell back to the generic placeholder, so Hangar rows had no real icon.
+    const hangarIcon = u => !u ? null : (String(u).startsWith('http') ? String(u) : 'https://hangar.papermc.io' + String(u));
+    return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, icon: hangarIcon(x.avatarUrl || x.iconUrl || x.icon), version })) };
   }
   if (source === 'spigot') {
     const page = Math.floor(skip / 20) + 1;
     const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=20&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
-    return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: x.author?.username || 'Spigot author', description: x.tag || x.description || '', downloads: x.downloads || 0, version })) };
+
+    // CONFIRMED via a real Spiget response (scripts/spigot-probe.js): `icon.url` IS present but is a
+    // ROOT-RELATIVE path with NO leading slash, e.g. "data/resource_icons/62/62325.jpg?1564519207".
+    // The old code did `'https://www.spigotmc.org' + url` -> "...orgdata/..." (missing slash) -> the
+    // image 404'd. The SEARCH `author` is only {id} (no name) — that stays resolved lazily.
+    const spigotIcon = x => {
+      const ic = x && x.icon;
+      const raw = (ic && (ic.url || (typeof ic === 'string' ? ic : null))) || null;
+      if(raw){
+        const s = String(raw);
+        return s.startsWith('http') ? s : 'https://www.spigotmc.org/' + s.replace(/^\/+/, '');
+      }
+      // Fallback: icon.data is a base64 PNG on the same object — usable directly as a data URL.
+      if(ic && ic.data) return 'data:image/png;base64,' + String(ic.data);
+      return null;
+    };
+    const spigotAuthor = x => {
+      const a = x && x.author;
+      if(!a) return null;
+      return a.username || a.name || null; // search results carry only {id} -> null (resolved lazily)
+    };
+    return { ok: true, total: null, items: data.map(x => ({ source: 'spigot', id: String(x.id), title: x.name, author: spigotAuthor(x), description: x.tag || x.description || '', downloads: x.downloads || 0, icon: spigotIcon(x), version })) };
   }
   if (source === 'curseforge') {
     const headers = cfHeaders();
@@ -98,7 +122,22 @@ async function resolveMarketDownload(item) {
     const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
     const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
     let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
-    if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || byVersion[0] || versions[0];
+    if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || null;
+    // BUGFIX (v3.3.1): the old fallback `|| byVersion[0] || versions[0]` silently installed a
+    // MISMATCHED jar (e.g. a Floodgate NeoForge build onto a Paper/Purpur server) that then crashed
+    // the server on start. When the registry told us the loaders (so we KNOW a build exists) and NONE
+    // matches this server's loader family, refuse instead of guessing. Datapack/modpack keep the old
+    // fallback because their `loaders` field is not a server-loader contract (datapack packs list
+    // 'datapack'/'minecraft'; modpacks bundle their own loader).
+    if (!target) {
+      const loaderSensitive = kind === 'plugin' || kind === 'mod' || kind === 'forge' || kind === 'fabric';
+      const someWithLoaders = byVersion.some(v => Array.isArray(v.loaders) && v.loaders.length);
+      if (loaderSensitive && someWithLoaders) {
+        const found = [...new Set(byVersion.flatMap(v => v.loaders || []))].filter(Boolean).join(', ');
+        throw new Error(`No ${kind} build matches this server's loader (available: ${found || 'none'}). Refusing to install a mismatched jar — pass the exact versionId or install manually.`);
+      }
+      target = byVersion[0] || versions[0];
+    }
     if (!target?.files?.[0]) throw new Error('No downloadable version was found.');
     const f = target.files.find(x => x.primary) || target.files[0];
     // Extra metadata (non-breaking: GUI/MCP install callers ignore it) so the MCP modpack planner
@@ -165,6 +204,51 @@ function registerMarketplace(ipcMain, ctx) {
 
   ipcMain.handle('market:search', async (_, opts) => {
     try { return await searchMarket(opts); } catch (error) { return marketplaceError(error); }
+  });
+
+  // v4.0.0: Spiget SEARCH returns no icon + no author NAME (only author.id). This lazily fills both
+  // for a PAGE of ids so the search itself stays instant: the renderer shows the rows first, then
+  // calls this once and patches the cards in place as data arrives. Optimised: a bounded concurrency
+  // pool (5 in flight) + two in-memory caches (resource, author) so re-searching/paging is free.
+  const spigotResCache = new Map();    // id -> { icon, authorId }
+  const spigotAuthorCache = new Map(); // authorId -> name | null
+  async function poolMap(items, limit, fn) {
+    const out = new Array(items.length);
+    let next = 0;
+    const run = async () => { while (next < items.length) { const idx = next++; out[idx] = await fn(items[idx]); } };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length || 1) }, run));
+    return out;
+  }
+  ipcMain.handle('market:spigot-details', async (_, ids) => {
+    const list = (Array.isArray(ids) ? ids : []).slice(0, 40).map(String);
+    const rows = await poolMap(list, 5, async (id) => {
+      try {
+        let r = spigotResCache.get(id);
+        if (!r) {
+          const d = await json(`https://api.spiget.org/v2/resources/${encodeURIComponent(id)}`);
+          const ic = d && d.icon;
+          const raw = (ic && (ic.url || (typeof ic === 'string' ? ic : null))) || null;
+          let icon = null;
+          if(raw){ const s = String(raw); icon = s.startsWith('http') ? s : 'https://www.spigotmc.org/' + s.replace(/^\/+/, ''); }
+          else if(ic && ic.data) icon = 'data:image/png;base64,' + String(ic.data);
+          r = { icon, authorId: (d && d.author && d.author.id != null) ? String(d.author.id) : null };
+          spigotResCache.set(id, r);
+        }
+        let author = null;
+        if (r.authorId) {
+          if (spigotAuthorCache.has(r.authorId)) author = spigotAuthorCache.get(r.authorId);
+          else {
+            try { const a = await json(`https://api.spiget.org/v2/authors/${encodeURIComponent(r.authorId)}`); author = (a && a.name) || null; }
+            catch { author = null; }
+            spigotAuthorCache.set(r.authorId, author);
+          }
+        }
+        return { id, icon: r.icon, author };
+      } catch { return { id, icon: null, author: null }; }
+    });
+    const details = {};
+    for (const r of rows) if (r) details[r.id] = { icon: r.icon, author: r.author };
+    return { ok: true, details };
   });
 
   ipcMain.handle('market:detail', async (_, item) => {
@@ -258,7 +342,8 @@ function registerMarketplace(ipcMain, ctx) {
     try { u = new URL(String(rawUrl)); } catch { return { ok: false, error: 'Invalid link.' }; }
     if (u.protocol !== 'https:') return { ok: false, error: 'Only https links can be opened.' };
     const host = u.hostname.toLowerCase();
-    const allowed = ['modrinth.com', 'hangar.papermc.io', 'spigotmc.org', 'github.com', 'gitlab.com', 'bitbucket.org', 'curseforge.com'];
+    // 4.0.0: extended for the New Server wizard's "Learn more" links (official software sites).
+    const allowed = ['modrinth.com', 'hangar.papermc.io', 'spigotmc.org', 'github.com', 'gitlab.com', 'bitbucket.org', 'curseforge.com', 'papermc.io', 'purpurmc.org', 'leafmc.one', 'fabricmc.net', 'neoforged.net', 'minecraftforge.net', 'minecraft.net'];
     if (!allowed.some(h => host === h || host.endsWith('.' + h))) return { ok: false, error: 'This link is not on the allowlist.' };
     try { await shell.openExternal(u.href); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || 'Could not open the link.' }; }
   });

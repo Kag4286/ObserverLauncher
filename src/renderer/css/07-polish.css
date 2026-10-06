@@ -12,7 +12,7 @@
 .sec-head img,.set-advanced>summary>img{box-sizing:content-box;width:20px;height:20px;padding:4px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm)}
 .sec-head img:hover,.set-advanced>summary:hover>img{border-color:var(--border-hover)}
 /* Rows get a faint accent tick on hover; LATEST keeps its green tick */
-.wld-row:hover,.bk-row:hover{box-shadow:inset 2px 0 0 rgba(0,229,255,.35)}
+.wld-row:hover,.bk-row:hover{box-shadow:inset 2px 0 0 rgba(34,197,94,.35)}
 .bk-row.latest:hover{box-shadow:inset 2px 0 0 var(--success)}
 .bk-timeline::before{background:linear-gradient(180deg,transparent,var(--border) 10%,var(--border) 90%,transparent)}
 /* Accent stat gets a soft glow */
@@ -39,7 +39,6 @@
 .nsw2-step.active i{border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px var(--accent-weak)}
 .nsw2-step.done{color:var(--text-muted)}
 .nsw2-step.done i{background:var(--success-weak);border-color:rgba(0,229,160,.4);color:var(--success)}
-.nsw2-tech{margin-top:auto;font-size:11px}
 .nsw2-main{background:var(--panel);padding:18px 20px;min-width:0;max-height:min(620px,72vh);overflow:auto}
 .nsw2-steplabel{margin-bottom:8px}
 .nsw2-main h2{font-size:17px;margin-bottom:4px}
@@ -61,8 +60,26 @@
 .nsw2-req{display:inline-block;margin-top:6px;font:600 9.5px var(--font-mono);letter-spacing:.04em;color:var(--text-dim);background:var(--field);border:1px solid var(--border);border-radius:999px;padding:2px 8px}
 .nsw2-req.warn{color:var(--warning);border-color:rgba(255,210,63,.35);background:var(--warning-weak)}
 .nsw2-tag{font:700 8.5px var(--font-mono);letter-spacing:.1em;font-style:normal;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-dim);vertical-align:1px;margin-left:6px}
-.nsw2-tag.accent{color:var(--accent);border-color:rgba(0,229,255,.35)}
+.nsw2-tag.accent{color:var(--accent);border-color:rgba(34,197,94,.35)}
 .nsw2-tag.warn{color:var(--warning);border-color:rgba(255,210,63,.35)}
+/* v4.0.0 wizard step 2: grouped cards + an info (i) button that opens a details popover. */
+.nsw2-hintbar{display:block;margin:0 0 12px;padding:10px 13px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:500 11.5px var(--font-ui);color:var(--text-muted);line-height:1.5}
+.nsw2-hintbar b{color:var(--text)}
+.nsw2-group{margin:14px 0 7px}
+.nsw2-cardwrap{position:relative;display:flex;min-width:0}
+.nsw2-cardwrap .nsw2-row{flex:1}
+.nsw-info{position:absolute;top:9px;right:9px;width:22px;height:22px;flex-shrink:0;border-radius:50%;border:1px solid var(--border-strong);background:var(--field);color:var(--text-muted);font:700 12px var(--font-mono);font-style:italic;cursor:pointer;display:grid;place-items:center;transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.nsw-info:hover{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+/* v4.0.0: the popover lives in .nsw2-main (overflow:auto), so it MUST be position:fixed +
+   portaled to <body> (placed by JS) or the scroll container clips it — same lesson as .ol-dd. */
+.nsw-info-pop{position:fixed;z-index:130;width:min(340px,90vw);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--r);box-shadow:var(--shadow-lg);padding:var(--space-4);animation:ddIn var(--dur-fast) var(--ease-out) both}
+.nsw-info-pop h4{margin:0 0 6px;font:700 14px var(--font-ui);color:var(--text);display:flex;align-items:center;gap:8px}
+.nsw-info-pop p{margin:0 0 8px;font:500 12px var(--font-ui);color:var(--text-muted);line-height:1.55}
+.nsw-info-pop ul{margin:0 0 10px;padding-left:16px;display:flex;flex-direction:column;gap:4px}
+.nsw-info-pop li{font:500 11.5px var(--font-ui);color:var(--text-muted);line-height:1.45}
+.nsw-info-pop .nsw-info-link{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--font-ui);color:var(--brand);text-decoration:none;background:none;border:0;cursor:pointer;padding:0}
+.nsw-info-pop .nsw-info-link:hover{text-decoration:underline}
+@media (prefers-reduced-motion:reduce){.nsw-info-pop{animation:none}}
 /* Version chips */
 .nsw2-chiploading{display:inline-block;font:500 11px var(--font-mono);color:var(--text-dim);padding:8px 2px}
 /* 2.2.0: NeoForge/Forge MC-first breadcrumb + back chip (fixes the 'cannot change MC' dead end). */
@@ -86,7 +103,7 @@
 .nsw2-kv b{font:600 12.5px var(--font-mono);word-break:break-all;text-align:right}
 .nsw-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
 .nsw-actions-spacer{flex:1}
-@media(max-width:860px){.nsw2-layout{grid-template-columns:1fr}.nsw2-rail{flex-direction:row;flex-wrap:wrap;align-items:center}.nsw2-steps{flex-direction:row;flex-wrap:wrap}.nsw2-tech{margin:0 0 0 auto}}
+@media(max-width:860px){.nsw2-layout{grid-template-columns:1fr}.nsw2-rail{flex-direction:row;flex-wrap:wrap;align-items:center}.nsw2-steps{flex-direction:row;flex-wrap:wrap}}
 
 /* Wizard step 3 — memory */
 .nsw2-memory-head{display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:12px;background:var(--panel-raised);border:1px solid var(--border);border-radius:var(--r)}
@@ -112,13 +129,13 @@
 .brand-mark img,.player-avatar,.inspect-avatar,.item-cell .item-icon{image-rendering:pixelated}
 
 /* ---------- WORLD MAP ---------- */
-.wm-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border)}
-.wm-tabs{display:flex;gap:6px}
-.wm-seed{font:600 11px var(--font-mono);color:var(--accent);background:var(--accent-weak);border:1px solid rgba(0,229,255,.25);border-radius:var(--r-sm);padding:5px 10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wm-coord{font:700 11.5px var(--font-mono);color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:5px 10px;min-width:130px;text-align:center}
+.wm-toolbar{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);background:var(--surface)}
+.wm-tabs{display:flex;gap:var(--space-2)}
+.wm-seed{font:600 11px var(--font-mono);color:var(--brand);background:var(--brand-soft);border:1px solid var(--brand-soft);border-radius:var(--r-xs);padding:5px 10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wm-coord{font:700 11.5px var(--font-mono);color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 10px;min-width:130px;text-align:center}
 .wm-goto{display:inline-flex;gap:6px;align-items:center}
-.wm-goto-input{width:110px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:5px 8px;color:var(--text);font:500 11px var(--font-mono);outline:0}
-.wm-goto-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
+.wm-goto-input{width:110px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 8px;color:var(--text);font:500 11px var(--font-mono);outline:0}
+.wm-goto-input:focus{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
 .spacer{flex:1}
 .wm-main{display:grid;grid-template-columns:1fr 250px;min-height:0;position:relative}
 #wmCanvas{display:block;width:100%;height:min(58vh,560px);background:#0A0F14;cursor:crosshair;touch-action:none}
@@ -131,21 +148,26 @@
 .wm-pop-title b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm-pop-line{font-size:11.5px;color:var(--text-muted);margin:2px 0}
 .wm-pop-copy{margin-top:8px;width:100%}
-.wm-panel{border-left:1px solid var(--border);padding:12px 14px;background:var(--panel);overflow:auto;max-height:min(58vh,560px)}
-.wm-wplist{display:flex;flex-direction:column;gap:6px}
-.wm-wprow{display:flex;gap:8px;align-items:center;padding:7px 8px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm)}
-.wm-wprow:hover{border-color:var(--border-hover)}
+.wm-panel{border-left:1px solid var(--border);padding:var(--space-3) var(--space-4);background:var(--surface);overflow:auto;max-height:min(58vh,560px)}
+.wm-wplist{display:flex;flex-direction:column;gap:var(--space-2)}
+.wm-wprow{display:flex;gap:var(--space-2);align-items:center;padding:8px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);transition:border-color var(--dur-micro) var(--ease-out)}
+.wm-wprow:hover{border-color:var(--border-strong)}
 .wm-dot{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex-shrink:0}
 .wm-wpmain{flex:1;min-width:0}
 .wm-wpmain b{display:block;font:600 12px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm-wpmain small{font:500 9.5px var(--font-mono);color:var(--text-dim)}
-.wm-legend{border-top:1px solid var(--border);padding:10px 14px;background:var(--panel)}
-.wm-legend summary{cursor:pointer;font:600 11px var(--font-ui);color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase}
+.wm-legend{border-top:1px solid var(--border);padding:var(--space-3) var(--space-4);background:var(--surface);interpolate-size:allow-keywords}
+.wm-legend::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
+.wm-legend[open]::details-content{block-size:auto}
+.wm-legend summary{cursor:pointer;font:600 11px var(--font-ui);color:var(--text-muted);letter-spacing:.04em;text-transform:uppercase;list-style:none}
+.wm-legend summary::-webkit-details-marker{display:none}
+.wm-legend summary::before{content:'▸ ';color:var(--brand)}
+.wm-legend[open] summary::before{content:'▾ '}
 .wm-legend summary:hover{color:var(--text)}
-.wm-lg-grid{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px}
+.wm-lg-grid{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;animation:panelIn var(--dur-modal) var(--ease-out) both}
 .wm-lg-chip{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--font-ui);color:var(--text-muted)}
 .wm-lg-chip i{width:11px;height:11px;border-radius:2px;flex-shrink:0;border:1px solid rgba(255,255,255,.12)}
-.wm-mini{position:absolute;right:12px;bottom:12px;width:160px;height:160px;background:rgba(10,15,20,.82);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;pointer-events:none;z-index:3}
+.wm-mini{position:absolute;right:12px;bottom:12px;width:160px;height:160px;background:rgba(12,13,15,.85);border:1px solid var(--border-strong);border-radius:var(--r-sm);overflow:hidden;pointer-events:none;z-index:3}
 .content-list li.is-disabled .file-name{opacity:.5;text-decoration:line-through}
 .content-list li .file-ver{font:500 10.5px var(--font-mono);color:var(--text-dim);white-space:nowrap;flex-shrink:0}
 .remote-addresses{display:flex;flex-direction:column;gap:6px;margin-top:10px}
@@ -197,7 +219,17 @@
 .inspect-uuid.copied{color:var(--success)}
 .inspect-badge{font:600 9.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--warning);background:var(--warning-weak);border:1px solid rgba(255,210,63,.25);padding:3px 7px;border-radius:999px;white-space:nowrap;flex-shrink:0}
 .inspect-header .btn{flex-shrink:0;align-self:center}
-.inspect-note{font:500 11px var(--font-ui);color:var(--text-dim);background:var(--warning-weak);border:1px solid rgba(255,210,63,.2);padding:8px 12px;border-radius:var(--r);animation:sectionIn .3s var(--ease) .08s both}
+.inspect-note{font:500 11px var(--font-ui);color:var(--text-dim);background:var(--warning-weak);border:1px solid rgba(255,210,63,.2);padding:8px 12px;border-radius:var(--r)}
+.inspect-panel.active>.inspect-note{animation:sectionIn .3s var(--ease) .06s both}
+/* v4.0.0 inspector: header badges + coords + stats grid. */
+.inspect-badges{display:inline-flex;gap:5px;flex-wrap:wrap}
+.inspect-pos{font:600 11.5px var(--font-mono);color:var(--brand);letter-spacing:.02em}
+.pd-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.inspect-panel.active>.pd-stats-grid{animation:sectionIn .35s var(--ease) .06s both}
+@media (prefers-reduced-motion:reduce){.inspect-panel.active>.pd-stats-grid{animation:none}}
+.pd-stat{display:flex;flex-direction:column;gap:3px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;min-width:0;animation:rowIn .25s var(--ease) both}
+.pd-stat>span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-stat>b{font:600 15px var(--font-mono);color:var(--text);overflow-wrap:anywhere}
 /* Two-column layout: left = stats + clear + equipment, right = inventory + ender chest.
    Collapses to a single column on narrow windows. minmax(0,...) + min-width:0 let the inner
    lists shrink instead of forcing the grid wider than the modal. */
@@ -206,18 +238,26 @@
 @media(max-width:820px){.inspect-cols{grid-template-columns:1fr}}
 /* Stats: auto-fit so the 6 fields reflow to as many columns as fit instead of being squeezed
    into a fixed 3-column grid (which clipped long labels / "Total XP" values). */
-.inspect-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;animation:sectionIn .3s var(--ease) .1s both}
+.inspect-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.inspect-panel.active>.inspect-stats{animation:sectionIn .3s var(--ease) .08s both}
 .inspect-stats label{display:flex;flex-direction:column;gap:6px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;transition:border-color .12s;min-width:0}
 .inspect-stats label:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .inspect-stats label span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inspect-stats input,.inspect-stats select{width:100%;min-width:0;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 10px;color:var(--text);font:500 13px var(--font-ui)}
 .inspect-stats input:focus,.inspect-stats select:focus{outline:none;border-color:var(--accent)}
-.inspect-check{display:flex;gap:8px;align-items:center;font:500 12px var(--font-ui);color:var(--text-muted);cursor:pointer;animation:sectionIn .3s var(--ease) .12s both}
-.inspect-check input{width:16px;height:16px;accent-color:var(--accent)}
-.inspect-section{display:flex;flex-direction:column;gap:10px;animation:sectionIn .35s var(--ease) both}
-.inspect-section:nth-of-type(3){animation-delay:.14s}
-.inspect-section:nth-of-type(4){animation-delay:.18s}
-.inspect-section:nth-of-type(5){animation-delay:.22s}
+.inspect-check{display:flex;gap:8px;align-items:center;font:500 12px var(--font-ui);color:var(--text-muted);cursor:pointer}
+.inspect-panel.active>.inspect-check{animation:sectionIn .3s var(--ease) .12s both}
+@media (prefers-reduced-motion:reduce){.inspect-panel.active>.inspect-note,.inspect-panel.active>.inspect-stats,.inspect-panel.active>.inspect-check{animation:none}}
+
+/* v4.0.0 FIX: sections animated ONCE at page load (panel hidden but present), so switching tabs
+   showed them static. Bind the animation to .inspect-panel.active so it REPLAYS on every switch. */
+.inspect-section{display:flex;flex-direction:column;gap:10px}
+.inspect-panel.active .inspect-section{animation:sectionIn .35s var(--ease) both}
+.inspect-panel.active .inspect-section:nth-of-type(3){animation-delay:.10s}
+.inspect-panel.active .inspect-section:nth-of-type(4){animation-delay:.14s}
+.inspect-panel.active .inspect-section:nth-of-type(5){animation-delay:.18s}
+@media (prefers-reduced-motion:reduce){.inspect-panel.active .inspect-section{animation:none}}
+html.motion-lite .inspect-panel.active .inspect-section{animation:none}
 @keyframes sectionIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* Section head: title + optional subtitle + count + bar on one row that wraps instead of
    overlapping. h3 and the count never shrink; the bar takes the leftover space. */
@@ -230,9 +270,16 @@
 .inv-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .inv-toolbar input[type="search"]{flex:1;min-width:160px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 10px;color:var(--text);font:500 12px var(--font-ui)}
 .inv-toolbar input[type="search"]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
-.inv-toolbar .chk{font:500 11px var(--font-ui);color:var(--text-muted);display:flex;gap:6px;align-items:center;cursor:pointer}
-.inv-toolbar .chk input{width:14px;height:14px;accent-color:var(--accent)}
+.inv-toolbar .chk{font:500 11px var(--font-ui);color:var(--text-muted);display:flex;gap:7px;align-items:center;cursor:pointer}
+/* v4.0.0: native checkboxes looked like OS widgets and did not animate. Use the custom box
+   (appearance:none + a tick) same as the wizard/onboarding checkboxes. */
+.inv-toolbar .chk input,.inspect-check input{appearance:none;-webkit-appearance:none;width:16px;height:16px;flex-shrink:0;background:var(--field);border:1px solid var(--border-strong);border-radius:var(--r-xs);display:grid;place-items:center;cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.inv-toolbar .chk input:hover,.inspect-check input:hover{border-color:var(--brand)}
+.inv-toolbar .chk input:checked,.inspect-check input:checked{background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.inv-toolbar .chk input:checked::after,.inspect-check input:checked::after{content:'✓';color:var(--brand-ink);font:700 11px var(--font-ui);line-height:1}
 .inv-toolbar select{background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 8px;color:var(--text);font:500 11px var(--font-ui)}
+/* v4.0.0: the sort <select> is now an .ol-select (custom dropdown) — keep it compact in the toolbar. */
+.inv-toolbar .ol-dd .ol-dd-btn{min-width:96px;padding:7px 10px;font-size:11.5px}
 .text-list{display:flex;flex-direction:column;gap:6px;max-height:min(46vh,440px);overflow:auto;padding-right:4px}
 .text-list::-webkit-scrollbar{width:6px}
 .text-list::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px}
@@ -253,5 +300,6 @@
    and the long "minecraft:..." string was eating the room the name needed. */
 .inv-row.equip .item-id{display:none}
 .inv-empty{padding:24px 16px;text-align:center;border:1px dashed var(--border);border-radius:var(--r);background:var(--field)}
-.inv-empty b{font-size:13px}
-.inv-empty span{font:500 11px var(--font-ui);color:var(--text-muted)}
+/* v4.0.0 FIX: b/span were inline -> title and subtitle collided ("Inventory is emptyNo items…"). */
+.inv-empty b{display:block;font-size:13px;color:var(--text)}
+.inv-empty span{display:block;margin-top:4px;font:500 11px var(--font-ui);color:var(--text-muted)}

@@ -104,7 +104,7 @@ is active (renderer adds .wco-app to <html>), reserve its width on the right sid
 @media(max-width:1100px){.inst-dd{display:block}}
 /* keep channelIndicator hidden but exists for JS */
 .channel-indicator{display:none}
-.workspace{display:flex;flex-direction:column;overflow:hidden;padding:0;background:radial-gradient(800px 400px at 20% 0%, rgba(0,229,255,.06), transparent 60%), var(--bg)}
+.workspace{display:flex;flex-direction:column;overflow:hidden;padding:0;background:radial-gradient(800px 400px at 20% 0%, rgba(34,197,94,.05), transparent 60%), var(--bg)}
 .workspace main{flex:1;overflow:auto;padding:18px 18px 40px;min-height:0}
 .topbar{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1.5px solid var(--border)}
 .top-actions{display:flex;gap:8px;align-items:center}
@@ -137,22 +137,55 @@ is active (renderer adds .wco-app to <html>), reserve its width on the right sid
   .status-dot .sd-ring{animation:none!important;opacity:0}
 }
 /* (iconSpin/iconGlow removed — replaced by the status-dot component animations) */
-/* BUTTONS */
-.btn{border:1px solid var(--border);border-radius:var(--r);padding:9px 14px;font:600 12.5px var(--font-ui);cursor:pointer;background:var(--panel-raised);color:var(--text);transition:all .13s var(--ease)}
-.btn:hover{border-color:var(--border-hover);background:var(--panel-hover);transform:translateY(-1px)}
-.btn:active{transform:translateY(0) scale(.98)} .btn:disabled{opacity:.4;pointer-events:none}
-.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 0 12px var(--accent-weak)}
-.btn.primary:hover{background:var(--accent-dim);border-color:var(--accent-dim);box-shadow:0 0 16px var(--accent-glow)}
+/* BUTTONS (v4.0.0: soft radius --r-sm, token durations, no hover lift per DESIGN.md 2.1) */
+.btn{border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 14px;font:600 13px var(--font-ui);cursor:pointer;background:var(--surface-2);color:var(--text);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.btn:hover{border-color:var(--border-strong);background:var(--surface-3)}
+.btn:active{transform:scale(.985)} .btn:disabled{opacity:.4;pointer-events:none}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.primary:hover{background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .btn.secondary{background:transparent}
-.btn.danger{background:var(--danger-weak);color:var(--danger);border-color:rgba(255,59,92,.25)}
-.text-btn{background:none;border:0;color:var(--accent);font:600 11px var(--font-ui);cursor:pointer} .text-btn:hover{color:var(--text)}
+.btn.danger{background:var(--danger-weak);color:var(--danger);border-color:var(--danger-weak)}
+.btn.danger:hover{border-color:var(--danger);background:var(--danger-weak)}
+/* v4.0.0 sizes: .sm is the compact height (30px) used in toolbars. */
+.btn.sm{padding:6px 11px;font-size:12px;border-radius:var(--r-xs)}
+.text-btn{background:none;border:0;color:var(--brand);font:600 12px var(--font-ui);cursor:pointer;padding:4px 2px;border-radius:var(--r-xs);transition:color var(--dur-micro) var(--ease-out)} .text-btn:hover{color:var(--text)}
 .text-btn.danger{color:var(--danger)}
-/* PANELS */
-.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);position:relative;overflow:hidden}
-.glass::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(to bottom, rgba(0,229,255,.03) 0 1px, transparent 1px 3px);pointer-events:none;opacity:.6}
-.glass:hover{border-color:var(--border-hover)}
-.panel{padding:16px} .panel-head{display:flex;justify-content:space-between;gap:10px;align-items:start;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)}
-.panel-head p{margin:0;color:var(--text-muted);font-size:11px}
+/* PANELS (v4.0.0: clean surface, no cyan scanline — DESIGN.md 2.1) */
+.glass{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);position:relative;overflow:hidden}
+.glass:hover{border-color:var(--border-strong)}
+.panel{padding:var(--space-4)} .panel-head{display:flex;justify-content:space-between;gap:var(--space-2);align-items:start;padding-bottom:var(--space-3);margin-bottom:var(--space-3);border-bottom:1px solid var(--border)}
+.panel-head p{margin:0;color:var(--text-muted);font-size:12px}
+
+/* ============ v4.0.0 COMPONENT CATALOGUE (DESIGN.md 12) ============ */
+/* Section: NOT a box — a heading + spacing (DESIGN.md 2.1). */
+.section{display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-6)}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3)}
+.section-head h3{font-size:var(--fs-sec);font-weight:700}
+.section-head .sub{margin:2px 0 0;color:var(--text-muted);font-size:12px}
+/* Card: interactive grouping. Border optional, hover = background shift only (no lift). */
+.card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);padding:var(--space-4);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.card:hover{background:var(--surface-3);border-color:var(--border-strong)}
+/* Badge: small pill for counts / versions / status words. */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font:700 10px var(--font-mono);letter-spacing:.04em;background:var(--surface-3);color:var(--text-muted);border:1px solid var(--border)}
+.badge.ok{color:var(--success);border-color:var(--success-weak);background:var(--success-weak)}
+.badge.warn{color:var(--warning);border-color:var(--warning-weak);background:var(--warning-weak)}
+.badge.bad{color:var(--danger);border-color:var(--danger-weak);background:var(--danger-weak)}
+.badge.brand{color:var(--brand);border-color:var(--brand-soft);background:var(--brand-soft)}
+/* Entity card: the shared model for Players / Content / Marketplace rows (avatar/icon + title +
+   meta + action). Replaces the ad-hoc .player-row / .market-item shapes over the rework. */
+.entity-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-3);padding:var(--space-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.entity-card:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.entity-avatar{width:40px;height:40px;flex-shrink:0;display:grid;place-items:center;border-radius:var(--r-sm);background:var(--surface-3);color:var(--text);font:800 14px var(--font-ui);letter-spacing:.02em}
+.entity-avatar.accent{background:var(--brand-soft);color:var(--brand)}
+.entity-body{min-width:0}
+.entity-title{font:600 14px var(--font-ui);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entity-meta{margin-top:2px;font:500 12px var(--font-ui);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entity-actions{display:flex;gap:var(--space-2);align-items:center;flex-shrink:0}
+/* Empty state: icon + title + one-line help + optional action. Every async region needs one. */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--space-2);padding:var(--space-8) var(--space-4);color:var(--text-muted)}
+.empty-icon{width:46px;height:46px;display:grid;place-items:center;border-radius:var(--r);background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim)}
+.empty b{font:700 14px var(--font-ui);color:var(--text)}
+.empty span{font-size:13px;max-width:42ch;line-height:1.5}
 
 /* ============ FOUNDATION (Phase 1 redesign) ============ */
 /* One tab header for every tab. Replaces the 8 ad-hoc variants (.content-head,

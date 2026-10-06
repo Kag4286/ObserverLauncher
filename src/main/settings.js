@@ -53,6 +53,8 @@ function defaultGlobal() {
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
     remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remotePort: 0, remoteBind: '',
     playitPath: '', motionLevel: 'full', curseforgeApiKey: '',
+    // 4.0.0: auto-check for app updates on startup (global, default ON). Read by setupAutoUpdater.
+    autoCheckUpdates: true,
   };
 }
 

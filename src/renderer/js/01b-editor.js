@@ -93,29 +93,51 @@ function buildFileTree(files){
   }
   return root;
 }
-function fbDirRow(node,prefix,depth){
+// v4.0.0: a small colored type badge so the browser is not a wall of plain text. Maps a file name
+// to {cls, label}; unknown extensions fall back to a neutral 3-char tag.
+function fileBadge(name){
+  const n=String(name||'').toLowerCase();
+  const ext=(n.split('.').pop()||'').replace(/[^a-z0-9]/g,'').slice(0,4);
+  if(/\.disabled$/.test(n))return {cls:'off',label:'off'};
+  if(ext==='json')return {cls:'json',label:'{ }'};
+  if(ext==='yml'||ext==='yaml')return {cls:'yml',label:'yml'};
+  if(ext==='toml')return {cls:'toml',label:'tml'};
+  if(ext==='properties'||ext==='conf'||ext==='config'||ext==='cfg'||ext==='ini')return {cls:'cfg',label:'cfg'};
+  if(ext==='mcfunction'||ext==='snbt')return {cls:'fn',label:'ƒ'};
+  if(ext==='md'||ext==='txt')return {cls:'txt',label:'¶'};
+  if(ext==='log'||ext==='logs')return {cls:'log',label:'log'};
+  if(ext==='jar')return {cls:'jar',label:'jar'};
+  if(ext==='zip')return {cls:'zip',label:'zip'};
+  if(!ext)return {cls:'txt',label:'§'};
+  return {cls:'gen',label:ext.slice(0,3)};
+}
+function fbDirRow(node,prefix,depth,reveal){
   const open=edState.fbOpen.has(prefix);
   const count=countTreeFiles(node);
-  return `<div class="fb-row fb-dir${open?' open':''}" data-dir="${esc(prefix)}" style="padding-left:${8+depth*16}px"><span class="fb-caret">${open?'▾':'▸'}</span><span class="file-name">${esc(node.name)}</span><span class="fb-size">${count}</span></div>`;
+  return `<div class="fb-row fb-dir${open?' open':''}${reveal?' fb-reveal':''}" data-dir="${esc(prefix)}" style="padding-left:${8+depth*16}px"><span class="fb-caret">${open?'▾':'▸'}</span><span class="fb-ico fb-ico-dir" aria-hidden="true"></span><span class="file-name">${esc(node.name)}</span><span class="fb-size">${count}</span></div>`;
 }
 function countTreeFiles(node){
   let n=node.files.length;
   for(const c of node.dirs.values())n+=countTreeFiles(c);
   return n;
 }
-function renderTree(node,depth,prefix,out){
-  // folders first (alphabetical), then files
+function renderTree(node,depth,prefix,out,revealPrefix){
+  // folders first (alphabetical), then files. When revealPrefix is set, every row that lives UNDER
+  // that just-opened folder gets the .fb-reveal class so it animates out once (card-open feel).
   const dirs=[...node.dirs.values()].sort((a,b)=>a.name.localeCompare(b.name));
   const files=node.files.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const underReveal = !!revealPrefix && (prefix===revealPrefix || (prefix||'').startsWith(revealPrefix+'/'));
   for(const d of dirs){
     const p=prefix?prefix+'/'+d.name:d.name;
-    out.push(fbDirRow(d,p,depth));
-    if(edState.fbOpen.has(p))renderTree(d,depth+1,p,out);
+    out.push(fbDirRow(d,p,depth,underReveal));
+    if(edState.fbOpen.has(p))renderTree(d,depth+1,p,out,revealPrefix);
   }
   for(const f of files){
-    out.push(`<div class="fb-row" data-rel="${esc(f.rel)}" title="${esc(f.rel)}" style="padding-left:${8+(depth+1)*16}px"><span class="file-name">${esc(f.name)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`);
+    const b=fileBadge(f.name);
+    out.push(`<div class="fb-row${underReveal?' fb-reveal':''}" data-rel="${esc(f.rel)}" title="${esc(f.rel)}" style="padding-left:${8+(depth+1)*16}px"><span class="fb-ico fb-ico-${b.cls}" aria-hidden="true">${esc(b.label)}</span><span class="file-name">${esc(f.name)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`);
   }
 }
+let fbRevealPrefix=null; // set to the folder path when it is EXPANDED, so its children animate in
 function renderFbList(){
   const q=$('#fbSearch').value.trim().toLowerCase();
   const box=$('#fbList');
@@ -123,15 +145,16 @@ function renderFbList(){
     // Search stays flat: show every matching path in full so a known filename is one glance away.
     const list=edState.files.filter(f=>f.path.toLowerCase().includes(q));
     $('#fbCount').textContent=t('ed.filesCount',{a:list.length});
-    box.innerHTML=list.length?list.map(f=>`<div class="fb-row" data-rel="${esc(f.path)}" title="${esc(f.path)}"><span class="file-name">${esc(f.path)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`).join(''):`<li class="empty"><span>${t('ed.noFiles')}</span></li>`;
+    box.innerHTML=list.length?list.map(f=>{const b=fileBadge(f.path);return `<div class="fb-row" data-rel="${esc(f.path)}" title="${esc(f.path)}"><span class="fb-ico fb-ico-${b.cls}" aria-hidden="true">${esc(b.label)}</span><span class="file-name">${esc(f.path)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`}).join(''):`<li class="empty"><span>${t('ed.noFiles')}</span></li>`;
   } else {
     $('#fbCount').textContent=t('ed.filesCount',{a:edState.files.length});
     // Defensive: if fbOpen was ever lost (edState rebuilt) or a file has an odd path, fall back
     // to the flat list instead of leaving the browser stuck on the loading placeholder.
     if(!(edState.fbOpen instanceof Set))edState.fbOpen=new Set();
     let out=[];
-    try { renderTree(buildFileTree(edState.files),0,'',out); }
+    try { renderTree(buildFileTree(edState.files),0,'',out,fbRevealPrefix); }
     catch(e){ console.error('file tree render failed, falling back to flat list:',e); out=[]; }
+    fbRevealPrefix=null; // one-shot: only the render right after an expand animates
     box.innerHTML=out.length?out.join(''):(edState.files.length
       ? edState.files.map(f=>`<div class="fb-row" data-rel="${esc(f.path)}" title="${esc(f.path)}"><span class="file-name">${esc(f.path)}</span><span class="fb-size">${edFmtBytes(f.size)}</span></div>`).join('')
       : `<li class="empty"><span>${t('ed.noFiles')}</span></li>`);
@@ -139,7 +162,8 @@ function renderFbList(){
   box.querySelectorAll('.fb-row[data-rel]').forEach(row=>row.onclick=()=>openEd(row.dataset.rel,'browser'));
   box.querySelectorAll('.fb-row[data-dir]').forEach(row=>row.onclick=()=>{
     const d=row.dataset.dir;
-    if(edState.fbOpen.has(d))edState.fbOpen.delete(d);else edState.fbOpen.add(d);
+    if(edState.fbOpen.has(d)){edState.fbOpen.delete(d);fbRevealPrefix=null;}
+    else {edState.fbOpen.add(d);fbRevealPrefix=d;}
     renderFbList();
   });
 }

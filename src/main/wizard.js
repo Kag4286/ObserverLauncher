@@ -29,8 +29,13 @@ function registerWizard(ipcMain, ctx) {
       const s = String(software || 'vanilla');
       if (s === 'vanilla') {
         const m = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
-        const v = m.versions.filter(x => x.version_type === 'release').map(x => x.id);
-        return { ok: true, versions: v, latest: v[0] || null, raw: false };
+        // BUGFIX: the v2 manifest labels each entry with `type`, NOT `version_type`. The wrong field
+        // name made this filter return an EMPTY array for Vanilla, so the step-3 picker showed no
+        // versions and every typed version read as 'not in the live list'. Read `type` instead.
+        const v = m.versions.filter(x => x.type === 'release').map(x => x.id);
+        // Fail loudly if the shape ever changes again instead of silently showing an empty picker.
+        if (!v.length) throw new Error('Mojang returned no release versions - the version manifest shape may have changed.');
+        return { ok: true, versions: v, latest: m.latest?.release || v[0] || null, raw: false };
       }
       if (s === 'paper' || s === 'folia' || s === 'velocity') {
         // 2.2.0 (option 1a): the newest version often only has ALPHA/BETA builds, so "Latest" must
@@ -80,7 +85,8 @@ function registerWizard(ipcMain, ctx) {
       }
       if (s === 'spigot') {
         const m = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
-        const v = m.versions.filter(x => x.version_type === 'release').map(x => x.id);
+        // Same `type` fix as the Vanilla branch above.
+        const v = m.versions.filter(x => x.type === 'release').map(x => x.id);
         return { ok: true, versions: v, latest: 'latest', raw: false, note: 'BuildTools accepts any release Mojang publishes — very old ones may fail to compile.' };
       }
       return { ok: false, error: `Unknown software "${s}".` };

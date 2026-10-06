@@ -84,9 +84,17 @@ function createRemoteServer(opts) {
     // defense-in-depth as the MCP server. The real remote client sends no Origin and connects by IP.
     if (req.headers['origin']) { res.writeHead(403); return res.end('forbidden'); }
     const hostHdr = String(req.headers['host'] || '').split(':')[0];
-    if (hostHdr && hostHdr !== '127.0.0.1' && hostHdr !== 'localhost' && hostHdr !== '::1' && hostHdr !== '[::1]' && hostHdr !== String(o.bind || '127.0.0.1')) {
-      res.writeHead(403); return res.end('forbidden');
-    }
+    // BUGFIX: when the user binds to 0.0.0.0 ("expose directly"), the real client still sends
+    // Host: <the actual IP>, never '0.0.0.0' — so the old exact-match guard 403'd EVERY request.
+    // A wildcard bind means "accept any local interface", so allow any IP-LITERAL host (still reject
+    // hostnames, which is what DNS-rebinding uses). A specific bind keeps the exact-match behavior.
+    const bind = String(o.bind || '127.0.0.1');
+    const wildcardBind = bind === '0.0.0.0' || bind === '::' || bind === '';
+    const hostOk = !hostHdr
+      || hostHdr === '127.0.0.1' || hostHdr === 'localhost' || hostHdr === '::1' || hostHdr === '[::1]'
+      || hostHdr === bind
+      || (wildcardBind && (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostHdr) || /^[0-9a-f:]+$/i.test(hostHdr)));
+    if (!hostOk) { res.writeHead(403); return res.end('forbidden'); }
     const ip = String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
     // /health is unauthenticated liveness (no tool access) - same idea as the MCP /health.
     if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, uptime: Math.round(process.uptime()), version: o.version || 'dev' });

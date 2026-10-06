@@ -1,9 +1,8 @@
 /* css/04-players.css — split from style.css (lines 241-315); link in numeric order to keep the cascade. */
 /* players roster, inspect modal, equipment. */
-/* PLAYERS — professional roster */
-.roster-panel{display:flex;flex-direction:column;min-height:520px}
+/* PLAYERS — roster (v4.0.0: the roster-panel card wrapper is gone; the list sits on the canvas). */
 .roster-count{font:700 11px var(--font-mono);letter-spacing:.06em;color:var(--text-muted);border:1px solid var(--border);padding:7px 10px;border-radius:999px;background:var(--field);white-space:nowrap}
-.roster-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.roster-toolbar{display:flex;justify-content:space-between;gap:var(--space-3);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-2)}
 .roster-search{position:relative;display:flex;align-items:center}
 .roster-search input{width:200px;background:var(--field);border:1px solid var(--field-border);border-radius:4px;padding:8px 28px 8px 10px;color:var(--text);font:12px var(--font-ui);outline:0}
 .roster-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
@@ -13,21 +12,24 @@
 .manual-kicker{font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-dim);flex-shrink:0}
 .player-manual-row input{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--field-border);padding:8px 10px;border-radius:4px;color:var(--text);font:12px var(--font-ui)}
 .manual-btns{display:flex;gap:6px;flex-wrap:wrap}
-.players-table{margin-top:14px;display:grid;gap:8px}
-.player-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;background:var(--panel-raised);border:1px solid var(--border);border-radius:4px;transition:all .12s}
-.player-row:hover{border-color:var(--border-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.18)}
-.player-avatar{width:36px;height:36px;border-radius:4px;background:var(--field);border:1px solid var(--border);object-fit:cover;flex-shrink:0}
-.player-main{display:flex;flex-direction:column;gap:4px;min-width:0}
-.player-name{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.player-name b{font:700 14px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-meta{font:500 11px var(--font-mono);color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
+.players-table{margin-top:var(--space-3);display:grid;gap:var(--space-2)}
+/* Entity card (DESIGN.md 16.3): a player is a card, not a table row. */
+.player-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-3);align-items:center;padding:var(--space-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.player-row:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.player-row.online{border-color:var(--success-weak)}
+.player-avatar{width:42px;height:42px;border-radius:50%;background:var(--surface-3);border:2px solid var(--border);object-fit:cover;flex-shrink:0}
+.player-row.online .player-avatar{border-color:var(--success);box-shadow:0 0 0 3px var(--success-weak)}
+.player-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.player-name{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.player-name b{font:700 15px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player-meta{font:500 12px var(--font-ui);color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
 .player-name .player-row-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);flex-shrink:0} .player-row.online .player-row-dot{background:var(--success);box-shadow:0 0 0 4px var(--success-weak)}
-.player-badge{font:700 9px var(--font-mono);padding:3px 7px;border-radius:999px;letter-spacing:.04em} .player-badge.op{background:var(--accent-weak);color:var(--accent);border:1px solid rgba(0,229,255,.18)} .player-badge.whitelisted{background:var(--panel);border:1px solid var(--border);color:var(--text-muted)} .player-badge.banned{background:var(--danger-weak);color:var(--danger);border:1px solid rgba(255,59,92,.2)}
+.player-badge{font:700 10px var(--font-mono);padding:3px 8px;border-radius:999px;letter-spacing:.04em} .player-badge.op{background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand-soft)} .player-badge.whitelisted{background:var(--surface);border:1px solid var(--border);color:var(--text-muted)} .player-badge.banned{background:var(--danger-weak);color:var(--danger);border:1px solid var(--danger-weak)}
 .player-row-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.row-action{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);border-radius:4px;padding:7px 10px;font:600 11px var(--font-ui);cursor:pointer;white-space:nowrap}
-.row-action:hover{color:var(--text);border-color:var(--border-hover);background:var(--field)}
-.row-action.danger{color:var(--danger);border-color:rgba(255,59,92,.3)} .row-action.danger:hover{background:var(--danger-weak);border-color:var(--danger)}
-.row-action.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.row-action{border:1px solid var(--border);background:var(--surface-2);color:var(--text-muted);border-radius:var(--r-xs);padding:7px 10px;font:600 12px var(--font-ui);cursor:pointer;white-space:nowrap;transition:color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+.row-action:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface-3)}
+.row-action.danger{color:var(--danger);border-color:var(--danger-weak)} .row-action.danger:hover{background:var(--danger-weak);border-color:var(--danger)}
+.row-action.active{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 /* INSPECT MODAL — professional */
 .player-modal{width:min(760px,100%);max-height:88vh;display:flex;flex-direction:column}
 .player-modal #playerInspector{flex:1;min-height:0;overflow:auto;padding-right:4px}
@@ -73,8 +75,21 @@
 .inspect-section .item-cell:hover .item-icon{animation:itemFloat .9s ease-in-out infinite alternate}
 @keyframes itemFloat{from{transform:translateY(0)}to{transform:translateY(-3px)}}
 
-/* ============ PLAYERS TAB REDESIGN (0.7.0) ============ */
-/* Header moved to .tab-head; the panel below is now a plain surface (no .glass wrapper). */
-.roster-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:var(--s3) var(--s4);min-height:0}
-.roster-panel .roster-toolbar{margin-bottom:var(--s2)}
-.roster-panel .players-table{margin-top:var(--s3)}
+/* ============ PLAYERS TAB (v4.0.0) ============ */
+/* The roster sits directly on the canvas (no card wrapper). Toolbar, list and the collapsed
+   "manage by name" section stack with the standard gap. */
+.player-filters{gap:var(--space-2)}
+.player-pager{margin-top:var(--space-3);display:flex;align-items:center;justify-content:center;gap:var(--space-3)}
+/* "Manage by name" (was the always-open Quick Action row) — collapsed by default, under the list. */
+.player-manual{margin-top:var(--space-4);interpolate-size:allow-keywords}
+.player-manual::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
+.player-manual[open]::details-content{block-size:auto}
+.player-manual .player-manual-row{animation:heroIn var(--dur-modal) var(--ease-out) both}
+@media (prefers-reduced-motion:reduce){.player-manual .player-manual-row{animation:none}}
+.player-manual-summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:var(--space-3);font:600 13.5px var(--font-ui);color:var(--text);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.player-manual-summary::-webkit-details-marker{display:none}
+.player-manual-summary::before{content:'▸';color:var(--brand);font-family:var(--font-mono);font-size:13px;transition:transform var(--dur-fast) var(--ease-out)}
+.player-manual[open] .player-manual-summary::before{transform:rotate(90deg)}
+.player-manual-summary:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.player-manual[open] .player-manual-summary{border-radius:var(--r-sm) var(--r-sm) 0 0;border-bottom-color:transparent}
+.player-manual .player-manual-row{margin-top:0;border-radius:0 0 var(--r-sm) var(--r-sm);border-top:0}

@@ -20,6 +20,7 @@ const { importMrpackFromPath, detectServerCompat } = require('../main/modpacks.j
 const { searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject } = require('../main/marketplace.js');
 const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY } = require('./modpack-plan.js');
 const { detectServerTarget, versionMatchesServer } = require('../main/server-compat.js');
+const { compareVersions, isComparableVersion } = require('../main/version-compare.js');
 const { openJar } = require('../main/jar-read.js');
 const { classifyJar } = require('../main/mod-metadata.js');
 const repair = require('./repair.js');
@@ -392,14 +393,37 @@ async function tInstallFromMarket(ctx, a) {
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   const { download } = require('../main/http.js');
   const { recordManifestEntry, verifyFileHash } = require('../main/fs-utils.js');
+  // UX/SAFETY (v3.3.1): refuse a mismatched-loader / older build BEFORE touching disk. Both used to
+  // be silent (a NeoForge jar onto Paper crashed on start; a lower version over a newer one silently
+  // downgraded). force:true overrides the loader/MC gate; allowDowngrade:true overrides the version gate.
+  if (!a.force) {
+    const files = serverFiles(root);
+    const server = detectServerTarget(root, files);
+    const vc = versionMatchesServer(dl, server);
+    if (!vc.ok) return { ok: false, error: `Refused: this build does not match the server (${vc.reason === 'loader' ? 'loader' : 'Minecraft version'} mismatch). Pass force:true to install anyway.` };
+  }
+  if (!a.allowDowngrade) {
+    const entry = (readJsonList(root, 'observerlauncher-manifest.json') || []).find(e => e && e.projectId && String(e.projectId) === String(dl.projectId));
+    if (entry && entry.version && dl.versionNumber && isComparableVersion(entry.version) && isComparableVersion(dl.versionNumber) && compareVersions(dl.versionNumber, entry.version) < 0) {
+      return { ok: false, error: `Refused: ${dl.versionNumber} is older than the installed ${entry.version}. Pass allowDowngrade:true to downgrade on purpose.` };
+    }
+  }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   // A single plugin/mod jar from the market; cap at 512 MB (mirrors the GUI install path).
   await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
   // SECURITY (supply-chain): verify against the registry hash before keeping the file.
   const vh = verifyFileHash(dest, dl.hashes);
   if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} return { ok: false, error: `${vh.error} The file was deleted — retry, or install manually from the project page.` }; }
-  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, env: item.env || undefined, projectId: dl.projectId || item.id, versionId: dl.versionId || undefined, gameVersion: dl.gameVersion || undefined, version: dl.versionNumber || undefined, installedAt: new Date().toISOString() }); } catch {}
-  return { ok: true, result: { name: dl.filename, files: serverFiles(root) } };
+  // BUGFIX (v3.3.1): `item` was undefined here (the handler receives `a`), so the ReferenceError was
+  // swallowed by the catch and the manifest row was NEVER written — breaking check_updates for every
+  // MCP install. Use `a` + the resolved dl fields.
+  try { recordManifestEntry(root, { kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: dl.source, env: a.env || undefined, projectId: dl.projectId || id, versionId: dl.versionId || undefined, gameVersion: dl.gameVersion || undefined, version: dl.versionNumber || undefined, installedAt: new Date().toISOString() }); } catch {}
+  // Lean by default (v3.3.1): the full serverFiles() snapshot (plugins+mods+worlds+properties+players)
+  // is ~15k chars and BLEW the AI client's context on every write. Return just what changed; pass
+  // verbose:true for the old full snapshot.
+  const result = { name: dl.filename, kind, folder };
+  if (a.verbose) result.files = serverFiles(root);
+  return { ok: true, result };
 }
 async function tInstallLocalJar(ctx, a) {
   const root = needPath(ctx);
@@ -719,14 +743,21 @@ async function tDeleteContent(ctx, a) {
   try { isDir = fs.statSync(target).isDirectory(); } catch {}
   try { isDir ? fs.rmSync(target, { recursive: true, force: true }) : fs.unlinkSync(target); }
   catch (e) { return { ok: false, error: e.message }; }
-  return { ok: true, result: { files: serverFiles(root) } };
+  // Lean by default (v3.3.1): the full serverFiles() snapshot is huge and blew the AI context.
+  // verbose:true restores the old full snapshot for callers that need it.
+  const result = { deleted: name, kind };
+  if (a.verbose) result.files = serverFiles(root);
+  return { ok: true, result };
 }
 async function tToggleContent(ctx, a) {
   const root = needPath(ctx);
   const { toggleContent } = require('../main/content-ops.js');
   const r = toggleContent(root, a.kind || 'plugin', String(a.name || ''), a.action);
   if (!r.ok) return r;
-  return { ok: true, result: { from: r.from, to: r.to, files: serverFiles(root) } };
+  // Lean by default (v3.3.1); verbose:true restores the full serverFiles() snapshot.
+  const result = { from: r.from, to: r.to };
+  if (a.verbose) result.files = serverFiles(root);
+  return { ok: true, result };
 }
 // 3.3.0: validate a datapack's pack.mcmeta against the server MC version (datapack.js is pure +
 // readJarEntry). Read-only.
@@ -1167,7 +1198,7 @@ const TOOLS = [
   { name: 'list_backups', risk: 'read', description: 'Backup files with size + date.', inputSchema: S(), handler: tListBackups },
   { name: 'get_network_info', risk: 'read', description: 'LAN IPs and server port.', inputSchema: S(), handler: tGetNetworkInfo },
   { name: 'get_java_info', risk: 'read', description: 'Detected Java version/path/arch.', inputSchema: S(), handler: tGetJavaInfo },
-  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar, Spigot or CurseForge for plugins/mods/datapacks/modpacks. CurseForge requires the user to have set an API key in Settings.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
+  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar, Spigot or CurseForge for plugins/mods/datapacks/modpacks. Pass loader (neoforge|forge|fabric|quilt) to pin the search to a loader instead of the loose kind group. CurseForge requires the user to have set an API key in Settings.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), loader: STR('neoforge|forge|fabric|quilt (pin to one loader)'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
   { name: 'list_market_versions', risk: 'read', description: 'Versions of a project (Modrinth, Hangar or CurseForge). Pick a versionId then install_from_market.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), source: STR('modrinth|hangar|curseforge (default modrinth)') }, ['id']), handler: tListMarketVersions },
   { name: 'diagnose_server', risk: 'read', description: 'Full server health check: folder, jar, Java version/arch, EULA, port, world, backups, recent crash. Returns per-check level (ok/warn/error) + fixes.', inputSchema: S(), handler: tDiagnoseServer },
   { name: 'analyze_console', risk: 'read', description: 'Scan the console buffer for errors/warnings (OOM, port-busy, exceptions, lag), grouped and ranked.', inputSchema: S({ lines: { type: 'number', description: 'lines to scan (default 500, max 2000)' } }), handler: tAnalyzeConsole },
@@ -1197,7 +1228,7 @@ const TOOLS = [
   { name: 'set_schedule', risk: 'write', description: 'Set the server schedule. Any of enabled (bool), startTime/stopTime (HH:MM 24h or ""), days (array of mon..sun, empty = every day).', inputSchema: S({ enabled: { type: 'boolean', description: 'true = scheduler on' }, startTime: STR('HH:MM (24h) or empty to disable'), stopTime: STR('HH:MM (24h) or empty to disable'), days: { type: 'array', items: { type: 'string' }, description: 'weekdays mon..sun (empty = every day)' } }), handler: tSetSchedule },
   { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name') }, ['name']), handler: tKickPlayer },
   { name: 'search_modpacks', risk: 'read', description: 'Search Modrinth for installable modpacks. Install one with install_from_market { kind: "modpack", id }.', inputSchema: S({ query: STR('search text'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchModpacks },
-  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack/MODPACK from Modrinth, Hangar, Spigot or CurseForge (same resolver as the GUI). kind:"modpack" downloads the .mrpack and imports it (its files + overrides) into this instance. CurseForge needs the user to have set an API key in Settings, and refuses projects whose author blocks third-party downloads.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)') }, ['id']), handler: tInstallFromMarket },
+  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack/MODPACK from Modrinth, Hangar, Spigot or CurseForge (same resolver as the GUI). Refuses a build whose loader/MC does not match the server, or one OLDER than the installed version (pass force:true / allowDowngrade:true to override). kind:"modpack" downloads the .mrpack and imports it. CurseForge needs the user to have set an API key in Settings, and refuses projects whose author blocks third-party downloads.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)'), env: STR('client|server|both (optional, recorded in the manifest)'), force: { type: 'boolean', description: 'install even on a loader/MC mismatch (default false)' }, allowDowngrade: { type: 'boolean', description: 'allow installing an older version over a newer one (default false)' }, verbose: { type: 'boolean', description: 'return the full server file snapshot (default false, lean result)' } }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
@@ -1216,8 +1247,8 @@ const TOOLS = [
   { name: 'stop_instance', risk: 'destroy', description: 'Gracefully stop a specific instance by id (defaults to the active one).', inputSchema: S({ instance: STR('instance id (optional, default active)') }), handler: tStopInstance },
   { name: 'stop_server', risk: 'destroy', description: 'Gracefully stop the server.', inputSchema: S(), handler: tStopServer },
   { name: 'force_stop_server', risk: 'destroy', description: 'Kill the server process tree.', inputSchema: S(), handler: tForceStopServer },
-  { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name') }, ['name']), handler: tDeleteContent },
-  { name: 'toggle_content', risk: 'write', description: 'Enable or disable a plugin/mod/datapack by renaming <name> <-> <name>.disabled (no data loss, unlike delete).', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name'), action: STR('enable|disable|toggle (default)') }, ['name']), handler: tToggleContent },
+  { name: 'delete_content', risk: 'destroy', description: 'Delete a plugin/mod/datapack file.', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name'), verbose: { type: 'boolean', description: 'return the full server file snapshot (default false, lean result)' } }, ['name']), handler: tDeleteContent },
+  { name: 'toggle_content', risk: 'write', description: 'Enable or disable a plugin/mod/datapack by renaming <name> <-> <name>.disabled (no data loss, unlike delete).', inputSchema: S({ kind: STR('plugin|mod|datapack'), name: STR('file name'), action: STR('enable|disable|toggle (default)'), verbose: { type: 'boolean', description: 'return the full server file snapshot (default false, lean result)' } }, ['name']), handler: tToggleContent },
   { name: 'validate_datapack', risk: 'read', description: "Check a datapack's pack.mcmeta pack_format against the server's Minecraft version so a mismatch (which fails to load or crashes) is caught before starting.", inputSchema: S({ name: STR('datapack folder or .zip name inside <world>/datapacks') }, ['name']), handler: tValidateDatapack },
   { name: 'extract_datapack', risk: 'write', description: 'Extract a .zip datapack into a folder (folder datapacks are easier to edit + load). Safe: reuses the zip-slip guarded extractor.', inputSchema: S({ name: STR('.zip datapack file name'), removeZip: { type: 'boolean', description: 'delete the .zip after a successful extract (default false)' } }, ['name']), handler: tExtractDatapack },
   { name: 'delete_backup', risk: 'destroy', description: 'Delete a backup ZIP.', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tDeleteBackup },

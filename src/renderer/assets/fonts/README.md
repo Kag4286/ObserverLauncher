@@ -1,26 +1,29 @@
-# Space Grotesk — self-hosted font
+# Bundled fonts (offline-safe)
 
-`style.css` declares an `@font-face` pointing to:
+v4.0.0 loads its UI + mono fonts from `fonts.css` in this folder (linked before `css/01-tokens.css`).
+That file is **generated** - do not edit it by hand. There is NO Google Fonts `@import`, and the
+CSP is `font-src 'self'`, so the app renders fully offline either way.
+
+Right now `fonts.css` is a placeholder and the app uses the fallback stack
+(`Inter, system-ui, …`), which looks correct - just not the exact typeface.
+
+## One-time: fetch + bundle the real fonts
+
+On a machine with network access, from the project root:
 
 ```
-./assets/fonts/SpaceGrotesk-Variable.woff2
+npm i --no-save @fontsource-variable/manrope @fontsource/ibm-plex-mono
+node scripts/fetch-fonts.js
 ```
 
-That file is **not bundled** in this patch (this sandbox has no network to download the binary).
-If the file is missing, the browser/Electron falls back to
-`-apple-system, "Segoe UI", Inter, Roboto, Arial, sans-serif` — the app still works and the style
-is still correct, only the font differs slightly.
+The script copies the woff2 subsets (Latin, Vietnamese, Cyrillic - so all 7 locales render in the
+real font) into this folder and rewrites `fonts.css` with the correct `@font-face` + `unicode-range`.
+It is **not** an npm dependency of the app - `--no-save` keeps it out of package.json (the woff2
+files are committed here instead).
 
-## How to add the real font (one time, on a machine with network access)
+Then reload the app (`npm start`). No CSS/CSP change needed - the files live inside the app (`'self'`).
 
-1. Download the Space Grotesk variable font (OFL license, free) from one of these sources:
-   - Fontsource: https://fontsource.org/fonts/space-grotesk → download the "variable" `.woff2`
-   - Google Fonts (upstream GitHub repo): https://github.com/googlefonts/space-grotesk → build it or
-     grab `SpaceGrotesk[wght].ttf` and convert it to `.woff2` (e.g. with `fonttools varLib.instancer`
-     or https://transfonter.org, choosing "TTF/OTF → WOFF2").
-2. Rename the file to `SpaceGrotesk-Variable.woff2` and place it in this folder
-   (`src/renderer/assets/fonts/`).
-3. Reload the app (`npm start`) — no CSS/CSP change needed, because the file lives inside the app
-   (`'self'`) so it does not violate `default-src 'self'` and needs no Google Fonts domain.
+## Fonts + licenses (both OFL)
 
-Optional — it only affects the typography, not any functionality.
+- **Manrope** (UI) - https://github.com/sharanda/manrope
+- **IBM Plex Mono** (technical) - https://github.com/IBM/plex

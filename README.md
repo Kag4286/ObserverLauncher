@@ -45,12 +45,12 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-3.3.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-3.3.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-4.0.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-4.0.0.AppImage` |
 
 **Windows:** run the installer. It sets up auto-update.
 
-**Linux:** `chmod +x ObserverLauncher-3.3.0.AppImage`, then run it. No root needed.
+**Linux:** `chmod +x ObserverLauncher-4.0.0.AppImage`, then run it. No root needed.
 
 Running from source needs Node.js 18 or newer:
 

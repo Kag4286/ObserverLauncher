@@ -10,6 +10,126 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [4.0.0] — 2026-10-06
+
+**Major GUI/UX redesign + MCP hardening.** v4.0.0 is a visual and UX reset of the whole launcher
+(new design system, docs/DESIGN.md) plus the MCP install-safety fixes that landed first.
+
+### Added — design system + redesign (v4.0.0)
+- **`docs/DESIGN.md`** — the executable design system: color/type/shape/depth/spacing tokens, a token
+  migration map, motion contract, i18n contract, a component catalogue, and per-tab specs.
+- **New token layer** in `01-tokens.css`: warm near-black surfaces, an **emerald brand**
+  (`--brand #22C55E`, replaced the old cyan identity), soft radii (`--r-xs`..`--r-xl`), an 8px spacing
+  scale (`--space-1..10`), depth shadows, `--instance-accent`. Old names kept as aliases during migration.
+- **Component catalogue** (`.section`, `.card`, `.badge`, `.entity-card`, `.empty`) in `02-shell.css`;
+  buttons/panels restyled to the new tokens.
+- **Custom animated dropdown** (`js/00-dropdown.js` + `css/10-dropdown.css`): native `<select>` popups
+  are OS-drawn and cannot animate, so selects marked `ol-select` are wrapped in an animated listbox
+  that proxies back to the real `<select>` (existing `.value`/`onchange` code unchanged). Applied to
+  the Marketplace filters, language, motion level, Java picker and install-version selects.
+- **Content tab UX**: `+ Add` / `More` menus (portaled), `{} Edit files` button, a prominent
+  "Modpack tools" disclosure, **double-click a file to reveal it in the OS file manager**, and a
+  **right-click context menu** (show in folder / update / enable-disable / delete). New IPC `files:reveal`.
+- **Marketplace**: Hangar + Spigot plugin **icons** (Spigot icon path fixed), Spigot **author names**
+  resolved lazily (search has no author name), Spigot details fetched in the background with a bounded
+  concurrency pool + caches so the search stays instant.
+- **Editor file-type badges** + a CSS folder icon so the file browser is not a wall of text.
+
+### Changed — redesign
+- **Overview**: a dominant "world header" hero (server name + status + one primary action), removed
+  the 4-stat panel + quick-actions strip, moved RAM allocation into a collapsed card, connect panel
+  auto-opens when the server runs.
+- **Players**: roster is a flat entity-card list (round avatars with a green ring when online); the
+  always-open "Quick Action" row became a collapsed "Manage by name" disclosure.
+- **Performance**: 4 KPI cards merged into one hairline-divided surface; the 2 charts share one
+  surface with a vertical divider (no more "card slop").
+- **Content / Marketplace / Worlds**: flat sections instead of bordered cards; counts moved into the
+  seg / section titles; **Worlds** now uses entity cards for worlds and flat cards for backups (latest
+  = brand rail); **Marketplace** removed the redundant active-filter chips + duplicated status line.
+- **Settings**: replaced the Basic/Advanced toggle + one long scroll with a **5-category nav**
+  (Setup / Personal / Automation / Integrations / Advanced) and per-category content. Schedule moved to
+  Automation; Updates + JVM to Advanced; tunnel/CurseForge/MCP/Remote to Integrations. Dropped the
+  auto section-numbering and the outer box (box-in-box); active nav item is pure CSS (no fragile JS
+  glider); panes animate in on switch.
+- **Console / World Map**: recolored the remaining cyan-era rules to the emerald brand; the World Map
+  perf note is now a quiet hint, not an alarm.
+- **Motion**: a global panel-entrance cascade (each tab's blocks rise in on activation), plus hero
+  breathing, folder-open reveals and dropdown/list animations — all token-based, with
+  reduced-motion + Lite guards. `color-scheme: dark` set.
+
+### Fixed — MCP (from an external review)
+- **MCP installs never wrote their manifest row** (`src/mcp/tools.js`, `tInstallFromMarket`). The
+  handler referenced an undefined `item` (it receives `a`), so the `ReferenceError` was swallowed by
+  the `catch {}` and `recordManifestEntry` never ran — which silently broke `check_updates` for every
+  plugin/mod installed through MCP. Now uses `a` + the resolved `dl` fields.
+- **`resolveMarketDownload` no longer installs a mismatched-loader jar.** It used to fall back to
+  `byVersion[0] || versions[0]`, so a project with only NeoForge/Fabric builds (e.g. Floodgate)
+  silently installed that jar onto a Paper/Purpur server. When the registry reports loaders and none
+  matches the server's family, it now throws a clear `No <kind> build matches this server's loader`
+  error instead of guessing. Datapack/modpack keep the old fallback.
+- **Spigot search icons were broken** — Spiget returns `icon.url` as a root-relative path with no
+  leading slash, so the old `spigotmc.org` + url produced `...orgdata/...` (404). Now prefixed
+  correctly (verified against the live API via `scripts/spigot-probe.js`).
+
+### Added — MCP
+- **`install_from_market` refuses unsafe installs by default**: a loader/Minecraft mismatch
+  (`versionMatchesServer`) and a version OLDER than what is installed (via the new
+  `src/main/version-compare.js`, natural digit-aware compare). `force:true` / `allowDowngrade:true`
+  override. Both refusals name the reason.
+- **`search_marketplace` gained a `loader` param** so a search can be pinned to neoforge/forge/
+  fabric/quilt instead of the loose kind group.
+- **New pure module `src/main/version-compare.js`** (`compareVersions`, `isComparableVersion`).
+- **New IPC `files:reveal`** (used by the Content tab's double-click / context menu).
+
+### Changed — MCP
+- **MCP write tools return a LEAN result by default** — `install_from_market`, `delete_content` and
+  `toggle_content` used to return the full `serverFiles()` snapshot (~15k chars), which blew an AI
+  client's context on every write. They now return only what changed; pass `verbose:true` for the old
+  full snapshot. The GUI path (`market:install`) is unchanged.
+
+> The **Settings tab, the Player Inspector and the new-server wizard / modals** ARE all redesigned
+> (see the sections below and above).
+
+### Changed — New Server wizard + modals
+- **Step 2 (Software) regrouped**: the flat list of 10 server types is now four labelled groups
+  (Start here / Plugin servers / Modded servers / Proxy) with a hint bar. Each card gained an **ⓘ
+  info popover** explaining what the software is, who it is for, and an **"Open the official page"**
+  link (papermc.io, neoforged.net, …) so nobody has to search the web to tell Leaf from Purloin.
+- **i18n gaps fixed**: several wizard step 2/3/5 strings were hardcoded English; now translated in
+  all 7 locales.
+- **Onboarding + small modals** re-tokenized to the new design (soft radii, surface tokens, no
+  hardcoded whites, no hover-lift).
+- Removed a large amount of dead wizard CSS left over from the pre-2.2.0 wizard.
+
+### Changed — Settings (second pass)
+- **Integrations** split into two labelled groups — **Share your server** (Internet tunnel, Remote
+  access) and **Connect tools** (CurseForge) — with the power-user fields (Playit path, allowed IPs,
+  port, bind) folded into an "Advanced" disclosure, so the pane reads as a few calm switches.
+- **MCP / AI got its own category** in the Settings nav (now: Setup, Personal, Automation,
+  Integrations, **AI**, Advanced). The pane explains, in plain steps, how to connect an AI client
+  (the exact JSON config is shown in-app and copyable) and lists the three permission tiers
+  (read / write / destructive), so a newcomer and a power user both see what an assistant may do.
+- **RAM + JVM arguments moved back onto the Overview** as one collapsing "Memory & JVM" panel, where
+  they are launch-critical and easy to find; the Overview is the control hub again.
+- **Updates** is now a flat card with a "check on startup" toggle and a right-aligned Check button.
+- **Unsaved-changes feedback**: editing any setting shows a labelled "Unsaved changes" pill next to a
+  **pulsing** Apply button, so the save action is impossible to miss.
+- Collapsed disclosures (advanced folds, Schedule) are now clearly tappable bars; a stray header
+  margin that pinned "Enable scheduler" to the corner was fixed.
+
+### Added — Player Inspector rework
+- The inspector is now **five tabs**: **Overview** (profile + equipment + active effects),
+  **Inventory** (hotbar, main inventory and ender chest, each searchable/sortable), **Stats**,
+  **Live actions** and **Saved data (edit)**.
+- **Stats** — blocks mined, distance walked, playtime, deaths, kills and more, read straight from the
+  world save (no server command needed).
+- **Active effects** — the player's current potion/status effects with level and remaining time.
+- **Teleport** — send an online player to any X/Y/Z from the Live tab.
+- The header shows role badges (OP / whitelist / banned) and the player's coordinates at a glance.
+- Item grids are text-only by design and now share one renderer, so hotbar / inventory / ender chest
+  behave identically; native OS checkboxes and sort dropdowns were replaced with the app's animated,
+  themed controls.
+
 ## [3.3.0] — 2026-10-03
 
 **Feature release: remote access + full content lifecycle + world-map performance.** Adds a

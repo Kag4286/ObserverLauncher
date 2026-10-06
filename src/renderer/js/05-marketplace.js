@@ -4,10 +4,30 @@
 // exact version picker, warnings and byte progress replace the old native confirm() prompts.
 // Card grid: icon + title/author + source/kind badges + clamped description + meta foot + Install.
 // The kind badge class carries the colour (plugin/mod/datapack), source badge shows the registry.
-function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel glass market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';const blocked=!!x.blocked;const action=blocked?`<button class="btn secondary" data-market-open="${i}">${t('mkt.cfOpenPage')}</button>`:`<button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button>`;const badge=blocked?`<span class="mi-badge warn">${t('mkt.cfBlocked')}</span>`:'';return `<article class="panel glass market-item"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span>${badge}</div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small>${action}</div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
+function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';const blocked=!!x.blocked;const action=blocked?`<button class="btn secondary" data-market-open="${i}">${t('mkt.cfOpenPage')}</button>`:`<button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button>`;const badge=blocked?`<span class="mi-badge warn">${t('mkt.cfBlocked')}</span>`:'';return `<article class="market-item" data-mid="${esc(x.id)}"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span>${badge}</div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small>${action}</div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
   const item=items[Number(b.dataset.marketInstall)];
   openInstallModal(item);
-});$$('[data-market-open]').forEach(b=>b.onclick=()=>{const item=items[Number(b.dataset.marketOpen)];if(item&&item.projectUrl)window.observer.marketOpenExternal(item.projectUrl)})}
+});$$('[data-market-open]').forEach(b=>b.onclick=()=>{const item=items[Number(b.dataset.marketOpen)];if(item&&item.projectUrl)window.observer.marketOpenExternal(item.projectUrl)});
+  // CSP-safe broken-image fallback: a remote icon that 404s / is blocked must show the generic
+  // placeholder, not the browser's broken-image glyph. Inline onerror is forbidden by the CSP, so
+  // bind here instead.
+  const PH='<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>';
+  n.querySelectorAll('.market-icon img').forEach(img=>{img.addEventListener('error',()=>{const d=img.parentElement;if(d){d.innerHTML=PH}},{once:true})});
+  // Spigot lazily enriches its rows (search has no icon/author) WITHOUT re-rendering: fetch the page's
+  // details in the background and patch each card in place. Cached backend-side, so re-paging is free.
+  if(items.some(x=>x.source==='spigot')&&window.observer.marketSpigotDetails){
+    const ids=items.filter(x=>x.source==='spigot').map(x=>String(x.id));
+    window.observer.marketSpigotDetails(ids).then(r=>{
+      if(!r||!r.ok||!r.details)return;
+      const map=r.details;
+      n.querySelectorAll('.market-item[data-mid]').forEach(card=>{
+        const d=map[card.dataset.mid];if(!d)return;
+        if(d.icon){const box=card.querySelector('.market-icon');if(box&&!box.querySelector('img')){const im=document.createElement('img');im.loading='lazy';im.alt='';im.onerror=()=>{box.innerHTML=PH};im.src=d.icon;box.innerHTML='';box.appendChild(im)}}
+        if(d.author){const a=card.querySelector('.mi-author');if(a)a.textContent=d.author}
+      });
+    }).catch(()=>{});
+  }
+}
 
 // ============ INSTALL CONFIRM MODAL ============
 // Full GUI confirmation for Marketplace installs: compatibility panel (game version / loader /
