@@ -89,15 +89,16 @@ new look, instead of the plain system pop-up.
   meant for a different server type (loader) or Minecraft version, or one that is **older** than what
   you already have — unless you deliberately allow it. This prevents the "why did my server break after
   an install" surprises.
+- **Fonts are now bundled** into the app, so the interface looks the same **with no internet** — the
+  old "load fonts from Google" behaviour is gone. (Latin, Vietnamese and Cyrillic are all covered.)
 - **Spigot icons** now load correctly.
 - **AI tools (MCP)** got cleaner, smaller responses and the same safety checks, so an assistant driving
   your server wastes less of its memory and is less likely to do something wrong.
 
 ## What is NOT in this release
 
-- Nothing major: every tab, the **Player Inspector**, the **New Server wizard** and the small pop-up
-  dialogs are all redesigned in this release. The app still bundles its fonts from Google for now (a
-  small follow-up will make it fully offline-safe).
+- Nothing major: every tab, the **Player Inspector**, the **New Server wizard**, the small pop-up
+  dialogs and the fonts are all done in this release. It is fully offline-safe.
 
 ## Upgrading
 

@@ -34,6 +34,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
   resolved lazily (search has no author name), Spigot details fetched in the background with a bounded
   concurrency pool + caches so the search stays instant.
 - **Editor file-type badges** + a CSS folder icon so the file browser is not a wall of text.
+- **Bundled fonts (offline-safe)**: the UI (Manrope) + technical (IBM Plex Mono) fonts now ship inside
+  the app — the Google Fonts `@import` is gone and the CSP is `font-src 'self'`. `scripts/fetch-fonts.js`
+  copies the woff2 subsets (Latin / Vietnamese / Cyrillic so every locale renders in the real font) and
+  generates `assets/fonts/fonts.css` with the correct `@font-face` + unicode-range.
 
 ### Changed — redesign
 - **Overview**: a dominant "world header" hero (server name + status + one primary action), removed
@@ -46,9 +50,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **Content / Marketplace / Worlds**: flat sections instead of bordered cards; counts moved into the
   seg / section titles; **Worlds** now uses entity cards for worlds and flat cards for backups (latest
   = brand rail); **Marketplace** removed the redundant active-filter chips + duplicated status line.
-- **Settings**: replaced the Basic/Advanced toggle + one long scroll with a **5-category nav**
-  (Setup / Personal / Automation / Integrations / Advanced) and per-category content. Schedule moved to
-  Automation; Updates + JVM to Advanced; tunnel/CurseForge/MCP/Remote to Integrations. Dropped the
+- **Settings**: replaced the Basic/Advanced toggle + one long scroll with a **6-category nav**
+  (Setup / Personal / Automation / Integrations / **AI** / Advanced) and per-category content. Schedule
+  moved to Automation; Updates + JVM to Advanced; tunnel/CurseForge/MCP/Remote to Integrations; the MCP/
+  AI controls got their own category. Dropped the
   auto section-numbering and the outer box (box-in-box); active nav item is pure CSS (no fragile JS
   glider); panes animate in on switch.
 - **Console / World Map**: recolored the remaining cyan-era rules to the emerald brand; the World Map
@@ -100,6 +105,20 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **Onboarding + small modals** re-tokenized to the new design (soft radii, surface tokens, no
   hardcoded whites, no hover-lift).
 - Removed a large amount of dead wizard CSS left over from the pre-2.2.0 wizard.
+
+### Fixed — audit pass (v4.0.0)
+- **Remote API was unreachable when bound to `0.0.0.0`.** The Host-header guard exact-matched the bind
+  value, but a real client sends `Host: <its actual IP>`, never `0.0.0.0` — so every request 403'd. A
+  wildcard bind now accepts any IP-literal Host (still rejects hostnames, which is what DNS-rebinding
+  uses). +2 regression tests.
+- **The Minecraft version picker was empty for Vanilla / Spigot.** The Mojang v2 manifest labels each
+  entry with `type` ('release'/'snapshot'), NOT `version_type`, so the filter returned an empty list
+  and every typed version read as invalid — while the Java check (a different call) still said
+  'verified'. Both branches now read `type` and fail loudly if the manifest shape changes again.
+- **A Settings warning** now appears when Remote access is enabled on a non-loopback bind with an empty
+  IP allowlist (token-only protection).
+- **Wizard version chips** no longer replay their entrance animation on every filter keystroke (it read
+  as 'loading' jitter); the stagger runs only when a fresh list loads.
 
 ### Changed — Settings (second pass)
 - **Integrations** split into two labelled groups — **Share your server** (Internet tunnel, Remote
