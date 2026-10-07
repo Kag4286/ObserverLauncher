@@ -10,6 +10,44 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [4.1.0] — 2026-10-07
+
+**Housekeeping release: dead-translation cleanup + a guard so they cannot come back.** No user-facing
+feature and no settings migration — the interface is unchanged; this only removes unused translation
+strings and adds a test that fails when an unused key is introduced.
+
+### Fixed — server status + controls
+- **"Running" was shown while the server was still booting.** The start watchdog flipped
+  `starting` -> `running` on a fixed 15s timer, so a heavy modpack (which can boot for minutes)
+  was reported as running long before it finished loading. The watchdog is now re-armed on every
+  output line and only fires after 15s of QUIET, so the status flips when the server is actually
+  idle. The exact `Done (…)!` line still flips it immediately. (`server-lifecycle.js`)
+- **New Restart button.** While the server is running the top bar now shows **Restart** instead of
+  Force stop; it gracefully stops and relaunches with the current settings. New IPC `server:restart`
+  (+ `requestStop()` shared with `server:stop`, a `restartAfterStop` per-instance flag, and 5 new
+  i18n keys x7). Force stop is still reachable while starting/stopping (the escape hatch for a hung
+  transition).
+
+### Added — Linux packaging
+- **AppStream metainfo** (`build/dev.observerlauncher.minecraftservercontrol.metainfo.xml`), shipped
+  into the AppImage at `usr/share/metainfo/` via `linux.extraFiles`. Linux app catalogs (AppImageHub,
+  GNOME Software, KDE Discover) now show the real description and the two project screenshots instead
+  of an auto-captured placeholder. No Windows impact.
+
+### Changed — i18n
+- **Removed 49 dead locale keys** from all 7 locales (key count 951 -> 902). A "dead" key is an `en`
+  key that no renderer code references (scanned repo-wide: `index.html` + `src/renderer/js/*` and the
+  rest of the tree outside `locales/`). They were leftovers from earlier tab redesigns (the old
+  Overview stat panel, the pre-grouping Marketplace filter chips, the pre-4.0.0 wizard memory hints,
+  etc.). Cosmetic only — no string was showing anywhere.
+- **`tests/i18n.test.js` now enforces NO DEAD KEYS.** It scans every `en` key against the renderer
+  (HTML + JS) and fails if one is unreferenced. Concatenation-built key families that never appear as
+  a quoted literal are whitelisted in the test (`DEAD_DYN`): `mkt.<kind>Type`, `wm.lg.<biome>`,
+  `prop.group.<id>`. Adding a new concatenation family means adding it to that whitelist.
+
+> Previously the i18n test only checked the three "positive" directions (missing / extra / duplicate
+> keys); this closes the fourth (unused keys) that let ~50 dead strings accumulate unnoticed.
+
 ## [4.0.0] — 2026-10-06
 
 **Major GUI/UX redesign + MCP hardening.** v4.0.0 is a visual and UX reset of the whole launcher

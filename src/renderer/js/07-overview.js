@@ -118,9 +118,12 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   const canStart=hasFolder && hasJar && !!j.ok && state.status==='stopped';
   if(startBtn){startBtn.disabled=!canStart; if(!hasFolder||!hasJar) startBtn.title=!hasFolder?'Choose a server folder first':!j.ok?'Java not detected — install or set Java path':'No runnable server .jar or run.bat found in this folder'; else if(state.status!=='stopped') startBtn.title={starting:'Server is starting…', stopping:'Server is stopping…', running:'Server is already running'}[state.status]||''; else startBtn.title='';}
   if(stopBtn) stopBtn.disabled=state.status==='stopped';
-  // Force stop stays available through starting/running/stopping — it is the
-  // escape hatch when graceful Stop hangs or was already requested.
-  const forceBtn=$('#forceStopBtn');if(forceBtn)forceBtn.disabled=state.status==='stopped';
+  // Restart is offered only while the server is fully running. While it is starting or stopping a
+  // restart would race the in-flight transition, so we hide the button instead.
+  const restartBtn=$('#restartBtn');if(restartBtn){restartBtn.hidden=state.status!=='running';restartBtn.disabled=state.status!=='running';}
+  // Force stop is the escape hatch when graceful Stop hangs mid-transition: show it during
+  // starting/stopping only. While running, Restart takes its place (B1).
+  const forceBtn=$('#forceStopBtn');if(forceBtn){forceBtn.hidden=state.status==='running'||state.status==='stopped';forceBtn.disabled=state.status==='stopped';}
   if(welcomeCard) welcomeCard.classList.toggle('needs-attention', !hasFolder || !hasJar);
   // v4.0.0 Overview hero: ONE obvious action in the hero (DESIGN.md 15). No folder -> Choose/Create;
   // a folder -> Start (stopped) or Open console (running). The top-bar Start is the permanent

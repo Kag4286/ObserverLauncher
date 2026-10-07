@@ -1,6 +1,6 @@
 {
   "name": "observerlauncher",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "A beginner-friendly and advanced-capable desktop launcher for hosting local Minecraft servers on Windows and Linux.",
   "license": "Apache-2.0",
   "author": "ObserverLauncher contributors",
@@ -62,7 +62,13 @@
       "target": [
         "AppImage"
       ],
-      "category": "Game"
+      "category": "Game",
+      "extraFiles": [
+        {
+          "from": "build/dev.observerlauncher.minecraftservercontrol.metainfo.xml",
+          "to": "usr/share/metainfo/dev.observerlauncher.minecraftservercontrol.metainfo.xml"
+        }
+      ]
     },
     "appImage": {
       "artifactName": "ObserverLauncher-${version}.AppImage"

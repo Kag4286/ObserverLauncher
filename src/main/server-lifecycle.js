@@ -346,6 +346,7 @@ async function startServerInternal(ctx, settings) {
   // ACTIVE instance's serverStatus/process fields. setTimeout/setInterval created inside a
   // wrapped callback inherit the AsyncLocalStorage context, so nested timers stay pinned too.
   const inInst = (fn) => (...a) => ctx.runInInstance(instId, () => fn(...a));
+  let doneWatchdog = null; // re-armed on every boot output line; fires when the server goes quiet
 
   // Shared teardown for the error + exit handlers: clears every per-instance runtime field and
   // repaints. Extracted so the two copies cannot drift out of sync (was an 11-line copy-paste).
@@ -354,6 +355,7 @@ async function startServerInternal(ctx, settings) {
     ctx.monitoredPid = null;
     ctx.previousCpu = null;
     ctx.waitingForDone = false;
+    ctx.restartAfterStop = null;
     ctx.currentSoftware = null;
     clearInterval(ctx.autoPollTimer);
     clearTimeout(doneWatchdog);
@@ -368,18 +370,29 @@ async function startServerInternal(ctx, settings) {
     teardown();
   }));
 
-  const doneWatchdog = setTimeout(inInst(() => {
-    if (ctx.waitingForDone && ctx.serverProcess === startedProcess) {
-      ctx.waitingForDone = false;
-      startAutoPoll(ctx, software);
-      ctx.setServerStatus('running');
-      try { require('./tunnel.js').autoStartTunnel(ctx).catch(() => {}); } catch {}
-    }
-  }), 15000);
+  // Status watchdog: flip 'starting' -> 'running' when the server goes QUIET, not on a fixed clock.
+  // A big modpack can boot for minutes while still printing output; a hard 15s timer flipped the
+  // status to 'running' mid-boot (the "already running while still loading" bug). Re-armed on every
+  // output line (see the stdout handler below) and cleared the moment a real "Done (…)" is seen.
+  const armDoneWatchdog = () => {
+    clearTimeout(doneWatchdog);
+    doneWatchdog = setTimeout(inInst(() => {
+      if (ctx.waitingForDone && ctx.serverProcess === startedProcess) {
+        ctx.waitingForDone = false;
+        startAutoPoll(ctx, software);
+        ctx.setServerStatus('running');
+        try { require('./tunnel.js').autoStartTunnel(ctx).catch(() => {}); } catch {}
+      }
+    }), 15000);
+  };
+  armDoneWatchdog();
   setTimeout(inInst(() => { if (ctx.serverProcess === startedProcess) ctx.restartAttempts = 0; }), 30000);
 
   ctx.serverProcess.stdout.on('data', inInst(d => {
     d.toString().split(/\r?\n/).filter(Boolean).forEach(x => {
+      // Any output while we are still waiting means boot is still in progress -> push the quiet
+      // watchdog out, so a slow modpack is never flipped to 'running' mid-load.
+      if (ctx.waitingForDone) armDoneWatchdog();
       if (ctx.waitingForDone && /\bDone \([^)]*\)!/i.test(x)) {
         ctx.waitingForDone = false;
         clearTimeout(doneWatchdog);
@@ -425,14 +438,42 @@ async function startServerInternal(ctx, settings) {
       const d = st.decideRollback(rec);
       if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
     } catch {}
+    // A user-requested restart: relaunch with the settings captured at request time. teardown()
+    // (just below) clears the flag, so read it first.
+    const restartWith = ctx.restartAfterStop;
     teardown();
     // SECURITY: never leave the public tunnel up once the server is down.
     try { require('./tunnel.js').stopTunnel(ctx); } catch {}
+    if (restartWith) {
+      ctx.appendLog('Restarting server…', 'system');
+      startServerInternal(ctx, restartWith).catch(() => {});
+      return;
+    }
     handleAutoRestart(ctx, wasManual, code);
   }));
 
   ctx.setServerStatus(isProxy ? 'running' : 'starting');
   ctx.pushFiles();
+  return { ok: true };
+}
+
+// Shared graceful stop for server:stop and server:restart. `restartSettings` (restart only) is
+// stashed so the process 'exit' handler relaunches instead of just going idle. Escalates if the
+// server hangs (stop -> 15s -> SIGTERM/taskkill -> 5s -> force kill), logging the instance.
+async function requestStop(ctx, restartSettings) {
+  if (ctx.serverStatus === 'stopped' || ctx.serverStatus === 'stopping') return { ok: false, error: ctx.serverStatus === 'stopping' ? 'Server is already stopping.' : 'Server is not running.' };
+  if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
+  ctx.restartAfterStop = restartSettings || null;
+  ctx.manualStop = true;
+  clearTimeout(ctx.restartTimer);
+  ctx.setServerStatus('stopping');
+  // An ADOPTED process (re-attached after a crash) has no stdin — send the stop via RCON instead.
+  if (ctx.serverProcess.adopted) {
+    try { await sendConsoleCommand(ctx, 'stop'); } catch {}
+  } else {
+    try { ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
+  }
+  scheduleGracefulEscalation(ctx, ctx.inst(), ctx.serverProcess);
   return { ok: true };
 }
 
@@ -460,23 +501,10 @@ function registerServer(ipcMain, ctx) {
     // M6: prefer RCON; stdin fallback keeps early-boot commands working.
     return await sendConsoleCommand(ctx, command.trim());
   });
-  ipcMain.handle('server:stop', async () => {
-    if (ctx.serverStatus === 'stopped' || ctx.serverStatus === 'stopping') return { ok: false, error: ctx.serverStatus === 'stopping' ? 'Server is already stopping.' : 'Server is not running.' };
-    if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
-    ctx.manualStop = true;
-    clearTimeout(ctx.restartTimer);
-    ctx.setServerStatus('stopping');
-    // An ADOPTED process (re-attached after a crash) has no stdin — send the stop via RCON instead.
-    if (ctx.serverProcess.adopted) {
-      try { await sendConsoleCommand(ctx, 'stop'); } catch {}
-    } else {
-      try { ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
-    }
-    // Phase C (item 16): escalate a graceful stop if the server hangs. Important with N instances:
-    // a stuck shutdown must not pin one server forever. Send stop -> wait 15s -> SIGTERM/taskkill
-    // -> wait 5s -> force kill, and LOG which instance was force-killed.
-    scheduleGracefulEscalation(ctx, ctx.inst(), ctx.serverProcess);
-    return { ok: true };
+  ipcMain.handle('server:stop', async () => requestStop(ctx));
+  ipcMain.handle('server:restart', async (_, settings) => {
+    if (ctx.serverStatus === 'stopped' || !ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
+    return requestStop(ctx, settings || loadSettings());
   });
   // FEATURE: force-stop (kill) — graceful "stop" goes through the game's own
   // save+shutdown, which hangs when the server is frozen mid-start or stuck
@@ -523,6 +551,7 @@ async function forceStopServer(ctx) {
   const proc = ctx.serverProcess;
   if (!proc || ctx.serverStatus === 'stopped') return { ok: false, error: 'Server is not running.' };
   ctx.manualStop = true; // the exit handler must not auto-restart our own kill
+  ctx.restartAfterStop = null; // force stop cancels any queued restart
   clearTimeout(ctx.restartTimer);
   clearInterval(ctx.autoPollTimer);
   try { if (proc.stdin?.writable) proc.stdin.write('stop\r\n'); } catch {}

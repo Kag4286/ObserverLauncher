@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metainfo for ObserverLauncher.
+  Read by AppImageHub, GNOME Software, KDE Discover and other Linux app catalogs.
+  NOTE: bump the <releases> entry below on every release so catalogs show the current version.
+-->
+<component type="desktop-application">
+  <id>dev.observerlauncher.minecraftservercontrol</id>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+
+  <name>ObserverLauncher</name>
+  <summary>Host a local Minecraft server</summary>
+
+  <description>
+    <p>
+      ObserverLauncher is a desktop app for hosting Minecraft servers on your own computer,
+      made for both beginners and power users. Pick a folder, choose a server type, and it
+      downloads, starts and manages everything for you.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Guided setup for Vanilla, Paper, Purpur, Fabric, Forge and NeoForge servers</li>
+      <li>Live console, player list, performance charts and a world map from your save</li>
+      <li>Install plugins, mods and datapacks from the built-in Marketplace</li>
+      <li>Scheduled backups, crash auto-restart and a share-to-internet tunnel</li>
+      <li>Runs fully offline; optional local AI/MCP integration</li>
+    </ul>
+  </description>
+
+  <url type="homepage">https://observerlauncher-site.kag4286.workers.dev</url>
+  <url type="bugtracker">https://github.com/Kag4286/ObserverLauncher/issues</url>
+  <url type="vcs-browser">https://github.com/Kag4286/ObserverLauncher</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>The Overview tab: server status and launch controls</caption>
+      <image>https://raw.githubusercontent.com/Kag4286/ObserverLauncher/main/docs/screenshot-overview.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The World Map tab rendered from a world save</caption>
+      <image>https://raw.githubusercontent.com/Kag4286/ObserverLauncher/main/docs/screenshot-worldmap.png</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="4.1.0" date="2026-10-07">
+      <description>
+        <p>Housekeeping release: removed unused translation strings and added a test that keeps them out.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-4.1.0.md</url>
+    </release>
+  </releases>
+
+  <categories>
+    <category>Game</category>
+    <category>Utility</category>
+  </categories>
+
+  <keywords>
+    <keyword>minecraft</keyword>
+    <keyword>server</keyword>
+    <keyword>paper</keyword>
+    <keyword>forge</keyword>
+    <keyword>fabric</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+</component>

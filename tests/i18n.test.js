@@ -80,6 +80,22 @@ for (const c of Object.keys(window.LOCALES)) {
 }
 console.log(extraFail ? `extra keys in ${extraFail} locale(s)` : 'no extra keys in any locale');
 
-// The missing-lists + duplicate/extra checks are the assertions.
-const fail = missing.length + jsMissing.length + dynMissing.length + dupFail + extraFail;
+// --- DEAD keys: an en key that nothing references (renderer HTML/JS). Dynamic key
+// families built only by concatenation are whitelisted below -- they never appear as a
+// quoted literal, so a plain scan cannot see them. Keep this list in sync when a new key
+// family is built by string concatenation instead of a literal.
+const DEAD_DYN = new Set();
+for (const k of ['plugin', 'forge', 'fabric', 'datapack', 'modpack']) DEAD_DYN.add('mkt.' + k + 'Type');
+for (const b of ['water', 'plains', 'forest', 'desert', 'snow', 'mountain', 'swamp', 'nether', 'end']) DEAD_DYN.add('wm.lg.' + b);
+for (const g of ['gameplay', 'world', 'network', 'security']) DEAD_DYN.add('prop.group.' + g);
+const Q = String.fromCharCode(34, 39, 96); // double quote, single quote, backtick
+const haystack = html + '\n' + jsAll;
+const escDot = s => s.split('.').join('[.]');
+const dead = en.filter(k => !DEAD_DYN.has(k) && !new RegExp('[' + Q + ']' + escDot(k) + '[' + Q + ']').test(haystack));
+if (dead.length) console.log('dead keys (in en, never referenced):', dead.join(','));
+console.log(dead.length ? `dead keys: ${dead.length}` : 'no dead keys');
+const deadFail = dead.length ? 1 : 0;
+
+// The missing-lists + duplicate/extra + dead checks are the assertions.
+const fail = missing.length + jsMissing.length + dynMissing.length + dupFail + extraFail + deadFail;
 process.exit(fail ? 1 : 0);

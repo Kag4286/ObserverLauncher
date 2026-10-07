@@ -68,6 +68,7 @@ function createContext() {
       suppressStatusUntil: 0,
       lastManualCommandAt: 0,
       manualStop: false,
+      restartAfterStop: null, // settings to relaunch with after a user-requested restart (else null)
       restartTimer: null,
       restartAttempts: 0,
       shutdownTimer: null,
@@ -114,7 +115,7 @@ function createContext() {
     'currentServerPath', 'serverProcess', 'javaInfo', 'consoleBuffer', 'sampleTimer',
     'previousCpu', 'monitoredPid', 'live', 'metricsHistory', 'currentSoftware',
     'autoPollTimer', 'suppressStatusUntil', 'lastManualCommandAt', 'manualStop',
-    'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
+    'restartAfterStop', 'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
     'schedulerLastFired', 'serverStatus', 'waitingForDone', 'runtimeInstanceId',
     'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported', 'sparkAvailable',
     'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
