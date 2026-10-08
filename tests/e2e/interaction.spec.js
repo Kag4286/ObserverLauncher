@@ -97,24 +97,31 @@ test('language switch re-derives the JS-owned page title when changing tabs', as
   await selectByValue(win, '#languageSelect', 'en');
 });
 
+// Set a <select> value AND persist it in the SAME synchronous tick (no await between). A background
+// server:files / server:state push runs refreshUI(), which re-fills #motionLevelSelect from the
+// PERSISTED value — if that lands between our selection and the save, it undoes the change. On a
+// fast machine the window is tiny; on a slow CI runner it is wide enough to lose the race (the
+// saved value stayed 'full' and the reloaded page never got .motion-lite). Reading getSettings()
+// right after setting the value — before any await — guarantees we save what we just picked.
+async function setAndSaveMotion(level) {
+  await win.evaluate(async (lv) => {
+    const el = document.querySelector('#motionLevelSelect');
+    el.value = lv;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    const r = await window.observer.saveSettings(getSettings());
+    if (!r || !r.ok) throw new Error('save failed: ' + (r && r.error));
+  }, level);
+}
+
 test('changing motion level to Lite persists across a renderer reload', async () => {
   await gotoTab(win, 'settings');
-  await selectByValue(win, '#motionLevelSelect', 'lite');
-  await expect(win.locator('#saveSettings')).toHaveClass(/dirty/); // the change marked settings dirty
-  await win.locator('#saveSettings').click();
-  // Wait until the save actually FINISHED (markSettingsSaved clears .dirty) instead of a fixed
-  // timeout — settings:save is async (it runs Java detection) and can exceed 400ms on a slow CI
-  // runner, so a fixed wait raced the reload and the value was not yet on disk.
-  await expect(win.locator('#saveSettings')).not.toHaveClass(/dirty/, { timeout: 15000 });
+  await setAndSaveMotion('lite');
 
   await reloadApp();
-  await expect(win.locator('html')).toHaveClass(/motion-lite/);
+  await expect(win.locator('html')).toHaveClass(/motion-lite/, { timeout: 15000 });
 
   // Reset to the default (Full) so later tests see the stock UI.
-  await gotoTab(win, 'settings');
-  await selectByValue(win, '#motionLevelSelect', 'full');
-  await win.locator('#saveSettings').click();
-  await expect(win.locator('#saveSettings')).not.toHaveClass(/dirty/, { timeout: 15000 });
+  await setAndSaveMotion('full');
 });
 
 // --- Phase 2: real data flows against the fixture server folder ---
