@@ -266,3 +266,11 @@ function edJsonCheck(){
     }
   },300);
 }
+// external-change watcher: auto-reload when clean, conflict banner when dirty. Lives with the
+// editor that owns edState/openEd (was misplaced at the end of 02-worldmap.js).
+window.observer.onEditorExternal(r=>{
+  if($('#fileEditor').hidden||!edState.rel)return;
+  if(r.mtime===edState.mtime)return;
+  if(!edState.dirty){openEd(edState.rel,edState.from).then(()=>toast(t('ed.reloadedExternal')))}
+  else{edState.conflict=true;$('#edConflict').hidden=false}
+});

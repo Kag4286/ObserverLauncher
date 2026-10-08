@@ -202,14 +202,18 @@ function startMcpServer(ctx) {
   // RATE LIMIT (1.2.0): a simple token bucket per tool name. An AI that spins in a tight loop
   // (e.g. polling in a bad retry) could otherwise hammer the main process. 60 calls/min per tool is
   // far above any legitimate use, but stops runaway loops.
+  // Keyed by CLIENT + tool (1.2.0, revised 4.2.0): a bucket per bridge process (x-ob-client header)
+  // so two MCP clients do not share one 60/min budget. A missing header (old bridge) falls back to
+  // 'local', preserving the old per-tool behaviour for it.
   const buckets = new Map();
-  const rateLimited = name => {
+  const rateLimited = (client, name) => {
+    const key = client + '::' + name;
     const now = Date.now();
-    const b = buckets.get(name) || { tokens: 60, at: now };
+    const b = buckets.get(key) || { tokens: 60, at: now };
     b.tokens = Math.min(60, b.tokens + ((now - b.at) / 60000) * 60);
     b.at = now;
-    if (b.tokens < 1) { buckets.set(name, b); return true; }
-    b.tokens -= 1; buckets.set(name, b); return false;
+    if (b.tokens < 1) { buckets.set(key, b); return true; }
+    b.tokens -= 1; buckets.set(key, b); return false;
   };
   const server = http.createServer((req, res) => {
     // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
@@ -276,7 +280,8 @@ function startMcpServer(ctx) {
       try { payload = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end('bad json'); }
       const settings = require('../main/settings.js').loadSettings();
       const cfg = { autoAllowWrite: !!settings.mcpAutoAllowWrite, readOnly: !!settings.mcpReadOnly };
-      if (rateLimited(String(payload.tool || ''))) {
+      const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';
+      if (rateLimited(client, String(payload.tool || ''))) {
         res.writeHead(429, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (60/min per tool) - slow down and retry.' }));
       }

@@ -191,10 +191,12 @@ function wmScheduleBiomes(){
     const fetchDim=wm.dim;               // capture NOW so a late reply stores under its OWN dim
     wm.biomeLoading=true;wmDraw();
     let r;
-    try{r=await window.observer.worldmapBiomes({dim:fetchDim,cx0,cz0,cx1,cz1})}catch{wm.biomeLoading=false;return}
+    // On a failed/timeout fetch, clear lastBiomeRect so this rect is retried on the next pan
+    // instead of staying stuck on the seed-wash forever.
+    try{r=await window.observer.worldmapBiomes({dim:fetchDim,cx0,cz0,cx1,cz1})}catch{wm.biomeLoading=false;if(seq===wm.biomeReqSeq)wm.lastBiomeRect='';return}
     if(seq!==wm.biomeReqSeq)return;
     wm.biomeLoading=false;
-    if(!r||!r.ok)return;
+    if(!r||!r.ok){wm.lastBiomeRect='';return}
     wm.biomeTruncated=!!r.truncated;
     let added=0;
     // Each row is [cx, cz, biome, heights?, water?] — store the whole record so the renderer can
@@ -272,8 +274,9 @@ function wmVisible(){
   // so this ran with wm.level=null and threw on `...wm.level.spawn`.
   if(!wm.level)return[];
   const list=(wm.dim==='overworld'?[{type:'spawn',...wm.level.spawn,name:t('wm.spawn'),color:'#00E5A0'}]:[]);
-  for(const p of wm.players)if(p.dim===wm.dim)list.push({type:'player',...p.pos,name:p.name||p.uuid.slice(0,8),color:'#00E5FF'});
-  for(const w of wm.waypoints)if(w.dim===wm.dim)list.push({type:'wp',...w});
+  for(const p of wm.players)if(p.dim===wm.dim)list.push({type:'player',...p.pos,name:p.name||p.uuid.slice(0,8),color:'#00E5FF',seenAt:p.seenAt});
+  // color fallback: a hand-edited/external waypoint may lack color -> a dot with no colour is invisible.
+  for(const w of wm.waypoints)if(w.dim===wm.dim)list.push({type:'wp',...w,color:w.color||'#B8C2CC'});
   return list;
 }
 // WM-1 (3.3.0 perf): the seed-wash colour is a pure function of (dim, wx, wz). Panning re-computed
@@ -444,7 +447,7 @@ $('#wmFitSpawn')?.addEventListener('click',wmFitSpawn);
 function wmRenderList(){
   const box=$('#wmWpList');const list=wm.waypoints;
   $('#wmWpCount').textContent=String(list.length);
-  box.innerHTML=list.length?list.map(w=>`<div class="wm-wprow" data-id="${esc(w.id)}"><span class="wm-dot" style="background:${esc(w.color)}"></span><div class="wm-wpmain"><b>${esc(w.name)}</b><small>${esc(w.dim)} · ${Math.round(w.x)} ${Math.round(w.z)}</small></div><button class="text-btn" data-wm-jump="${esc(w.id)}">${esc(t('wm.jump'))}</button><button class="text-btn danger" data-wm-del="${esc(w.id)}">${esc(t('wm.delete'))}</button></div>`).join(''):`<p class="field-hint">${esc(t('wm.none'))}</p>`;
+  box.innerHTML=list.length?list.map(w=>`<div class="wm-wprow" data-id="${esc(w.id)}"><span class="wm-dot" style="background:${esc(w.color||'#B8C2CC')}"></span><div class="wm-wpmain"><b>${esc(w.name)}</b><small>${esc(w.dim)} · ${Math.round(w.x)} ${Math.round(w.z)}</small></div><button class="text-btn" data-wm-jump="${esc(w.id)}">${esc(t('wm.jump'))}</button><button class="text-btn danger" data-wm-del="${esc(w.id)}">${esc(t('wm.delete'))}</button></div>`).join(''):`<p class="field-hint">${esc(t('wm.none'))}</p>`;
   box.querySelectorAll('[data-wm-jump]').forEach(b=>b.onclick=()=>{const w=wm.waypoints.find(x=>x.id===b.dataset.wmJump);if(w){wmJump(w.x,w.z);if(w.dim!==wm.dim){wm.dim=w.dim;wmSyncDimTabs();wmDraw()}}});
   box.querySelectorAll('[data-wm-del]').forEach(b=>b.onclick=async()=>{wm.waypoints=wm.waypoints.filter(x=>x.id!==b.dataset.wmDel);await window.observer.worldmapSetWaypoints(wm.waypoints);wmRenderList();wmDraw()});
 }
@@ -696,19 +699,4 @@ function wmDrawMini(force){
   ctx.strokeStyle='rgba(232,244,248,.85)';ctx.lineWidth=1;
   ctx.strokeRect(vx0,vy0,Math.max(2,vx1-vx0),Math.max(2,vy1-vy0));
 }
-// external-change watcher: auto-reload when clean, conflict banner when dirty
-window.observer.onEditorExternal(r=>{
-  if($('#fileEditor').hidden||!edState.rel)return;
-  if(r.mtime===edState.mtime)return;
-  if(!edState.dirty){openEd(edState.rel,edState.from).then(()=>toast(t('ed.reloadedExternal')))}
-  else{edState.conflict=true;$('#edConflict').hidden=false}
-});
-// icons:update — a placeholder icon just got its real pixels; bump the cache-buster and
-// re-render whatever icon grid is on screen (the player inspector).
-window.observer.onIconsUpdate(()=>{
-  if(!$('#playerInspectModal').hidden&&lastInspectData){
-    renderEquipment(lastInspectData.armor,lastInspectData.offhand);
-    renderItemGrid('#inventoryList',lastInspectData.inventory);
-    renderItemGrid('#enderChestList',lastInspectData.enderChest);
-  }
-});
+

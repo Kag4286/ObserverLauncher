@@ -17,6 +17,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// A per-bridge-process id so the app can rate-limit PER CLIENT rather than globally per tool: two
+// MCP clients (two bridge processes) get their own 60/min buckets instead of sharing one.
+const CLIENT_ID = require('crypto').randomBytes(8).toString('hex');
+
 // Resolve the bridge config. The app passes its userData dir in OBSERVER_MCP_USERDATA when it
 // generates the launcher script; otherwise fall back to the usual per-OS location.
 function bridgeConfigPath() {
@@ -57,7 +61,7 @@ function callApp(tool, args) {
     const body = JSON.stringify({ tool, args: args || {} });
     const req = http.request({
       host: '127.0.0.1', port: cfg.port, path: '/rpc', method: 'POST',
-      headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + cfg.token, 'content-length': Buffer.byteLength(body) },
+      headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + cfg.token, 'x-ob-client': CLIENT_ID, 'content-length': Buffer.byteLength(body) },
     }, res => {
       let data = '';
       res.on('data', c => data += c);

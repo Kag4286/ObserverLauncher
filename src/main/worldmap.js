@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
-const { safeTarget, readJsonList, writeFileAtomic } = require('./fs-utils.js');
+const { readJsonList, writeFileAtomic } = require('./fs-utils.js');
 
 // 3.2.5: insert into a Map and evict the oldest entry (FIFO) once it exceeds max. Shared by the
 // explored/biome region caches so the eviction rule is written once.

@@ -48,6 +48,44 @@ function scrubPII(text) {
     .replace(PII_IPV4, '[ip]');
 }
 
+// A key whose VALUE must never leave the machine: config secrets an AI client has no need for
+// (velocity forwarding-secret, rcon.password, any *token* / *api-key*). Reused for text masking
+// (velocity.toml) and object masking (server.properties) so the pattern lives in one place.
+const SECRET_KEY_RE = /(?:secret|token|password|api[-_]?key)/i;
+// Mask the value of any `key = value` / `key: value` line whose KEY looks secret, keeping the key
+// visible so the reader can still see the file shape. Used on velocity.toml before it goes to MCP.
+function maskSecrets(text) {
+  const re = new RegExp('^([ \\t]*[\\w.-]*' + SECRET_KEY_RE.source + '[\\w.-]*[ \\t]*[=:][ \\t]*)(.+)$', 'gim');
+  return String(text == null ? '' : text).replace(re, (m, pre) => pre + '[redacted]');
+}
+// Scrub PII out of a summarizeCrashText() result (crash reports can carry system info / user paths /
+// an IP). Applied at the MCP boundary so the pure helper keeps returning raw data for tests.
+function scrubCrashSummary(summary) {
+  const s = summary || {};
+  return {
+    ...s,
+    description: s.description ? scrubPII(s.description) : s.description,
+    cause: Array.isArray(s.cause) ? s.cause.map(scrubPII) : (s.cause || []),
+  };
+}
+// Sanity-check ONE server.properties value before write. Numeric keys must parse and be in range;
+// enum keys must be one of the known values. Returns an error string, or null when fine. Keys not
+// listed here pass through (the writer already blocks newline injection + prototype keys).
+const PROP_NUMERIC = { 'server-port': [0, 65535], 'rcon.port': [0, 65535], 'query.port': [0, 65535], 'max-players': [1, 10000], 'view-distance': [3, 32], 'simulation-distance': [3, 32], 'player-idle-timeout': [0, 1440], 'spawn-protection': [0, 1000], 'max-world-size': [1, 29999984], 'op-permission-level': [1, 4], 'function-permission-level': [1, 4], 'entity-broadcast-range-percentage': [10, 1000] };
+const PROP_ENUM = { difficulty: ['peaceful', 'easy', 'normal', 'hard'], gamemode: ['survival', 'creative', 'adventure', 'spectator'] };
+function propertyValueError(key, value) {
+  const k = String(key), v = String(value == null ? '' : value).trim();
+  if (PROP_NUMERIC[k]) {
+    const [lo, hi] = PROP_NUMERIC[k];
+    if (!/^-?\d+$/.test(v)) return `${k} must be an integer.`;
+    const n = Number(v);
+    if (n < lo || n > hi) return `${k} must be between ${lo} and ${hi}.`;
+  } else if (PROP_ENUM[k]) {
+    if (!PROP_ENUM[k].includes(v)) return `${k} must be one of: ${PROP_ENUM[k].join(', ')}.`;
+  }
+  return null;
+}
+
 // Strip volatile numbers so 100 stack-trace lines with different line numbers collapse to one key.
 function signatureOf(line) {
   return String(line)
@@ -304,6 +342,10 @@ module.exports = {
   CONSOLE_RULES,
   signatureOf,
   scrubPII,
+  maskSecrets,
+  scrubCrashSummary,
+  propertyValueError,
+  SECRET_KEY_RE,
   REGEX_MAX_LINE,
   analyzeConsoleLines,
   summarizeCrashText,

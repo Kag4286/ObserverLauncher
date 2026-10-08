@@ -287,3 +287,12 @@ $('#refreshPlayersBtn').onclick=async()=>{
   if(state.running)command('list');
   $('#refreshPlayersBtn').disabled=false;
 };
+// icons:update — a placeholder icon just got its real pixels; re-render the open player
+// inspector grid. Lives with the inspector that owns lastInspectData (was misplaced in 02-worldmap.js).
+window.observer.onIconsUpdate(()=>{
+  if(!$('#playerInspectModal').hidden&&lastInspectData){
+    renderEquipment(lastInspectData.armor,lastInspectData.offhand);
+    renderItemGrid('#inventoryList',lastInspectData.inventory);
+    renderItemGrid('#enderChestList',lastInspectData.enderChest);
+  }
+});

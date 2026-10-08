@@ -165,7 +165,7 @@ async function tReadCrashReport(ctx, a) {
   if (!pick) { const latest = doctor.latestCrashReport(root); if (!latest) return { ok: true, result: { found: false } }; pick = latest.file; }
   let text = '';
   try { text = fs.readFileSync(pick, 'utf8'); } catch (e) { return { ok: false, error: 'Could not read: ' + (e.code || e.message) }; }
-  const summary = doctor.summarizeCrashText(text);
+  const summary = doctor.scrubCrashSummary(doctor.summarizeCrashText(text));
   let classification = doctor.classifyCrash(text);
   // BUGFIX (v2.3.1): an FML crash-report often says "<No associated exception found>" while the
   // real cause (missing dependency / wrong-loader jar) is only in logs/latest.log. Always scan the
@@ -179,11 +179,17 @@ async function tReadCrashReport(ctx, a) {
   return { ok: true, result: { found: true, file: path.basename(pick), classification, missing, fromLog, ...summary } };
 }
 async function tGetProperties(ctx) {
-  return { ok: true, result: serverFiles(needPath(ctx)).properties || {} };
+  // Mask secret values (rcon.password, ...) - an AI client never needs them and must not leak them.
+  const props = { ...(serverFiles(needPath(ctx)).properties || {}) };
+  const { SECRET_KEY_RE } = require('./doctor.js');
+  for (const k of Object.keys(props)) if (SECRET_KEY_RE.test(k)) props[k] = '[redacted]';
+  return { ok: true, result: props };
 }
 async function tGetRawProperties(ctx) {
   const root = needPath(ctx);
-  try { return { ok: true, result: fs.readFileSync(path.join(root, 'velocity.toml'), 'utf8') }; }
+  const { maskSecrets } = require('./doctor.js');
+  // velocity.toml carries forwarding-secret - mask it before this read-tier tool returns it.
+  try { return { ok: true, result: maskSecrets(fs.readFileSync(path.join(root, 'velocity.toml'), 'utf8')) }; }
   catch { return { ok: true, result: '' }; }
 }
 async function tGetWorldInfo(ctx) {
@@ -251,6 +257,8 @@ async function tSetProperty(ctx, a) {
   const root = needPath(ctx);
   const key = String(a.key || ''); const val = String(a.value == null ? '' : a.value);
   if (!key) return { ok: false, error: 'key is required.' };
+  const bad = require('./doctor.js').propertyValueError(key, val);
+  if (bad) return { ok: false, error: bad };
   const f = serverFiles(root).properties || {};
   f[key] = val;
   const { buildPropertiesContent } = require('../main/server-files.js');
@@ -975,7 +983,7 @@ async function tExplainCrash(ctx, a) {
   if (fromLog.missingDeps.length || fromLog.skippedJars.length) {
     finalClass = { category: fromLog.missingDeps.length ? 'mod-dependency' : 'loader-mismatch', confidence: 'high', hints: fromLog.missingDeps.length ? ['Install the missing dependency mod(s) listed in missingDeps, then restart.'] : ['Remove the listed jars that are for a different loader.'] };
   }
-  return { ok: true, result: { found: true, file: pick.name, mtime: pick.mtime, classification: finalClass, fromLog, ...doctor.summarizeCrashText(text) } };
+  return { ok: true, result: { found: true, file: pick.name, mtime: pick.mtime, classification: finalClass, fromLog, ...doctor.scrubCrashSummary(doctor.summarizeCrashText(text)) } };
 }
 async function tListCrashReports(ctx) {
   const root = needPath(ctx);
@@ -985,7 +993,10 @@ async function tListCrashReports(ctx) {
 async function tReadServerLog(ctx, a) {
   const root = needPath(ctx);
   const r = doctor.tailLogFile(root, { file: a.file, lines: a.lines, maxBytes: a.maxBytes });
-  return r.ok ? { ok: true, result: r } : { ok: false, error: r.error };
+  if (!r.ok) return { ok: false, error: r.error };
+  // The log is raw text: scrub IPs/emails before it goes to an AI client (same rule as read_console).
+  const { scrubPII } = require('./doctor.js');
+  return { ok: true, result: { ...r, lines: (r.lines || []).map(scrubPII) } };
 }
 async function tCheckPerformance(ctx) {
   const live = ctx.live || {};

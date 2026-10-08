@@ -10,6 +10,52 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [4.2.0] — 2026-10-08
+
+**Security + correctness release: MCP output hygiene (PII / config secrets), World Map fixes, and
+doc accuracy.** No settings migration.
+
+### Security — MCP output hygiene
+- **PII (IPv4/IPv6/e-mail) is now scrubbed on EVERY console/log path to an AI client**, not just
+  some. `read_server_log` (returned raw `logs/latest.log`, which carries player IPs) and
+  `read_crash_report` / `explain_crash` (returned raw crash-report text with system info + paths)
+  now pass through `doctor.scrubPII` like `read_console` already did. A new `scrubCrashSummary()`
+  wraps the crash summariser so its `description` + `cause[]` are scrubbed at the MCP boundary.
+- **Config secrets are masked before leaving the machine.** New `doctor.maskSecrets()` masks the value
+  of any `secret` / `token` / `password` / `api-key` line. `get_raw_properties` (velocity.toml,
+  which holds `forwarding-secret`) and `get_properties` (`rcon.password` in server.properties) now
+  return `[redacted]` for those values. The AI never needs them.
+- **`set_property` now validates the value** (`doctor.propertyValueError`): numeric keys are range-
+  checked (server-port 0-65535, view-distance 3-32, max-players 1-10000, …) and enum keys
+  (difficulty, gamemode) must be a known value — a bad value is refused with a clear message instead
+  of being written.
+- **MCP rate limit is now per CLIENT, not per tool.** The bridge sends a per-process `x-ob-client`
+  id, so two MCP clients no longer share one 60/min bucket. A missing header falls back to the old
+  per-tool behaviour.
+
+### Fixed — World Map
+- **Player "last seen" time never showed.** `wmVisible()` dropped `seenAt` when building a player
+  marker, so the popup's `if(m.seenAt)` branch was dead — you could not tell a fresh position from a
+  stale one. Now passed through.
+- **Biome fetch did not retry after a failure.** `wmScheduleBiomes` marked a rect as "tried" before
+  the async fetch, so a failed/timed-out fetch left that area stuck on the seed-wash until you
+  panned away. `lastBiomeRect` is now cleared on failure so the next pan retries.
+- **Waypoint with no colour rendered an invisible dot.** External/hand-edited waypoints may omit
+  `color`; the renderer now falls back to a neutral swatch.
+- **Misplaced handlers.** `onEditorExternal` (editor) and `onIconsUpdate` (player inspector) were
+  registered at the bottom of `02-worldmap.js`; moved to the files that own their state
+  (`01b-editor.js`, `03-players.js`). No behaviour change.
+- **Removed an unused `safeTarget` import** in `src/main/worldmap.js`.
+
+### Changed — docs
+- **README** download filenames refreshed to 4.2.0; MCP tool count corrected (75).
+- **CONTRIBUTING** module lists updated (`remote.js`, `version-compare.js`, `content-ops.js`,
+  `content-updates.js`, `datapack.js`) and the CSS range now ends at `10-dropdown.css`.
+
+### Tests
+- New `tests/mcp-pii.test.js` (26 checks): `maskSecrets`, `scrubCrashSummary`, `propertyValueError`,
+  `SECRET_KEY_RE`.
+
 ## [4.1.0] — 2026-10-07
 
 **Housekeeping release: dead-translation cleanup + a guard so they cannot come back.** No user-facing
