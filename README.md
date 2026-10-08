@@ -17,10 +17,10 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-4.0.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-4.0.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-4.1.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-4.1.0.AppImage` |
 
-Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-4.0.0.AppImage` and run it. No root needed.
+Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-4.1.0.AppImage` and run it. No root needed.
 
 From source (Node.js 18 or newer):
 
@@ -171,7 +171,7 @@ Flags: `--json` for scripts, `--instance <id>` to target an instance, `--help`, 
 
 ### MCP and AI integration
 
-The app can act as an MCP server, letting a client read and control the server over 70+ tools. Enable it in Settings under MCP / AI. It binds to 127.0.0.1 with a fresh token each launch. Read tools run freely, write tools ask for confirmation, and destructive tools always ask and cannot be auto-approved. Every write and destroy call is written to an audit log.
+The app can act as an MCP server, letting a client read and control the server over 75 tools. Enable it in Settings under MCP / AI. It binds to 127.0.0.1 with a fresh token each launch. Read tools run freely, write tools ask for confirmation, and destructive tools always ask and cannot be auto-approved. Every write and destroy call is written to an audit log.
 
 ### Remote access
 

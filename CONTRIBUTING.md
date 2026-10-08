@@ -27,12 +27,14 @@ plus a window-less entry point that reuses the exact same backend:
   - Feature modules (stateful, take `ipcMain` + `ctx`): `context.js`, `server-lifecycle.js`,
     `backups.js`, `players.js`, `marketplace.js`, `modpacks.js`, `wizard.js`, `settings-handlers.js`,
     `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`, `tunnel.js`, `orphan.js`,
-    `orphan-prompt.js`, `rcon.js`, `runtime-state.js`, `tunnel-manager.js`.
+    `orphan-prompt.js`, `rcon.js`, `runtime-state.js`, `tunnel-manager.js`, `remote.js`.
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
     `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
     (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key),
-    `server-compat.js`, `server-java.js`, `forge-versions.js`, `jar-read.js`, `mod-metadata.js`,
+    `server-compat.js`, `server-java.js`, `version-compare.js` (natural digit-aware version compare),
+    `forge-versions.js`, `jar-read.js`, `mod-metadata.js`, `content-ops.js` / `content-updates.js`
+    (content toggle/update logic), `datapack.js`,
     `secrets.js`, `data-dir.js` (the ONE data-folder resolver), `ipc-shim.js` (a fake `ipcMain` so the
     feature modules register without Electron), `templates.js` (server templates), `docker.js` (a pure
     Dockerfile/compose generator), `modpack-manifest.js` (modpack.json schema + static verifier),
@@ -64,7 +66,7 @@ plus a window-less entry point that reuses the exact same backend:
   so the renderer never touches Node APIs directly.
 
 - **Renderer** (`src/renderer/`) — the UI. `index.html` is the shell and loads, **in numeric order**:
-  - `css/` — styles split by area (`01-tokens.css` … `09-pulse.css`). Motion lives in
+  - `css/` — styles split by area (`01-tokens.css` … `10-dropdown.css`). Motion lives in
     `08-motion.css` (tokens, stagger, modal fade) and `09-pulse.css` (ambience, boot, lite-mode);
     see `docs/motion.md` for the approved animation patterns and the rules every new animation must
     follow (use tokens, short durations, `prefers-reduced-motion` guard, never animate the console
