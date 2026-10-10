@@ -499,6 +499,16 @@
             </details>
             <div class="input-row"><span class="hint" id="remoteStatus" data-i18n="remote.stopped">Stopped</span><button type="button" class="btn secondary sm" id="remoteOpenDoc" style="margin-left:auto" data-i18n="remote.doc">How to reach it from anywhere (Tailscale) →</button></div>
             <div id="remoteAddresses" class="remote-addresses"></div>
+            <!-- 4.3.0: the long-lived token. Masked by default; Reveal fetches it on demand (never
+                 stored in renderer state), Regenerate mints a new one and drops old clients. -->
+            <label class="set-field"><span data-i18n="remote.tokenLabel">Token</span>
+              <div class="remote-token-row">
+                <input id="remoteTokenInput" class="remote-token-input" type="text" readonly value="" placeholder="••••••••••••" spellcheck="false" autocomplete="off">
+                <button type="button" class="btn secondary sm" id="remoteTokenReveal" data-i18n="remote.tokenReveal">Reveal</button>
+                <button type="button" class="btn secondary sm" id="remoteTokenCopy" data-i18n="remote.tokenCopy">Copy</button>
+                <button type="button" class="btn secondary sm" id="remoteTokenRotate" data-i18n="remote.tokenRotate">Regenerate</button>
+              </div>
+            </label>
             <!-- v4.0.0: warn when the remote API is bound off-loopback with NO IP allowlist, so any
                  host on the network can reach it (token-only). -->
             <p class="proxy-notice" id="remoteWildWarn" hidden data-i18n="remote.wildWarn">The bind address is not 127.0.0.1 and the IP allowlist is empty — any device on this network can reach the remote API (only the token protects it). Set an allowlist, or bind 127.0.0.1 and use Tailscale.</p>

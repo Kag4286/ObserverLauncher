@@ -242,6 +242,7 @@ function syncRemoteFields(s){
   const pill=$('#remotePill');if(pill){pill.textContent=m.running?t('mcp.live'):t('mcp.off');pill.className='mcp-pill'+(m.running?' on':'')}
   renderRemoteAddresses(m);
   updateRemoteWildWarn();
+  resetRemoteToken();
 }
 // v4.0.0: warn when bound off-loopback with an EMPTY allowlist (token-only protection).
 function updateRemoteWildWarn(){
@@ -260,6 +261,28 @@ function renderRemoteAddresses(m){
   box.innerHTML=addrs.map(a=>`<div class="remote-addr"><code>${esc(a)}</code><button class="text-btn" data-copy-addr="${esc(a)}">${esc(t('remote.copy'))}</button></div>`).join('');
   box.querySelectorAll('[data-copy-addr]').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.copyAddr);toast(t('remote.copied'),'success')}catch{toast(b.dataset.copyAddr)}});
 }
+// 4.3.0: the remote token is fetched on demand and NEVER kept in state — refreshUI resets the field
+// to blank (masked placeholder) so it does not linger on screen after the user navigates away.
+function resetRemoteToken(){const i=$('#remoteTokenInput');if(i){i.value='';i.dataset.shown=''}}
+$('#remoteTokenReveal')?.addEventListener('click',async()=>{
+  const i=$('#remoteTokenInput');if(!i)return;
+  if(i.dataset.shown){resetRemoteToken();return}
+  const r=await window.observer.getRemoteToken();
+  if(r&&r.ok&&r.token){i.value=r.token;i.dataset.shown='1'}
+  else toast(t('remote.tokenNone'),'error');
+});
+$('#remoteTokenCopy')?.addEventListener('click',async()=>{
+  const r=await window.observer.getRemoteToken();
+  if(r&&r.ok&&r.token){try{await navigator.clipboard.writeText(r.token);toast(t('remote.tokenCopied'),'success')}catch{toast(t('remote.tokenCopyFail'),'error')}}
+  else toast(t('remote.tokenNone'),'error');
+});
+$('#remoteTokenRotate')?.addEventListener('click',async()=>{
+  if(!await confirmDialog({title:t('remote.tokenRotate'),body:t('remote.tokenRotateConfirm'),ok:t('remote.tokenRotate'),danger:true}))return;
+  const r=await window.observer.saveSettings({...getSettings(),rotateRemoteToken:true});
+  if(!r||!r.ok)return toast(friendlyError(r&&r.error),'error');
+  state={...state,remote:r.remote??state.remote};resetRemoteToken();markSettingsSaved();refreshUI();
+  toast(t('remote.tokenRotated'),'success');
+});
 $('#remoteOpenDoc')?.addEventListener('click',()=>{try{window.observer.marketOpenExternal('https://github.com/Kag4286/ObserverLauncher/blob/main/docs/remote.md')}catch{}});
 const BACKUP_PRESETS=[0,15,30,60];
 function syncBackupChips(mins){

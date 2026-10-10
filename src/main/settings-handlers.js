@@ -101,7 +101,13 @@ function registerSettings(ipcMain, ctx) {
   });
 
   ipcMain.handle('settings:save', async (_, settings) => {
-    const merged = { ...loadSettings(), ...settings };
+    const prev = loadSettings();
+    const merged = { ...prev, ...settings };
+    // 4.3.0: optional remote-token rotation. The flag is a SIGNAL, never persisted; clearing the
+    // stored token makes startRemote() mint a fresh one on the next start.
+    const rotateRemoteToken = !!(settings && settings.rotateRemoteToken === true);
+    delete merged.rotateRemoteToken;
+    if (rotateRemoteToken) merged.remoteToken = '';
     // SECURITY/VALIDATION: memoryMin/Max arrive from the renderer and become -Xms/-Xmx. Clamp them
     // to a sane 1..64 GB integer range (the MCP set_setting path already validates this) so a bad
     // value can never produce an invalid JVM flag or a nonsensical swap (max < min).
@@ -159,19 +165,31 @@ function registerSettings(ipcMain, ctx) {
     if (nowMcp && !wasMcp && typeof ctx.startMcpServer === 'function') { try { ctx.startMcpServer(); } catch {} }
     else if (!nowMcp && wasMcp && typeof ctx.stopMcpServer === 'function') { try { ctx.stopMcpServer(); } catch {} }
     ctx.currentMcpEnabled = nowMcp;
-    // 3.3.0 remote toggle: same pattern as MCP. startRemoteServer generates a long-lived token on
-    // first enable and starts the loopback server; disabling stops it. No new IPC channel needed.
+    // 4.3.0: persist BEFORE the remote toggle so startRemoteServer() reads the NEW values — it loads
+    // settings from disk. Previously the save happened after the toggle, so the very first "Enable
+    // remote" did not start the server until an app restart.
+    saveSettings(merged);
+    // 3.3.0/4.3.0 remote toggle: start on enable, stop on disable, and RESTART on a live config
+    // change (bind / allowlist / read-only / port) so tightening one takes effect immediately —
+    // previously the running server kept its stale config until a restart.
     const wasRemote = !!ctx.currentRemoteEnabled;
     const nowRemote = !!merged.remoteEnabled;
+    const remoteCfgChanged = prev.remoteBind !== merged.remoteBind
+      || prev.remoteAllow !== merged.remoteAllow
+      || (prev.remoteReadOnly !== false) !== (merged.remoteReadOnly !== false)
+      || Number(prev.remotePort || 0) !== Number(merged.remotePort || 0);
     if (nowRemote && !wasRemote && typeof ctx.startRemoteServer === 'function') { try { await ctx.startRemoteServer(); } catch {} }
     else if (!nowRemote && wasRemote && typeof ctx.stopRemoteServer === 'function') { try { ctx.stopRemoteServer(); } catch {} }
+    else if (nowRemote && wasRemote && (remoteCfgChanged || rotateRemoteToken)) {
+      try { if (typeof ctx.stopRemoteServer === 'function') ctx.stopRemoteServer(); } catch {}
+      try { if (typeof ctx.startRemoteServer === 'function') await ctx.startRemoteServer(); } catch {}
+    }
     ctx.currentRemoteEnabled = nowRemote;
     // startMcpServer sets ctx.mcpPort from listen()'s async callback — wait briefly so the status
     // we return (and the UI shows) is accurate instead of a stale null "stopped".
     if (nowMcp) { for (let i = 0; i < 50 && !ctx.mcpPort; i++) await new Promise(r => setTimeout(r, 20)); }
     ctx.currentServerPath = merged.serverPath;
     ctx.watchServerFolder();
-    saveSettings(merged);
     ctx.javaInfo = await detectJava(merged.javaPath || 'java');
     const mcpStatus = { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!merged.mcpAutoAllowWrite };
     return {
@@ -180,8 +198,18 @@ function registerSettings(ipcMain, ctx) {
       files: serverFiles(ctx.currentServerPath),
       eulaAccepted: readEula(ctx.currentServerPath),
       javaRequired: requiredJavaForServer(ctx.currentServerPath, serverFiles) || null,
-      mcp: mcpStatus
+      mcp: mcpStatus,
+      // 4.3.0: mirror the live remote status so the UI refreshes right after Save (it already
+      // consumes r.remote in 08-shell.js). Never includes the token.
+      remote: (() => { try { const { remoteSnapshot } = require('./remote.js'); return { ...remoteSnapshot(merged), running: !!ctx.remotePort, port: ctx.remotePort || null }; } catch { return undefined; } })(),
     };
+  });
+
+  // 4.3.0 remote: reveal the long-lived token so a user can configure a client. Auth is implicit —
+  // this is the trusted renderer only (contextIsolation, no remote page). Never logged.
+  ipcMain.handle('remote:token', async () => {
+    try { const s = loadSettings(); return { ok: true, token: String(s.remoteToken || '') }; }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
   // --- v2.0.0 multi-instance CRUD (Phase B backend) ---

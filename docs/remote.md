@@ -54,7 +54,7 @@ Tailscale is the safer default because access is tied to real device identity, n
 | **Port** | Fixed TCP port for the remote server. `0` = pick a free one each launch. |
 | **Allowed IPs** | Comma/space list. Each entry may be an exact IP (`10.0.0.5`), a wildcard (`192.168.1.*`), or CIDR (`100.64.0.0/10` for a Tailscale range). **Empty = allow any** (still loopback-only unless you expose it). |
 | **Read-only** | **On by default.** Blocks `/command` (the only action endpoint) — the API can only read. |
-| **Token** | A long-lived bearer token (48 hex chars). Rotate it any time by clearing the field and re-saving; the launcher generates a new one. |
+| **Token** | A long-lived bearer token (48 hex chars). Use **Reveal** / **Copy** to configure a client, and **Regenerate** to mint a new one (existing clients must be updated). |
 
 ## API
 
@@ -82,6 +82,13 @@ curl -H "Authorization: Bearer <token>" "http://127.0.0.1:8777/console?lines=50"
 curl -X POST -H "Authorization: Bearer <token>" -H "content-type: application/json" \
      -d '{"command":"list"}' http://127.0.0.1:8777/command
 ```
+
+## Applying changes
+
+Enabling remote access and every change to **Bind / Allowed IPs / Read-only / Port** take effect
+**immediately on Save** — the running server is restarted with the new config, so tightening a
+setting (e.g. turning Read-only on, or narrowing the allowlist) is never left pending. Rotating the
+token also restarts the server and invalidates the old token at once.
 
 ## Security model
 

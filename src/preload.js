@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('observer', {
   networkInfo: () => ipcRenderer.invoke('network:info'), checkPublicIp: () => ipcRenderer.invoke('network:public-ip'), allowFirewall: port => ipcRenderer.invoke('network:allow-firewall', port), javaAutoInstall: () => ipcRenderer.invoke('java:auto-install'), javaList: () => ipcRenderer.invoke('java:list'), exportConsole: () => ipcRenderer.invoke('console:export'), pickPlayitFile: () => ipcRenderer.invoke('dialog:playit-file'),
   tunnelStart: provider => ipcRenderer.invoke('tunnel:start', provider), tunnelStop: () => ipcRenderer.invoke('tunnel:stop'), tunnelGet: () => ipcRenderer.invoke('tunnel:get'), tunnelOpenUrl: url => ipcRenderer.invoke('tunnel:open-url', url), onTunnelStatus: cb => ipcRenderer.on('tunnel:status', (_, d) => cb(d)), onTunnelProgress: cb => ipcRenderer.on('tunnel:progress', (_, d) => cb(d)),
   saveManualTunnel: addr => ipcRenderer.invoke('tunnel:set-address', addr),
+  // 4.3.0 remote: reveal the long-lived token (trusted renderer only).
+  getRemoteToken: () => ipcRenderer.invoke('remote:token'),
   // v2.0.0 multi-instance (Phase B backend)
   instancesList: () => ipcRenderer.invoke('instances:list'),
   instanceAdd: payload => ipcRenderer.invoke('instances:add', payload),

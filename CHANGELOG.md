@@ -10,6 +10,32 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [4.3.0] — 2026-10-09
+
+**Security release: remote-access config is now applied live, plus token rotation and reveal.**
+No settings migration.
+
+### Security — remote access
+- **Config changes now take effect immediately.** Previously `settings:save` only started/stopped the
+  remote server on the enable/disable edge; changing **Bind / Allowed IPs / Read-only / Port** while it
+  was running left the OLD config in force until an app restart. That meant tightening a setting (e.g.
+  turning Read-only on, or removing an IP from the allowlist) appeared to work but did not — the
+  server kept accepting `/command` or the removed IP. `settings:save` now detects a remote config
+  change and restarts the running server with the new values.
+- **First-enable bug fixed.** `saveSettings` now runs BEFORE the remote toggle, so enabling remote for
+  the first time starts it the same turn — it used to start only after an app restart (the start path
+  read the not-yet-saved `remoteEnabled:false`).
+- **Token rotation.** New **Regenerate** button (with a confirm) mints a fresh token and invalidates
+  the old one at once; the old flow (editing settings.json by hand) is no longer required.
+- **Token reveal/copy.** New `remote:token` IPC + **Reveal** / **Copy** buttons in Settings → Remote
+  access, so a user can configure a client without opening settings.json. The token is fetched on
+  demand and never stored in renderer state; it is not in the `remoteSnapshot` payload.
+- `settings:save` now also returns the live remote status so the UI refreshes right after Save.
+
+### Tests
+- New `tests/remote-config-save.test.js` (17 checks): live config apply, read-only enforcement after
+  restart, allowlist enforcement, token rotation invalidating the old token, `remote:token`.
+
 ## [4.2.0] — 2026-10-08
 
 **Security + correctness release: MCP output hygiene (PII / config secrets), World Map fixes, and

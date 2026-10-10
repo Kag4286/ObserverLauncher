@@ -173,6 +173,10 @@
 .remote-addresses{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .remote-addr{display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px}
 .remote-addr code{font:500 11px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 4.3.0: token row — masked field + Reveal/Copy/Regenerate. Mono so the hex is readable. */
+.remote-token-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.remote-token-row .remote-token-input{flex:1;min-width:0;font:500 11px var(--font-mono);letter-spacing:.04em}
+.remote-token-row .btn{flex:0 0 auto;white-space:nowrap}
 @media(max-width:900px){.wm-mini{display:none}}
 @media(max-width:900px){.wm-main{grid-template-columns:1fr}.wm-panel{border-left:0;border-top:1px solid var(--border)}}
 /* ===== PLAYER INSPECTOR — TEXT-ONLY REDESIGN ===== */
