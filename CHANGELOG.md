@@ -10,6 +10,23 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.2.1] — 2026-10-10
+
+**Fix: the address the launcher shared could be a virtual adapter friends cannot reach.** No settings
+migration.
+
+### Fixed — LAN address could be a virtual adapter
+- **`localIPv4s()` now ranks PHYSICAL adapters before virtual ones.** `os.networkInterfaces()` does
+  not order its entries, so the app could hand the user (and the beginner "share this address" card)
+  a VPN / Hyper-V / WSL / Docker / Tailscale address that friends cannot reach — e.g. `10.2.0.2`
+  instead of the real `192.168.x.x`. Virtual adapters are DEMOTED (not deleted) so a machine with
+  only virtual adapters still returns an address. New `interfaceRank` helper. Affects every consumer:
+  the connect panel, the beginner share card, the Remote dashboard's advertised URLs, and MCP
+  `get_network_info`.
+
+### Tests
+- New `tests/network-rank.test.js` (25 checks). `npm test` 100 files + E2E 12 green.
+
 ## [5.2.0] — 2026-10-10
 
 **Beginner mode: a gentler UI for first-time users, with every tool one click away.** New global
@@ -30,8 +47,8 @@ setting `beginnerMode` (default false). No settings migration.
 - New locale keys x7 (set.beginner, set.beginnerSub, nav.showAll, ov.shareTitle, ov.shareSub).
 
 ### Tests
-- New `tests/beginner-mode.test.js` (21 source-level checks: default, wiring, CSS hiding, HTML ids).
-  `npm test` 98 files + E2E 12 green. Motion uses existing `var(--dur-*)` tokens (no ratchet change).
+- New `tests/beginner-mode.test.js` (23 checks) + `tests/motion-lite.test.js` (6).
+  `npm test` 99 files + E2E 12 green. Motion uses existing `var(--dur-*)` tokens (ratchet 104).
 
 ## [5.1.0] — 2026-10-10
 

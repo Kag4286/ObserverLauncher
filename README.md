@@ -17,10 +17,10 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-5.2.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-5.2.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-5.2.1-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-5.2.1.AppImage` |
 
-Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.2.0.AppImage` and run it. No root needed.
+Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.2.1.AppImage` and run it. No root needed.
 
 From source (Node.js 18 or newer):
 
