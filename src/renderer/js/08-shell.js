@@ -925,9 +925,9 @@ function _bootSkip(){ bootFinish(); }
   _bootSafety=setTimeout(bootFinish,4000);
 })();
 
-// Live-apply the 'Interface animation' setting the moment it changes (no need to hit Apply for
-// a purely visual preference). Persisted on the next settings save like every other field.
-$('#motionLevelSelect')?.addEventListener('change',e=>{ try{ applyMotionLevel(e.target.value); }catch{} });
+// 5.2.0: 'Interface animation' now follows the SAME edit -> Apply flow as every other setting. It
+// used to live-apply on change (changing the UI before the user hit Apply), which was inconsistent
+// and confusing. It is applied when Apply runs refreshUI() -> applyMotionLevel(state.settings...).
 
 // 4.5.0: shuffle the active instance's avatar art (random seed) and repaint the Settings preview.
 $('#instShuffleArt')?.addEventListener('click',()=>{ setInstanceAppearance({artSeed:Math.floor(Math.random()*100000)}); });
