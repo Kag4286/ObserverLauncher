@@ -49,11 +49,9 @@ To let friends join, open **How friends can join**. On the same network, share t
 <td align="center" width="50%"><b>World map</b><br><img src="docs/screenshot-worldmap.png" width="420" alt="World map"></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><b>MCP / AI integration</b><br><img src="docs/screenshot-MCP.png" width="860" alt="MCP / AI integration"></td>
+<td align="center" colspan="2"><b>MCP / AI integration</b><br><img src="docs/screenshot-MCP.png" width="560" alt="MCP / AI integration"></td>
 </tr>
 </table>
-
-More screenshots are on the [website](https://observerlauncher-site.kag4286.workers.dev).
 
 ## What it does
 
