@@ -32,8 +32,10 @@ It works exactly the same from your phone over Tailscale — no port forwarding.
 
 - **Token checking is now constant-time** — a wrong token can no longer be narrowed down by how long
   the answer takes.
-- **The remote server is rate-limited** (60 requests a minute) — a leaked token can't be used to
+- **The remote server is rate-limited** (300 requests a minute) — a leaked token can't be used to
   hammer your server.
+- **The IP allowlist now guards everything**, including the health check and the page's own files — not
+  just the data endpoints.
 - **Errors no longer leak internals** — a failure returns a plain "Internal error." and the detail is
   kept in the app's log.
 - **Browser requests are allowed only from the page itself** (same address). Any other website trying

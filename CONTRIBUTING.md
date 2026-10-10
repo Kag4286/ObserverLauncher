@@ -39,8 +39,11 @@ plus a window-less entry point that reuses the exact same backend:
     feature modules register without Electron), `templates.js` (server templates), `docker.js` (a pure
     Dockerfile/compose generator), `modpack-manifest.js` (modpack.json schema + static verifier),
     `modpack-resolve.js` (manifest -> resolved items via the marketplace resolver), `modpack-build.js`
-    (resolved items -> a real server folder; pure `planBuild` + injectable `buildPack`), and
+    (resolved items -> a real server folder; pure `planBuild` + injectable `buildPack`),
+    `rate-limit.js` (a shared token-bucket used by the MCP and remote servers), and
     `stability.js` (persistent per-instance run records + the auto-rollback decision).
+  - `remote-ui/` — the Remote-access WEB dashboard (index.html / style.css / app.js), served by
+    `remote.js` from a fixed in-memory asset map. Plain scripts, self-contained i18n (7 locales).
   - `mcp/` — optional MCP/AI integration (see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang).

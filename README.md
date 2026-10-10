@@ -175,7 +175,7 @@ The app can act as an MCP server, letting a client read and control the server o
 
 ### Remote access
 
-A loopback-only HTTP server for checking on a running server from another device. It reads status, console and players; the one action endpoint is blocked while Read-only is on (the default). A long-lived token and an optional IP allowlist guard every request. Use Tailscale to reach it from anywhere. Full guide: [docs/remote.md](docs/remote.md).
+A loopback-only HTTP server for checking on a running server from another device. Open `http://127.0.0.1:<port>/` in a browser for a small dashboard (status, console, players), or call the JSON API from a script. When Read-only is off you can also run four safe actions — start, stop, restart and kick. A long-lived token and an optional IP allowlist guard every request; it can never install, delete or edit files. Use Tailscale to reach it from anywhere. Full guide: [docs/remote.md](docs/remote.md).
 
 ### Docker
 

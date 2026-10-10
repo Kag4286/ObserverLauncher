@@ -73,10 +73,16 @@ No settings migration.
   it. The rollback warning is also not re-logged on a manual stop.
 
 ### Tests
-- New `tests/remote-ui.test.js` (15 checks): static serving, same-origin Origin allowed, cross-origin
-  403, no-Origin allowed, traversal refused, read-only gating.
+- New `tests/remote-ui.test.js` (24 checks): static serving, same-origin Origin allowed, cross-origin
+  403, no-Origin allowed, traversal refused, read-only gating, `/action` (start + unknown + read-only),
+  allowlist gating `/health`+assets, empty-token fail-closed, and a 65-read burst staying under the
+  rate limit.
 - `tests/stability.test.js` extended with manual-stop cases (24 checks).
 - New `src/main/rate-limit.js`.
+
+### Docs
+- New `docs/v4.4.0-plan.md` and `docs/release-4.4.0.md`; `docs/remote.md` covers the dashboard +
+  actions; README remote section + CONTRIBUTING module list updated.
 
 ## [4.3.0] — 2026-10-09
 
