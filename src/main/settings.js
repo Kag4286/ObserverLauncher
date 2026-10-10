@@ -51,6 +51,9 @@ function defaultGlobal() {
   return {
     version: latestVersion,
     onboarded: false, locale: 'en',
+    // 5.2.0: Beginner mode — a gentler UI (fewer tabs, no RAM/JVM panel). Set by the onboarding
+    // choice, changeable in Settings. GLOBAL, not per-instance. Default false (advanced).
+    beginnerMode: false,
     mcpEnabled: false, mcpAutoAllowWrite: false, mcpReadOnly: false,
     // 3.3.0 remote management (Track A): OFF by default, read-only by default, no IP restriction by
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).

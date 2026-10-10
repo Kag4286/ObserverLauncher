@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.2.0" date="2026-10-10">
+      <description>
+        <p>A new Beginner mode shows only the essentials (Overview, Console, Players, Settings) with a one-click way to reveal every tool, plus a prominent "share this address" card when the server is running.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.2.0.md</url>
+    </release>
     <release version="5.1.0" date="2026-10-10">
       <description>
         <p>An AI client can now create a new server (it opens a folder picker for you) and is told what Java a server needs; a wedged app can no longer hang the AI. Also adds an early MCP Apps preview.</p>

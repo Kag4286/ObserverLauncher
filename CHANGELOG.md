@@ -10,6 +10,29 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.2.0] — 2026-10-10
+
+**Beginner mode: a gentler UI for first-time users, with every tool one click away.** New global
+setting `beginnerMode` (default false). No settings migration.
+
+### Added — Beginner mode
+- **The onboarding choice now sets the UI mode.** "Create a new server" (the recommended beginner
+  path) turns Beginner mode ON; "I already have a server" (experienced) turns it OFF. Changeable any
+  time in Settings > Personal.
+- **A slimmer rail.** Beginner mode hides Performance, Content, Marketplace, Worlds & backups, World
+  Map and Server properties, leaving Overview / Console / Players / Settings. This is LAYERING, not
+  deletion (DESIGN.md 2.4): a **"Show all tools"** button at the bottom of the rail turns the full set
+  back on in one click, and switching to a hidden tab auto-returns to Overview.
+- **A beginner-focused Overview.** The RAM & JVM panel is hidden, and when the server is RUNNING a
+  prominent **"Your server is running!"** card shows the address to share (first LAN address) with a
+  Copy button — turning the hardest first-time step (inviting friends) into one visible action.
+- **Settings toggle** (Personal) to switch modes, with a short explanation.
+- New locale keys x7 (set.beginner, set.beginnerSub, nav.showAll, ov.shareTitle, ov.shareSub).
+
+### Tests
+- New `tests/beginner-mode.test.js` (21 source-level checks: default, wiring, CSS hiding, HTML ids).
+  `npm test` 98 files + E2E 12 green. Motion uses existing `var(--dur-*)` tokens (no ratchet change).
+
 ## [5.1.0] — 2026-10-10
 
 **MCP reliability + a new creation path, plus an early MCP Apps preview.** Tool count 75 -> 76. No

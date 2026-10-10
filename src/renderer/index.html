@@ -33,7 +33,7 @@
         <button class="nav-item" data-tab="players" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/person.svg" alt=""> <span data-i18n="nav.players">Players</span></button>
         <button class="nav-item" data-tab="performance" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/gauge.svg" alt=""> <span data-i18n="nav.performance">Performance</span></button>
       </div>
-      <div class="nav-group">
+      <div class="nav-group" data-grp="content">
         <p class="nav-group-label" data-i18n="nav.grpContent">Content &amp; world</p>
         <button class="nav-item" data-tab="content" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/hook.svg" alt=""> <span data-i18n="nav.content">Content</span></button>
         <button class="nav-item" data-tab="marketplace" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/funnel.svg" alt=""> <span data-i18n="nav.marketplace">Marketplace</span></button>
@@ -46,6 +46,11 @@
         <button class="nav-item" data-tab="settings" aria-current="false"><img class="nav-icon" src="./assets/icons/ui/sliders.svg" alt=""> <span data-i18n="nav.settings">Launcher Settings</span></button>
       </div>
     </nav>
+    <!-- 5.2.0 Beginner mode: shown ONLY while beginner-mode is on, at the bottom of the rail. Turns
+         the full tool set back on in one click. -->
+    <button type="button" class="rail-showall" id="railShowAll" hidden>
+      <span aria-hidden="true">＋</span> <span data-i18n="nav.showAll">Show all tools</span>
+    </button>
     <div class="rail-foot"></div>
     <span class="channel-indicator" id="channelIndicator" aria-hidden="true" hidden></span>
   </aside>
@@ -83,6 +88,19 @@
           </div>
         </div>
         <ul class="hero-steps" id="setupSteps" aria-label="Setup checklist" hidden></ul>
+      </div>
+      <!-- 5.2.0 Beginner mode: a big, unmissable "share this address" card shown ONLY when the
+           server is running and beginner-mode is on. Turns the hardest beginner step (inviting
+           friends) into one visible action. Hidden for everyone else. -->
+      <div class="beginner-share" id="beginnerShare" hidden>
+        <div class="beginner-share-text">
+          <b data-i18n="ov.shareTitle">Your server is running!</b>
+          <span data-i18n="ov.shareSub">Send this address to your friends so they can join.</span>
+        </div>
+        <div class="beginner-share-row">
+          <input id="beginnerShareAddr" readonly value="—" aria-label="Server address">
+          <button class="btn secondary" data-copy="#beginnerShareAddr" data-i18n="conn.copy">Copy</button>
+        </div>
       </div>
       <div class="proxy-notice ed-conflict" id="javaWarnBanner" hidden style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <span id="javaWarnText" style="flex:1;min-width:200px"></span>
@@ -419,6 +437,8 @@
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.language">Language</b><small data-i18n="set.languageSub">Interface language — applies immediately.</small></div><select id="languageSelect" class="launcher-select ol-select"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
             <hr class="set-hr">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.motion">Interface animation</b><small data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</small></div><select id="motionLevelSelect" class="launcher-select ol-select"><option value="full" data-i18n="set.motionFull">Full (default)</option><option value="lite" data-i18n="set.motionLite">Lite (less motion)</option></select></div>
+            <hr class="set-hr">
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.beginner">Beginner mode</b><small data-i18n="set.beginnerSub">Shows only the essentials: Overview, Console, Players and Settings. Turn off to see every tool.</small></div><label class="switch"><input type="checkbox" id="beginnerModeInput"><span class="slider"></span></label></div>
             <hr class="set-hr">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.guide">Welcome guide</b><small data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</small></div><button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button></div>
           </section>

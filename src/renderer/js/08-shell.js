@@ -568,7 +568,10 @@ async function loadConnectInfo(){
   const r=await window.observer.networkInfo();if(!r.ok)return;
   const port=r.port;
   launcherPlatform=r.platform||'win32';
-  $('#connectLocal').value=r.localIps.length?r.localIps.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
+  const localAddr=r.localIps.length?r.localIps.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
+  $('#connectLocal').value=localAddr;
+  // 5.2.0: mirror the LAN address into the beginner share card (first address only — one thing to copy).
+  const bs=$('#beginnerShareAddr');if(bs)bs.value=r.localIps.length?`${r.localIps[0]}:${port}`:t('conn.noLan');
   $('#allowFirewall').dataset.port=port;
   // Linux cannot auto-open the firewall without sudo; relabel the button so it copies the command.
   const fw=$('#allowFirewall'); if(fw){ fw.textContent = launcherPlatform==='linux' ? t('conn.copyFwCmd') : t('conn.firewall'); }
@@ -651,13 +654,37 @@ async function markOnboarded(){await window.observer.onboardingComplete();state.
 // once, generically, so this can't quietly happen again for a future modal either.
 $('#onboardingClose').onclick=()=>hideOnboarding();
 $('#obSkip').onclick=async()=>{hideOnboarding();await markOnboarded()};
-$('#obPickExisting').onclick=async()=>{hideOnboarding();await markOnboarded();await addExistingInstance()};
+// 5.2.0: the onboarding choice also sets Beginner mode. "Create a new server" (the beginner path)
+// turns it ON; "I already have a server" (experienced) turns it OFF. Persisted like any setting;
+// the user can flip it any time in Settings.
+$('#obPickExisting').onclick=async()=>{hideOnboarding();await markOnboarded();await saveBeginnerMode(false);await addExistingInstance()};
 $('#obCreateNew').onclick=async()=>{
   // The wizard's step 1 picks the folder and creates a NEW instance for it — do NOT run
   // chooseFolder here: that would save serverPath onto the currently-active instance.
-  hideOnboarding();await markOnboarded();
+  hideOnboarding();await markOnboarded();await saveBeginnerMode(true);
   openNewServerWizard();
 };
+// 5.2.0 Beginner mode: a gentler UI — rail shows only Overview/Console/Players/Settings, and the
+// RAM/JVM panel + advanced tabs are hidden via the body.beginner-mode CSS. Nothing is REMOVED
+// (DESIGN.md 2.4 layering): "Show all tools" turns the full set back on instantly.
+const BEGINNER_TABS=new Set(['overview','console','players','settings']);
+function applyBeginnerMode(on){
+  const on_=!!on;
+  document.body.classList.toggle('beginner-mode',on_);
+  // Never leave the user stranded on a tab that just got hidden.
+  if(on_){const cur=document.querySelector('.tab.active');if(cur&&!BEGINNER_TABS.has(cur.id))switchTab('overview')}
+  const sa=$('#railShowAll');if(sa)sa.hidden=!on_;
+  const share=$('#beginnerShare');if(share)share.hidden=!(on_&&state.running);
+}
+async function saveBeginnerMode(on){
+  let r;try{r=await window.observer.saveSettings({...getSettings(),beginnerMode:!!on});}catch{return false}
+  if(!r||!r.ok)return false;
+  state={...state,settings:{...state.settings,beginnerMode:!!on}};
+  applyBeginnerMode(on);try{markSettingsSaved()}catch{}
+  return true;
+}
+$('#railShowAll')&&($('#railShowAll').onclick=()=>saveBeginnerMode(false));
+$('#beginnerModeInput')&&($('#beginnerModeInput').addEventListener('change',e=>saveBeginnerMode(e.target.checked)));
 
 // The guided "create a new server" wizard now lives in 12-wizard.js (loads after this file).
 // Wizard state/functions moved to 12-wizard.js.

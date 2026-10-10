@@ -1,0 +1,43 @@
+// 5.2.0 Beginner mode: source-level guards (the feature is mostly CSS/HTML wiring + a settings
+// flag, so we assert the wiring exists and the defaults are safe).
+const fs = require('fs');
+const path = require('path');
+const root = path.join(__dirname, '..');
+let pass = 0, fail = 0;
+const check = (n, c) => c ? (pass++, console.log('PASS', n)) : (fail++, console.log('FAIL', n));
+
+// settings default
+const settings = fs.readFileSync(path.join(root, 'src', 'main', 'settings.js'), 'utf8');
+check('settings has beginnerMode default false', /beginnerMode:\s*false/.test(settings));
+
+// getSettings carries it (so it persists on save)
+const ov = fs.readFileSync(path.join(root, 'src', 'renderer', 'js', '07-overview.js'), 'utf8');
+check('getSettings includes beginnerMode', /beginnerMode:\$\('#beginnerModeInput'\)/.test(ov));
+check('refreshUI syncs the toggle', /beginnerModeInput'\)\)\$\('#beginnerModeInput'\)\.checked/.test(ov));
+
+// shell wiring
+const sh = fs.readFileSync(path.join(root, 'src', 'renderer', 'js', '08-shell.js'), 'utf8');
+check('applyBeginnerMode defined', /function applyBeginnerMode\(/.test(sh));
+check('BEGINNER_TABS has 4 tabs', /BEGINNER_TABS=new Set\(\['overview','console','players','settings'\]\)/.test(sh));
+check('create-new turns beginner ON', /saveBeginnerMode\(true\)/.test(sh));
+check('pick-existing turns beginner OFF', /saveBeginnerMode\(false\)/.test(sh));
+check('show-all button wired', /railShowAll'\).onclick=\(\)=>saveBeginnerMode\(false\)/.test(sh));
+
+// CSS hides the advanced tabs under body.beginner-mode
+const css = fs.readFileSync(path.join(root, 'src', 'renderer', 'css', '02-shell.css'), 'utf8');
+['performance', 'content', 'marketplace', 'worlds', 'worldmap', 'properties'].forEach(tab => {
+  check('CSS hides tab ' + tab, new RegExp('body\\.beginner-mode \\.nav-item\\[data-tab="' + tab + '"\\]').test(css));
+});
+check('CSS hides ov-adv', /body\.beginner-mode \.ov-adv\{display:none\}/.test(css));
+check('CSS hides content group', /body\.beginner-mode \.nav-group\[data-grp="content"\]/.test(css));
+
+// HTML wiring
+const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
+check('HTML has beginnerModeInput', /id="beginnerModeInput"/.test(html));
+check('HTML has railShowAll', /id="railShowAll"/.test(html));
+check('HTML has beginnerShare', /id="beginnerShare"/.test(html));
+check('HTML has beginnerShareAddr', /id="beginnerShareAddr"/.test(html));
+check('content group has data-grp', /data-grp="content"/.test(html));
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
