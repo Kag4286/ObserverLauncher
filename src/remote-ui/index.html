@@ -21,6 +21,12 @@
     <div class="card">
       <div class="card-head"><h2 data-i18n="status">Status</h2><span class="pill" id="statePill">-</span></div>
       <dl class="kv" id="statusKv"></dl>
+      <!-- Actions are shown only when Read-only is OFF (same gate as the command box). -->
+      <div class="actions" id="actions" hidden>
+        <button class="btn primary" id="actStart" data-i18n="start">Start</button>
+        <button class="btn" id="actStop" data-i18n="stop">Stop</button>
+        <button class="btn" id="actRestart" data-i18n="restart">Restart</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-head"><h2 data-i18n="playersTitle">Players</h2><span class="badge" id="playerCount">0</span></div>

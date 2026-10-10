@@ -80,6 +80,17 @@ function createRemoteServer(opts) {
   const h = o.handlers || {};
   const MAX = 64 * 1024;
   const send = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+  // Read + size-cap + JSON-parse a POST body, then hand the payload to cb. Shared by /command and
+  // /action so the boilerplate lives once (gotcha #20). Sends 413/400 itself and returns.
+  const readJson = (req, res, cb) => {
+    let body = ''; let big = false;
+    req.on('data', c => { if (big) return; body += c; if (body.length > MAX) { big = true; send(res, 413, { ok: false, error: 'Request too large.' }); req.destroy(); } });
+    req.on('end', () => {
+      if (big) return;
+      let payload; try { payload = JSON.parse(body || '{}'); } catch { return send(res, 400, { ok: false, error: 'bad json' }); }
+      cb(payload || {});
+    });
+  };
   const { isSafeConsoleCommand, tokenEquals, bearerToken } = require('./validate.js');
   // 4.4.0: the Remote web dashboard — three FIXED files, read once at server creation and served
   // from memory. The path is never built from the request (no traversal possible). If the assets are
@@ -92,9 +103,11 @@ function createRemoteServer(opts) {
     uiAssets['/ui/style.css'] = { type: 'text/css; charset=utf-8', body: fs.readFileSync(path.join(UI_DIR, 'style.css')) };
     uiAssets['/ui/app.js'] = { type: 'text/javascript; charset=utf-8', body: fs.readFileSync(path.join(UI_DIR, 'app.js')) };
   } catch { /* GUI not available -> API only */ }
-  // RATE LIMIT (4.4.0): 60 requests/min per client IP, the same shared budget the MCP server uses.
-  // A trusted token-holder is never throttled in practice; this only bounds a leaked/abused token.
-  const rateLimited = require('./rate-limit.js').makeRateLimiter(60, 60000);
+  // RATE LIMIT (4.4.0): per client IP, shared token-bucket. The web dashboard polls a few
+  // endpoints every few seconds, so the budget must sit well above that (the old 60/min throttled
+  // the GUI itself). 300/min still bounds a leaked-token hammer. The bucket is PER SERVER, so it
+  // does not share the MCP server's per-tool budget.
+  const rateLimited = require('./rate-limit.js').makeRateLimiter(300, 60000);
   const server = http.createServer((req, res) => {
     // SECURITY: reject browser-shaped cross-origin requests up front (localhost CSRF /
     // DNS-rebinding), same defense-in-depth as the MCP server. 4.4.0: the dashboard is served from
@@ -148,13 +161,21 @@ function createRemoteServer(opts) {
     if (req.method === 'GET' && url.pathname === '/status') return run(() => h.status && h.status(inst));
     if (req.method === 'GET' && url.pathname === '/console') return run(() => h.console && h.console(Math.max(1, Math.min(1000, Number(url.searchParams.get('lines')) || 200)), inst));
     if (req.method === 'GET' && url.pathname === '/players') return run(() => h.players && h.players(inst));
+    // 4.4.0: safe server ACTIONS (start/stop/restart/kick). Gated exactly like /command: only when
+    // read-only is OFF. Never install/delete/edit — those stay in the desktop GUI.
+    if (req.method === 'POST' && url.pathname === '/action') {
+      if (readOnly) return send(res, 403, { ok: false, error: 'Remote is in read-only mode.' });
+      return readJson(req, res, (payload) => {
+        const action = String(payload.action || '').trim();
+        if (!h.action) return send(res, 501, { ok: false, error: 'action not supported.' });
+        const inst = String(payload.instance || url.searchParams.get('instance') || '');
+        const name = payload.name == null ? '' : String(payload.name);
+        run(() => h.action(action, { instance: inst, name }));
+      });
+    }
     if (req.method === 'POST' && url.pathname === '/command') {
       if (readOnly) return send(res, 403, { ok: false, error: 'Remote is in read-only mode.' });
-      let body = ''; let big = false;
-      req.on('data', c => { if (big) return; body += c; if (body.length > MAX) { big = true; send(res, 413, { ok: false, error: 'Request too large.' }); req.destroy(); } });
-      req.on('end', () => {
-        if (big) return;
-        let payload; try { payload = JSON.parse(body || '{}'); } catch { return send(res, 400, { ok: false, error: 'bad json' }); }
+      return readJson(req, res, (payload) => {
         const cmd = String(payload.command == null ? '' : payload.command);
         // SECURITY: same guard the MCP send_console_command tool uses - a single line, <=2000 chars.
         // Without it a `\r\nstop` in the body would inject a SECOND console command.
@@ -163,7 +184,6 @@ function createRemoteServer(opts) {
         if (!h.command) return send(res, 501, { ok: false, error: 'command not supported.' });
         run(() => h.command(cmd, inst));
       });
-      return;
     }
     return send(res, 404, { ok: false, error: 'not found' });
   });
@@ -210,7 +230,17 @@ async function startRemote(ctx) {
     bind: String(s.remoteBind || '').trim() || '127.0.0.1',
     version: (() => { try { return require('../../package.json').version; } catch { return 'dev'; } })(),
     // 4.4.0: log handler failures server-side instead of returning the raw message to the client.
-    onError: (e) => { try { ctx.appendLog('Remote handler error: ' + (e?.message || String(e)), 'error'); } catch {} },
+    // Throttle repeated identical messages (a polling client could otherwise spam the log).
+    onError: (() => {
+      const seen = new Map();
+      return (e) => {
+        const msg = e?.message || String(e);
+        const now = Date.now();
+        if ((seen.get(msg) || 0) > now - 30000) return;
+        seen.set(msg, now);
+        try { ctx.appendLog('Remote handler error: ' + msg, 'error'); } catch {}
+      };
+    })(),
     handlers: {
       instances: () => listInstances(),
       status: (inst) => call('get_status', {}, inst),
@@ -221,6 +251,33 @@ async function startRemote(ctx) {
         if (!runId) return { ok: false, error: `Unknown instance "${inst}".` };
         const { sendConsoleCommand } = require('./server-lifecycle.js');
         return await ctx.runInInstance(runId, () => sendConsoleCommand(ctx, String(c)));
+      },
+      // 4.4.0: the four safe remote actions. Whitelisted actions only — an unknown string is
+      // refused (no remote install/delete/edit path exists).
+      action: async (action, opts) => {
+        const a = String(action || '').trim().toLowerCase();
+        const runId = resolveInst(opts && opts.instance);
+        if (!runId) return { ok: false, error: `Unknown instance "${opts && opts.instance}".` };
+        if (a === 'kick') {
+          const name = String((opts && opts.name) || '').trim();
+          const { isSafePlayerName } = require('./validate.js');
+          if (!isSafePlayerName(name)) return { ok: false, error: 'Invalid player name.' };
+          const { sendConsoleCommand } = require('./server-lifecycle.js');
+          const r = await ctx.runInInstance(runId, () => sendConsoleCommand(ctx, 'kick ' + name));
+          return { ok: true, result: r && r.ok === false ? r : { kicked: name } };
+        }
+        const { startServerInternal, requestStop } = require('./server-lifecycle.js');
+        const { loadSettingsFor } = require('./settings.js');
+        if (a === 'start') {
+          return await ctx.runInInstance(runId, () => startServerInternal(ctx, loadSettingsFor(runId)));
+        }
+        if (a === 'stop') {
+          return await ctx.runInInstance(runId, () => requestStop(ctx));
+        }
+        if (a === 'restart') {
+          return await ctx.runInInstance(runId, () => requestStop(ctx, loadSettingsFor(runId)));
+        }
+        return { ok: false, error: 'Unknown action. Allowed: start, stop, restart, kick.' };
       },
     },
   });

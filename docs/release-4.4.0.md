@@ -19,6 +19,7 @@ Now, open the same address (`http://127.0.0.1:<port>/`) and you get a small dash
 - **Console** — the recent output, refreshed automatically.
 - **Players** — who is online, the whitelist, bans and operators.
 - **Instance picker** — if you run more than one server, choose which one to look at.
+- **Actions** — Start, Stop and Restart buttons, plus a Kick link on each online player. They appear **only when Read-only is turned off**.
 - **Command box** — send a single console command. It appears **only when Read-only is turned off**.
 
 Paste your token once (use **Copy** in Settings → Remote access). The page remembers it in that
@@ -39,6 +40,13 @@ It works exactly the same from your phone over Tailscale — no port forwarding.
   to talk to your remote API is still refused.
 
 None of this changes how the JSON API works for scripts; it is the same as before.
+
+## What Remote access can and cannot do
+
+Remote access is deliberately narrow. When **Read-only is off** you can read status/console/players
+and run the four **safe actions** (start, stop, restart, kick). It can **never** install, delete, edit
+files or restore backups — those stay in the desktop app only. Turn Read-only on and even the
+actions are blocked; the dashboard becomes read-only.
 
 ## Fixed: a false "unstable server" warning
 

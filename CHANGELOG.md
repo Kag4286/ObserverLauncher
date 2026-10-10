@@ -23,14 +23,20 @@ No settings migration.
   Tailscale. 7 locales, DESIGN.md tokens, no framework, no bundler.
 - **`GET /ui/config`** (auth'd) reports `readOnly` so the dashboard knows whether to show the command
   box; the server still enforces read-only on `/command`.
+- **Safe remote actions: start / stop / restart / kick.** New `POST /action` (body
+  `{ action, name?, instance? }`), gated exactly like `/command` — only when Read-only is OFF. It is a
+  fixed WHITELIST: an unknown action string is refused, and there is no remote install/delete/edit
+  path. The dashboard shows Start/Stop/Restart buttons next to the status and a Kick link on each
+  online player.
 
 ### Security — remote hardening (the 4.3.0 audit LOW findings)
 - **Constant-time token compare.** `remote.js` and `mcp/server.js` now compare tokens with
   `crypto.timingSafeEqual` over SHA-256 digests (shared `validate.tokenEquals`/`bearerToken`) instead
   of `a !== b`, closing a timing side-channel.
-- **The remote server is rate-limited** (60 req/min per client IP) like the MCP server — a leaked
-  token can no longer hammer it unbounded. The bucket math is now a shared `src/main/rate-limit.js`
-  (used by both servers; avoids the duplicate block `no-dup.test.js` flags).
+- **The remote server is rate-limited** (300 req/min per client IP) — a leaked token can no longer
+  hammer it unbounded. The bucket math is a shared `src/main/rate-limit.js` (used by both servers;
+  avoids the duplicate block `no-dup.test.js` flags). 300 (not the MCP server's 60) because the web
+  dashboard polls several endpoints every few seconds; 60 throttled the GUI itself.
 - **500 responses no longer leak `e.message`.** Handler errors are logged server-side (via a new
   `onError` hook) and the client gets a generic `Internal error.`.
 - **Origin guard relaxed for same-origin only.** The dashboard's `fetch` POSTs carry an `Origin`;

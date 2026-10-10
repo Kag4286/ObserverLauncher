@@ -15,6 +15,7 @@ const get = (url, headers) => fetch(url, { headers: headers || {} }).then(async 
       console: async () => ({ lines: ['a', 'b'] }),
       players: async () => ({ online: [] }),
       command: async (c) => ({ ran: c }),
+      action: async (a) => (a === 'start' ? { ok: true, started: true } : { ok: false, error: 'Unknown action.' }),
     },
   });
   const port = await srv.listen();
@@ -72,7 +73,25 @@ const get = (url, headers) => fetch(url, { headers: headers || {} }).then(async 
   ck('read-only /ui/config -> readOnly:true', r.status === 200 && JSON.parse(r.body).data.readOnly === true);
   const rc = await fetch(`${rbase}/command`, { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify({ command: 'stop' }) });
   ck('read-only /command -> 403', rc.status === 403);
+  const roAct = await fetch(`${rbase}/action`, { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) });
+  ck('read-only /action -> 403', roAct.status === 403);
   ro.close();
+
+  // --- /action: the four safe actions. Gate = read-only (like /command). Whitelist enforced. ---
+  const act = (a, extra) => fetch(`${base}/action`, { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ action: a, ...(extra || {}) }) }).then(async x => ({ status: x.status, body: await x.json().catch(() => ({})) }));
+  let ar = await act('start');
+  ck('/action start -> ok (handled)', ar.status === 200 && ar.body.ok === true && ar.body.data && ar.body.data.ok === true);
+  ar = await act('nonsense');
+  ck('/action unknown action -> handler ok:false', ar.status === 200 && ar.body.data && ar.body.data.ok === false);
+
+  // --- 4.4.0 fix: the dashboard polls every few seconds; a burst must NOT trip 429 (the old
+  // 60/min budget throttled the GUI itself). 65 rapid reads must all be 200. ---
+  let allOk = true;
+  for (let i = 0; i < 65; i++) {
+    const x = await get(`${base}/ui/config`, auth);
+    if (x.status !== 200) { allOk = false; break; }
+  }
+  ck('65 rapid reads stay under the limit (no 429)', allOk);
 
   srv.close();
   console.log(`\n${pass} passed, ${fail} failed`);

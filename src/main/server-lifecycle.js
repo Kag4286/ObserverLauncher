@@ -583,4 +583,4 @@ async function forceStopServer(ctx) {
   return { ok: true };
 }
 
-module.exports = { startServerInternal, forceStopServer, startAutoPoll, startMetrics, registerServer, parseMetricValue, checkRamBudget, checkPortLease, scheduleGracefulEscalation, sendConsoleCommand, connectRcon, closeRcon, ensureRconInProperties, adoptProcess, startAdoptedWatch };
+module.exports = { startServerInternal, forceStopServer, startAutoPoll, startMetrics, registerServer, parseMetricValue, checkRamBudget, checkPortLease, scheduleGracefulEscalation, sendConsoleCommand, connectRcon, closeRcon, ensureRconInProperties, adoptProcess, startAdoptedWatch, requestStop };
