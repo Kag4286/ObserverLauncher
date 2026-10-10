@@ -39,10 +39,21 @@ No settings migration.
   dashboard polls several endpoints every few seconds; 60 throttled the GUI itself.
 - **500 responses no longer leak `e.message`.** Handler errors are logged server-side (via a new
   `onError` hook) and the client gets a generic `Internal error.`.
+- **Allowlist now gates everything, including `/health` and the dashboard assets.** They used to be
+  served before the IP-allowlist check (no secret in them, but they bypassed the allowlist). Order is
+  now Origin/Host -> IP allowlist -> assets -> token -> rate limit.
+- **An empty configured token is fail-closed.** `tokenEquals('', '')` returns true, so a
+  `createRemoteServer` built without a token would have authorized any request. The server now refuses
+  every request when no token is set (startRemote always mints one; this hardens direct embedding).
 - **Origin guard relaxed for same-origin only.** The dashboard's `fetch` POSTs carry an `Origin`;
   a same-origin Origin (host:port matches the Host header) is now allowed, every other Origin is
   still 403. Static assets are served from a fixed, in-memory map — never a path from the request, so
   no traversal is possible.
+
+### Fixed — remote dashboard XSS hardening
+- **The dashboard's `esc()` now escapes quotes too.** Player names are interpolated into an HTML
+  attribute (`data-kick="..."`); a name containing `"` could break out of it. Low risk (the value
+  comes from the user's own whitelist/ops files) but fixed: `"` and `'` are escaped.
 
 ### Fixed — settings / remote status UX
 - **Remote/MCP status no longer shows OFF right after launch.** `main.js` starts those loopback

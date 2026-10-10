@@ -93,6 +93,23 @@ const get = (url, headers) => fetch(url, { headers: headers || {} }).then(async 
   }
   ck('65 rapid reads stay under the limit (no 429)', allOk);
 
+  // --- 4.4.0 hardening: the IP allowlist must gate the STATIC assets + /health too (they used to be
+  // served before the allowlist check). ---
+  const al = createRemoteServer({ token: 't', allow: ['10.9.9.9'], readOnly: true, handlers: {} });
+  const alp = await al.listen();
+  const alGet = (p) => fetch(`http://127.0.0.1:${alp}${p}`).then(x => x.status);
+  ck('allowlist blocks GET / -> 403', (await alGet('/')) === 403);
+  ck('allowlist blocks /ui/app.js -> 403', (await alGet('/ui/app.js')) === 403);
+  ck('allowlist blocks /health -> 403', (await alGet('/health')) === 403);
+  al.close();
+
+  // --- 4.4.0 hardening: an EMPTY configured token is fail-closed (never authorize). ---
+  const nt = createRemoteServer({ token: '', allow: [], readOnly: true, handlers: {} });
+  const ntp = await nt.listen();
+  ck('empty token -> /ui/config 401', (await fetch(`http://127.0.0.1:${ntp}/ui/config`)).status === 401);
+  ck('empty token -> /status 401', (await fetch(`http://127.0.0.1:${ntp}/status`, { headers: { authorization: 'Bearer ' } })).status === 401);
+  nt.close();
+
   srv.close();
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

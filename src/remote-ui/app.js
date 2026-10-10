@@ -91,7 +91,9 @@
       actionDone: '已完成。', actionFailed: '操作失败。' }
   };
   const $ = s => document.querySelector(s);
-  const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  // Escape & < > AND quotes — player names go into HTML attributes (data-kick="..."), so an
+  // unescaped quote could break out of the attribute (self-XSS from the user's own whitelist file).
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // pick a locale: exact match, then base language, else English.
   const nav = (navigator.language || 'en');

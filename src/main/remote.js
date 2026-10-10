@@ -133,16 +133,24 @@ function createRemoteServer(opts) {
       || (wildcardBind && (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostHdr) || /^[0-9a-f:]+$/i.test(hostHdr)));
     if (!hostOk) { res.writeHead(403); return res.end('forbidden'); }
     const ip = String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
-    // /health is unauthenticated liveness (no tool access) - same idea as the MCP /health.
+    // SECURITY: the IP allowlist applies to EVERYTHING below this line, including /health and the
+    // dashboard assets (they used to be served before the allowlist check). Order stays: Origin/Host
+    // -> IP allowlist -> (assets, no token) -> token -> rate limit -> handler.
+    if (!isIpAllowed(ip, allow)) return send(res, 403, { ok: false, error: 'IP not allowed.' });
+    // /health is unauthenticated liveness (no tool access, no server state) - same idea as MCP /health.
     if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, uptime: Math.round(process.uptime()), version: o.version || 'dev' });
-    // 4.4.0: serve the dashboard's fixed assets (no secret in them; data calls still need the token).
+    // 4.4.0: serve the dashboard's fixed assets (no secret in them; the page must load so the user
+    // can paste a token; every DATA call below still needs the token).
     if (req.method === 'GET' && uiAssets[req.url]) {
       const a = uiAssets[req.url];
       res.writeHead(200, { 'content-type': a.type, 'cache-control': 'no-cache' });
       return res.end(a.body);
     }
-    if (!isIpAllowed(ip, allow)) return send(res, 403, { ok: false, error: 'IP not allowed.' });
     const auth = req.headers['authorization'] || '';
+    // SECURITY (fail-closed): an empty configured token must reject EVERYTHING, never pass (the old
+    // `tokenEquals('', '') === true` would have authorized any request). startRemote always mints a
+    // token, but createRemoteServer is used directly in tests/embedding - keep it safe on its own.
+    if (!token) return send(res, 401, { ok: false, error: 'unauthorized' });
     // 4.4.0: constant-time compare (hash both sides, then timingSafeEqual) so a wrong token cannot
     // be narrowed down via response timing.
     if (!tokenEquals(bearerToken(auth), token)) return send(res, 401, { ok: false, error: 'unauthorized' });
