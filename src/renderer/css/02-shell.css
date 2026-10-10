@@ -43,6 +43,14 @@
 .inst-item .inst-dot.st-stopping{background:var(--warning,#d6a24a)}
 @keyframes instPulse{0%,100%{opacity:1}50%{opacity:.35}}
 .inst-item .inst-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 4.5.0 instance avatar: seed-art tile + initials + a corner status dot. Replaces the bare dot as the
+   row's leading identity (DESIGN.md 13.3). Accent is per-row via --inst-accent (set inline by
+   instAvatarHtml); the art layer fills with that accent, the tile stays neutral. No animation. */
+.inst-avatar{position:relative;width:26px;height:26px;border-radius:var(--r-xs);flex-shrink:0;background:var(--surface-3);border:1px solid var(--border);display:grid;place-items:center;overflow:visible}
+.inst-avatar .inst-art{position:absolute;inset:0;border-radius:inherit;overflow:hidden;opacity:.5;display:grid;place-items:center}
+.inst-avatar .inst-art svg{width:100%;height:100%;display:block}
+.inst-avatar .inst-initials{position:relative;font:800 10px var(--font-ui);color:var(--text);letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+.inst-avatar .inst-dot{position:absolute;right:-3px;bottom:-3px;width:9px;height:9px;border:2px solid var(--surface);opacity:1}
 .inst-item .inst-badge{font:700 8px var(--font-mono);letter-spacing:.1em;color:var(--success);border:1px solid var(--border);border-radius:3px;padding:1px 4px}
 /* Stagger reveal: each row fades+slides in like the tab content rows (--stagger step). Re-applied
    on every renderInstanceList so add/remove/switch feels alive instead of snapping. */
@@ -100,6 +108,18 @@ is active (renderer adds .wco-app to <html>), reserve its width on the right sid
 .inst-dd-caret{font-size:10px;color:var(--text-dim);flex-shrink:0}
 .inst-dd-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:200px;max-width:min(320px,80vw);max-height:60vh;overflow-y:auto;padding:4px;background:var(--panel-raised);border:1px solid var(--border-strong);border-radius:var(--r);box-shadow:0 12px 30px -10px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:2px}
 .inst-dd-menu .inst-item{width:100%}
+/* 4.5.0 Settings > Instance appearance: avatar preview + accent swatch radiogroup. */
+.inst-appear{display:flex;gap:var(--space-5);align-items:flex-start;margin-top:var(--space-3)}
+.inst-appear-preview{flex-shrink:0}
+.inst-appear-preview .inst-avatar{width:56px;height:56px;border-radius:var(--r-sm)}
+.inst-appear-preview .inst-avatar .inst-initials{font-size:18px}
+.inst-appear-preview .inst-avatar .inst-art{opacity:.55}
+.inst-appear-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-3)}
+.inst-appear-label{font:600 12px var(--font-ui);color:var(--text-2)}
+.accent-swatches{display:flex;gap:var(--space-2);flex-wrap:wrap}
+.accent-swatch{width:30px;height:30px;border-radius:var(--r-xs);border:2px solid var(--border);background:var(--sw);cursor:pointer;padding:0;transition:transform var(--dur-micro),border-color var(--dur-micro)}
+.accent-swatch:hover{transform:scale(1.08)}
+.accent-swatch.active{border-color:var(--text);box-shadow:0 0 0 2px var(--brand-glow)}
 /* The existing <1100px rule hides the rail (05-market.css); show the dropdown there instead. */
 @media(max-width:1100px){.inst-dd{display:block}}
 /* keep channelIndicator hidden but exists for JS */

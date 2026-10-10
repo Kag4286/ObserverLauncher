@@ -148,7 +148,7 @@ function renderInstanceList(){
   wrap.hidden=list.length===0;
   if(list.length===0)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
-  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||''])]);
+  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||'',i.accent||'',i.artSeed||0])]);
   if(sig===lastInstSig){
     // Same list/active/names -> just refresh the dots (status can change without a rebuild).
     host.querySelectorAll('.inst-item').forEach(row=>{
@@ -174,7 +174,7 @@ function renderInstanceList(){
     // Stagger reveal: same cadence as tab-content rows (--stagger per index, capped so a long
     // list never waits). Re-runs on every render, so add/remove/switch animates.
     row.style.animationDelay=(idx*28)+'ms';
-    row.innerHTML='<span class="inst-dot st-'+st+'"></span>'
+    row.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,st)
       +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>'
       +'<span class="inst-acts">'
         +'<button type="button" class="inst-act" data-act="rename" title="'+esc(t('inst.rename'))+'" aria-label="'+esc(t('inst.rename'))+'">✎</button>'
@@ -187,6 +187,38 @@ function renderInstanceList(){
     host.appendChild(row);
   });
   renderInstanceDropdown(list, activeId);
+}
+// 4.5.0 instance appearance: render the accent swatches + avatar-art preview for the ACTIVE instance
+// into the Settings 'Instance appearance' section. accent/artSeed live in the nested instances[]
+// (state.instances), NOT in the flat settings view, so we read them from state here. Writes go
+// through the instances:style IPC (validated main-side) and update state optimistically.
+function activeInstanceMeta(){
+  const list=Array.isArray(state.instances)?state.instances:[];
+  const id=state.activeInstanceId||(list[0]&&list[0].id);
+  return list.find(i=>i.id===id)||null;
+}
+function renderInstanceAppearance(){
+  const host=$('#instAccentRow'),preview=$('#instAccentPreview');
+  if(!host||!preview)return;
+  const inst=activeInstanceMeta();
+  const accent=(inst&&inst.accent)||'';
+  const seed=(inst&&inst.artSeed)||0;
+  host.innerHTML=INST_ACCENT_KEYS.map(k=>{
+    const on=k===accent?' active':'';
+    return '<button type="button" class="accent-swatch'+on+'" role="radio" aria-checked="'+(k===accent)+'" data-accent="'+k+'" title="'+esc(k||'brand')+'" style="--sw:'+instAccentCss(k)+'"></button>';
+  }).join('');
+  host.querySelectorAll('[data-accent]').forEach(b=>b.onclick=()=>setInstanceAppearance({accent:b.dataset.accent}));
+  preview.innerHTML=instAvatarHtml(inst?inst.name:'',seed,accent,'stopped');
+}
+// Persist an appearance change for the active instance, then repaint the section + rail (avatar).
+async function setInstanceAppearance(patch){
+  const inst=activeInstanceMeta();
+  if(!inst)return;
+  let r;try{ r=await window.observer.instanceStyle({id:inst.id,...patch}); }catch(e){ return toast(e?.message||'Could not save appearance.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Could not save appearance.','error');
+  const next=(state.instances||[]).map(i=>i.id===inst.id?{...i,accent:r.accent,artSeed:r.artSeed}:i);
+  state={...state,instances:next};
+  renderInstanceAppearance();
 }
 // Compact instance switcher for narrow screens (rail hidden <1100px). Same state as the rail list:
 // shows the active instance + a menu to switch. Hidden when there is 0-1 instance.
@@ -209,7 +241,7 @@ function renderInstanceDropdown(list, activeId){
     b.setAttribute('role','option');
     b.setAttribute('aria-selected',isActive?'true':'false');
     b.dataset.instance=inst.id;
-    b.innerHTML='<span class="inst-dot st-'+st+'"></span><span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>';
+    b.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,st)+'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>';
     b.onclick=()=>{ closeInstDd(); switchInstance(inst.id); };
     menu.appendChild(b);
   });
@@ -835,6 +867,9 @@ function _bootSkip(){ bootFinish(); }
 // Live-apply the 'Interface animation' setting the moment it changes (no need to hit Apply for
 // a purely visual preference). Persisted on the next settings save like every other field.
 $('#motionLevelSelect')?.addEventListener('change',e=>{ try{ applyMotionLevel(e.target.value); }catch{} });
+
+// 4.5.0: shuffle the active instance's avatar art (random seed) and repaint the Settings preview.
+$('#instShuffleArt')?.addEventListener('click',()=>{ setInstanceAppearance({artSeed:Math.floor(Math.random()*100000)}); });
 
 // ===== CURSOR PROXIMITY (1.3.0, signature) =====
 // Rail items brighten as the pointer approaches — an 'instrument feels responsive' cue. Uses a

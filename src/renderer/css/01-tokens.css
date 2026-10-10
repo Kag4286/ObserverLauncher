@@ -21,6 +21,8 @@
   /* Brand — acid-lime replaces cyan (DESIGN.md 3.3) */
   --brand:#22C55E; --brand-soft:rgba(34,197,94,.14); --brand-glow:rgba(34,197,94,.30); --brand-ink:#04160A;
   --violet:#9B8CFF; --orange:#FFB86B; --pink:#FF7AA8;
+  /* 4.5.0 instance accent palette (DESIGN.md 3.5): blue rounds out the selectable set. */
+  --blue:#6EA8FE;
   /* Semantic status (DESIGN.md 3.4) */
   --success:#72E6A6; --success-weak:rgba(114,230,166,.12);
   --warning:#FFC857; --warning-weak:rgba(255,200,87,.12);

@@ -21,4 +21,13 @@ function annotateVersions(list) {
   return (Array.isArray(list) ? list : []).map(v => ({ v, stable: !isPrerelease(v), mc: mcFor(v) }));
 }
 
-module.exports = { isPrerelease, mcFor, annotateVersions };
+// Numeric MC-version comparator (26.3 > 1.21.1 > 1.21). Newest-first when used directly as an
+// Array.sort comparator. Orders API lists that arrive unsorted (e.g. Leaf's versions[]).
+function compareMc(a, b) {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (y[i] || 0) - (x[i] || 0); if (d) return d; }
+  return 0;
+}
+function sortMcVersionsDesc(list) { return (Array.isArray(list) ? list.slice() : []).sort(compareMc); }
+
+module.exports = { isPrerelease, mcFor, annotateVersions, compareMc, sortMcVersionsDesc };

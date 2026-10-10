@@ -10,6 +10,47 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [4.5.0] — 2026-10-10
+
+**Per-instance appearance (accent colour + generated avatar) and a New Server wizard version/Java
+correctness pass.** Settings migration v4 -> v5 (adds two per-instance keys; existing instances get
+safe defaults).
+
+### Added — Instance appearance
+- **Per-instance accent colour.** A persisted `accent` key (`'' | lime | violet | orange | pink |
+  blue`; `''` = the brand colour) drives a new `--instance-accent` CSS var used by the rail avatar,
+  the active item, the world header and the active chart series. Never recolours the whole app.
+- **Generated instance avatar** (`src/renderer/js/00b-instance-art.js`): a deterministic 5x5 mirrored
+  identicon SVG (`instanceArt`) tinted with the accent, plus two-letter initials (`instInitials`) and
+  a corner status dot. Replaces the bare dot in the rail and the compact dropdown.
+- **Settings > Personal > Instance appearance**: a live avatar preview, an accent swatch radiogroup,
+  and a **Shuffle avatar art** button. New `--blue` token.
+- New IPC **`instances:style`** (`{ id, accent, artSeed }`) validated + clamped in
+  `settings.setInstanceStyle`; `renameInstance` and `setInstanceStyle` now share `findInstanceForEdit`
+  (no-dup guard). New per-instance key `artSeed` (int, 0 = derive from the name hash).
+
+### Fixed — New Server wizard (software / version / Java)
+- **CRITICAL: Forge/NeoForge Java check used a wrong MC mapping.** The inline regex turned a NeoForge
+  calendar build (`26.3.0.16`) into the bogus MC id `1.26`, so the Mojang lookup failed and the
+  fallback guessed **Java 21** for a 26.x server that needs **Java 25** — a silently-wrong pre-start
+  check that let the server crash with an obscure JVM error. `wizard:java-check` now uses the SAME
+  `forge-versions.mcFor()` mapping as the wizard's MC-first picker (one source of truth).
+- **Purpur**: "Latest" prefers the API's `metadata.current` instead of `versions[last]` (which can be
+  a just-published build).
+- **Leaf**: `versions[]` is not reliably ordered — sorted numerically, newest first
+  (`sortMcVersionsDesc`).
+- **Velocity**: it is a proxy, not a Minecraft version, so it now reports **Java 17** explicitly
+  (previously no Java row was shown at all).
+- **Forge/NeoForge maven** and **Purpur/Leaf APIs**: throw a clear error when the list is empty / the
+  shape changed, instead of silently showing an empty picker.
+- New helpers `compareMc` / `sortMcVersionsDesc` in `src/main/forge-versions.js`; new tests pin the
+  calendar mapping (`26.3.0.16 -> 26.3`) and numeric sort.
+
+### Tests
+- `tests/forge-versions.test.js` extended (calendar + sort); `tests/migration-v4.test.js` pins v5 +
+  the new appearance defaults. `npm test` 95 files + `npm run test:e2e` 12 green. No settings loss:
+  migration v4 -> v5 only ADDS `accent`/`artSeed` with safe defaults.
+
 ## [4.4.0] — 2026-10-10
 
 **Remote access gets a web dashboard, plus the remaining remote LOW findings and a stability fix.**

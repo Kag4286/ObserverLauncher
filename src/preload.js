@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('observer', {
   instanceAdd: payload => ipcRenderer.invoke('instances:add', payload),
   instanceSwitch: id => ipcRenderer.invoke('instances:switch', id),
   instanceRename: payload => ipcRenderer.invoke('instances:rename', payload),
+  instanceStyle: payload => ipcRenderer.invoke('instances:style', payload),
   instanceRemove: id => ipcRenderer.invoke('instances:remove', id),
   instanceSnapshot: id => ipcRenderer.invoke('instances:snapshot', id),
   instanceProbe: folder => ipcRenderer.invoke('instances:probe', folder),

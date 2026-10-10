@@ -5,7 +5,7 @@ const path = require('path');
 // B1 (v3.0.0): no top-level electron require (throws in plain Node). Data paths go through
 // dataDir()/tempDir(); `dialog`/`app` are required LAZILY inside the GUI-only handlers.
 const { dataDir, tempDir } = require('./data-dir.js');
-const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, removeInstance } = require('./settings.js');
+const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance } = require('./settings.js');
 const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
@@ -290,6 +290,13 @@ function registerSettings(ipcMain, ctx) {
     const r = renameInstance(String(id || ''), name);
     if (r.ok) { try { ctx.seedInstances(); } catch {} }
     return r;
+  });
+
+  // 4.5.0: per-instance appearance (accent palette key + avatar art seed). Validated + clamped in
+  // settings.setInstanceStyle; no ctx seed needed (appearance is not runtime state). Returns the
+  // sanitised values so the renderer can update the picker immediately.
+  ipcMain.handle('instances:style', async (_, { id, accent, artSeed } = {}) => {
+    return setInstanceStyle(String(id || ''), { accent, artSeed });
   });
 
   ipcMain.handle('instances:remove', async (_, id) => {

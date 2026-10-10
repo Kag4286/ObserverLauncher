@@ -15,6 +15,8 @@ const PER_INSTANCE_KEYS = [
   'autoTunnel', 'tunnelAddress',
   // v2.0.0 M6: per-instance RCON (rconPort 0 = not assigned yet; rconPassword '' = none).
   'rconPort', 'rconPassword',
+  // 4.5.0: per-instance appearance — accent palette key ('' = brand default) + avatar art seed.
+  'accent', 'artSeed',
 ];
 
 const migrations = [
@@ -47,6 +49,24 @@ const migrations = [
     out.instances = [inst];
     out.activeInstanceId = 'default';
     return { ...out, version: 4 };
+  },
+  // v4 -> v5 (4.5.0): per-instance appearance — an accent palette key ('' = brand default) and a
+  // numeric seed for the generated instance avatar. DEFENSIVE + idempotent: a store whose instances
+  // already carry the keys passes through; existing instances get the defaults via the spread order
+  // (later keys win, so a real value survives, a missing one gets '' / 0).
+  (s) => {
+    const out = { ...s, version: 5 };
+    if (Array.isArray(out.instances)) {
+      // Normalise explicitly: a v3->v4 instance already carries the keys as `undefined`
+      // (PER_INSTANCE_KEYS copied them from a store that had none), so a spread default
+      // would be clobbered. Coerce a missing/invalid value to the real default.
+      out.instances = out.instances.map(i => ({
+        ...i,
+        accent: typeof i.accent === 'string' ? i.accent : '',
+        artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0,
+      }));
+    }
+    return out;
   },
 ];
 

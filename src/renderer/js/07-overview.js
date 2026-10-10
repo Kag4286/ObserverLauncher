@@ -145,6 +145,7 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   const perfSec=$('#performance'); if(perfSec) perfSec.classList.toggle('is-live', state.status==='running');
   const perfStatus=$('#perfStatus'); if(perfStatus) perfStatus.hidden = state.status!=='stopped';
   if(typeof renderInstanceList==='function')renderInstanceList();
+  if(typeof renderInstanceAppearance==='function')renderInstanceAppearance();
   if(typeof renderTunnelOverview==='function')renderTunnelOverview();
   requestAnimationFrame(()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')})}
 // FEATURE: plain-language setup checklist for beginners — one glance says what

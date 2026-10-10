@@ -41,7 +41,7 @@ const readRaw = () => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
   });
   const s = loadSettings();
   const raw = readRaw();
-  ok('migrated file version = 4', raw.version === 4);
+  ok('migrated file version = 5', raw.version === 5);
   ok('backup written before migration', fs.existsSync(backupPathV3()));
   ok('backup is the original v3', JSON.parse(fs.readFileSync(backupPathV3(), 'utf8')).version === 3);
   ok('one instance created', Array.isArray(raw.instances) && raw.instances.length === 1);
@@ -49,6 +49,9 @@ const readRaw = () => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
   ok('instance name from basename', raw.instances[0].name === 'survival');
   ok('activeInstanceId default', raw.activeInstanceId === 'default');
   ok('per-instance key moved (memoryMax)', raw.instances[0].memoryMax === 6);
+  // 4.5.0 v4->v5: appearance keys default in on an existing instance.
+  ok('appearance default accent empty', raw.instances[0].accent === '');
+  ok('appearance default artSeed 0', raw.instances[0].artSeed === 0);
   ok('tunnel moved into instance', raw.instances[0].tunnelAddress === 'survival.playit.gg:12345');
   ok('schedule moved into instance', raw.instances[0].scheduleStartTime === '08:00');
   ok('top level no longer has serverPath', raw.serverPath === undefined);
@@ -118,7 +121,7 @@ const readRaw = () => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
   ok('round-trip: instance memoryMax updated', raw.instances[0].memoryMax === 10);
   ok('round-trip: still one instance', raw.instances.length === 1);
   ok('round-trip: no flat serverPath leaked to top level', raw.serverPath === undefined);
-  ok('round-trip: version still 4', raw.version === 4);
+  ok('round-trip: version still 5', raw.version === 5);
   // A second load still sees the change through the flat view.
   ok('round-trip: reload sees memoryMax', loadSettings().memoryMax === 10);
 }

@@ -422,6 +422,18 @@
             <hr class="set-hr">
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.guide">Welcome guide</b><small data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</small></div><button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button></div>
           </section>
+          <!-- 4.5.0 instance appearance: accent + avatar art for the ACTIVE instance (DESIGN.md 3.5 / 13.3). -->
+          <section class="flat-cell" id="instAppearanceSection">
+            <div class="sec-head"><img src="./assets/icons/ui/grid.svg" alt=""><h3 data-i18n="set.appearT">Instance appearance</h3><small data-i18n="set.appearD">accent colour and avatar art for this server</small></div>
+            <div class="inst-appear">
+              <span class="inst-appear-preview" id="instAccentPreview"></span>
+              <div class="inst-appear-body">
+                <div class="inst-appear-label" data-i18n="set.appearAccent">Accent colour</div>
+                <div class="accent-swatches" id="instAccentRow" role="radiogroup" aria-label="Accent colour"></div>
+                <button type="button" class="btn secondary sm" id="instShuffleArt" data-i18n="set.appearShuffle">Shuffle avatar art</button>
+              </div>
+            </div>
+          </section>
           </div>
           <div class="set-pane" data-set-pane="automation" hidden>
           <!-- Reliability -->
@@ -817,4 +829,4 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00b-instance-art.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>

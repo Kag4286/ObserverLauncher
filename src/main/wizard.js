@@ -12,6 +12,7 @@ const { json, download, marketplaceError, withTimeout } = require('./http.js');
 const { requiredJavaForJar } = require('./java.js');
 const { downloadFillProject, listFillVersions } = require('./adapters/papermc.js');
 const mojang = require('./adapters/mojang.js');
+const { mcFor, sortMcVersionsDesc } = require('./forge-versions.js');
 
 const RESOLVERS = {
   vanilla: (v) => require('./adapters/vanilla.js').resolve(v),
@@ -54,13 +55,23 @@ function registerWizard(ipcMain, ctx) {
       }
       if (s === 'purpur') {
         const p = await json('https://api.purpurmc.org/v2/purpur');
+        // Purpur exposes metadata.current — the version its authors consider current. Prefer it as
+        // "Latest" rather than versions[last] (which can be a just-published version with no stable
+        // build). Reverse to newest-first for the picker. Fail loudly if the shape ever changes.
         const v = [...(p.versions || [])].reverse();
-        return { ok: true, versions: v, latest: v[0] || null, raw: false };
+        if (!v.length) throw new Error('Purpur returned no versions - its API shape may have changed.');
+        const current = p.metadata && p.metadata.current ? String(p.metadata.current) : null;
+        const latest = (current && v.includes(current)) ? current : v[0];
+        return { ok: true, versions: v, latest, raw: false };
       }
       if (s === 'leaf') {
         const p = await json('https://api.leafmc.one/v2/projects/leaf');
-        const v = [...(p.versions || [])].reverse();
-        return { ok: true, versions: v, latest: v[0] || null, raw: false };
+        // Leaf's versions[] is NOT reliably ordered (an older 1.21.x can sit after a 26.x). Sort
+        // numerically, newest first, so both the picker order and "Latest" are correct. Fail loudly
+        // if the shape ever changes instead of silently showing an empty list.
+        const v = sortMcVersionsDesc(p.versions || []);
+        if (!v.length) throw new Error('Leaf returned no versions - its API shape may have changed.');
+        return { ok: true, versions: v, latest: v[0], raw: false };
       }
       if (s === 'fabric') {
         const g = await json('https://meta.fabricmc.net/v2/versions/game');
@@ -77,6 +88,7 @@ function registerWizard(ipcMain, ctx) {
         // MC version + stable flag so the version step can group/filter. A prerelease is any tag
         // with a hyphen (e.g. 26.3.0.16-beta).
         const all = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map(m => m[1]).reverse(); // newest first
+        if (!all.length) throw new Error(`${s === 'neoforge' ? 'NeoForge' : 'Forge'} maven returned no versions - the metadata shape may have changed.`);
         // Pure helpers (src/main/forge-versions.js) so the MC-label mapping is unit-tested.
         const { isPrerelease, annotateVersions } = require('./forge-versions.js');
         const latest = all.find(v => !isPrerelease(v)) || all[0] || null;
@@ -97,14 +109,17 @@ function registerWizard(ipcMain, ctx) {
     try {
       const v = String(version || '').trim();
       if (!v || v === 'latest') return { ok: true, source: 'none', java: null, exact: false };
+      // Velocity is a proxy, not a Minecraft version — its versions never appear in the Mojang
+      // manifest. It needs Java 17 regardless of the proxy build (was: no Java row shown at all).
+      if (software === 'velocity') return { ok: true, source: 'mapping', java: 17, exact: false };
       let mcId = v;
       if (software === 'forge' || software === 'neoforge') {
-        const forgeStyle = v.match(/^(1\.\d{1,2}(?:\.\d{1,2})?)-/);
-        if (forgeStyle) mcId = forgeStyle[1];
-        else {
-          const major = v.match(/^(\d{2})\./);
-          mcId = major ? `1.${major[1]}` : null;
-        }
+        // Use the SAME MC-label mapping as the wizard's MC-first picker (forge-versions.mcFor) so the
+        // two can never drift. It handles Forge '1.21.1-52.0.1', NeoForge calendar '26.3.0.16' and the
+        // older '21.1.251' form. The old inline regex turned a calendar build into '1.26' (not a real
+        // MC id) and requiredJavaForJar then guessed Java 21 for a 26.x server that needs Java 25 —
+        // a silently-wrong pre-start check that let the server crash with an obscure JVM error.
+        mcId = mcFor(v) || null;
       }
       if (mcId) {
         const java = await mojang.javaVersionFor(mcId);

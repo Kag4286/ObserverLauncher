@@ -40,6 +40,9 @@ function defaultInstanceFields() {
     scheduleEnabled: false, scheduleStartTime: '', scheduleStopTime: '', scheduleDays: [],
     autoTunnel: false, tunnelAddress: '',
     rconPort: 0, rconPassword: '',
+    // 4.5.0 appearance: accent palette key ('' = --brand default) + avatar art seed (0 = derive
+    // from the name hash in the renderer). Both are per-instance, persisted in the nested store.
+    accent: '', artSeed: 0,
   };
 }
 
@@ -198,7 +201,7 @@ function newInstanceId() {
 function listInstances() {
   const store = loadSettingsStore();
   const instances = (Array.isArray(store.instances) ? store.instances : [])
-    .map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel }));
+    .map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0 }));
   return { instances, activeInstanceId: store.activeInstanceId || (instances[0] && instances[0].id) || null };
 }
 
@@ -240,14 +243,40 @@ function switchInstance(id) {
   return { ok: true, activeInstanceId: id };
 }
 
-function renameInstance(id, name) {
+// Shared loader for the per-instance editors (renameInstance / setInstanceStyle): load the nested
+// store + a mutable copy of the instances array and find the target. Returns { store, instances, inst }
+// (inst null when the id is unknown). Extracted so the two editors cannot drift (no-dup guard).
+function findInstanceForEdit(id) {
   const store = loadSettingsStore();
   const instances = Array.isArray(store.instances) ? store.instances.map(i => ({ ...i })) : [];
-  const inst = instances.find(i => i.id === id);
+  const inst = instances.find(i => i.id === id) || null;
+  return { store, instances, inst };
+}
+
+function renameInstance(id, name) {
+  const { store, instances, inst } = findInstanceForEdit(id);
   if (!inst) return { ok: false, error: 'No such instance.' };
   inst.name = String(name || '').trim().slice(0, 60) || inst.name || 'Server';
   saveSettings({ ...store, instances });
   return { ok: true, id, name: inst.name };
+}
+
+// 4.5.0 appearance: the fixed accent palette (DESIGN.md 3.5). Anything else falls back to ''
+// (brand). artSeed is a non-negative int < 100000; the renderer derives the avatar art from it.
+const INSTANCE_ACCENTS = ['lime', 'violet', 'orange', 'pink', 'blue'];
+function setInstanceStyle(id, { accent, artSeed } = {}) {
+  const { store, instances, inst } = findInstanceForEdit(id);
+  if (!inst) return { ok: false, error: 'No such instance.' };
+  if (accent !== undefined) {
+    const a = String(accent || '');
+    inst.accent = INSTANCE_ACCENTS.includes(a) ? a : '';
+  }
+  if (artSeed !== undefined) {
+    const n = Number(artSeed);
+    inst.artSeed = Number.isFinite(n) ? (Math.abs(Math.floor(n)) % 100000) : 0;
+  }
+  saveSettings({ ...store, instances });
+  return { ok: true, id, accent: inst.accent || '', artSeed: inst.artSeed || 0 };
 }
 
 // Remove an instance from the list ONLY — never touches the folder on disk. If it was active,
@@ -260,7 +289,7 @@ function removeInstance(id) {
   let activeInstanceId = store.activeInstanceId;
   if (activeInstanceId === id) activeInstanceId = (instances[0] && instances[0].id) || null;
   saveSettings({ ...store, instances, activeInstanceId });
-  return { ok: true, instances: instances.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel })), activeInstanceId };
+  return { ok: true, instances: instances.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0 })), activeInstanceId };
 }
 
 function saveSettings(settings) {
@@ -294,4 +323,4 @@ function saveSettingsFor(instanceId, flat) {
   writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
-module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, removeInstance };
+module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, INSTANCE_ACCENTS, removeInstance };
