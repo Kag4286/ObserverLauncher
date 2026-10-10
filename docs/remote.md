@@ -6,6 +6,11 @@ port on your router. **Off by default.** When you turn it on, the launcher start
 players) and, if you allow it, a few safe actions (send a console command). **It never exposes
 install or delete.**
 
+> **4.4.0:** opening the remote address in a browser (`http://127.0.0.1:<port>/`) now shows a small
+> web dashboard — status, console, players, and a command box when Read-only is off. Paste the token
+> once (from Settings → Remote access → Copy); it is stored in the browser and never put in the URL.
+> The JSON API below is unchanged and still works for scripts.
+
 ## Quick start (friendly path)
 
 1. **Settings → Remote access → Enable.** The launcher generates a long-lived token and shows the

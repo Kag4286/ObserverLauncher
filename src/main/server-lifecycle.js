@@ -434,9 +434,13 @@ async function startServerInternal(ctx, settings) {
     // (an actual deploy rollback) is deliberately left to the caller; this only persists + logs.
     try {
       const st = require('./stability.js');
-      const rec = st.noteExit(ctx.runtimeInstanceId || instId, { code });
-      const d = st.decideRollback(rec);
-      if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
+      // 4.4.0: a user-requested Stop is 'manual' — it must not count as an unstable run, and it
+      // must not re-log the rollback warning (the streak is preserved on disk for a later real crash).
+      const rec = st.noteExit(ctx.runtimeInstanceId || instId, { code, manual: wasManual });
+      if (!wasManual) {
+        const d = st.decideRollback(rec);
+        if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
+      }
     } catch {}
     // A user-requested restart: relaunch with the settings captured at request time. teardown()
     // (just below) clears the flag, so read it first.

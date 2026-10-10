@@ -1,0 +1,85 @@
+/* style.css — the Remote web dashboard. A SELF-CONTAINED token block: this page is served by the
+   remote server and cannot import the app's renderer CSS build, so it mirrors the DESIGN.md tokens
+   (warm near-black canvas, --brand emerald, soft radii, --dur-* motion) by hand. Keep the values in
+   sync with src/renderer/css/01-tokens.css. System fonts only (the app bundles Manrope for itself;
+   this standalone page must not fetch a remote font). */
+:root{
+  --bg:#0C0D0F; --bg-elev:#111317; --surface:#15171B; --surface-2:#1B1E23;
+  --field:#101216; --border:#2A2E35; --border-strong:#3A4049;
+  --text:#F4F1EA; --text-2:#D7D3CA; --text-muted:#A39F97; --text-dim:#76736D;
+  --brand:#9CD32E; --brand-soft:rgba(156,211,46,.12); --brand-ink:#0A1200;
+  --success:#72E6A6; --warning:#FFC857; --danger:#FF667D;
+  --r-sm:10px; --r:14px; --r-lg:18px;
+  --dur-micro:90ms; --dur-fast:120ms; --dur-modal:210ms;
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"JetBrains Mono","IBM Plex Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:500 14px/1.5 var(--font-ui);
+  background-image:radial-gradient(circle at 70% 0%,rgba(156,211,46,.04),transparent 40%);}
+.muted{color:var(--text-muted)}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,13,15,.85);backdrop-filter:blur(8px);z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700}
+.brand .dot{width:9px;height:9px;border-radius:999px;background:var(--text-dim);flex:0 0 auto}
+.brand .dot.on{background:var(--success);box-shadow:0 0 12px rgba(114,230,166,.5)}
+.brand .dot.off{background:var(--text-dim)}
+.top-right{display:flex;align-items:center;gap:10px}
+
+/* layout */
+main{max-width:1100px;margin:0 auto;padding:24px 20px 60px;display:flex;flex-direction:column;gap:18px}
+.row-cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.row-cards{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.card-head h2{margin:0;font-size:15px;font-weight:700}
+.tools{display:flex;align-items:center;gap:10px}
+
+/* pills / badges */
+.pill{font:600 11px var(--font-ui);padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--text-2)}
+.pill.on{background:var(--brand-soft);color:var(--brand)}
+.pill.err{background:rgba(255,102,125,.14);color:var(--danger)}
+.badge{font:600 11px var(--font-mono);padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--text-muted)}
+
+/* key/value */
+.kv{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+.kv dt{color:var(--text-muted)}
+.kv dd{margin:0;text-align:right;font-family:var(--font-mono);color:var(--text-2);overflow-wrap:anywhere}
+
+/* players */
+.pl-group{margin-bottom:10px}
+.pl-group b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
+.pl-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pl{font:500 12px var(--font-mono);padding:3px 9px;border-radius:var(--r-sm);background:var(--field);border:1px solid var(--border);color:var(--text-2)}
+
+/* console */
+.console{margin:0;max-height:52vh;overflow:auto;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:12px 14px;font:12px/1.6 var(--font-mono);color:var(--text-2);white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* form controls */
+.field,.sel{background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);
+  font:500 13px var(--font-ui);padding:8px 11px;outline:none;transition:border-color var(--dur-fast) var(--ease)}
+.field:focus,.sel:focus{border-color:var(--brand)}
+.btn{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);
+  font:600 13px var(--font-ui);padding:8px 14px;cursor:pointer;transition:background var(--dur-micro) var(--ease)}
+.btn:hover{background:var(--surface-3,#23272E)}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);cursor:pointer}
+.cmd-row{display:flex;gap:10px}
+.cmd-row .field{flex:1;font-family:var(--font-mono)}
+
+/* token gate */
+.overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:20}
+.overlay[hidden]{display:none}
+.gate{width:min(92vw,360px);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:28px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.gate h1{margin:0;font-size:20px;font-weight:800}
+.gate .field{margin-top:4px}
+.err{color:var(--danger);font-size:12px;margin:0}
+
+@media(prefers-reduced-motion:reduce){*{transition-duration:0ms!important;animation-duration:0ms!important}}

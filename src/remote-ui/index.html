@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>ObserverLauncher - Remote</title>
+<link rel="stylesheet" href="./ui/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot" id="statusDot"></span><b>ObserverLauncher</b><span class="muted" data-i18n="title">Remote</span></div>
+  <div class="top-right">
+    <select id="langSel" class="sel" title="Language"></select>
+    <button class="btn ghost" id="forgetBtn" data-i18n="forget">Forget token</button>
+  </div>
+</header>
+
+<main id="app" hidden>
+  <section class="row-cards">
+    <div class="card">
+      <div class="card-head"><h2 data-i18n="status">Status</h2><span class="pill" id="statePill">-</span></div>
+      <dl class="kv" id="statusKv"></dl>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 data-i18n="playersTitle">Players</h2><span class="badge" id="playerCount">0</span></div>
+      <div id="players"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 data-i18n="consoleTitle">Console</h2>
+      <div class="tools">
+        <label class="chk"><input type="checkbox" id="autoRefresh" checked> <span data-i18n="autoRefresh">Auto</span></label>
+        <button class="btn" id="refreshBtn" data-i18n="refresh">Refresh</button>
+      </div>
+    </div>
+    <pre class="console" id="console"></pre>
+  </section>
+
+  <section class="card" id="cmdCard" hidden>
+    <div class="card-head"><h2 data-i18n="commandTitle">Command</h2><span class="muted" data-i18n="commandHint">Single line</span></div>
+    <form class="cmd-row" id="cmdForm">
+      <input class="field" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="/list">
+      <button class="btn primary" type="submit" data-i18n="send">Send</button>
+    </form>
+  </section>
+</main>
+
+<div class="overlay" id="gate">
+  <form class="gate" id="gateForm">
+    <h1>ObserverLauncher</h1>
+    <p class="muted" data-i18n="gateHint">Paste your remote token to continue.</p>
+    <input class="field" id="tokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="token">
+    <button class="btn primary" type="submit" data-i18n="connect">Connect</button>
+    <p class="err" id="gateErr" hidden></p>
+  </form>
+</div>
+
+<script src="./ui/app.js"></script>
+</body>
+</html>

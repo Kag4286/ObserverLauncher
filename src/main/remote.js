@@ -70,6 +70,8 @@ function remoteAddresses(port) {
 //   opts: { token, allow, readOnly, handlers:{ status, console, players, command }, version }
 // Returns { server, port, close() }. Binds 127.0.0.1 ONLY. Never serves write/destroy/install.
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 function createRemoteServer(opts) {
   const o = opts || {};
   const token = String(o.token || '');
@@ -78,11 +80,32 @@ function createRemoteServer(opts) {
   const h = o.handlers || {};
   const MAX = 64 * 1024;
   const send = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
-  const { isSafeConsoleCommand } = require('./validate.js');
+  const { isSafeConsoleCommand, tokenEquals, bearerToken } = require('./validate.js');
+  // 4.4.0: the Remote web dashboard — three FIXED files, read once at server creation and served
+  // from memory. The path is never built from the request (no traversal possible). If the assets are
+  // missing (an unpackaged checkout) the GUI routes 404 but the JSON API still works.
+  const UI_DIR = path.join(__dirname, '..', 'remote-ui');
+  const uiAssets = {};
+  try {
+    uiAssets['/'] = { type: 'text/html; charset=utf-8', body: fs.readFileSync(path.join(UI_DIR, 'index.html')) };
+    uiAssets['/ui'] = uiAssets['/'];
+    uiAssets['/ui/style.css'] = { type: 'text/css; charset=utf-8', body: fs.readFileSync(path.join(UI_DIR, 'style.css')) };
+    uiAssets['/ui/app.js'] = { type: 'text/javascript; charset=utf-8', body: fs.readFileSync(path.join(UI_DIR, 'app.js')) };
+  } catch { /* GUI not available -> API only */ }
+  // RATE LIMIT (4.4.0): 60 requests/min per client IP, the same shared budget the MCP server uses.
+  // A trusted token-holder is never throttled in practice; this only bounds a leaked/abused token.
+  const rateLimited = require('./rate-limit.js').makeRateLimiter(60, 60000);
   const server = http.createServer((req, res) => {
-    // SECURITY: reject browser-shaped requests up front (localhost CSRF / DNS-rebinding), same
-    // defense-in-depth as the MCP server. The real remote client sends no Origin and connects by IP.
-    if (req.headers['origin']) { res.writeHead(403); return res.end('forbidden'); }
+    // SECURITY: reject browser-shaped cross-origin requests up front (localhost CSRF /
+    // DNS-rebinding), same defense-in-depth as the MCP server. 4.4.0: the dashboard is served from
+    // THIS origin, so its fetch() calls carry an Origin header — allow a SAME-ORIGIN Origin (its
+    // host:port matches the Host header); any other Origin stays 403. No Origin = the CLI/curl client.
+    const origin = req.headers['origin'];
+    if (origin) {
+      let sameOrigin = false;
+      try { sameOrigin = new URL(origin).host === String(req.headers['host'] || ''); } catch {}
+      if (!sameOrigin) { res.writeHead(403); return res.end('forbidden'); }
+    }
     // BUGFIX: hostFromHeader handles an IPv6 Host ('[::1]:8080') that split(':')[0] would break.
     const hostHdr = require('./validate.js').hostFromHeader(req.headers['host']);
     // BUGFIX: when the user binds to 0.0.0.0 ("expose directly"), the real client still sends
@@ -99,14 +122,28 @@ function createRemoteServer(opts) {
     const ip = String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
     // /health is unauthenticated liveness (no tool access) - same idea as the MCP /health.
     if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, uptime: Math.round(process.uptime()), version: o.version || 'dev' });
+    // 4.4.0: serve the dashboard's fixed assets (no secret in them; data calls still need the token).
+    if (req.method === 'GET' && uiAssets[req.url]) {
+      const a = uiAssets[req.url];
+      res.writeHead(200, { 'content-type': a.type, 'cache-control': 'no-cache' });
+      return res.end(a.body);
+    }
     if (!isIpAllowed(ip, allow)) return send(res, 403, { ok: false, error: 'IP not allowed.' });
     const auth = req.headers['authorization'] || '';
-    if (auth !== `Bearer ${token}`) return send(res, 401, { ok: false, error: 'unauthorized' });
+    // 4.4.0: constant-time compare (hash both sides, then timingSafeEqual) so a wrong token cannot
+    // be narrowed down via response timing.
+    if (!tokenEquals(bearerToken(auth), token)) return send(res, 401, { ok: false, error: 'unauthorized' });
+    if (rateLimited(ip)) return send(res, 429, { ok: false, error: 'Too many requests.' });
     const url = new URL(req.url, 'http://127.0.0.1');
     // 3.3.0: optional ?instance=<id> on every read (and `instance` in the /command body) so a remote
     // client can target a SPECIFIC server, not just the active one. Empty -> active instance.
     const inst = url.searchParams.get('instance') || '';
-    const run = async fn => { try { const r = await fn(); send(res, 200, { ok: true, data: r }); } catch (e) { send(res, 500, { ok: false, error: e?.message || String(e) }); } };
+    // 4.4.0: never leak an internal error message to the client. Report it out-of-band via o.onError
+    // (the app logs it) and return a generic string.
+    const run = async fn => { try { const r = await fn(); send(res, 200, { ok: true, data: r }); } catch (e) { try { if (typeof o.onError === 'function') o.onError(e); } catch {} send(res, 500, { ok: false, error: 'Internal error.' }); } };
+    // 4.4.0: the dashboard asks whether the command box may be shown (read-only off). Auth'd like
+    // every other data call; the server still enforces read-only on /command regardless.
+    if (req.method === 'GET' && url.pathname === '/ui/config') return send(res, 200, { ok: true, data: { readOnly } });
     if (req.method === 'GET' && url.pathname === '/instances') return run(() => h.instances && h.instances());
     if (req.method === 'GET' && url.pathname === '/status') return run(() => h.status && h.status(inst));
     if (req.method === 'GET' && url.pathname === '/console') return run(() => h.console && h.console(Math.max(1, Math.min(1000, Number(url.searchParams.get('lines')) || 200)), inst));
@@ -172,6 +209,8 @@ async function startRemote(ctx) {
     // 0.0.0.0 to skip a proxy — that is their explicit choice in Advanced settings.
     bind: String(s.remoteBind || '').trim() || '127.0.0.1',
     version: (() => { try { return require('../../package.json').version; } catch { return 'dev'; } })(),
+    // 4.4.0: log handler failures server-side instead of returning the raw message to the client.
+    onError: (e) => { try { ctx.appendLog('Remote handler error: ' + (e?.message || String(e)), 'error'); } catch {} },
     handlers: {
       instances: () => listInstances(),
       status: (inst) => call('get_status', {}, inst),

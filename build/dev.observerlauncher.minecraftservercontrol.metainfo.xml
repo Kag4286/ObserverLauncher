@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="4.4.0" date="2026-10-10">
+      <description>
+        <p>Remote access now includes a small web dashboard you can open in a browser (status, console, players), plus token hardening and a stability fix.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-4.4.0.md</url>
+    </release>
     <release version="4.3.0" date="2026-10-09">
       <description>
         <p>Security: remote-access settings (bind, allowed IPs, read-only, port) now apply immediately when you Save; add token reveal and rotation.</p>

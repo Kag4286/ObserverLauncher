@@ -5,6 +5,7 @@
 // some of them, the lower layers (platform/*, players, backups) re-validate
 // so a forgotten check at one call site can't become an injection.
 const path = require('path');
+const crypto = require('crypto');
 
 function isValidPort(port) {
   const p = Number(port);
@@ -128,8 +129,26 @@ function hostFromHeader(hostHeader) {
   return colon >= 0 ? h.slice(0, colon) : h;
 }
 
+// SECURITY (4.4.0): constant-time bearer-token comparison. A naive `a === b` leaks length and (in
+// theory) prefix via timing. Hash both sides to a fixed 32-byte digest, then timingSafeEqual — the
+// hash also hides the length difference, and timingSafeEqual never throws on equal-length buffers.
+function tokenEquals(provided, expected) {
+  const a = crypto.createHash('sha256').update(String(provided == null ? '' : provided)).digest();
+  const b = crypto.createHash('sha256').update(String(expected == null ? '' : expected)).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+// Extract the token from an Authorization header ('Bearer <token>'), or '' when absent/malformed.
+function bearerToken(header) {
+  const h = String(header || '');
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : '';
+}
+
 module.exports = {
   isValidPort,
+  tokenEquals,
+  bearerToken,
   isSafeIp,
   hostFromHeader,
   isSafePlayerName,

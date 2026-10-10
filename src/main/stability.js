@@ -39,13 +39,16 @@ function writeAll(state) {
 }
 
 // PURE: given a run record and the clock, was the LAST run stable? A run with no startedAt, or one that
-// has not yet run long enough AND has not ended, is 'unknown' (not counted). Returns 'stable' |
-// 'unstable' | 'unknown'.
+// has not yet run long enough AND has not ended, is 'unknown' (not counted). A user-requested Stop
+// (opts.manual) is 'manual': a short run the USER ended is not a crash, so it must not count as
+// unstable (a quick Start->Stop cycle used to trip the rollback warning). Returns 'stable' |
+// 'unstable' | 'manual' | 'unknown'.
 //   record: { startedAt?: number, endedAt?: number|null, lastExitCode?: number|null }
 function classifyRun(record, now, opts) {
   const o = opts || {};
   const stableMs = Number.isFinite(o.stableMs) ? o.stableMs : STABLE_MS;
   const r = record || {};
+  if (o.manual) return 'manual';
   if (!Number.isFinite(r.startedAt)) return 'unknown';
   // Still running: stable as soon as it has crossed the threshold, otherwise unknown (too early to say).
   if (!Number.isFinite(r.endedAt)) return (now - r.startedAt >= stableMs) ? 'stable' : 'unknown';
@@ -73,7 +76,9 @@ function noteStart(instanceId, info) {
   writeAll(s);
 }
 
-// Record a run END. Updates the streak: a stable run resets it, an unstable run increments it. Returns
+// Record a run END. Updates the streak: a stable run resets it, an unstable run increments it. A
+// MANUAL stop (info.manual, i.e. the user pressed Stop) is neither: it must not increment the streak
+// (it is not a crash) nor reset it (a real crash streak should survive a clean manual stop). Returns
 // the updated record so a caller can immediately evaluate decideRollback().
 function noteExit(instanceId, info) {
   const key = String(instanceId || 'default');
@@ -84,9 +89,13 @@ function noteExit(instanceId, info) {
   r.endedAt = now;
   r.lastExitCode = (o.code === undefined ? null : o.code);
   const outcome = classifyRun(r, now, o);
-  r.lastOutcome = outcome;
-  if (outcome === 'unstable') r.unstableStreak = (Number(r.unstableStreak) || 0) + 1;
-  else if (outcome === 'stable') r.unstableStreak = 0;
+  if (outcome === 'manual') {
+    // Keep the previous lastOutcome/streak untouched: a manual stop is not evidence about stability.
+  } else {
+    r.lastOutcome = outcome;
+    if (outcome === 'unstable') r.unstableStreak = (Number(r.unstableStreak) || 0) + 1;
+    else if (outcome === 'stable') r.unstableStreak = 0;
+  }
   s.instances[key] = r;
   writeAll(s);
   return r;

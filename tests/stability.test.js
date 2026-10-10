@@ -53,6 +53,31 @@ check('decide: reason mentions the streak', /2 runs/.test(st.decideRollback({ la
   check('stabilityPath lives in OBSERVER_DATA_DIR', st.stabilityPath().startsWith(tmpData));
 }
 
+// v4.4.0: a MANUAL stop must not count as an unstable run (3 quick Start->Stop cycles used to log
+// "unstable 3 runs in a row - rollback recommended" with no crash).
+{
+  check('classify: manual -> manual', st.classifyRun({ startedAt: 0, endedAt: 5000 }, 5000, { manual: true }) === 'manual');
+
+  // Two quick manual stops in a row: streak must stay 0, never trips the warning.
+  st.noteStart('inst2', { at: 1000 });
+  const m1 = st.noteExit('inst2', { at: 5000, code: 0, manual: true });
+  check('manual stop does not increment streak', (m1.unstableStreak || 0) === 0, JSON.stringify(m1));
+  st.noteStart('inst2', { at: 6000 });
+  const m2 = st.noteExit('inst2', { at: 9000, code: 0, manual: true });
+  check('second manual stop still streak 0', (m2.unstableStreak || 0) === 0, JSON.stringify(m2));
+  check('manual stop never recommends rollback', st.decideRollback(m2).rollback === false);
+
+  // A real crash streak survives a later manual stop (the streak is not reset by it).
+  st.noteStart('inst3', { at: 1000 });
+  st.noteExit('inst3', { at: 5000, code: 1, stableMs: 120000 }); // unstable #1
+  st.noteStart('inst3', { at: 6000 });
+  st.noteExit('inst3', { at: 9000, code: 1, stableMs: 120000 }); // unstable #2 -> streak 2
+  st.noteStart('inst3', { at: 10000 });
+  const afterManual = st.noteExit('inst3', { at: 11000, code: 0, manual: true });
+  check('manual stop preserves a real crash streak', afterManual.unstableStreak === 2, JSON.stringify(afterManual));
+  check('manual stop leaves lastOutcome on the real crash', afterManual.lastOutcome === 'unstable');
+}
+
 try { fs.rmSync(tmpData, { recursive: true, force: true }); } catch {}
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail ? 1 : 0);

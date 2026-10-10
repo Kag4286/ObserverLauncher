@@ -10,6 +10,47 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [4.4.0] — 2026-10-10
+
+**Remote access gets a web dashboard, plus the remaining remote LOW findings and a stability fix.**
+No settings migration.
+
+### Added — Remote web dashboard
+- **A real page at `http://127.0.0.1:<port>/`.** Opening the remote address used to show raw JSON
+  (`{"ok":false,"error":"unauthorized"}`). The remote server now serves a small, self-contained
+  dashboard (`src/remote-ui/`): status, console tail, players (online/whitelist/ban/op), an instance
+  picker, and — only when Read-only is OFF — a one-line console command box. Works from a phone over
+  Tailscale. 7 locales, DESIGN.md tokens, no framework, no bundler.
+- **`GET /ui/config`** (auth'd) reports `readOnly` so the dashboard knows whether to show the command
+  box; the server still enforces read-only on `/command`.
+
+### Security — remote hardening (the 4.3.0 audit LOW findings)
+- **Constant-time token compare.** `remote.js` and `mcp/server.js` now compare tokens with
+  `crypto.timingSafeEqual` over SHA-256 digests (shared `validate.tokenEquals`/`bearerToken`) instead
+  of `a !== b`, closing a timing side-channel.
+- **The remote server is rate-limited** (60 req/min per client IP) like the MCP server — a leaked
+  token can no longer hammer it unbounded. The bucket math is now a shared `src/main/rate-limit.js`
+  (used by both servers; avoids the duplicate block `no-dup.test.js` flags).
+- **500 responses no longer leak `e.message`.** Handler errors are logged server-side (via a new
+  `onError` hook) and the client gets a generic `Internal error.`.
+- **Origin guard relaxed for same-origin only.** The dashboard's `fetch` POSTs carry an `Origin`;
+  a same-origin Origin (host:port matches the Host header) is now allowed, every other Origin is
+  still 403. Static assets are served from a fixed, in-memory map — never a path from the request, so
+  no traversal is possible.
+
+### Fixed — stability false positive
+- **A manual Stop is no longer counted as an "unstable run".** Three quick Start->Stop cycles used to
+  log `Stability: unstable 3 runs in a row - rollback recommended` even with no crash (a user-ended
+  run was classified unstable because it lived < 120s). `classifyRun`/`noteExit` now take a `manual`
+  flag (outcome `'manual'` neither increments nor resets the streak), and `server-lifecycle.js` passes
+  it. The rollback warning is also not re-logged on a manual stop.
+
+### Tests
+- New `tests/remote-ui.test.js` (15 checks): static serving, same-origin Origin allowed, cross-origin
+  403, no-Origin allowed, traversal refused, read-only gating.
+- `tests/stability.test.js` extended with manual-stop cases (24 checks).
+- New `src/main/rate-limit.js`.
+
 ## [4.3.0] — 2026-10-09
 
 **Security release: remote-access config is now applied live, plus token rotation and reveal.**

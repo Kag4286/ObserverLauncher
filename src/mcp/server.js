@@ -20,6 +20,8 @@ const crypto = require('crypto');
 // dataDir(); the one remaining Electron use (app.getVersion) stays lazily inside a try/catch.
 const { dataDir } = require('../main/data-dir.js');
 const { TOOLS, getTool } = require('./tools.js');
+// 4.4.0: constant-time bearer-token compare (shared with the remote server).
+const { tokenEquals, bearerToken } = require('../main/validate.js');
 
 // RESOURCES (1.2.0): expose server state as read-only MCP resources so an AI client can pull
 // context without spending a tool call. Each URI maps to an existing read tool's result.
@@ -199,22 +201,15 @@ function startMcpServer(ctx) {
     try { ctx.appendLog('MCP: an AI client connected.', 'system'); } catch {}
     try { ctx.send('mcp:client', { connected: true }); } catch {}
   };
-  // RATE LIMIT (1.2.0): a simple token bucket per tool name. An AI that spins in a tight loop
+  // RATE LIMIT (1.2.0): a shared token bucket per (client, tool). An AI that spins in a tight loop
   // (e.g. polling in a bad retry) could otherwise hammer the main process. 60 calls/min per tool is
   // far above any legitimate use, but stops runaway loops.
   // Keyed by CLIENT + tool (1.2.0, revised 4.2.0): a bucket per bridge process (x-ob-client header)
   // so two MCP clients do not share one 60/min budget. A missing header (old bridge) falls back to
   // 'local', preserving the old per-tool behaviour for it.
-  const buckets = new Map();
-  const rateLimited = (client, name) => {
-    const key = client + '::' + name;
-    const now = Date.now();
-    const b = buckets.get(key) || { tokens: 60, at: now };
-    b.tokens = Math.min(60, b.tokens + ((now - b.at) / 60000) * 60);
-    b.at = now;
-    if (b.tokens < 1) { buckets.set(key, b); return true; }
-    b.tokens -= 1; buckets.set(key, b); return false;
-  };
+  // 4.4.0: the bucket math lives in the shared rate-limit.js (also used by the remote server).
+  const limitBucket = require('../main/rate-limit.js').makeRateLimiter(60, 60000);
+  const rateLimited = (client, name) => limitBucket(client + '::' + name);
   const server = http.createServer((req, res) => {
     // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
     // Origin header and connects by IP. A browser page on any site can still POST to 127.0.0.1
@@ -240,7 +235,7 @@ function startMcpServer(ctx) {
     // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
     // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.
     if (req.method === 'GET' && req.url === '/tools') {
-      if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
       announceClient();
       const tools = TOOLS.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -248,7 +243,7 @@ function startMcpServer(ctx) {
     }
     // GET /resource?uri=... returns one resource body as JSON. Auth required (loopback + token).
     if (req.method === 'GET' && req.url.startsWith('/resource')) {
-      if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
       let uri = '';
       try { uri = new URL(req.url, 'http://127.0.0.1').searchParams.get('uri') || ''; } catch {}
       resourceForUri(ctx, uri).then(result => {
@@ -260,7 +255,7 @@ function startMcpServer(ctx) {
     }
     // Only POST /rpc is served beyond that. Anything else → 404.
     if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
-    if (auth !== `Bearer ${token}`) { res.writeHead(401); return res.end('unauthorized'); }
+    if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
     announceClient();
     let body = '';
     let tooBig = false;
