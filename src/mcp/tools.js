@@ -1189,6 +1189,43 @@ async function tApplyFix(ctx, a) {
 const S = (props, required) => ({ type: 'object', properties: props || {}, required: required || [] });
 const STR = desc => ({ type: 'string', description: desc });
 
+// v5.0.0 (MCP spec surface): tool ANNOTATIONS derived from the internal risk tier, so a client can
+// auto-approve read-only calls (readOnlyHint) and warn before destructive ones (destructiveHint).
+// openWorldHint marks tools that reach the NETWORK (marketplace / downloads), not the local server.
+// Single source of truth (risk) is preserved; nothing is re-declared per tool.
+const TOOL_ANNOTATIONS = {
+  read:    { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  openWorldHint: false },
+  write:   { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  destroy: { readOnlyHint: false, destructiveHint: true,  idempotentHint: false, openWorldHint: false },
+};
+const OPEN_WORLD_TOOLS = new Set([
+  'search_marketplace', 'list_market_versions', 'search_modpacks', 'install_from_market',
+  'install_local_jar', 'import_modpack_path', 'export_modpack', 'plan_modpack',
+  'assemble_modpack', 'install_java', 'check_updates', 'update_content',
+]);
+// v5.0.0: outputSchema for the highest-value READ tools. The bridge already sends structuredContent;
+// declaring the shape lets a client validate/act on fields instead of re-parsing the text blob.
+const OUTPUT_SCHEMAS = {
+  get_status: S({ status: STR('running|starting|stopping|stopped'), running: { type: 'boolean' }, serverPath: { type: ['string', 'null'] }, jar: { type: ['string', 'null'] }, launchScript: { type: ['string', 'null'] }, software: { type: ['string', 'null'] }, javaRequired: { type: ['number', 'null'] } }),
+  list_players: S({ online: { type: 'array', items: { type: 'object' } }, whitelist: { type: 'array', items: { type: 'object' } }, banned: { type: 'array', items: { type: 'object' } }, ops: { type: 'array', items: { type: 'object' } }, known: { type: 'array', items: { type: 'object' } } }),
+  list_content: S({ plugins: { type: 'array', items: { type: 'object' } }, mods: { type: 'array', items: { type: 'object' } }, datapacks: { type: 'array', items: { type: 'object' } } }),
+  list_instances: S({ instances: { type: 'array', items: { type: 'object' } }, activeInstanceId: { type: ['string', 'null'] } }),
+  get_instance_snapshot: S({ id: STR('instance id'), status: STR(''), running: { type: 'boolean' }, logs: { type: 'array', items: { type: 'object' } }, metricsHistory: { type: 'array', items: { type: 'object' } }, active: { type: 'boolean' } }),
+  get_properties: S({ properties: { type: 'object' } }),
+  get_metrics_history: S({ samples: { type: 'array', items: { type: 'object' } }, count: { type: 'number' } }),
+  check_performance: S({ tps: { type: ['number', 'null'] }, mspt: { type: ['number', 'null'] }, players: { type: ['number', 'null'] }, warnings: { type: 'array', items: { type: 'string' } } }),
+  diagnose_server: S({ checks: { type: 'array', items: { type: 'object' } } }),
+  doctor_report: S({ checks: { type: 'array', items: { type: 'object' } } }),
+  analyze_console: S({ findings: { type: 'array', items: { type: 'object' } } }),
+  explain_crash: S({ summary: STR('plain-language crash summary'), causes: { type: 'array', items: { type: 'string' } } }),
+  list_crash_reports: S({ reports: { type: 'array', items: { type: 'object' } } }),
+  read_audit_log: S({ entries: { type: 'array', items: { type: 'object' } } }),
+  check_updates: S({ updates: { type: 'array', items: { type: 'object' } }, current: { type: 'array', items: { type: 'object' } }, unknown: { type: 'array', items: { type: 'object' } } }),
+  propose_fix: S({ plan: { type: 'array', items: { type: 'object' } } }),
+  list_market_versions: S({ versions: { type: 'array', items: { type: 'object' } } }),
+  search_marketplace: S({ results: { type: 'array', items: { type: 'object' } } }),
+};
+
 const TOOLS = [
   { name: 'get_status', risk: 'read', description: 'Server status, folder, jar, software and Java info.', inputSchema: S(), handler: tGetStatus },
   { name: 'read_console', risk: 'read', description: 'Recent console/log lines.', inputSchema: S({ lines: { type: 'number' } }), handler: tReadConsole },
@@ -1265,8 +1302,12 @@ const TOOLS = [
   { name: 'delete_backup', risk: 'destroy', description: 'Delete a backup ZIP.', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tDeleteBackup },
   { name: 'restore_backup', risk: 'destroy', description: 'Restore a backup (overwrites worlds).', inputSchema: S({ name: STR('backup file name') }, ['name']), handler: tRestoreBackup },
   { name: 'apply_fix', risk: 'destroy', description: 'Autonomous Doctor: execute the actions from a propose_fix plan (change_port, install_dependency, tune_performance, restore_backup). Always requires confirmation. Pass the plan entries you showed the user.', inputSchema: S({ actions: { type: 'array', description: 'plan[] entries from propose_fix: [{action, args}]', items: { type: 'object' } } }, ['actions']), handler: tApplyFix },
-];
+].map(t => ({
+  ...t,
+  annotations: { ...TOOL_ANNOTATIONS[t.risk], openWorldHint: OPEN_WORLD_TOOLS.has(t.name) },
+  ...(OUTPUT_SCHEMAS[t.name] ? { outputSchema: OUTPUT_SCHEMAS[t.name] } : {}),
+}));
 
 function getTool(name) { return TOOLS.find(t => t.name === name) || null; }
 
-module.exports = { TOOLS, getTool };
+module.exports = { TOOLS, getTool, TOOL_ANNOTATIONS, OUTPUT_SCHEMAS };

@@ -61,14 +61,28 @@ function safeTarget(root, relative) {
   // root (e.g. plugins -> /etc) would still pass the check while reading/writing outside it.
   // Resolve the real path and re-check. If the target does not exist yet, resolve its parent
   // (the file is about to be created there) and verify that stays inside the real root.
-  try {
-    const realBase = fs.realpathSync.native ? fs.realpathSync.native(base) : fs.realpathSync(base);
-    let probe = target;
-    try { probe = fs.realpathSync.native ? fs.realpathSync.native(target) : fs.realpathSync(target); }
-    catch { try { probe = path.dirname(target); probe = fs.realpathSync.native ? fs.realpathSync.native(probe) : fs.realpathSync(probe); } catch { return target; } }
-    if (probe === realBase || probe.startsWith(realBase + path.sep)) return target;
-    return null;
-  } catch { return target; }
+  // SECURITY (fail-CLOSED, 5.0.0): resolve the nearest EXISTING ancestor of the target and require
+  // it to stay inside the real root. Walk up from the target: the first level realpath can resolve
+  // is the deepest ancestor that exists; its real path must be inside the real root, else the target
+  // escapes via a symlink (e.g. root/link -> /etc with link/sub/new.txt still being created). If the
+  // ROOT itself cannot be resolved, refuse (null). This allows creating a new file inside a new
+  // sub-folder under the root (the walk stops at the root, which resolves inside itself).
+  let realBase;
+  try { realBase = fs.realpathSync.native ? fs.realpathSync.native(base) : fs.realpathSync(base); }
+  catch { return null; }
+  let cur = target;
+  for (let i = 0; i < 64; i++) {
+    let real;
+    try { real = fs.realpathSync.native ? fs.realpathSync.native(cur) : fs.realpathSync(cur); }
+    catch {
+      const parent = path.dirname(cur);
+      if (parent === cur) return null; // reached the filesystem root without resolving any ancestor
+      cur = parent;
+      continue;
+    }
+    return (real === realBase || real.startsWith(realBase + path.sep)) ? target : null;
+  }
+  return null;
 }
 // Startup cleanup (debt #7): writeFileAtomic leaves a `.name.tmp-<pid>-<ts>` file behind if the
 // app is killed between writeFileSync and renameSync. Those orphans never get renamed and just

@@ -23,21 +23,16 @@ const { TOOLS, getTool } = require('./tools.js');
 // 4.4.0: constant-time bearer-token compare (shared with the remote server).
 const { tokenEquals, bearerToken } = require('../main/validate.js');
 
-// RESOURCES (1.2.0): expose server state as read-only MCP resources so an AI client can pull
-// context without spending a tool call. Each URI maps to an existing read tool's result.
+// RESOURCES (1.2.0, single-source in 5.0.0): expose server state as read-only MCP resources so an
+// AI client can pull context without spending a tool call. The URI->{tool,args} map lives in
+// resources.js (static + RFC 6570 templates) so the bridge and this server cannot drift.
 async function resourceForUri(ctx, uri) {
-  const call = async (name, args) => { const t = getTool(name); return t ? await t.handler(ctx, args || {}) : { ok: false, error: 'tool missing: ' + name }; };
-  if (uri === 'observer://server/status') return call('get_status');
-  if (uri === 'observer://server/properties') return call('get_properties');
-  if (uri === 'observer://server/console') return call('read_console');
-  if (uri === 'observer://server/diagnosis') return call('diagnose_server');
-  // v2.5.0: dynamic resources an AI can SUBSCRIBE to (bridge polls + pushes
-  // notifications/resources/updated). Each maps to an existing read tool.
-  if (uri === 'observer://metrics/history') return call('get_metrics_history');
-  if (uri === 'observer://console/tail') return call('read_console', { lines: 200 });
-  if (uri === 'observer://world/players') return call('list_players');
-  if (uri === 'observer://instances') return call('list_instances');
-  return { ok: false, error: 'Unknown resource: ' + uri };
+  const { resolveResource } = require('./resources.js');
+  const hit = resolveResource(String(uri || ''));
+  if (!hit) return { ok: false, error: 'Unknown resource: ' + uri };
+  const t = getTool(hit.tool);
+  if (!t) return { ok: false, error: 'tool missing: ' + hit.tool };
+  return await t.handler(ctx, hit.args || {});
 }
 
 const MAX_BODY = 4 * 1024 * 1024; // 4 MB — generous for file writes, capped to avoid abuse
@@ -148,10 +143,18 @@ async function callTool(ctx, toolName, args, cfg) {
   const denyMsg = (riskLabel) => ((ctx.confirmMode && ctx.confirmMode !== 'gui')
     ? `Denied by headless confirm policy (${riskLabel}).`
     : `Denied by user (${riskLabel}).`);
+  // 5.0.0: server LIFECYCLE actions (start/stop/restart/force-stop, incl. per-instance variants) are
+  // the everyday operations of a launcher. When the user enables auto-allow-write they should NOT
+  // have to approve each one. start_* is already 'write' (skipped by autoAllowWrite below); the
+  // stop/restart/force-stop tools are 'destroy' tier for SAFETY, but they are lifecycle, not data
+  // loss, so autoAllowWrite covers them too. Everything else at 'destroy' (delete/restore/apply_fix)
+  // still ALWAYS confirms.
+  const LIFECYCLE_TOOLS = new Set(['start_server', 'stop_server', 'force_stop_server', 'safe_restart', 'start_instance', 'stop_instance', 'prepare_and_start']);
+  const lifecycleAutoAllowed = cfg.autoAllowWrite && LIFECYCLE_TOOLS.has(toolName);
   if (tool.risk === 'write' && !cfg.autoAllowWrite) {
     const yes = await confirmOnGui(ctx, toolName, args, 'write', instanceName);
     if (!yes) { auditLog(toolName, 'write', { ok: false, error: 'denied by user' }); return { ok: false, error: denyMsg('write tool') }; }
-  } else if (tool.risk === 'destroy') {
+  } else if (tool.risk === 'destroy' && !lifecycleAutoAllowed) {
     const yes = await confirmOnGui(ctx, toolName, args, 'destroy', instanceName);
     if (!yes) { auditLog(toolName, 'destroy', { ok: false, error: 'denied by user' }); return { ok: false, error: denyMsg('destructive tool') }; }
   }
@@ -218,7 +221,10 @@ function startMcpServer(ctx) {
     if (req.headers['origin']) { res.writeHead(403); return res.end('forbidden'); }
     // BUGFIX: use hostFromHeader so an IPv6 Host ('[::1]:8080') is not mis-split to '['.
     const host = require('../main/validate.js').hostFromHeader(req.headers['host']);
-    if (host && host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') {
+    // 5.0.0 (defense in depth): a MISSING Host header must be refused too (was: the guard was
+    // skipped entirely when host was falsy). HTTP/1.1 always sends Host; the bridge sends an
+    // IP-literal Host. Only a malformed/rebinding-shaped request omits it.
+    if (!host || (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1')) {
       res.writeHead(403); return res.end('forbidden');
     }
     // C2 (v3.0.0): UNAUTHENTICATED /health for container/orchestrator healthchecks (Docker 3.1.0).
@@ -232,21 +238,89 @@ function startMcpServer(ctx) {
       return res.end(JSON.stringify({ ok: true, uptime: Math.round(process.uptime()), version }));
     }
     const auth = req.headers['authorization'] || '';
+    // 5.0.0 (fail-closed): an empty/absent configured token rejects everything below (mirrors
+    // remote.js). startMcpServer always mints one, so this only guards direct embedding.
+    if (!token) { res.writeHead(401); return res.end('unauthorized'); }
     // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
     // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.
     if (req.method === 'GET' && req.url === '/tools') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
       announceClient();
-      const tools = TOOLS.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+      // v5.0.0: advertise annotations + outputSchema too, so the MCP client can auto-approve reads
+      // (readOnlyHint) and validate structured results. Omitted fields are simply absent.
+      const tools = TOOLS.map(t => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+        ...(t.annotations ? { annotations: t.annotations } : {}),
+        ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
+      }));
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ tools }));
     }
+    // v5.0.0: GET /prompts returns the prompt list (name/title/description/arguments) so the bridge
+    // can advertise workflow templates. GET /prompt?name=..&args=<base64 json> returns the BUILT
+    // message list for one prompt. Both auth-gated (loopback + token).
+    if (req.method === 'GET' && req.url === '/prompts') {
+      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      announceClient();
+      const { promptList } = require('./prompts.js');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ prompts: promptList() }));
+    }
+    if (req.method === 'GET' && req.url.startsWith('/prompt')) {
+      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      let name = '', args = {};
+      try {
+        const u = new URL(req.url, 'http://127.0.0.1');
+        name = u.searchParams.get('name') || '';
+        const raw = u.searchParams.get('args');
+        if (raw) { try { args = JSON.parse(Buffer.from(raw, 'base64').toString('utf8')) || {}; } catch {} }
+      } catch {}
+      const { getPrompt } = require('./prompts.js');
+      const p = getPrompt(name);
+      if (!p) { res.writeHead(404, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: false, error: 'Unknown prompt: ' + name })); }
+      let messages;
+      try { messages = p.build(args); } catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: false, error: e?.message || String(e) })); }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, description: p.description, messages }));
+    }
     // GET /resource?uri=... returns one resource body as JSON. Auth required (loopback + token).
+    // v5.0.0: GET /resource-templates returns the RFC 6570 templates so a client can build concrete
+    // instance/file URIs. Auth-gated.
+    // v5.0.0: GET /resources returns the static resource list (single source: resources.js) so the
+    // bridge does not carry a duplicate copy. Auth-gated.
+    if (req.method === 'GET' && req.url === '/resources') {
+      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      announceClient();
+      const { STATIC_RESOURCES } = require('./resources.js');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ resources: STATIC_RESOURCES }));
+    }
+    if (req.method === 'GET' && req.url === '/resource-templates') {
+      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      announceClient();
+      const { RESOURCE_TEMPLATES } = require('./resources.js');
+      const tpl = RESOURCE_TEMPLATES.map(t => ({ uriTemplate: t.uriTemplate, name: t.name, description: t.description, mimeType: t.mimeType }));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ resourceTemplates: tpl }));
+    }
     if (req.method === 'GET' && req.url.startsWith('/resource')) {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      // 5.0.0: /resource previously bypassed the rate limiter AND the per-instance ALS scope
+      // (it called the handler directly). Both now apply, so an instance template reads the RIGHT
+      // instance and a leaked token cannot spam the expensive diagnosis resource.
+      const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';
+      if (rateLimited(client, 'resource')) {
+        res.writeHead(429, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (60/min) - slow down and retry.' }));
+      }
       let uri = '';
       try { uri = new URL(req.url, 'http://127.0.0.1').searchParams.get('uri') || ''; } catch {}
-      resourceForUri(ctx, uri).then(result => {
+      const { resolveResource } = require('./resources.js');
+      const hit = resolveResource(uri);
+      const runId = (hit && hit.args && hit.args.instance) || ctx.activeInstanceId;
+      Promise.resolve().then(() => (typeof ctx.runInInstance === 'function' ? ctx.runInInstance(runId, () => resourceForUri(ctx, uri)) : resourceForUri(ctx, uri))).then(result => {
         const ok = result && result.ok !== false;
         res.writeHead(ok ? 200 : 404, { 'content-type': 'application/json' });
         res.end(JSON.stringify(ok ? { ok: true, data: result.result ?? result } : { ok: false, error: (result && result.error) || 'not available' }));

@@ -25,6 +25,22 @@ const fakeApp = http.createServer((req, res) => {
       { name: 'read_file', description: 'read', inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
     ] }));
   }
+  if (req.method === 'GET' && req.url === '/resources') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ resources: [{ uri: 'observer://server/status', name: 'Server status', mimeType: 'application/json' }] }));
+  }
+  if (req.method === 'GET' && req.url === '/resource-templates') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ resourceTemplates: [{ uriTemplate: 'observer://instance/{id}/status', name: 'Instance status', mimeType: 'application/json' }] }));
+  }
+  if (req.method === 'GET' && req.url === '/prompts') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ prompts: [{ name: 'diagnose_server', title: 'Diagnose', description: 'd', arguments: [] }] }));
+  }
+  if (req.method === 'GET' && req.url.startsWith('/prompt')) {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, description: 'd', messages: [{ role: 'user', content: { type: 'text', text: 'built' } }] }));
+  }
   if (req.method === 'POST' && req.url === '/rpc') {
     let body = ''; req.on('data', c => body += c);
     req.on('end', () => {
@@ -91,6 +107,18 @@ function makeClient(child) {
   const callErr = await rpc('tools/call', { name: 'boom', arguments: {} });
   check('tools/call error -> isError true', callErr.result && callErr.result.isError === true);
   check('tools/call error -> text mentions error', /tool blew up/.test((callErr.result.content[0] || {}).text || ''));
+
+  check('initialize advertises prompts capability', !!init.result.capabilities.prompts);
+  check('initialize does NOT advertise subscriptions.listen', !init.result.capabilities.subscriptions);
+
+  const res = await rpc('resources/list', {});
+  check('resources/list from app', Array.isArray(res.result.resources) && res.result.resources.length === 1);
+  const tpl = await rpc('resources/templates/list', {});
+  check('resources/templates/list from app', Array.isArray(tpl.result.resourceTemplates) && tpl.result.resourceTemplates[0].uriTemplate === 'observer://instance/{id}/status');
+  const pl = await rpc('prompts/list', {});
+  check('prompts/list from app', Array.isArray(pl.result.prompts) && pl.result.prompts[0].name === 'diagnose_server');
+  const pg = await rpc('prompts/get', { name: 'diagnose_server', arguments: {} });
+  check('prompts/get -> messages', Array.isArray(pg.result.messages) && pg.result.messages[0].content.text === 'built');
 
   const bad = await rpc('nonexistent/method', {});
   check('unknown method -> error code', bad.error && bad.error.code === -32601);

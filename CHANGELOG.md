@@ -10,6 +10,63 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.0.0] — 2026-10-10
+
+**Major MCP upgrade — the AI integration becomes a first-class surface: annotations, workflow
+prompts, output schemas and dynamic resource templates.** No settings migration. The tool count is
+unchanged at 75; this release deepens the protocol surface instead of adding tools.
+
+### Added — Tool annotations (Gói A)
+- **Every tool now carries MCP `annotations`** derived from its internal risk tier: read tools are
+  `readOnlyHint: true`, destroy tools `destructiveHint: true`, and network-reaching tools (marketplace,
+  installs) `openWorldHint: true`. An MCP client can now auto-approve safe reads and warn before
+  destructive actions — the biggest friction reduction for AI use. `GET /tools` advertises them.
+- **`outputSchema` for the highest-value read tools** (status, players, content, instances, snapshot,
+  properties, metrics, performance, diagnose, doctor_report, analyze_console, explain_crash,
+  crash reports, audit log, updates, propose_fix, market versions/search). The bridge already sent
+  `structuredContent`; now the shape is declared so a client can validate/act on fields.
+- **Protocol negotiation fixed**: the bridge echoes the client's protocol version only when supported,
+  otherwise answers with the newest it implements. Removed the `subscriptions: { listen: true }`
+  capability that was advertised but never handled (a spec-conformance bug).
+
+### Added — Workflow prompts (Gói B)
+- **`prompts/list` + `prompts/get`** expose six ready-made workflows, so a user picks a menu entry
+  instead of phrasing the request: `diagnose_server`, `optimize_for_ram`, `explain_last_crash`,
+  `set_up_paper_for_players`, `audit_mods`, `safe_modpack_install`. Defined in the new pure
+  `src/mcp/prompts.js` (one source; the bridge fetches over HTTP like tools/resources).
+
+### Added — Dynamic resources (Gói C)
+- **Resource templates** (`resources/templates/list`): `observer://instance/{id}/status|console|metrics`
+  (inspect ONE instance without switching) and `observer://file/{path}` (path-safe file read).
+- **Single-source resources**: the static list + templates + URI resolver now live in one module
+  `src/mcp/resources.js`; the bridge fetches the list over HTTP instead of carrying a duplicate copy
+  (fixes the old bridge.js/server.js drift — the no-dup guard had flagged it).
+
+### Security (MCP audit)
+- **`safeTarget` is now fail-CLOSED.** Its outer catch (and the inner fallback) returned the
+  string-only target when a `realpathSync` probe threw, silently skipping the symlink re-check. It now
+  walks up to the nearest EXISTING ancestor, requires that ancestor's real path to stay inside the
+  real root, and returns null when the root itself cannot be resolved. A new file inside a new
+  sub-folder under the root still works (the walk stops at the root).
+- **`/resource` now goes through the rate limiter AND the per-instance ALS scope.** It used to call
+  the tool handler directly, so it bypassed the 60/min bucket (a leaked token could spam the expensive
+  diagnosis resource) and read the ACTIVE instance's context even for an `observer://instance/{id}/...`
+  template.
+- **A missing `Host` header is refused** (was: the loopback guard was skipped when Host was empty).
+- **An empty configured token fails closed** in the MCP server, mirroring `remote.js`.
+
+### Changed
+- **Lifecycle tools skip confirmation when Auto-allow-write is on.** `start_server`, `stop_server`,
+  `force_stop_server`, `safe_restart`, `start_instance`, `stop_instance` and `prepare_and_start` are
+  everyday launcher operations, not data loss, so they no longer prompt when the user enabled
+  auto-allow-write. Data-destroying tools (`delete_backup`, `restore_backup`, `apply_fix`, ...) STILL
+  always confirm.
+- `INSTRUCTIONS` sent at initialize now describes prompts + resource templates, so the model knows to
+  use them instead of re-polling with tools.
+- New `tests/mcp-security-5.test.js` (12 checks) pins the four security fixes + the lifecycle policy.
+- New tests: `tests/mcp-surface.test.js` (36 checks: annotations, outputSchema, prompts, templates,
+  resolver) + extended `tests/mcp-bridge-stdio.test.js` (18 checks). `npm test` 96 files + E2E 12 green.
+
 ## [4.5.0] — 2026-10-10
 
 **Per-instance appearance (accent colour + generated avatar) and a New Server wizard version/Java

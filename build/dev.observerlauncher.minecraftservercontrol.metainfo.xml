@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.0.0" date="2026-10-10">
+      <description>
+        <p>A major MCP upgrade: the AI integration now exposes tool annotations, workflow prompts, output schemas and dynamic resource templates, so an AI client can auto-approve safe reads and follow ready-made workflows.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.0.0.md</url>
+    </release>
     <release version="4.5.0" date="2026-10-10">
       <description>
         <p>Give each server its own colour and generated avatar, and fix the New Server wizard's version and Java handling for Forge, NeoForge, Paper, Purpur, Leaf and Velocity.</p>

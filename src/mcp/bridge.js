@@ -44,7 +44,8 @@ const INSTRUCTIONS = [
   'MULTI-INSTANCE: call list_instances FIRST to see every instance (id, name, serverPath, status). Most tools act on the ACTIVE instance; pass an optional "instance" id to target a specific one. get_instance_snapshot reads any instance\'s state (status/console/metrics/java/files) WITHOUT switching - prefer it over select_instance when you only need to inspect a background server.',
   'SETTINGS/SCHEDULE tools (get_settings, set_setting, get_schedule, set_schedule) also honour the "instance" arg: they read/write that instance\'s per-instance keys.',
   'READ tools are free: use them to inspect status, console, players, files, world and performance before acting.',
-  'RESOURCES: prefer resources/list + resources/read for polling-free context (observer://server/status, /properties, /console, /diagnosis, observer://metrics/history, /console/tail, /world/players, /instances). SUBSCRIBE with resources/subscribe to get notifications/resources/updated when a resource changes, instead of polling with tools.',
+  'RESOURCES: prefer resources/list + resources/read for polling-free context (observer://server/status, /properties, /console, /diagnosis, observer://metrics/history, /console/tail, /world/players, /instances). RESOURCE TEMPLATES (resources/templates/list): build observer://instance/{id}/status|console|metrics for ONE instance, and observer://file/{path} to read a server file. SUBSCRIBE with resources/subscribe to get notifications/resources/updated when a resource changes, instead of polling with tools.',
+  'PROMPTS: prompts/list exposes ready-made workflows (diagnose_server, optimize_for_ram, explain_last_crash, set_up_paper_for_players, audit_mods, safe_modpack_install). When the user picks one, prompts/get returns the exact message list to follow.',
   'WRITE tools change the server and require GUI approval unless the user enabled auto-allow-write; DESTROY tools always ask.',
   'WORKFLOW when something is wrong: call doctor_report (one-shot) or diagnose_server + analyze_console + explain_crash; each check returns a level (ok/warn/error) and a concrete fix.',
   'SAFE CHANGE: prefer prepare_and_start / safe_restart so a backup is taken and the health checks pass first.',
@@ -89,18 +90,8 @@ function fetchResource(uri) {
     req.end();
   });
 }
-// Fixed resource list (the app owns the real bodies). Advertised so the AI can pull server state
-// as context instead of spending a tool call.
-const STATIC_RESOURCES = [
-  { uri: 'observer://server/status', name: 'Server status', description: 'Folder, jar, software, Java, running state.', mimeType: 'application/json' },
-  { uri: 'observer://server/properties', name: 'server.properties', description: 'Parsed server.properties.', mimeType: 'application/json' },
-  { uri: 'observer://server/console', name: 'Console buffer', description: 'Recent console lines.', mimeType: 'application/json' },
-  { uri: 'observer://server/diagnosis', name: 'Health diagnosis', description: 'The doctor health check result.', mimeType: 'application/json' },
-  { uri: 'observer://metrics/history', name: 'Metrics history', description: 'Sampled metrics time series (tps/mspt/cpu/ram/players).', mimeType: 'application/json' },
-  { uri: 'observer://console/tail', name: 'Console tail', description: 'Last 200 console lines.', mimeType: 'application/json' },
-  { uri: 'observer://world/players', name: 'Players', description: 'Online, whitelisted, banned, op and known players.', mimeType: 'application/json' },
-  { uri: 'observer://instances', name: 'Instances', description: 'Every server instance (id, name, path, status, active).', mimeType: 'application/json' },
-];
+// Resource list is owned by the app (src/mcp/resources.js) and fetched over HTTP, so the bridge
+// does not carry a duplicate copy that could drift (the no-dup guard rejects the duplication).
 
 // v2.5.0 SUBSCRIBE: MCP clients can subscribe to a resource; the bridge polls the app every
 // RESOURCE_POLL_MS and pushes notifications/resources/updated when the body changes. This is the
@@ -144,6 +135,22 @@ function fetchToolsFromApp() {
     req.end();
   });
 }
+// v5.0.0: fetch the prompt list / a built prompt / the resource templates from the app. The bridge
+// is extracted standalone (no require of app modules), so it always talks to the app over HTTP.
+function fetchJsonPath(pathQ, timeoutMs) {
+  return new Promise(resolve => {
+    const cfg = readConfig();
+    if (!cfg || !cfg.port || !cfg.token) return resolve(null);
+    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: pathQ, method: 'GET', headers: { authorization: 'Bearer ' + cfg.token } }, res => {
+      let data = ''; res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+    });
+    req.setTimeout(timeoutMs || 4000, () => { try { req.destroy(); } catch {} resolve(null); });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 let cachedTools = null;
 let cachedAt = 0;
 async function fetchTools() {
@@ -247,9 +254,22 @@ function replyError(id, code, message) { write({ jsonrpc: '2.0', id, error: { co
 async function handle(msg) {
   const { id, method, params } = msg;
   if (method === 'initialize') {
+    // Protocol negotiation: echo the client's version ONLY if we support it; otherwise answer with
+    // the newest version we actually implement. (Was: echoed ANY string verbatim, even one we do not
+    // speak.) Supported set is the revisions whose features this bridge implements.
+    const SUPPORTED = ['2025-06-18', '2025-03-26', '2024-11-05'];
+    const want = params && params.protocolVersion;
+    const protocolVersion = SUPPORTED.includes(want) ? want : SUPPORTED[0];
     return reply(id, {
-      protocolVersion: (params && params.protocolVersion) || '2025-06-18',
-      capabilities: { tools: { listChanged: false }, resources: { listChanged: false, subscribe: true }, subscriptions: { listen: true } },
+      protocolVersion,
+      // capabilities: only advertise what we implement. `subscriptions/listen` was removed (it was
+      // advertised but never handled). resources.subscribe is real (bridge polls + notifies).
+      // v5.0.0: prompts are now exposed (workflow templates for host management).
+      capabilities: {
+        tools: { listChanged: false },
+        resources: { listChanged: false, subscribe: true },
+        prompts: { listChanged: false },
+      },
       serverInfo: { name: 'observerlauncher', version: (readConfig() || {}).appVersion || 'dev' },
       instructions: INSTRUCTIONS,
     });
@@ -261,11 +281,29 @@ async function handle(msg) {
     return reply(id, { tools });
   }
   if (method === 'resources/list') {
-    return reply(id, { resources: STATIC_RESOURCES });
+    const r = await fetchJsonPath('/resources');
+    return reply(id, { resources: (r && r.resources) || [] });
+  }
+  if (method === 'resources/templates/list') {
+    const r = await fetchJsonPath('/resource-templates');
+    return reply(id, { resourceTemplates: (r && r.resourceTemplates) || [] });
+  }
+  if (method === 'prompts/list') {
+    const r = await fetchJsonPath('/prompts');
+    return reply(id, { prompts: (r && r.prompts) || [] });
+  }
+  if (method === 'prompts/get') {
+    const name = params && params.name;
+    if (!name) return replyError(id, -32602, 'prompt name is required');
+    const args = (params && params.arguments) || {};
+    const b64 = Buffer.from(JSON.stringify(args)).toString('base64');
+    const r = await fetchJsonPath('/prompt?name=' + encodeURIComponent(name) + '&args=' + encodeURIComponent(b64));
+    if (!r || !r.ok) return replyError(id, -32602, (r && r.error) || 'Prompt not available (is ObserverLauncher running?).');
+    return reply(id, { description: r.description, messages: r.messages });
   }
   if (method === 'resources/subscribe') {
     const uri = params && params.uri;
-    if (!uri || !STATIC_RESOURCES.some(r => r.uri === uri)) return replyError(id, -32602, 'Unknown resource: ' + uri);
+    if (!uri) return replyError(id, -32602, 'Unknown resource: ' + uri);
     subscriptions.set(uri, { hash: null });
     startSubPolling();
     pollSubscriptions().catch(() => {}); // seed the hash so the first change fires

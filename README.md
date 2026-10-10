@@ -17,10 +17,10 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-4.5.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-4.5.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-5.0.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-5.0.0.AppImage` |
 
-Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-4.5.0.AppImage` and run it. No root needed.
+Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.0.0.AppImage` and run it. No root needed.
 
 From source (Node.js 18 or newer):
 
@@ -47,6 +47,9 @@ To let friends join, open **How friends can join**. On the same network, share t
 <tr>
 <td align="center" width="50%"><b>Overview</b><br><img src="docs/screenshot-overview.png" width="420" alt="Overview"></td>
 <td align="center" width="50%"><b>World map</b><br><img src="docs/screenshot-worldmap.png" width="420" alt="World map"></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><b>MCP / AI integration</b><br><img src="docs/screenshot-MCP.png" width="860" alt="MCP / AI integration"></td>
 </tr>
 </table>
 
@@ -171,7 +174,9 @@ Flags: `--json` for scripts, `--instance <id>` to target an instance, `--help`, 
 
 ### MCP and AI integration
 
-The app can act as an MCP server, letting a client read and control the server over 75 tools. Enable it in Settings under MCP / AI. It binds to 127.0.0.1 with a fresh token each launch. Read tools run freely, write tools ask for confirmation, and destructive tools always ask and cannot be auto-approved. Every write and destroy call is written to an audit log.
+The app can act as an MCP server, letting a client read and control the server over 75 tools. Enable it in Settings under MCP / AI. It binds to 127.0.0.1 with a fresh token each launch. Read tools run freely, write tools ask for confirmation, and destructive tools always ask — with one exception: when you enable **Auto-allow write tools**, the everyday lifecycle actions (start, stop, restart, force-stop) no longer prompt, while data-destroying tools (delete/restore/fix) still always confirm. Every write and destroy call is written to an audit log.
+
+The MCP surface goes beyond tools: each tool advertises **annotations** (`readOnlyHint` / `destructiveHint` / `openWorldHint`) so a client can auto-approve safe reads, the high-value read tools declare an **output schema**, **workflow prompts** (`prompts/list`) offer ready-made tasks like "Diagnose my server" and "Install a modpack safely", and **resource templates** let a client read one instance's console or any server file by URI.
 
 ### Remote access
 
