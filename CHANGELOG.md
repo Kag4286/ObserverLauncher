@@ -10,6 +10,33 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.1.0] — 2026-10-10
+
+**MCP reliability + a new creation path, plus an early MCP Apps preview.** Tool count 75 -> 76. No
+settings migration.
+
+### Added — create a server over MCP
+- **`create_instance` (write).** An AI client can now create a NEW server instance: it opens the SAME
+  native folder picker the GUI uses (the AI cannot pass an arbitrary path — serverPath stays GUI-only
+  everywhere else too), then downloads the chosen software's jar. The wizard's download logic was
+  extracted to `createServerFiles` in `wizard.js` so the tool and `wizard:create` share ONE code path
+  (no-dup guard). The new instance becomes active.
+
+### Fixed — MCP reliability
+- **A wedged app can no longer hang an MCP client forever.** `bridge.js` `callApp` (POST `/rpc`) had NO
+  timeout. It now enforces a hard per-tool ceiling in three buckets: **read 30s / write 120s /
+  build-and-spawn 600s** (`timeoutForTool`). On timeout the socket is destroyed and the client gets a
+  clean `{ ok:false, error:'Timed out...' }` instead of hanging.
+
+### Added — MCP Apps spike (SEP-1865)
+- A minimal `ui://observerlauncher/dashboard` resource (`text/html;profile=mcp-app`) is now advertised,
+  so a host that supports MCP Apps can render an in-client page. This is a SPIKE to confirm host
+  rendering; full two-way postMessage wiring is deferred to a later release.
+
+### Tests
+- `tests/mcp-surface.test.js` extended to 50 checks (timeout buckets, `create_instance`, the `ui://`
+  resource). `npm test` 97 files + E2E 12 green.
+
 ## [5.0.0] — 2026-10-10
 
 **Major MCP upgrade — the AI integration becomes a first-class surface: annotations, workflow

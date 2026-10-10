@@ -52,6 +52,23 @@ const INSTRUCTIONS = [
   'You cannot set the server folder over MCP - that is GUI-only. Add/remove instances in the GUI.',
 ].join('\n');
 
+// 5.1.0: per-tool timeout so a WEDGED app can never hang an MCP client forever (callApp had NO
+// timeout). Three buckets by how long the work legitimately takes:
+//   READ  30s  - cheap state reads (status, console, lists, diagnosis)
+//   WRITE 120s - file/config writes, backups, player edits, single installs
+//   BUILD 600s - things that spawn a JVM / compile / download a modpack or runtime (can run minutes)
+const BUILD_TOOLS = new Set([
+  'assemble_modpack', 'install_from_market', 'install_local_jar', 'import_modpack_path',
+  'install_java', 'update_content', 'apply_fix', 'start_server', 'start_instance',
+  'prepare_and_start', 'safe_restart', 'force_stop_server', 'create_instance',
+]);
+function timeoutForTool(tool) {
+  const n = String(tool || '');
+  if (BUILD_TOOLS.has(n)) return 600000;
+  if (/^(get_|list_|read_|search_|check_|diagnose_|analyze_|explain_)/.test(n) || n === 'doctor_report' || n === 'propose_fix' || n === 'list_instances' || n === 'get_instance_snapshot' || n === 'list_market_versions' || n === 'plan_modpack') return 30000;
+  return 120000;
+}
+
 // Forward one tool call to the app. Resolves a tool result object {ok,result|error}.
 function callApp(tool, args) {
   return new Promise(resolve => {
@@ -60,6 +77,8 @@ function callApp(tool, args) {
       return resolve({ ok: false, error: 'ObserverLauncher is not running, or the MCP integration is turned off in its Settings.' });
     }
     const body = JSON.stringify({ tool, args: args || {} });
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
     const req = http.request({
       host: '127.0.0.1', port: cfg.port, path: '/rpc', method: 'POST',
       headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + cfg.token, 'x-ob-client': CLIENT_ID, 'content-length': Buffer.byteLength(body) },
@@ -67,11 +86,14 @@ function callApp(tool, args) {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
-        try { resolve(JSON.parse(data || '{}')); }
-        catch { resolve({ ok: false, error: 'Bad response from the app.' }); }
+        try { done(JSON.parse(data || '{}')); }
+        catch { done({ ok: false, error: 'Bad response from the app.' }); }
       });
     });
-    req.on('error', e => resolve({ ok: false, error: 'Could not reach ObserverLauncher: ' + (e?.message || e) }));
+    // 5.1.0: a hard ceiling per tool. On timeout, destroy the socket and return a clean error instead
+    // of hanging the client. (The tool may still be running in the app; the caller can retry/inspect.)
+    req.setTimeout(timeoutForTool(tool), () => { try { req.destroy(); } catch {} done({ ok: false, error: 'Timed out waiting for ObserverLauncher (the operation may still be running in the app - check the Console tab).' }); });
+    req.on('error', e => done({ ok: false, error: 'Could not reach ObserverLauncher: ' + (e?.message || e) }));
     req.write(body); req.end();
   });
 }
@@ -230,6 +252,7 @@ const STATIC_TOOLS = [
   ['op_player', 'Grant/revoke operator.'],
   ['whitelist_player', 'Add/remove from whitelist.'],
   ['ban_player', 'Ban/unban a player.'],
+  ['create_instance', 'Create a new server instance (opens a folder picker) and download its server jar.'],
   ['list_instances', 'List all server instances (id, name, serverPath, status, active).'],
   ['get_instance_snapshot', 'Read one instance\'s full state without making it active.'],
   ['select_instance', 'Make an instance the active one.'],
@@ -349,4 +372,4 @@ process.stdin.on('data', chunk => {
 });
 process.stdin.on('end', () => process.exit(0));
 
-module.exports = { callApp, bridgeConfigPath, STATIC_TOOLS };
+module.exports = { callApp, bridgeConfigPath, STATIC_TOOLS, timeoutForTool };

@@ -24,6 +24,86 @@ const RESOLVERS = {
   leaf: (v) => require('./adapters/leaf.js').resolve(v),
 };
 
+// 5.1.0: the wizard's server-download logic, extracted to MODULE scope so the create_instance MCP
+// tool reuses it byte-for-byte (no-dup guard). The caller MUST run inside runInInstance for the
+// TARGET instance and have set ctx.currentServerPath to the chosen folder.
+async function createServerFiles(ctx, { software, version }) {
+  try {
+    if (ctx.serverProcess) return { ok: false, error: 'Stop the current server before using the wizard.' };
+    if (ctx.buildProcess) return { ok: false, error: 'A build is already running for this folder — check the Console tab for progress.' };
+    // DEFENSE (2.2.0): always resolve the folder from THIS instance's own settings, not just
+    // ctx.currentServerPath. That accessor is per-instance, but if any earlier handler left it
+    // stale we would otherwise check/download into the WRONG instance's folder (the reported
+    // 'wizard sees another server's purpur.jar'). loadSettings() is the ACTIVE instance's flat
+    // view, and this handler already runs inside runInInstance(ctx.inst()).
+    let targetPath = ctx.currentServerPath;
+    try { const s = require('./settings.js').loadSettingsFor(ctx.inst()); if (s && s.serverPath) targetPath = s.serverPath; } catch {}
+    if (!targetPath) return { ok: false, error: 'Choose and apply an empty server folder first.' };
+    ctx.currentServerPath = targetPath;
+    fs.mkdirSync(targetPath, { recursive: true });
+    const contents = fs.readdirSync(ctx.currentServerPath);
+    // BUGFIX (2.2.0): a Forge/NeoForge INSTALLER jar (neoforge-<ver>-installer.jar) left behind by
+    // a previous failed/retried install is NOT a server jar. The old check matched any '.jar', so
+    // retrying in a folder that only holds the leftover installer wrongly failed with 'already
+    // contains a server jar'. Ignore installer jars here.
+    const serverJar = contents.find(x => /\.jar$/i.test(x) && !/-installer\.jar$/i.test(x));
+    if (serverJar) return { ok: false, error: `This folder already contains a server jar (${serverJar}). Choose an empty folder to avoid overwriting it.` };
+    const targetVersion = version?.trim();
+    const onProgress = (received, total) => ctx.send('wizard:progress', { received, total });
+    // Cancellation: a single AbortController per wizard run; wizard:cancel aborts it.
+    ctx.wizardAbort = new AbortController();
+    const signal = ctx.wizardAbort.signal;
+
+    if (software === 'forge' || software === 'neoforge') {
+      const r = await require('./adapters/forge.js').install({ software, version: targetVersion, javaInfo: ctx.javaInfo, serverPath: ctx.currentServerPath, onProgress });
+      return { ok: true, files: serverFiles(ctx.currentServerPath), name: r.name, version: r.version };
+    }
+
+    if (software === 'spigot') {
+      if (!ctx.javaInfo?.ok) throw new Error('Java is required to run BuildTools. Set a valid Java path first.');
+      const gitOk = await new Promise(res => require('child_process').execFile('git', ['--version'], { windowsHide: true }, (e) => res(!e)));
+      if (!gitOk) throw new Error('Git is not installed or not on PATH — BuildTools needs Git to compile Spigot. Install Git from https://git-scm.com and try again.');
+      // BuildTools COMPILES Spigot, so it needs a full JDK (javac), not just the JRE that runs
+      // a server. Catch this here instead of failing minutes into the build.
+      const javacOk = await new Promise(res => require('child_process').execFile(ctx.javaInfo.path.replace(/java(\.exe)?$/i, 'javac$1'), ['-version'], { windowsHide: true }, (e) => res(!e)));
+      if (!javacOk) throw new Error('Spigot\'s BuildTools needs a full JDK (javac), but only a JRE was found. Install a JDK (e.g. Temurin or OpenJDK) and point Settings > Java at its bin folder, then try again.');
+      const resolvedVersion = targetVersion || 'latest';
+      await require('./adapters/spigot.js').fetchBuildTools(ctx.currentServerPath, onProgress);
+      ctx.appendLog(`BuildTools started for Spigot ${resolvedVersion} — this compiles from source and can take several minutes. Requires Git to be installed.`, 'system');
+      ctx.buildProcess = spawn(ctx.javaInfo.path, require('./adapters/spigot.js').spawnArgs(resolvedVersion), { cwd: ctx.currentServerPath, windowsHide: true });
+      ctx.buildProcess.stdout.on('data', d => d.toString().split(/\r?\n/).filter(Boolean).forEach(x => ctx.appendLog(x, 'system')));
+      ctx.buildProcess.stderr.on('data', d => d.toString().split(/\r?\n/).filter(Boolean).forEach(x => ctx.appendLog(x, 'system')));
+      ctx.buildProcess.on('exit', code => {
+        ctx.buildProcess = null;
+        if (code === 0) ctx.appendLog('BuildTools finished — the Spigot server jar is ready in this folder.', 'system');
+        else ctx.appendLog(`BuildTools exited with code ${code} — the Spigot build failed. Scroll up in this log for the real error (missing Git is the most common cause).`, 'error');
+        ctx.send('wizard:build-done', { ok: code === 0, files: serverFiles(ctx.currentServerPath) });
+      });
+      ctx.buildProcess.on('error', error => {
+        ctx.buildProcess = null;
+        ctx.appendLog(`BuildTools could not be started: ${error.message}`, 'error');
+        ctx.send('wizard:build-done', { ok: false, files: serverFiles(ctx.currentServerPath) });
+      });
+      return { ok: true, building: true, name: 'BuildTools (Spigot)', version: resolvedVersion };
+    }
+
+    const resolver = RESOLVERS[software] || RESOLVERS.purpur;
+    const { url, name, version: resolvedVersion, sha256 } = await resolver(targetVersion);
+    const dest = path.join(ctx.currentServerPath, name);
+    // Server software jars (vanilla/paper/purpur/leaf/fabric) are tens of MB; 1 GB is a generous
+    // ceiling that still stops a hostile/redirected URL from filling the disk.
+    await download(url, dest, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
+    if (sha256) {
+      try {
+        const got = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
+        if (got !== String(sha256).toLowerCase()) { fs.rmSync(dest, { force: true }); throw new Error(`Downloaded ${name} failed its SHA-256 checksum and was deleted — check your connection and retry.`); }
+      } catch (e) { if (String(e?.message || '').includes('checksum')) throw e; }
+    }
+    return { ok: true, files: serverFiles(ctx.currentServerPath), name, version: resolvedVersion };
+  } catch (error) { ctx.buildProcess = null; return marketplaceError(error); }
+  finally { ctx.wizardAbort = null; }
+}
+
 function registerWizard(ipcMain, ctx) {
   ipcMain.handle('wizard:versions', async (_, software) => {
     try {
@@ -130,89 +210,13 @@ function registerWizard(ipcMain, ctx) {
   });
 
   ipcMain.handle('wizard:create', async (_, args) => {
-    const { software, version } = args || {};
     // 2.2.0 CRITICAL: the renderer passes the TARGET instance id explicitly. The IPC proxy pins
     // ALS to whatever activeInstanceId was at dispatch time, which after a fresh Add-instance can
     // still be the PREVIOUS instance - so the folder check/download would otherwise run against the
     // wrong server (the reported 'wizard sees another server's purpur.jar' bug). Run explicitly in
     // the caller's instance.
     const runId = (args && args.instance) ? String(args.instance) : ctx.inst();
-    return await ctx.runInInstance(runId, async () => {
-    try {
-      if (ctx.serverProcess) return { ok: false, error: 'Stop the current server before using the wizard.' };
-      if (ctx.buildProcess) return { ok: false, error: 'A build is already running for this folder — check the Console tab for progress.' };
-      // DEFENSE (2.2.0): always resolve the folder from THIS instance's own settings, not just
-      // ctx.currentServerPath. That accessor is per-instance, but if any earlier handler left it
-      // stale we would otherwise check/download into the WRONG instance's folder (the reported
-      // 'wizard sees another server's purpur.jar'). loadSettings() is the ACTIVE instance's flat
-      // view, and this handler already runs inside runInInstance(ctx.inst()).
-      let targetPath = ctx.currentServerPath;
-      try { const s = require('./settings.js').loadSettingsFor(ctx.inst()); if (s && s.serverPath) targetPath = s.serverPath; } catch {}
-      if (!targetPath) return { ok: false, error: 'Choose and apply an empty server folder first.' };
-      ctx.currentServerPath = targetPath;
-      fs.mkdirSync(targetPath, { recursive: true });
-      const contents = fs.readdirSync(ctx.currentServerPath);
-      // BUGFIX (2.2.0): a Forge/NeoForge INSTALLER jar (neoforge-<ver>-installer.jar) left behind by
-      // a previous failed/retried install is NOT a server jar. The old check matched any '.jar', so
-      // retrying in a folder that only holds the leftover installer wrongly failed with 'already
-      // contains a server jar'. Ignore installer jars here.
-      const serverJar = contents.find(x => /\.jar$/i.test(x) && !/-installer\.jar$/i.test(x));
-      if (serverJar) return { ok: false, error: `This folder already contains a server jar (${serverJar}). Choose an empty folder to avoid overwriting it.` };
-      const targetVersion = version?.trim();
-      const onProgress = (received, total) => ctx.send('wizard:progress', { received, total });
-      // Cancellation: a single AbortController per wizard run; wizard:cancel aborts it.
-      ctx.wizardAbort = new AbortController();
-      const signal = ctx.wizardAbort.signal;
-
-      if (software === 'forge' || software === 'neoforge') {
-        const r = await require('./adapters/forge.js').install({ software, version: targetVersion, javaInfo: ctx.javaInfo, serverPath: ctx.currentServerPath, onProgress });
-        return { ok: true, files: serverFiles(ctx.currentServerPath), name: r.name, version: r.version };
-      }
-
-      if (software === 'spigot') {
-        if (!ctx.javaInfo?.ok) throw new Error('Java is required to run BuildTools. Set a valid Java path first.');
-        const gitOk = await new Promise(res => require('child_process').execFile('git', ['--version'], { windowsHide: true }, (e) => res(!e)));
-        if (!gitOk) throw new Error('Git is not installed or not on PATH — BuildTools needs Git to compile Spigot. Install Git from https://git-scm.com and try again.');
-        // BuildTools COMPILES Spigot, so it needs a full JDK (javac), not just the JRE that runs
-        // a server. Catch this here instead of failing minutes into the build.
-        const javacOk = await new Promise(res => require('child_process').execFile(ctx.javaInfo.path.replace(/java(\.exe)?$/i, 'javac$1'), ['-version'], { windowsHide: true }, (e) => res(!e)));
-        if (!javacOk) throw new Error('Spigot\'s BuildTools needs a full JDK (javac), but only a JRE was found. Install a JDK (e.g. Temurin or OpenJDK) and point Settings > Java at its bin folder, then try again.');
-        const resolvedVersion = targetVersion || 'latest';
-        await require('./adapters/spigot.js').fetchBuildTools(ctx.currentServerPath, onProgress);
-        ctx.appendLog(`BuildTools started for Spigot ${resolvedVersion} — this compiles from source and can take several minutes. Requires Git to be installed.`, 'system');
-        ctx.buildProcess = spawn(ctx.javaInfo.path, require('./adapters/spigot.js').spawnArgs(resolvedVersion), { cwd: ctx.currentServerPath, windowsHide: true });
-        ctx.buildProcess.stdout.on('data', d => d.toString().split(/\r?\n/).filter(Boolean).forEach(x => ctx.appendLog(x, 'system')));
-        ctx.buildProcess.stderr.on('data', d => d.toString().split(/\r?\n/).filter(Boolean).forEach(x => ctx.appendLog(x, 'system')));
-        ctx.buildProcess.on('exit', code => {
-          ctx.buildProcess = null;
-          if (code === 0) ctx.appendLog('BuildTools finished — the Spigot server jar is ready in this folder.', 'system');
-          else ctx.appendLog(`BuildTools exited with code ${code} — the Spigot build failed. Scroll up in this log for the real error (missing Git is the most common cause).`, 'error');
-          ctx.send('wizard:build-done', { ok: code === 0, files: serverFiles(ctx.currentServerPath) });
-        });
-        ctx.buildProcess.on('error', error => {
-          ctx.buildProcess = null;
-          ctx.appendLog(`BuildTools could not be started: ${error.message}`, 'error');
-          ctx.send('wizard:build-done', { ok: false, files: serverFiles(ctx.currentServerPath) });
-        });
-        return { ok: true, building: true, name: 'BuildTools (Spigot)', version: resolvedVersion };
-      }
-
-      const resolver = RESOLVERS[software] || RESOLVERS.purpur;
-      const { url, name, version: resolvedVersion, sha256 } = await resolver(targetVersion);
-      const dest = path.join(ctx.currentServerPath, name);
-      // Server software jars (vanilla/paper/purpur/leaf/fabric) are tens of MB; 1 GB is a generous
-      // ceiling that still stops a hostile/redirected URL from filling the disk.
-      await download(url, dest, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
-      if (sha256) {
-        try {
-          const got = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
-          if (got !== String(sha256).toLowerCase()) { fs.rmSync(dest, { force: true }); throw new Error(`Downloaded ${name} failed its SHA-256 checksum and was deleted — check your connection and retry.`); }
-        } catch (e) { if (String(e?.message || '').includes('checksum')) throw e; }
-      }
-      return { ok: true, files: serverFiles(ctx.currentServerPath), name, version: resolvedVersion };
-    } catch (error) { ctx.buildProcess = null; return marketplaceError(error); }
-    finally { ctx.wizardAbort = null; }
-    });
+    return await ctx.runInInstance(runId, () => createServerFiles(ctx, args || {}));
   });
 
   // Cancel a wizard download in progress (the AbortController created in wizard:create).
@@ -250,4 +254,4 @@ function registerWizard(ipcMain, ctx) {
   });
 }
 
-module.exports = { RESOLVERS, registerWizard };
+module.exports = { RESOLVERS, registerWizard, createServerFiles };

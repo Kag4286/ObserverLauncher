@@ -293,9 +293,9 @@ function startMcpServer(ctx) {
     if (req.method === 'GET' && req.url === '/resources') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
       announceClient();
-      const { STATIC_RESOURCES } = require('./resources.js');
+      const { STATIC_RESOURCES, UI_RESOURCES } = require('./resources.js');
       res.writeHead(200, { 'content-type': 'application/json' });
-      return res.end(JSON.stringify({ resources: STATIC_RESOURCES }));
+      return res.end(JSON.stringify({ resources: STATIC_RESOURCES.concat(UI_RESOURCES) }));
     }
     if (req.method === 'GET' && req.url === '/resource-templates') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
@@ -317,6 +317,10 @@ function startMcpServer(ctx) {
       }
       let uri = '';
       try { uri = new URL(req.url, 'http://127.0.0.1').searchParams.get('uri') || ''; } catch {}
+      // 5.1.0: ui:// resources (MCP Apps spike) are served directly (no backing tool).
+      const { resolveUiResource } = require('./resources.js');
+      const ui = resolveUiResource(uri);
+      if (ui) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, text: ui.text, mimeType: ui.mimeType })); }
       const { resolveResource } = require('./resources.js');
       const hit = resolveResource(uri);
       const runId = (hit && hit.args && hit.args.instance) || ctx.activeInstanceId;

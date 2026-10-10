@@ -12,7 +12,11 @@ Module._load = function (request) {
 
 const { TOOLS, getTool, TOOL_ANNOTATIONS, OUTPUT_SCHEMAS } = require('../src/mcp/tools.js');
 const { PROMPTS, getPrompt, promptList } = require('../src/mcp/prompts.js');
-const { STATIC_RESOURCES, RESOURCE_TEMPLATES, resolveResource } = require('../src/mcp/resources.js');
+const { STATIC_RESOURCES, RESOURCE_TEMPLATES, UI_RESOURCES, resolveResource, resolveUiResource } = require('../src/mcp/resources.js');
+// 5.1.0: bridge timeout policy. We can NOT require bridge.js here — it attaches a process.stdin
+// listener at load time and would hang the test runner. Parse its SOURCE instead (same approach
+// tests/mcp-tools.test.js uses for STATIC_TOOLS).
+const bridgeSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'mcp', 'bridge.js'), 'utf8');
 
 let pass = 0, fail = 0;
 const check = (name, cond) => cond ? (pass++, console.log('PASS', name)) : (fail++, console.log('FAIL', name));
@@ -60,6 +64,27 @@ check('resolve file template', (() => { const r = resolveResource('observer://fi
 check('file template url-decodes', (() => { const r = resolveResource('observer://file/config%2Ffoo.yml'); return r && r.args.path === 'config/foo.yml'; })());
 check('unknown resource -> null', resolveResource('observer://nope/x') === null);
 check('resolveResource for every static URI non-null', STATIC_RESOURCES.every(r => resolveResource(r.uri)));
+
+// --- 5.1.0 A1: per-tool timeout buckets (source-level assertions) ---
+check('bridge defines timeoutForTool', /function timeoutForTool\(/.test(bridgeSrc));
+check('bridge has a hard req.setTimeout', /req\.setTimeout\(timeoutForTool\(tool\)/.test(bridgeSrc));
+check('BUILD bucket 600000 present', /return 600000;/.test(bridgeSrc));
+check('read bucket 30000 present', /return 30000;/.test(bridgeSrc));
+check('write bucket 120000 default', /return 120000;/.test(bridgeSrc));
+check('create_instance is in BUILD_TOOLS', /BUILD_TOOLS = new Set\(\[[\s\S]*'create_instance'/.test(bridgeSrc));
+check('callApp uses a settled guard', /let settled = false;/.test(bridgeSrc));
+
+// --- 5.1.0 A2: create_instance registered (drift guard covers STATIC_TOOLS separately) ---
+check('create_instance exists', !!getTool('create_instance'));
+check('create_instance is write', getTool('create_instance')?.risk === 'write');
+
+// --- 5.1.0 C spike: ui:// resource ---
+check('1 UI resource', UI_RESOURCES.length === 1);
+check('ui resource has mcp-app mime', UI_RESOURCES[0].mimeType === 'text/html;profile=mcp-app');
+const ui = resolveUiResource('ui://observerlauncher/dashboard');
+check('resolveUiResource returns html', ui && /text\/html/.test(ui.mimeType) && /ObserverLauncher/.test(ui.text));
+check('resolveUiResource unknown -> null', resolveUiResource('ui://nope') === null);
+check('resolveResource ignores ui://', resolveResource('ui://observerlauncher/dashboard') === null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

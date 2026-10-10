@@ -736,6 +736,39 @@ async function tStopInstance(ctx, a) {
     return requestGracefulStop(ctx, 'Instance');
   });
 }
+// 5.1.0: create a NEW instance + download its server jar. The user picks the folder in the SAME
+// native dialog the GUI uses — the AI cannot pass an arbitrary path (serverPath is GUI-only
+// elsewhere too, so this keeps the sandbox consistent). Reuses createServerFiles (the wizard's
+// download logic) so there is no second copy.
+async function tCreateInstance(ctx, a) {
+  const software = String((a && a.software) || 'vanilla').toLowerCase();
+  const version = (a && a.version) ? String(a.version).trim() : '';
+  const name = (a && a.name) ? String(a.name).trim() : '';
+  let folder = '';
+  try {
+    const electron = require('electron');
+    const dialog = electron.dialog, app = electron.app;
+    if (!dialog || !app || !ctx.win) return { ok: false, error: 'Creating an instance needs the app window open (it opens a folder picker). Do this in the GUI, or open the app first.' };
+    const p = require('path');
+    const suggested = p.join(app.getPath('documents'), 'ObserverLauncher Servers');
+    const r = await dialog.showOpenDialog(ctx.win, { title: 'Choose an empty folder for the new server', defaultPath: suggested, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !(r.filePaths && r.filePaths.length)) return { ok: false, cancelled: true, error: 'No folder was chosen.' };
+    folder = r.filePaths[0];
+  } catch (e) { return { ok: false, error: 'Could not open the folder picker: ' + ((e && e.message) || e) }; }
+  const { addInstance, switchInstance, loadSettingsFor } = require('../main/settings.js');
+  const add = addInstance({ name: name || undefined, serverPath: folder });
+  if (!add.ok) return add;
+  const id = add.id;
+  switchInstance(id);
+  try { ctx.seedInstances(); } catch {}
+  return await ctx.runInInstance(id, async () => {
+    const s = loadSettingsFor(id);
+    ctx.currentServerPath = (s && s.serverPath) || folder;
+    const { createServerFiles } = require('../main/wizard.js');
+    const r = await createServerFiles(ctx, { software, version });
+    return { ok: r.ok !== false, instanceId: id, name: (s && s.name) || null, ...r };
+  });
+}
 async function tDeleteContent(ctx, a) {
   const root = needPath(ctx);
   const kind = a.kind || 'plugin';
@@ -1288,6 +1321,7 @@ const TOOLS = [
   { name: 'op_player', risk: 'write', description: 'Grant or revoke operator. level 1-4 applies when the server is STOPPED (writes ops.json); a running server always grants level 4 (vanilla /op has no level arg).', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' }, level: { type: 'number', description: 'operator level 1-4 (default 4; stopped server only)' } }, ['name']), handler: tOpPlayer },
   { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },
   { name: 'ban_player', risk: 'write', description: 'Ban or unban a player, or ban/unban an IP with ip.', inputSchema: S({ name: STR('player name (or any label when using ip)'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)'), ip: STR('ban by IP instead of name (optional)') }, ['name']), handler: tBanPlayer },
+  { name: 'create_instance', risk: 'write', description: 'Create a NEW server instance and download its server jar. Opens a folder picker in the app for the user to choose an empty folder (the AI cannot pass a path). Pass software (vanilla|paper|purpur|leaf|folia|fabric|forge|neoforge|spigot|velocity) + optional version and name. The new instance becomes active.', inputSchema: S({ software: STR('server software (default vanilla)'), version: STR('Minecraft version (optional; default = latest stable)'), name: STR('display name (optional)') }), handler: tCreateInstance },
   { name: 'list_instances', risk: 'read', description: 'List all configured server instances (id, name, serverPath, status, active). Call this FIRST to discover which instance to target, then pass instance: <id> to other tools.', inputSchema: S(), handler: tListInstances },
   { name: 'get_instance_snapshot', risk: 'read', description: 'Read ONE instance\'s full state (status, console tail, live metrics, java, files) WITHOUT making it active - use to inspect/compare a background server without disturbing the user\'s GUI.', inputSchema: S({ instance: STR('instance id (from list_instances)'), lines: { type: 'number', description: 'console lines to return (default 100, max 2000)' } }, ['instance']), handler: tGetInstanceSnapshot },
   { name: 'select_instance', risk: 'write', description: 'Make an instance the ACTIVE one (subsequent tools without an instance param target it). NOTE: this switches the user\'s GUI to that instance too - prefer passing an optional instance: <id> to the specific tool, or get_instance_snapshot, when you only need to read.', inputSchema: S({ instance: STR('instance id (from list_instances)') }, ['instance']), handler: tSelectInstance },

@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.1.0" date="2026-10-10">
+      <description>
+        <p>An AI client can now create a new server (it opens a folder picker for you) and is told what Java a server needs; a wedged app can no longer hang the AI. Also adds an early MCP Apps preview.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.1.0.md</url>
+    </release>
     <release version="5.0.0" date="2026-10-10">
       <description>
         <p>A major MCP upgrade: the AI integration now exposes tool annotations, workflow prompts, output schemas and dynamic resource templates, so an AI client can auto-approve safe reads and follow ready-made workflows.</p>
