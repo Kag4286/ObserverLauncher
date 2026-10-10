@@ -115,3 +115,15 @@ html.motion-lite .modal-rise{animation:none}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:var(--dur-instant)!important;animation-iteration-count:1!important;transition-duration:var(--dur-instant)!important;scroll-behavior:auto!important}
 }
+
+/* LITE MODE — the real fix. Per-selector lite guards only covered a fraction of the ~40 keyframe
+   animations across the CSS, so Lite looked almost identical to Full. This catch-all makes EVERY
+   animation instant in Lite (same idea as the reduced-motion block above) WITHOUT touching
+   `transition-duration` — so functional hover/press/focus feedback stays smooth, exactly as
+   DESIGN.md 10.3 requires (Lite kills ambient/signature motion, keeps functional feedback).
+   No literal durations here -> the motion ratchet count is unchanged. */
+html.motion-lite *,html.motion-lite *::before,html.motion-lite *::after{
+  animation-duration:var(--dur-instant)!important;
+  animation-delay:0ms!important;
+  animation-iteration-count:1!important;
+}
