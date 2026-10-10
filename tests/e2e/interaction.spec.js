@@ -14,6 +14,10 @@ let app, win, userDataDir, ctx, fixtureRoot;
 async function completeOnboarding() {
   const modal = win.locator('#onboardingModal');
   if (await modal.isVisible().catch(() => false)) {
+    // 5.2.0: onboarding now has a mode picker. Pick ADVANCED so the full rail (all tabs) is
+    // available for the E2E flows below — beginner mode hides several tabs by design.
+    const adv = win.locator('#obModeAdvanced');
+    if (await adv.isVisible().catch(() => false)) await adv.click();
     await win.locator('#obSkip').click();
     await expect(modal).toBeHidden();
     // markOnboarded() writes settings.json asynchronously; give it a beat before any reload.

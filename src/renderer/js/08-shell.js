@@ -644,7 +644,7 @@ $('#javaAutoInstall').onclick=async()=>{
 // FEATURE: first-run onboarding flow — create a new server (recommended for beginners), pick an
 // existing server folder, or skip to explore on your own. Doesn't ask again once completed
 // (settings.onboarded).
-function showOnboarding(){const m=$('#onboardingModal');m.hidden=false;trapFocus(m)}
+let showOnboarding=function(){const m=$('#onboardingModal');m.hidden=false;trapFocus(m)};
 function hideOnboarding(){const m=$('#onboardingModal');if(m.hidden)return;releaseFocus();m.hidden=true}
 async function markOnboarded(){await window.observer.onboardingComplete();state.settings={...state.settings,onboarded:true}}
 // BUGFIX: this modal had no way to dismiss it besides picking one of the 3 onboarding choices — fine
@@ -653,17 +653,47 @@ async function markOnboarded(){await window.observer.onboardingComplete();state.
 // A close (×) button, Escape, and clicking the dimmed backdrop now all dismiss any open modal — added
 // once, generically, so this can't quietly happen again for a future modal either.
 $('#onboardingClose').onclick=()=>hideOnboarding();
-$('#obSkip').onclick=async()=>{hideOnboarding();await markOnboarded()};
-// 5.2.0: the onboarding choice also sets Beginner mode. "Create a new server" (the beginner path)
-// turns it ON; "I already have a server" (experienced) turns it OFF. Persisted like any setting;
-// the user can flip it any time in Settings.
-$('#obPickExisting').onclick=async()=>{hideOnboarding();await markOnboarded();await saveBeginnerMode(false);await addExistingInstance()};
+// 5.2.0 onboarding: an explicit mode picker (Beginner / Advanced) + a language dropdown at the top.
+// The MODE chosen drives the app layout; the ACTION card below only decides what happens next. So
+// "Explore on my own" as a Beginner still turns Beginner mode on (the user picked that mode).
+let obMode='beginner';
+function setObMode(m){
+  obMode=(m==='advanced')?'advanced':'beginner';
+  const b=$('#obModeBeginner'),a=$('#obModeAdvanced');
+  if(b){b.classList.toggle('active',obMode==='beginner');b.setAttribute('aria-checked',obMode==='beginner'?'true':'false')}
+  if(a){a.classList.toggle('active',obMode==='advanced');a.setAttribute('aria-checked',obMode==='advanced'?'true':'false')}
+}
+$('#obModeBeginner')&&($('#obModeBeginner').onclick=()=>setObMode('beginner'));
+$('#obModeAdvanced')&&($('#obModeAdvanced').onclick=()=>setObMode('advanced'));
+// Language dropdown: populated from LOCALES_META. Changing it applies immediately (no Apply here —
+// this is the first-run wizard, not the Settings form) and re-translates the modal.
+function fillObLanguages(){
+  const sel=$('#obLangSelect');if(!sel||!window.LOCALES_META)return;
+  sel.innerHTML=window.LOCALES_META.map(l=>`<option value="${esc(l.code)}">${esc(l.name)}</option>`).join('');
+  sel.value=currentLocale||'en';
+}
+$('#obLangSelect')&&($('#obLangSelect').onchange=async e=>{
+  currentLocale=e.target.value;applyLocale();
+  const ls=$('#languageSelect');if(ls)ls.value=currentLocale;
+  try{await window.observer.saveSettings({...getSettings(),locale:currentLocale})}catch{}
+});
+// Persist mode + locale, then run the chosen action.
+async function obFinish(){
+  fillObLanguages();
+  await saveBeginnerMode(obMode==='beginner');
+  hideOnboarding();await markOnboarded();
+}
+$('#obSkip').onclick=async()=>{await obFinish()};
+$('#obPickExisting').onclick=async()=>{await obFinish();await addExistingInstance()};
 $('#obCreateNew').onclick=async()=>{
   // The wizard's step 1 picks the folder and creates a NEW instance for it — do NOT run
   // chooseFolder here: that would save serverPath onto the currently-active instance.
-  hideOnboarding();await markOnboarded();await saveBeginnerMode(true);
+  await obFinish();
   openNewServerWizard();
 };
+// Default the modal to Beginner + current language every time it opens.
+const _origShowOnboarding=showOnboarding;
+showOnboarding=function(){setObMode('beginner');fillObLanguages();_origShowOnboarding()};
 // 5.2.0 Beginner mode: a gentler UI — rail shows only Overview/Console/Players/Settings, and the
 // RAM/JVM panel + advanced tabs are hidden via the body.beginner-mode CSS. Nothing is REMOVED
 // (DESIGN.md 2.4 layering): "Show all tools" turns the full set back on instantly.
@@ -683,8 +713,12 @@ async function saveBeginnerMode(on){
   applyBeginnerMode(on);try{markSettingsSaved()}catch{}
   return true;
 }
+// "Show all tools" is a QUICK ESCAPE (not a settings form field): apply + persist immediately.
 $('#railShowAll')&&($('#railShowAll').onclick=()=>saveBeginnerMode(false));
-$('#beginnerModeInput')&&($('#beginnerModeInput').addEventListener('change',e=>saveBeginnerMode(e.target.checked)));
+// The Settings toggle follows the normal edit -> Apply flow: changing it only marks the form dirty
+// (the section-level input/change listener in 07-overview.js does that). It is actually applied when
+// the user clicks "Apply settings", which calls refreshUI() -> applyBeginnerMode(state.settings...).
+// (Previously this auto-saved on change, which bypassed Apply — the reported bug.)
 
 // The guided "create a new server" wizard now lives in 12-wizard.js (loads after this file).
 // Wizard state/functions moved to 12-wizard.js.

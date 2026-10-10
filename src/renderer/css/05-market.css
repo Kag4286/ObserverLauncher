@@ -257,6 +257,18 @@
 .onboarding-hero .hero-icon{width:46px;height:46px;display:grid;place-items:center;border-radius:var(--r-sm);background:var(--field);border:1px solid var(--border);flex-shrink:0}
 .onboarding-hero .hero-icon img{width:28px;height:28px;}
 .onboarding-grid{display:grid;gap:10px}
+/* 5.2.0: language + explicit mode picker at the top of the onboarding modal. */
+.ob-lang-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.ob-lang-row label{font:600 12px var(--font-ui);color:var(--text-2)}
+.ob-lang-row .launcher-select{max-width:200px;flex:1}
+.ob-mode-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.ob-mode{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface-2);color:var(--text);text-align:left;cursor:pointer;transition:border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+.ob-mode b{font:700 14px var(--font-ui)}
+.ob-mode span{font:500 11px var(--font-ui);color:var(--text-muted)}
+.ob-mode:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.ob-mode.active{border-color:var(--brand);background:var(--brand-soft);box-shadow:0 0 0 1px var(--brand-soft)}
+.ob-mode.active b{color:var(--brand)}
+@media (max-width:560px){.ob-mode-row{grid-template-columns:1fr}}
 /* v4.0.0: onboarding cards re-tokenized (were hardcoded #FFF/#E6EDF3 + 4px radius + hover-lift). */
 /* BUGFIX: .onboarding-card is a <button> -> it does NOT inherit color (UA default = black). The old
    hardcoded color:#FFFFFF was doing this implicitly; now set it explicitly to the text token. */

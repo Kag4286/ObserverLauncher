@@ -19,8 +19,11 @@ check('refreshUI syncs the toggle', /beginnerModeInput'\)\)\$\('#beginnerModeInp
 const sh = fs.readFileSync(path.join(root, 'src', 'renderer', 'js', '08-shell.js'), 'utf8');
 check('applyBeginnerMode defined', /function applyBeginnerMode\(/.test(sh));
 check('BEGINNER_TABS has 4 tabs', /BEGINNER_TABS=new Set\(\['overview','console','players','settings'\]\)/.test(sh));
-check('create-new turns beginner ON', /saveBeginnerMode\(true\)/.test(sh));
-check('pick-existing turns beginner OFF', /saveBeginnerMode\(false\)/.test(sh));
+// 5.2.0: the onboarding now has an explicit mode picker; obFinish() persists the chosen mode.
+check('onboarding mode picker exists', /obModeBeginner/.test(sh) && /obModeAdvanced/.test(sh));
+check('obFinish persists the picked mode', /saveBeginnerMode\(obMode==='beginner'\)/.test(sh));
+check('create-new calls obFinish', /obCreateNew'\).onclick=async\(\)=>\{[\s\S]*?obFinish\(\)/.test(sh));
+check('onboarding has language select', /obLangSelect/.test(sh));
 check('show-all button wired', /railShowAll'\).onclick=\(\)=>saveBeginnerMode\(false\)/.test(sh));
 
 // CSS hides the advanced tabs under body.beginner-mode

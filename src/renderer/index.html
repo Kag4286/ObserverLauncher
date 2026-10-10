@@ -650,7 +650,22 @@
 <div id="onboardingModal" class="modal-overlay" hidden>
   <div class="modal glass onboarding-modal">
     <button type="button" class="modal-close" id="onboardingClose" aria-label="Close">×</button>
-    <div class="onboarding-hero"><span class="hero-icon"><img src="./assets/icons/observer.png" alt=""></span><div><p class="eyebrow" data-i18n="ob.eyebrow">WELCOME TO OBSERVER</p><h2 data-i18n="ob.title">Get started — beginner or pro</h2><p class="text-muted" data-i18n="ob.sub">Pick your path. You can switch anytime in Launcher settings. <b>Beginners:</b> start fresh. <b>Experienced:</b> point to an existing server or import a world.</p></div></div>
+    <div class="onboarding-hero"><span class="hero-icon"><img src="./assets/icons/observer.png" alt=""></span><div><p class="eyebrow" data-i18n="ob.eyebrow">WELCOME TO OBSERVER</p><h2 data-i18n="ob.title">Get started — beginner or pro</h2><p class="text-muted" data-i18n="ob.sub">Pick your language and your path. You can switch anytime in Launcher settings.</p></div></div>
+    <!-- 5.2.0: language + explicit mode picker. The mode chosen here drives the app's rail layout. -->
+    <div class="ob-lang-row">
+      <label for="obLangSelect" data-i18n="ob.language">Language</label>
+      <select id="obLangSelect" class="launcher-select ol-select"></select>
+    </div>
+    <div class="ob-mode-row" role="radiogroup" aria-label="Experience level">
+      <button type="button" class="ob-mode active" id="obModeBeginner" role="radio" aria-checked="true" data-mode="beginner">
+        <b data-i18n="ob.modeBeginner">Beginner</b>
+        <span data-i18n="ob.modeBeginnerSub">A simpler app — just the essentials.</span>
+      </button>
+      <button type="button" class="ob-mode" id="obModeAdvanced" role="radio" aria-checked="false" data-mode="advanced">
+        <b data-i18n="ob.modeAdvanced">Advanced</b>
+        <span data-i18n="ob.modeAdvancedSub">Every tool, right away.</span>
+      </button>
+    </div>
     <div class="onboarding-grid">
       <button class="onboarding-card primary" id="obCreateNew"><span class="card-icon"><img src="./assets/icons/ui/cube.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.create">Create a new server</h3><p data-i18n="ob.createSub">Recommended for first time. Pick an empty folder, we download Vanilla and guide you. No manual JAR hunting.</p><span class="card-meta">Beginner • 2 min • Vanilla → Paper later</span><small class="card-hint">Advanced: you can switch to Paper/Purpur/Fabric in the wizard after.</small></div><span class="card-arrow">→</span></button>
       <button class="onboarding-card" id="obPickExisting"><span class="card-icon"><img src="./assets/icons/ui/funnel.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.pick">I already have a server</h3><p data-i18n="ob.pickSub">Point the launcher at an existing folder — it will detect JAR, worlds and configs instantly.</p><span class="card-meta">Experienced • Import • Keep your worlds</span><small class="card-hint">Tip: Works with any server type — Vanilla, Paper, Forge, etc.</small></div><span class="card-arrow">→</span></button>
