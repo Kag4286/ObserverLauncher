@@ -697,7 +697,7 @@ showOnboarding=function(){setObMode('beginner');fillObLanguages();_origShowOnboa
 // 5.2.0 Beginner mode: a gentler UI — rail shows only Overview/Console/Players/Settings, and the
 // RAM/JVM panel + advanced tabs are hidden via the body.beginner-mode CSS. Nothing is REMOVED
 // (DESIGN.md 2.4 layering): "Show all tools" turns the full set back on instantly.
-const BEGINNER_TABS=new Set(['overview','console','players','settings']);
+const BEGINNER_TABS=new Set(['overview','console','players','properties','settings']);
 function applyBeginnerMode(on){
   const on_=!!on;
   document.body.classList.toggle('beginner-mode',on_);

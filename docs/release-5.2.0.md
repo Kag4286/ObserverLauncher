@@ -18,9 +18,10 @@ a server:
 - **Overview** — start and stop your server
 - **Console** — see what it is doing
 - **Players** — who is on your server
-- **Settings** — the basics
+- **Server properties** — the server's own settings (name, difficulty, whitelist…)
+- **Settings** — the app's basics
 
-The rest (Performance, Marketplace, World Map, Server properties and more) is hidden, not gone. One
+The rest (Performance, Marketplace, World Map and more) is hidden, not gone. One
 click on **"Show all tools"** at the bottom of the menu brings everything back.
 
 ## How you get it

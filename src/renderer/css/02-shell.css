@@ -18,8 +18,9 @@ body.beginner-mode .nav-item[data-tab="performance"],
 body.beginner-mode .nav-item[data-tab="content"],
 body.beginner-mode .nav-item[data-tab="marketplace"],
 body.beginner-mode .nav-item[data-tab="worlds"],
-body.beginner-mode .nav-item[data-tab="worldmap"],
-body.beginner-mode .nav-item[data-tab="properties"]{display:none}
+body.beginner-mode .nav-item[data-tab="worldmap"]{display:none}
+/* NOTE: Server properties STAYS visible in beginner mode — a beginner still needs to configure the
+   server (motd, difficulty, whitelist, view-distance). Settings is launcher config, not server config. */
 /* the "Content & world" group label has no visible items left -> hide the label too (avoid an
    orphan heading + its top border) */
 body.beginner-mode .nav-group[data-grp="content"]{display:none}

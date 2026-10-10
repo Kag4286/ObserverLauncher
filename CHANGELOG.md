@@ -20,7 +20,7 @@ setting `beginnerMode` (default false). No settings migration.
   path) turns Beginner mode ON; "I already have a server" (experienced) turns it OFF. Changeable any
   time in Settings > Personal.
 - **A slimmer rail.** Beginner mode hides Performance, Content, Marketplace, Worlds & backups, World
-  Map and Server properties, leaving Overview / Console / Players / Settings. This is LAYERING, not
+  Map, leaving Overview / Console / Players / Server properties / Settings. This is LAYERING, not
   deletion (DESIGN.md 2.4): a **"Show all tools"** button at the bottom of the rail turns the full set
   back on in one click, and switching to a hidden tab auto-returns to Overview.
 - **A beginner-focused Overview.** The RAM & JVM panel is hidden, and when the server is RUNNING a

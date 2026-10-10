@@ -18,7 +18,7 @@ check('refreshUI syncs the toggle', /beginnerModeInput'\)\)\$\('#beginnerModeInp
 // shell wiring
 const sh = fs.readFileSync(path.join(root, 'src', 'renderer', 'js', '08-shell.js'), 'utf8');
 check('applyBeginnerMode defined', /function applyBeginnerMode\(/.test(sh));
-check('BEGINNER_TABS has 4 tabs', /BEGINNER_TABS=new Set\(\['overview','console','players','settings'\]\)/.test(sh));
+check('BEGINNER_TABS has 5 tabs (incl. properties)', /BEGINNER_TABS=new Set\(\['overview','console','players','properties','settings'\]\)/.test(sh));
 // 5.2.0: the onboarding now has an explicit mode picker; obFinish() persists the chosen mode.
 check('onboarding mode picker exists', /obModeBeginner/.test(sh) && /obModeAdvanced/.test(sh));
 check('obFinish persists the picked mode', /saveBeginnerMode\(obMode==='beginner'\)/.test(sh));
@@ -28,9 +28,11 @@ check('show-all button wired', /railShowAll'\).onclick=\(\)=>saveBeginnerMode\(f
 
 // CSS hides the advanced tabs under body.beginner-mode
 const css = fs.readFileSync(path.join(root, 'src', 'renderer', 'css', '02-shell.css'), 'utf8');
-['performance', 'content', 'marketplace', 'worlds', 'worldmap', 'properties'].forEach(tab => {
+['performance', 'content', 'marketplace', 'worlds', 'worldmap'].forEach(tab => {
   check('CSS hides tab ' + tab, new RegExp('body\\.beginner-mode \\.nav-item\\[data-tab="' + tab + '"\\]').test(css));
 });
+// Server properties must STAY visible in beginner mode (configuring the server is core, not advanced).
+check('CSS does NOT hide properties tab', !/body\.beginner-mode \.nav-item\[data-tab="properties"\]/.test(css));
 check('CSS hides ov-adv', /body\.beginner-mode \.ov-adv\{display:none\}/.test(css));
 check('CSS hides content group', /body\.beginner-mode \.nav-group\[data-grp="content"\]/.test(css));
 
