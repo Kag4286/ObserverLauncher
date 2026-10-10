@@ -61,7 +61,9 @@ function propRow(k,v){
   const search=esc((meta?.l||k)+' '+k),title=esc(meta?.h||k);
   let ctl;
   if(isBool)ctl=`<span class="prop-ctl"><label class="switch"><input type="checkbox" data-property="${esc(k)}" ${val==='true'?'checked':''}><span class="slider"></span></label></span>`;
-  else if(PROP_ENUMS[k])ctl=`<span class="prop-ctl"><select data-property="${esc(k)}">${(PROP_ENUMS[k].includes(val)?PROP_ENUMS[k]:[...PROP_ENUMS[k],val]).map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></span>`;
+  // ol-select: enhance into the app's animated dropdown (a native <select> popup is OS-drawn and
+  // cannot animate — the same reason every other select in the app carries this class).
+  else if(PROP_ENUMS[k])ctl=`<span class="prop-ctl"><select class="ol-select" data-property="${esc(k)}">${(PROP_ENUMS[k].includes(val)?PROP_ENUMS[k]:[...PROP_ENUMS[k],val]).map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></span>`;
   else ctl=`<span class="prop-ctl"><input data-property="${esc(k)}" value="${esc(val)}" placeholder="${esc(meta?.h||'')}" spellcheck="false"></span>`;
   return `<label data-prop-row data-prop-search="${search}" title="${title}" class="prop-row${isBool?' is-bool':''}"><span class="prop-label">${esc(meta?.l||k)}<small class="prop-key">${esc(k)}</small></span>${ctl}</label>`;
 }
@@ -71,5 +73,9 @@ function renderProperties(props){
   keys.forEach(k=>{const meta=PROPERTY_META[k];if(meta)byGroup[meta.g].push(k);else advanced.push(k)});
   const group=(id,label,arr,advancedG)=>arr.length?`<details class="prop-group${advancedG?' prop-advanced':''}" data-group-id="${id}" ${advancedG?'':'open'}><summary>${esc(label)}<span class="prop-count">${arr.length}</span><i class="prop-chevron">▸</i></summary><div class="properties-grid">${arr.map(k=>propRow(k,props[k])).join('')}</div></details>`:'';
   $('#propertiesGrid').innerHTML=PROPERTY_GROUPS.map(g=>group(g.id,t('prop.group.'+g.id),byGroup[g.id])).join('')+group('advanced',t('prop.advanced'),advanced,true);
+  // The grid was just rebuilt, so any <select class="ol-select"> inside it is brand new and not yet
+  // enhanced (enhanceAll() only ran at load). Enhance them now so the enum fields (difficulty,
+  // gamemode) get the animated dropdown instead of the OS popup.
+  if(window.enhanceAllSelects)try{window.enhanceAllSelects($('#propertiesGrid'))}catch{}
 }
 async function refreshProxyProperties(){const r=await window.observer.readRawProperties();if(r.ok)$('#propertiesRaw').value=r.content}

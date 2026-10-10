@@ -59,6 +59,16 @@
 .tab.active > .market-toolbar{animation-delay:calc(var(--stagger) * 1)}
 @media (prefers-reduced-motion:reduce){.tab.active > :is(.tab-head,.hero,.panel,.flat-wrap,.perf-stats,.perf-charts,.perf-details,.modpack-tools,.roster-toolbar,.player-manual,.proxy-notice,.wld-section,.content-toolbar),.tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.modpack-tools),.tab.active > :is(.market-hero,.market-toolbar){animation:none}}
 html.motion-lite .tab.active > :is(.tab-head,.hero,.panel,.flat-wrap,.perf-stats,.perf-charts,.perf-details,.modpack-tools,.roster-toolbar,.player-manual,.proxy-notice,.wld-section,.content-toolbar),html.motion-lite .tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.modpack-tools),html.motion-lite .tab.active > :is(.market-hero,.market-toolbar){animation:none}
+/* Lite mode: kill the SIGNATURE tab slide + list stagger + fade-swap + modal rise too. These were
+   the most VISIBLE motion (every tab switch / modal open) yet had NO lite guard — so Lite felt
+   almost identical to Full. Now the only motion left in Lite is fast functional feedback
+   (hover/press colour, focus rings, the switch slider). */
+html.motion-lite .tab-enter-fwd,html.motion-lite .tab-enter-back{animation:none}
+html.motion-lite .fade-swap{animation:none}
+html.motion-lite .tab.active :is(.player-row,.market-item,.backup-row,.file-list li[data-name],.worlds-list li){animation:none}
+html.motion-lite .modal-overlay{transition-duration:var(--dur-instant)}
+html.motion-lite .modal-overlay .modal{transition:none}
+html.motion-lite .modal-rise{animation:none}
 
 /* Modal entrance uses the emphasized ease (a hair of settle) — content that opens once. */
 .modal-rise{animation:modalRise var(--dur-modal) var(--ease-emphasized)}
