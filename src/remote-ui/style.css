@@ -102,4 +102,11 @@ main{max-width:1100px;margin:0 auto;padding:24px 20px 60px;display:flex;flex-dir
 .gate .field{margin-top:4px}
 .err{color:var(--danger);font-size:12px;margin:0}
 
+/* action/command result toast */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:30;max-width:92vw;
+  background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);
+  padding:10px 16px;border-radius:var(--r-sm);font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.toast.err{border-color:var(--danger);color:var(--danger)}
+.toast.ok{border-color:var(--success);color:var(--success)}
+
 @media(prefers-reduced-motion:reduce){*{transition-duration:0ms!important;animation-duration:0ms!important}}

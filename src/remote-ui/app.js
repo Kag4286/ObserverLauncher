@@ -250,12 +250,33 @@
     $('#actions').hidden = readOnly;
   }
 
+  // A tiny toast so an action result is VISIBLE (the old code swallowed a {ok:false} envelope whose
+  // HTTP status was still 200, so Start looked dead with no message).
+  let toastTimer = null;
+  function toast(msg, kind) {
+    let el = $('#toast');
+    if (!el) { el = document.createElement('div'); el.id = 'toast'; document.body.appendChild(el); }
+    el.textContent = String(msg);
+    el.className = 'toast' + (kind ? ' ' + kind : '');
+    el.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
+  }
+  const errText = (body) => {
+    const d = (body && body.data) || {};
+    return (d && d.error) || (body && body.error) || t('actionFailed');
+  };
+
   // 4.4.0: the four safe remote actions. Whitelisted client-side too; the server re-validates.
   async function runAction(action, name, confirmMsg) {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     const r = await api('/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, name: name || '', instance: activeInst }) });
-    if (r.status === 200) { loadAll(); }
-    else if (r.status === 403) { updateCmdCard(); }
+    if (r.status === 403) { updateCmdCard(); toast(t('readOnlyHint'), 'err'); return; }
+    // The handler wraps its own result: {ok:true,data:{ok:false,error}} on refusal.
+    const inner = (r.body && r.body.data) || {};
+    if (r.status !== 200 || inner.ok === false) { toast(errText(r.body), 'err'); return; }
+    toast(t('actionDone'), 'ok');
+    loadAll();
   }
 
   function startAuto() {
@@ -299,7 +320,9 @@
     const cmd = input.value.trim();
     if (!cmd) return;
     const r = await api('/command', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ command: cmd, instance: activeInst }) });
-    if (r.status === 200) { input.value = ''; loadAll(); }
-    else { input.value = ''; if (r.status === 403) updateCmdCard(); }
+    if (r.status === 403) { updateCmdCard(); toast(t('readOnlyHint'), 'err'); return; }
+    const inner = (r.body && r.body.data) || {};
+    if (r.status !== 200 || inner.ok === false) { toast(errText(r.body), 'err'); return; }
+    input.value = ''; loadAll();
   };
 })();
