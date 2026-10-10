@@ -44,6 +44,16 @@ No settings migration.
   still 403. Static assets are served from a fixed, in-memory map — never a path from the request, so
   no traversal is possible.
 
+### Fixed — settings / remote status UX
+- **Remote/MCP status no longer shows OFF right after launch.** `main.js` starts those loopback
+  servers after the window loads and does not await them, so the first `settings:get` snapshot could
+  race the `listen()` and report `running:false` even though the toggle was ON — you had to press
+  Apply to see LIVE. The renderer now re-syncs once the backend has settled (same pattern as the
+  existing "Start dead on launch" fix).
+- **The Apply dot clears when you revert an edit.** `settingsDirty` latched true on the first change
+  and never recomputed, so changing a setting and changing it back still demanded Apply. It is now
+  compared against a JSON snapshot of the last-saved form.
+
 ### Fixed — stability false positive
 - **A manual Stop is no longer counted as an "unstable run".** Three quick Start->Stop cycles used to
   log `Stability: unstable 3 runs in a row - rollback recommended` even with no crash (a user-ended

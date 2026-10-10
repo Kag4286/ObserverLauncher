@@ -648,10 +648,17 @@ $$('.modal-overlay').forEach(overlay=>overlay.addEventListener('click',e=>{if(e.
 
 (async()=>{const langSel=$('#languageSelect');if(langSel&&window.LOCALES_META)langSel.innerHTML=window.LOCALES_META.map(l=>`<option value="${esc(l.code)}">${esc(l.name)}</option>`).join('');
 let initial;try{initial=await window.observer.getState()}catch(e){toast(`Could not load launcher state: ${e?.message||e}`,'error');return}state={...state,...initial};addLogsBatch(initial.logs||[]);refreshUI();loadConnectInfo();bootStep(65,'boot.state');if(!state.settings?.onboarded)showOnboarding();
+// Baseline the settings form from the just-loaded state so an edit that returns every field to its
+// original value clears the Apply dot (no spurious "unsaved changes").
+try{markSettingsSaved()}catch{}
 // BUGFIX (Start dead on launch): if this first snapshot raced backend init and
 // came back without Java/files, re-sync once the backend has settled instead
 // of leaving Start disabled until the next folder save.
 if(!initial.java?.ok||!initial.files?.jar&&!initial.files?.launchScript){setTimeout(async()=>{try{const s2=await window.observer.getState();state={...state,...s2};const f2=await window.observer.getFiles();if(f2&&f2.ok){state.files=f2.files;state.javaRequired=f2.javaRequired??state.javaRequired}refreshUI()}catch{}},2500);}
+// BUGFIX (remote/MCP show OFF right after launch though enabled): main.js starts those loopback
+// servers AFTER the window loads and does not await them, so the first snapshot can race the
+// listen() and report running:false. Re-sync once the backend has settled, like the Java fix above.
+if(initial.settings?.remoteEnabled&&!initial.remote?.running||initial.settings?.mcpEnabled&&!initial.mcp?.running){setTimeout(async()=>{try{const s3=await window.observer.getState();state={...state,mcp:s3.mcp??state.mcp,remote:s3.remote??state.remote};refreshUI()}catch{}},2500);}
 // BUGFIX: the native min/max/close caption buttons overlay the top-right of the page and used to
 // cover the server-path text in the command bar. Detect the Window Controls Overlay and flag it so
 // CSS can reserve its width (.wco-app rules in style.css).

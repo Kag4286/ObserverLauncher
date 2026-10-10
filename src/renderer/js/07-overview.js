@@ -306,8 +306,11 @@ function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),ja
 // Launcher settings polish: an "unsaved changes" dot on Apply, a folder health line and a live
 // preview of the exact command line the launcher will run for this server.
 let settingsDirty=false;
+// A JSON snapshot of the LAST SAVED form state. An edit that returns every field to this snapshot
+// is not a real change, so the Apply dot must clear (was: dirty latched true until Apply).
+let _settingsBaseline=null;
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
-function markSettingsSaved(){settingsDirty=false;updateApplyDirty()}
+function markSettingsSaved(){settingsDirty=false;try{_settingsBaseline=JSON.stringify(getSettings())}catch{}updateApplyDirty()}
 // 2.2.0 (Java D): fill the 'Installed runtimes' pick-list from java:list. Hidden with 0-1 runtimes.
 let _javaRuntimes=null;
 async function populateJavaPicker(j){
@@ -347,7 +350,12 @@ function renderJvmPreview(){
 })();
 (function(){
   const sec=$('#settings');if(!sec)return;
-  const onEdit=e=>{if(e.target.closest('#settings')&&!e.target.closest('#newServerModal')){settingsDirty=true;updateApplyDirty()}};
+  const onEdit=e=>{if(!e.target.closest('#settings')||e.target.closest('#newServerModal'))return;
+    // Recompute from the current form: dirty only when it differs from the last saved snapshot.
+    let cur;try{cur=JSON.stringify(getSettings())}catch{cur=null}
+    settingsDirty=_settingsBaseline===null?true:(cur!==_settingsBaseline);
+    updateApplyDirty();
+  };
   sec.addEventListener('input',onEdit);sec.addEventListener('change',onEdit);
 })();
 $('#jvmArgsInput')?.addEventListener('input',renderJvmPreview);
