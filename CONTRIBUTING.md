@@ -90,9 +90,10 @@ plus a window-less entry point that reuses the exact same backend:
 The app manages several servers at once. The design is what keeps that from becoming a tangle of
 globals, so read this before touching backend state.
 
-- **Settings are nested (schema v4).** The store is `{ global..., instances: [], activeInstanceId }`.
+- **Settings are nested (schema v5).** The store is `{ global..., instances: [], activeInstanceId }`.
   The per-instance keys are listed once in `PER_INSTANCE_KEYS` (`src/main/migrations.js`); the v3→v4
-  migration moves them into `instances[0]`. `loadSettings()` returns a FLAT view of the ACTIVE
+  migration moves them into `instances[0]` (v4→v5 adds the per-instance `accent`/`artSeed` appearance
+  keys). `loadSettings()` returns a FLAT view of the ACTIVE
   instance (so old callers kept working), `loadSettingsStore()` returns the nested store, and
   `loadSettingsFor(id)` / `saveSettingsFor(id, flat)` read and write a SPECIFIC instance. Use the
   `*For(id)` variants in any code that targets an instance by id — plain `loadSettings()` always
