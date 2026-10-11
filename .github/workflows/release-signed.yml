@@ -1,0 +1,172 @@
+# Code-signed release (SignPath Foundation) - DORMANT until approved (v5.3.0 prep).
+#
+# WHY a separate file: the live .github/workflows/release.yml runs on tag push and is carefully tuned
+# (one tag -> one workflow -> one release; the draft stays a draft). Adding SignPath there before the
+# account is approved would risk a broken tag build. This workflow is workflow_dispatch ONLY, so it
+# never fires on a tag and never races the normal release. Once SignPath is approved you either (a) run
+# this manually for a signed release, or (b) promote it over release.yml (ask the agent to do that).
+#
+# THE HASH PROBLEM (why scripts/regenerate-update-yml.js exists): electron-builder writes latest.yml
+# with the sha512 of the UNSIGNED installer. SignPath re-writes the PE file, so the sha512 changes and
+# electron-updater would reject the download as corrupt. After signing we recompute sha512 + size from
+# the SIGNED exe and patch latest.yml before attaching it to the release.
+#
+# SECRETS to create in repo settings (Settings > Secrets and variables > Actions):
+#   SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG,
+#   SIGNPATH_SIGNING_POLICY_SLUG, SIGNPATH_ARTIFACT_CONFIGURATION_SLUG
+# (the last is optional - omit it in the `with:` block below if your project uses the default config).
+name: Release (code-signed)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # 1. Build the Windows installer UNSIGNED and upload it. The artifact-id output is what the SignPath
+  # action signs in the next job (it downloads by ID - no manual download needed there).
+  build-windows:
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build Windows installer (unsigned)
+        run: npx electron-builder --win nsis --publish never
+
+      - id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unsigned
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+
+  # 2. Build the Linux AppImage (unsigned). SignPath only does Windows Authenticode; Linux GPG
+  # signing is deliberately out of scope for now.
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build Linux AppImage (unsigned)
+        run: npx electron-builder --linux AppImage --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-dist
+          path: |
+            dist/*.AppImage
+            dist/latest-linux.yml
+          if-no-files-found: error
+
+  # 3. Submit the unsigned installer to SignPath and get it back signed. We download the unsigned
+  # artifact first so latest.yml sits next to the exe; the action overwrites the exe with the signed
+  # copy; then we recompute the hash. VERIFY the action input names against the SignPath docs at
+  # approval time - the action version may rename them.
+  sign-windows:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-unsigned
+          path: dist
+
+      - name: Submit signing request to SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ secrets.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ needs.build-windows.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist
+
+      - name: Regenerate update metadata (hash of the SIGNED exe)
+        run: node scripts/regenerate-update-yml.js --dist dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-signed
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+
+  # 4. Create the DRAFT release and attach everything. electron-builder is NOT the publisher here
+  # (we signed after it ran), so we build the draft with `gh` directly - same draft-first policy as
+  # the normal release: review it, then publish manually.
+  publish:
+    needs: [sign-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-signed
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-dist
+          path: dist
+
+      - name: Create draft release + attach installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" --draft --title "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            dist/*.exe dist/*.exe.blockmap dist/latest.yml \
+            dist/*.AppImage dist/latest-linux.yml
+
+  # 5. Attach the modpack artifact to the SAME (still draft) release - mirrors release.yml.
+  modpack-artifact:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build modpack artifacts
+        run: node scripts/modpack-publish.js --out dist
+
+      - name: Attach to the release (no create, no publish)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/*.tar.gz --repo "${GITHUB_REPOSITORY}" --clobber
