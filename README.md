@@ -225,4 +225,6 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) fi
 
 [Apache-2.0](LICENSE) © ObserverLauncher contributors. See [NOTICE](NOTICE) for third-party attributions.
 
+Windows installers are code-signed. The signing policy is in [CODE_SIGNING.md](CODE_SIGNING.md); free signing is provided by [SignPath.io](https://signpath.io/), certificate by the [SignPath Foundation](https://signpath.org/).
+
 ObserverLauncher is an unofficial tool. It is not affiliated with, endorsed by or associated with Mojang, Microsoft, or any server-software project. Minecraft is a trademark of Mojang Synergies AB. Running a server requires accepting the [Minecraft EULA](https://www.minecraft.net/en-us/eula).
