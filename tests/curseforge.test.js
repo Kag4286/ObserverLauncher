@@ -115,6 +115,12 @@ ck('mapCfFileToVersion not blocked when url present', fv.blocked === false);
 ck('mapCfFileToVersion blocked when no url', cf.mapCfFileToVersion({ id: 1, fileName: 'b.jar', downloadUrl: null }).blocked === true);
 ck('mapCfFileToVersion null safe', cf.mapCfFileToVersion(null) === null);
 ck('mapCfFileToVersion name fallback', cf.mapCfFileToVersion({ id: 9, fileName: 'z.jar', downloadUrl: 'https://x/y.jar' }).number === 'z.jar');
+// v5.3.0: mapCfFileToVersion now carries cfDependencies (listed in the modal, never auto-installed)
+ck('mapCfFileToVersion empty deps when none', Array.isArray(fv.dependencies) && fv.dependencies.length === 0);
+const fvDep = cf.mapCfFileToVersion({ id: 77, fileName: 'd.jar', downloadUrl: 'https://x/y.jar', dependencies: [{ modId: 500, relationType: 3 }] });
+ck('mapCfFileToVersion carries deps', fvDep.dependencies.length === 1 && fvDep.dependencies[0].projectId === '500');
+ck('mapCfFileToVersion dep is required', fvDep.dependencies[0].type === 'required');
+
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

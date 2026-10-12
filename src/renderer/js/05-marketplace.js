@@ -35,17 +35,26 @@ function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.in
 // warnings, and real byte progress — single file for mods/plugins, per-file for modpacks.
 let installState={item:null,detail:null,versionId:null,busy:false,done:false};
 const imFmtBytes=n=>{if(!n)return'—';if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(0)+' KB';if(n<1073741824)return (n/1048576).toFixed(1)+' MB';return (n/1073741824).toFixed(2)+' GB'};
+// v5.3.0: return BOTH `loader` (the matching FAMILY - paper/purpur/leaf/folia all accept Paper
+// plugins, so the compat match keeps the coarse group) and `software` (the EXACT jar name, for the
+// "YOUR SERVER" label). Before this, the family value WAS the label, so a Leaf server showed
+// "YOUR SERVER: paper". neoforge is checked BEFORE forge on purpose: "neoforge" contains "forge",
+// so a forge test first would mislabel every NeoForge server as Forge.
 function imDetectServer(){
   const jar=String(state.files?.jar||'');
   const mc=(jar.match(/\b(1\.\d{1,2}(?:\.\d{1,2})?|26\.\d{1,2})\b/)||[])[1]||null;
-  let loader='unknown';
-  if(/velocity|bungee|waterfall/i.test(jar))loader='proxy';
-  else if(/paper|purpur|leaf|folia/i.test(jar)||state.files?.hasSpigotConfig)loader='paper';
-  else if(/forge/i.test(jar))loader='forge';
-  else if(/neoforge/i.test(jar))loader='neoforge';
-  else if(/fabric|quilt/i.test(jar))loader='fabric';
-  else if(jar)loader='vanilla';
-  return {mc,loader};
+  let loader='unknown',software='unknown';
+  if(/velocity|bungee|waterfall/i.test(jar)){loader='proxy';software='velocity'}
+  else if(/purpur/i.test(jar)){loader='paper';software='purpur'}
+  else if(/leaf/i.test(jar)){loader='paper';software='leaf'}
+  else if(/folia/i.test(jar)){loader='paper';software='folia'}
+  else if(/paper/i.test(jar)){loader='paper';software='paper'}
+  else if(state.files?.hasSpigotConfig){loader='paper';software='paper'}
+  else if(/neoforge/i.test(jar)){loader='neoforge';software='neoforge'}
+  else if(/forge/i.test(jar)){loader='forge';software='forge'}
+  else if(/fabric|quilt/i.test(jar)){loader='fabric';software='fabric'}
+  else if(jar){loader='vanilla';software='vanilla'}
+  return {mc,loader,software};
 }
 function imBadge(ok,label,warn){return `<span class="im-badge ${ok===true?'ok':ok===false?'bad':warn?'warn':''}">${label}</span>`}
 function imRenderCompat(){
@@ -70,7 +79,7 @@ function imRenderCompat(){
     const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind]||null;
     const match=wanted?(srv.loader!=='unknown'&&wanted.includes(srv.loader)):null;
-    cells.push(`<div class="im-compat-cell"><small>YOUR SERVER</small>${imBadge(match,srv.loader==='unknown'?'unknown':srv.loader,itemLoaders.length&&match===false)}</div>`);
+    cells.push(`<div class="im-compat-cell"><small>YOUR SERVER</small>${imBadge(match,srv.software==='unknown'?'unknown':srv.software,itemLoaders.length&&match===false)}</div>`);
   }
   // server-side support (Modrinth env)
   if(detail?.env){const sup=detail.env.server;cells.push(`<div class="im-compat-cell"><small>SERVER-SIDE</small>${imBadge(sup==='required'?true:sup==='optional'?null:false,sup==='required'?'required':sup==='optional'?'optional':'client-only',sup!=='required')}</div>`)}
@@ -138,7 +147,11 @@ function imRenderDeps(){
     return `<li class="im-dep${bad?' bad':''}${done?' done':''}">${d.icon?`<img src="${esc(d.icon)}" alt="">`:''}<span class="im-dep-name">${esc(name)}</span><span class="im-dep-tag">${bad?esc(t('im.depIncompat')):done?esc(t('im.depInstalled')):esc(t('im.depRequired'))}</span></li>`;
   }).join('');
   const need=deps.filter(d=>d.type==='required'&&!imDepInstalled(d)).length;
-  btn.hidden=need===0;
+  // v5.3.0: CurseForge has no official relationType table, so its deps are best-effort (uncertain).
+  // List them, but never offer the one-click auto-install for a CurseForge item (matches the MCP
+  // planner, which also refuses to auto-install uncertain CF deps).
+  const cfNoAuto=installState.item?.source==='curseforge';
+  btn.hidden=cfNoAuto||need===0;
   btn.textContent=t('im.installDeps',{n:need});
 }
 // SOURCE LINKS: project page + source (if Modrinth gave one). Both go through the allowlisted

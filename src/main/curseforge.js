@@ -186,9 +186,11 @@ function cfDependencies(file) {
 }
 
 // Map a CF file object to the SAME version shape the renderer's version picker uses for Modrinth
-// ({ id, number, name, date, gameVersions, loaders, size, blocked }). CF files carry no loader list
-// and no per-version dependency graph, so `loaders` is left empty and `blocked` marks files the
-// author disabled for third-party downloads (the picker disables those). Pure.
+// ({ id, number, name, date, gameVersions, loaders, size, blocked, dependencies }). CF files carry no
+// loader list, so `loaders` stays empty and `blocked` marks files the author disabled for third-party
+// downloads. v5.3.0: `dependencies` now carries cfDependencies(file) so the install modal can LIST
+// them - but every entry is `uncertain` (CF publishes no relationType table), so the UI must NOT offer
+// the one-click auto-install (see imRenderDeps). Pure.
 function mapCfFileToVersion(file) {
   if (!file) return null;
   const sha1 = (file.hashes || []).find(h => Number(h.algo) === 1)?.value || null;
@@ -202,7 +204,7 @@ function mapCfFileToVersion(file) {
     size: file.fileLength || 0,
     sha1,
     blocked: !cfFileInstallable(file).ok,
-    dependencies: [],
+    dependencies: cfDependencies(file),
   };
 }
 
