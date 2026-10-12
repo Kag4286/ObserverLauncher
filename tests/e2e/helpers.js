@@ -74,7 +74,7 @@ function makeFixtureServer() {
   fs.writeFileSync(path.join(root, 'eula.txt'), 'eula=true\n');
   fs.writeFileSync(
     path.join(root, 'server.properties'),
-    ['motd=E2E Fixture Server', 'server-port=25565', 'online-mode=false', 'max-players=20', ''].join('\n')
+    ['motd=E2E Fixture Server', 'server-port=25565', 'online-mode=false', 'max-players=20', 'difficulty=normal', 'gamemode=survival', ''].join('\n')
   );
   fs.mkdirSync(path.join(root, 'plugins'));
   // A plugin jar so the Content tab renders a real row (content lists filter *.jar).

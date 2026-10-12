@@ -71,6 +71,17 @@ function propRow(k,v){
   else ctl=`<span class="prop-ctl"><input data-property="${esc(k)}" value="${esc(val)}" placeholder="${esc(hint)}" spellcheck="false"></span>`;
   return `<label data-prop-row data-prop-search="${search}" title="${title}" class="prop-row${isBool?' is-bool':''}"><span class="prop-label">${esc(label)}<small class="prop-key">${esc(k)}</small></span>${ctl}</label>`;
 }
+// 5.4.0: unsaved-changes tracking. The form counts as dirty only while it DIFFERS from the last
+// rendered/saved snapshot, so switching difficulty back to its original value clears the cue.
+// A plain boolean latched on the first edit and stayed on forever (reported bug).
+let _propsBaseline=null;
+function snapshotPropsForm(){
+  if(isProxyServer())return $('#propertiesRaw').value;
+  const o={};
+  $$('[data-property]').forEach(input=>{o[input.dataset.property]=input.type==='checkbox'?(input.checked?'true':'false'):input.value.trim()});
+  return JSON.stringify(o);
+}
+function capturePropsBaseline(){try{_propsBaseline=snapshotPropsForm()}catch{_propsBaseline=null}}
 function renderProperties(props){
   const keys=Object.keys(props);
   const byGroup={};PROPERTY_GROUPS.forEach(g=>byGroup[g.id]=[]);const advanced=[];
@@ -81,5 +92,7 @@ function renderProperties(props){
   // enhanced (enhanceAll() only ran at load). Enhance them now so the enum fields (difficulty,
   // gamemode) get the animated dropdown instead of the OS popup.
   if(window.enhanceAllSelects)try{window.enhanceAllSelects($('#propertiesGrid'))}catch{}
+  capturePropsBaseline();
+  if(typeof updatePropsDirty==='function')updatePropsDirty();
 }
-async function refreshProxyProperties(){const r=await window.observer.readRawProperties();if(r.ok)$('#propertiesRaw').value=r.content}
+async function refreshProxyProperties(){const r=await window.observer.readRawProperties();if(r.ok){$('#propertiesRaw').value=r.content;capturePropsBaseline();if(typeof updatePropsDirty==='function')updatePropsDirty()}}

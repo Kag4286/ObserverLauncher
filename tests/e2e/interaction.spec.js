@@ -189,6 +189,29 @@ test('Properties tab edits server.properties and persists the change', async () 
   expect(check.content).toContain('motd=E2E Edited');
 });
 
+// 5.4.0: the Apply pulse must clear when an edit is reverted. The form compares against the last
+// saved snapshot, so changing difficulty away and back must leave NO unsaved-changes cue.
+test('Properties Apply cue clears when an edit is reverted', async () => {
+  await gotoTab(win, 'properties');
+  await win.locator('#propertiesSearch').fill('difficulty');
+  await win.waitForTimeout(150);
+
+  const sel = win.locator('[data-property="difficulty"]');
+  await expect(sel).toBeVisible();
+  const apply = win.locator('#saveProperties');
+
+  // baseline: no cue on a freshly rendered form
+  await expect(apply).not.toHaveClass(/dirty/);
+
+  // change away -> cue appears
+  await selectByValue(win, '[data-property="difficulty"]', 'hard');
+  await expect(apply).toHaveClass(/dirty/);
+
+  // revert to the original -> cue clears (the reported bug latched it on)
+  await selectByValue(win, '[data-property="difficulty"]', 'normal');
+  await expect(apply).not.toHaveClass(/dirty/);
+});
+
 // --- 1.5.0: responsive breakpoint (the addStyleTag hack is bypassed on purpose here) ---
 // launchApp injects a style tag that neutralises the 1100px breakpoint so nav clicks work on small
 // CI screens. That leaves the REAL responsive layout untested. This test removes the injected hack,

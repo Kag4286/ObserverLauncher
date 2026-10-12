@@ -10,11 +10,33 @@ const crypto = require('crypto');
 // operation (POSIX rename(2), and Windows' MoveFileEx which fs.renameSync uses does the same,
 // replacing the destination). Same-directory temp file is required so the rename can't cross
 // filesystems/volumes, which would silently turn "atomic rename" into "non-atomic copy".
+// Synchronous sleep without spawning a process (Atomics.wait works on Node's main thread).
+function sleepSync(ms) {
+  try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { /* ignore */ }
+}
 function writeFileAtomic(filePath, content) {
   const dir = path.dirname(filePath);
   const tmp = path.join(dir, `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}`);
   fs.writeFileSync(tmp, content);
-  fs.renameSync(tmp, filePath);
+  // BUGFIX (5.4.0): on Windows fs.renameSync onto an EXISTING file can throw EPERM/EACCES when
+  // another process (antivirus scanning the fresh temp file, an editor, or the running server)
+  // holds a transient handle on the destination. Retry a few times — the rename is atomic when it
+  // succeeds — then fall back to a copy + unlink so a save never hard-fails on a momentary lock.
+  const retryable = e => e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY');
+  let lastErr;
+  for (let i = 0; i < 5; i++) {
+    try { fs.renameSync(tmp, filePath); return; }
+    catch (e) {
+      lastErr = e;
+      // A non-retryable error (ENOENT, EXDEV, ...) is a real failure — clean the temp and rethrow
+      // instead of masking it with a copy that would only fail the same way.
+      if (!retryable(e)) { try { fs.unlinkSync(tmp); } catch {} throw e; }
+      sleepSync(60);
+    }
+  }
+  // Rename kept getting a transient lock: fall back to copy + unlink so the save still lands.
+  try { fs.copyFileSync(tmp, filePath); fs.unlinkSync(tmp); return; }
+  catch { try { fs.unlinkSync(tmp); } catch {} throw lastErr; }
 }
 function readJsonList(root, name) { try { return JSON.parse(fs.readFileSync(path.join(root, name), 'utf8')); } catch { return []; } }
 function writeJsonList(root, name, list) { writeFileAtomic(path.join(root, name), JSON.stringify(list, null, 2)); }

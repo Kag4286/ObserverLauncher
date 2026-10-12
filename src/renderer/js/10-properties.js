@@ -3,6 +3,9 @@
 // Search + group chips share one filter pass: text matches highlight and auto-open collapsed
 // groups; the active chip narrows which groups are shown at all.
 let propGroupFilter='all';
+// 5.4.0: mirror propsDirty onto the Apply button (same .dirty cue as Settings). propsDirty alone
+// only suppressed re-renders, so the button never showed that there were unsaved edits.
+function updatePropsDirty(){const b=$('#saveProperties');if(b)b.classList.toggle('dirty',propsDirty)}
 function applyPropFilters(){
   const qRaw=$('#propertiesSearch').value.trim();
   const q=qRaw.toLowerCase();
@@ -34,13 +37,24 @@ $$('[data-prop-filter]').forEach(c=>c.onclick=()=>{
   applyPropFilters();
 });
 // Track unsaved edits in both property editors (see propsDirty above). Programmatic value writes in
-// renderProperties/refreshProxyProperties don't fire 'input', so this only trips on real typing.
-document.addEventListener('input',e=>{const el=e.target;if(el&&(el.closest?.('#propertiesGrid')||el.id==='propertiesRaw'))propsDirty=true});
+// renderProperties/refreshProxyProperties don't fire these, so this only trips on real edits.
+// 5.4.0 BUGFIX: text fields fire 'input', but the enum dropdown (ol-select) and the boolean switch
+// only fire 'change' — listening to 'input' alone meant picking a new difficulty/gamemode or toggling
+// a switch never marked the form dirty, so the Apply pulse never appeared (and a background
+// refreshUI could then re-render the grid and drop the edit). Listen to BOTH.
+const markPropsDirty=e=>{const el=e.target;if(!el||!(el.closest?.('#propertiesGrid')||el.id==='propertiesRaw'))return;
+  // Compare against the last snapshot so returning a field to its original value clears the cue.
+  let cur=null;try{cur=snapshotPropsForm()}catch{}
+  propsDirty=_propsBaseline===null?true:(cur!==_propsBaseline);
+  updatePropsDirty();
+};
+document.addEventListener('input',markPropsDirty);
+document.addEventListener('change',markPropsDirty);
 $('#saveProperties').onclick=()=>withBusy($('#saveProperties'),async()=>{
   if(isProxyServer()){
     const raw=$('#propertiesRaw').value;
     if(raw.length>200000) return toast(t('toast.tomlBig'),'error');
-    const r=await window.observer.saveRawProperties(raw);if(r.ok)propsDirty=false;return r.ok?toast(t('toast.tomlSaved'),'success'):toast(r.error||t('toast.propsFolder'),'error');
+    const r=await window.observer.saveRawProperties(raw);if(r.ok){capturePropsBaseline();propsDirty=false;updatePropsDirty()}return r.ok?toast(t('toast.tomlSaved'),'success'):toast(r.error||t('toast.propsFolder'),'error');
   }
   const p={}; let firstInvalid=null;
   const validators={
@@ -65,5 +79,5 @@ $('#saveProperties').onclick=()=>withBusy($('#saveProperties'),async()=>{
     }
   });
   if(firstInvalid){ firstInvalid.focus(); return; }
-  const r=await window.observer.saveProperties(p);if(r.ok){propsDirty=false;state.files.properties=p;loadConnectInfo();toast(t('toast.propsSaved'),'success')}else toast(friendlyError(r.error)||t('toast.propsFolder'),'error')
+  const r=await window.observer.saveProperties(p);if(r.ok){capturePropsBaseline();propsDirty=false;updatePropsDirty();state.files.properties=p;loadConnectInfo();toast(t('toast.propsSaved'),'success')}else toast(friendlyError(r.error)||t('toast.propsFolder'),'error')
 });

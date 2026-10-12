@@ -278,10 +278,10 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .apply-dirty-hint{font:600 12px var(--font-ui);color:var(--warning);white-space:nowrap}
 .apply-dirty-hint::before{content:'●';margin-right:6px;font-size:10px;vertical-align:middle}
 #saveSettings{position:relative}
-#saveSettings.dirty{box-shadow:0 0 0 2px var(--warning-weak),0 0 18px rgba(255,200,87,.35);animation:applyPulse calc(var(--dur-pulse) * 1.4) var(--ease-out) infinite}
+#saveSettings.dirty,#saveProperties.dirty{box-shadow:0 0 0 2px var(--warning-weak),0 0 18px rgba(255,200,87,.35);animation:applyPulse calc(var(--dur-pulse) * 1.4) var(--ease-out) infinite}
 @keyframes applyPulse{0%,100%{box-shadow:0 0 0 2px var(--warning-weak),0 0 14px rgba(255,200,87,.25)}50%{box-shadow:0 0 0 2px var(--warning),0 0 26px rgba(255,200,87,.5)}}
-@media (prefers-reduced-motion:reduce){#saveSettings.dirty{animation:none;box-shadow:0 0 0 2px var(--warning)}}
-html.motion-lite #saveSettings.dirty{animation:none;box-shadow:0 0 0 2px var(--warning)}
+@media (prefers-reduced-motion:reduce){#saveSettings.dirty,#saveProperties.dirty{animation:none;box-shadow:0 0 0 2px var(--warning)}}
+html.motion-lite #saveSettings.dirty,html.motion-lite #saveProperties.dirty{animation:none;box-shadow:0 0 0 2px var(--warning)}
 .folder-status{display:block;margin-top:8px}
 .folder-status.ok{color:var(--success)}
 .jvm-preview{margin-top:10px;padding:10px 12px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);font:11px/1.7 var(--font-mono);color:var(--text-muted);word-break:break-all}

@@ -41,6 +41,27 @@ All notable changes to ObserverLauncher are documented here. Format follows
   new folder. It refuses a folder already owned by another instance, the same rule `addInstance`
   enforces, and re-seeds ctx so the runtime folder/watcher follow.
 
+### Fixed — server.properties save could fail with EPERM on Windows
+- **`writeFileAtomic` used a bare `fs.renameSync`**, which on Windows can throw `EPERM`/`EACCES`/`EBUSY`
+  when another process (antivirus, an editor, the running server) holds a transient handle on the
+  destination file. The rename is now retried a few times, then falls back to copy + unlink. A
+  non-retryable error (`ENOENT`, `EXDEV`) still rethrows — a real failure is never masked by a copy
+  that would fail the same way. New `tests/fs-utils-atomic.test.js` proves the retry, the fallback,
+  and the rethrow.
+
+### Fixed — the properties Apply button never showed unsaved edits
+- **Two causes.** `propsDirty` only suppressed re-renders; it never toggled the `.dirty` cue on
+  `#saveProperties`. And the edit listener only watched `input`, so picking a new enum value in the
+  animated dropdown (ol-select) or flipping a boolean switch — which fire `change`, not `input` — was
+  never marked dirty. The listener now watches BOTH events, and `updatePropsDirty()` mirrors the flag
+  onto the button with the same pulse Settings uses. The cue clears on save or when the server folder
+  changes (the three `propsDirty=false` reset points). There is no auto-save: Apply is still the only
+  path that writes server.properties.
+- **The cue also latched on when an edit was reverted.** `propsDirty` was a plain boolean set on the
+  first edit; returning a field to its original value never cleared it. The form now compares against
+  a snapshot of the last rendered/saved values (`_propsBaseline`), the same approach Settings uses, so
+  reverting clears the cue. Covered by a new e2e check.
+
 ### Fixed — instance names could be unbounded
 - **`addInstance` did not cap or clean a display name.** A long folder basename, or a `name` passed
   by the MCP `create_instance` tool, was stored as-is; a name with a newline could break the rail and
