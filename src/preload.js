@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('observer', {
   instanceRemove: id => ipcRenderer.invoke('instances:remove', id),
   instanceSnapshot: id => ipcRenderer.invoke('instances:snapshot', id),
   instanceProbe: folder => ipcRenderer.invoke('instances:probe', folder),
+  instanceRelink: payload => ipcRenderer.invoke('instances:relink', payload),
   onLog: cb => ipcRenderer.on('server:log', (_, d) => cb(d)), onState: cb => ipcRenderer.on('server:state', (_, d) => cb(d)), onMetrics: cb => ipcRenderer.on('server:metrics', (_, d) => cb(d)), onLive: cb => ipcRenderer.on('server:live', (_, d) => cb(d)), onFiles: cb => ipcRenderer.on('server:files', (_, d) => cb(d)), onBuildDone: cb => ipcRenderer.on('wizard:build-done', (_, d) => cb(d)), onWizardProgress: cb => ipcRenderer.on('wizard:progress', (_, d) => cb(d)), onJavaProgress: cb => ipcRenderer.on('java:progress', (_, d) => cb(d)), onMarketProgress: cb => ipcRenderer.on('market:progress', (_, d) => cb(d)), onIconsUpdate: cb => ipcRenderer.on('icons:update', (_, d) => cb(d)), onEditorExternal: cb => ipcRenderer.on('editor:external', (_, d) => cb(d)),
   checkUpdate: () => ipcRenderer.invoke('app:check-update'),
   downloadUpdate: () => ipcRenderer.invoke('app:download-update'),

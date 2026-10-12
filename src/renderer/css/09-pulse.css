@@ -76,7 +76,7 @@ html.is-starting .topbar .status-pill{border-color:var(--accent);box-shadow:0 0 
 .panel-head{margin-bottom:var(--pad-panel);padding-bottom:8px;border-bottom:var(--hairline) solid var(--border)}
 
 /* ============ TOAST — elevated, once, then gone ============ */
-#toast{position:fixed;left:18px;bottom:18px;z-index:80;background:var(--panel-raised);border:1px solid var(--border-strong);color:var(--text);padding:10px 14px;border-radius:var(--r);font:600 12.5px var(--font-ui);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .16s var(--ease-out),transform .16s var(--ease-out)}
+#toast{position:fixed;left:18px;bottom:18px;z-index:80;background:var(--panel-raised);border:1px solid var(--border-strong);color:var(--text);padding:10px 14px;border-radius:var(--r);font:600 12.5px var(--font-ui);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .16s var(--ease-out),transform .16s var(--ease-out);max-width:min(90vw,440px);overflow-wrap:anywhere}
 #toast.show{opacity:1;transform:none;pointer-events:auto}
 #toast.show.success{border-color:var(--success);box-shadow:0 0 0 1px rgba(0,229,160,.25)}
 #toast.show.error{border-color:var(--danger);box-shadow:0 0 0 1px rgba(255,59,92,.25)}

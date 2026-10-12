@@ -144,4 +144,4 @@ window.LOCALES.vi = {
 
 
 'set.tunnelT':'Tunnel Internet','set.tunnelD':'chia sẻ server online với Playit',
-'set.catSetup':'Thiết lập','set.catPersonal':'Cá nhân','set.catAutomation':'Tự động','set.catIntegrations':'Tích hợp','set.catAdvanced':'Nâng cao','set.grpShare':'Chia sẻ server','set.grpTools':'Kết nối công cụ','set.adv':'Nâng cao','set.netAdv':'Mạng nâng cao' };
+'set.catSetup':'Thiết lập','set.catPersonal':'Cá nhân','set.catAutomation':'Tự động','set.catIntegrations':'Tích hợp','set.catAdvanced':'Nâng cao','set.grpShare':'Chia sẻ server','set.grpTools':'Kết nối công cụ','set.adv':'Nâng cao','set.netAdv':'Mạng nâng cao','as.title':'Thêm máy chủ','as.sub':'Tạo máy chủ mới, hoặc trỏ launcher vào máy chủ bạn đã có sẵn.','as.new':'Tạo máy chủ mới','as.newSub':'Chọn một thư mục trống, launcher sẽ tải máy chủ về cho bạn.','as.existingSub':'Trỏ tới thư mục đã có sẵn file server và world.','inst.missing':'không thấy thư mục','inst.missingTip':'Thư mục máy chủ này không còn tồn tại. Trỏ lại tới thư mục mới, hoặc xoá máy chủ khỏi danh sách.','inst.relink':'Trỏ lại thư mục','inst.relinked':'Đã trỏ máy chủ tới thư mục mới.' };

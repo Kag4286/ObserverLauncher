@@ -22,8 +22,7 @@
     <div class="instance-list" id="instanceList" hidden>
       <p class="instance-list-label" data-i18n="nav.instances">Instances</p>
       <div class="instance-items" id="instanceItems" role="list"></div>
-      <button type="button" class="inst-add" id="addInstanceBtn"><span aria-hidden="true">+</span> <span data-i18n="nav.addInstance">Add instance</span></button>
-      <button type="button" class="inst-add inst-add-existing" id="addExistingBtn"><span aria-hidden="true">⌂</span> <span data-i18n="inst.addExisting">Add existing folder</span></button>
+      <button type="button" class="inst-add" id="addServerBtn"><span aria-hidden="true">+</span> <span data-i18n="nav.addInstance">Add server</span></button>
     </div>
     <nav id="nav" class="rail-nav" role="navigation" aria-label="Main">
       <div class="nav-group">
@@ -818,10 +817,31 @@
     </div>
   </div>
 </div>
+<!-- 5.4.0: one entry point for adding a server. A single choice modal replaces the two rail
+     buttons (create new vs add existing), which were easy to mix up. -->
+<div id="addServerModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="asTitle">
+  <div class="modal confirm-modal">
+    <div class="confirm-head"><span class="confirm-ico" id="asIco">+</span><h2 id="asTitle" data-i18n="as.title">Add a server</h2></div>
+    <p class="confirm-body" data-i18n="as.sub">Create a fresh server, or point the launcher at one you already have.</p>
+    <div class="as-choices">
+      <button type="button" class="as-choice" id="asNew">
+        <b data-i18n="as.new">Create new server</b>
+        <span data-i18n="as.newSub">Pick an empty folder; the launcher downloads the server for you.</span>
+      </button>
+      <button type="button" class="as-choice" id="asExisting">
+        <b data-i18n="inst.addExisting">Add existing folder</b>
+        <span data-i18n="as.existingSub">Point at a folder that already has a server jar and world.</span>
+      </button>
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="btn secondary" id="asCancel" data-i18n="cf.cancel">Cancel</button>
+    </div>
+  </div>
+</div>
 <div id="promptModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <div class="modal confirm-modal">
     <div class="confirm-head"><span class="confirm-ico" id="pmIco">?</span><h2 id="pmTitle">Rename</h2></div>
-    <input type="text" id="pmInput" class="pm-input" autocomplete="off" maxlength="64">
+    <input type="text" id="pmInput" class="pm-input" autocomplete="off" maxlength="60">
     <div class="confirm-actions">
       <button type="button" class="btn secondary" id="pmCancel" data-i18n="cf.cancel">Cancel</button>
       <button type="button" class="btn primary" id="pmOk" data-i18n="cf.ok">OK</button>

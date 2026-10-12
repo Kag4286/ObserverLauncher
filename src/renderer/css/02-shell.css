@@ -86,6 +86,10 @@ html.motion-lite .beginner-share{animation:none}
 .inst-item:hover .inst-act,.inst-item.active .inst-act{display:inline-flex}
 .inst-act:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel)}
 .inst-act[data-act="remove"]:hover{color:var(--danger)}
+/* 5.4.0: instance whose folder is gone. Greyed, with a small tag and a relink action. */
+.inst-item.missing{opacity:.6}
+.inst-item.missing:hover{opacity:.85}
+.inst-missing-tag{font-style:normal;font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--danger);border:1px solid var(--danger);border-radius:3px;padding:1px 4px;margin-left:4px;white-space:nowrap}
 /* MOTION-LITE: kill the instance-list motion too, matching the rail contract. */
 html.motion-lite .inst-item{animation:none}
 html.motion-lite .inst-item::before,html.motion-lite .inst-item::after{display:none}

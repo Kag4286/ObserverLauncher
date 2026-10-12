@@ -198,13 +198,35 @@ function newInstanceId() {
   return require('crypto').randomBytes(4).toString('hex');
 }
 
+// 5.4.0: instance display names are capped and cleaned in ONE place so both addInstance (a folder
+// basename, or a name from the MCP create_instance tool) and renameInstance agree. Control chars
+// are collapsed to spaces: a `name` coming from an AI client could carry a newline that would break
+// the rail/toast layout. Kept short enough to stay readable in the rail and the narrow dropdown.
+const INSTANCE_NAME_MAX = 60;
+function sanitizeInstanceName(raw) {
+  return String(raw == null ? '' : raw)
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, INSTANCE_NAME_MAX);
+}
+
 // Lightweight list for the rail + Q2 tunnel overview: id/name/serverPath + the two
 // per-instance tunnel fields the overview table needs. No secrets, no big fields
 // (tunnelAddress/autoTunnel are not sensitive — the address is meant to be shared).
+// 5.4.0: `missing` flags an instance whose folder is gone (deleted, or on an unplugged drive).
+// The renderer greys the row, disables Start, and offers a relink. We do NOT auto-remove: the
+// folder may only be temporarily unavailable (removable media, network share).
 function listInstances() {
   const store = loadSettingsStore();
   const instances = (Array.isArray(store.instances) ? store.instances : [])
-    .map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0 }));
+    .map(i => {
+      const serverPath = i.serverPath || '';
+      let missing = false;
+      if (!serverPath) missing = true;
+      else { try { missing = !fs.existsSync(serverPath); } catch { missing = true; } }
+      return { id: i.id, name: i.name || '', serverPath, missing, tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0 };
+    });
   return { instances, activeInstanceId: store.activeInstanceId || (instances[0] && instances[0].id) || null };
 }
 
@@ -220,7 +242,7 @@ function addInstance({ name, serverPath } = {}) {
   const id = newInstanceId();
   // F3: names are display-only (the id is the key), but two identical names are confusing in the
   // rail/dropdown. Auto-suffix a duplicate instead of rejecting: 'Survival' -> 'Survival (2)'.
-  let baseName = String(name || '').trim() || (sp ? path.basename(sp) : '') || `Server ${instances.length + 1}`;
+  let baseName = sanitizeInstanceName(name) || sanitizeInstanceName(sp ? path.basename(sp) : '') || `Server ${instances.length + 1}`;
   const taken = new Set(instances.map(i => String(i.name || '')));
   if (taken.has(baseName)) {
     let n = 2;
@@ -259,7 +281,7 @@ function findInstanceForEdit(id) {
 function renameInstance(id, name) {
   const { store, instances, inst } = findInstanceForEdit(id);
   if (!inst) return { ok: false, error: 'No such instance.' };
-  inst.name = String(name || '').trim().slice(0, 60) || inst.name || 'Server';
+  inst.name = sanitizeInstanceName(name) || inst.name || 'Server';
   saveSettings({ ...store, instances });
   return { ok: true, id, name: inst.name };
 }
@@ -295,6 +317,22 @@ function removeInstance(id) {
   return { ok: true, instances: instances.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0 })), activeInstanceId };
 }
 
+// 5.4.0: point an instance at a NEW folder (after its old one was deleted or moved). Refuses a
+// folder already owned by ANOTHER instance (two processes on one serverPath corrupt the world),
+// same rule addInstance enforces. Returns the updated instance list for the caller to re-seed.
+function relinkInstance(id, serverPath) {
+  const store = loadSettingsStore();
+  const instances = Array.isArray(store.instances) ? store.instances.map(i => ({ ...i })) : [];
+  const target = instances.find(i => i.id === id);
+  if (!target) return { ok: false, error: 'No such instance.' };
+  const sp = String(serverPath || '').trim();
+  if (!sp) return { ok: false, error: 'Choose a folder.' };
+  if (instances.some(i => i.id !== id && i.serverPath === sp)) return { ok: false, error: 'That folder is already used by another instance.' };
+  const next = instances.map(i => i.id === id ? { ...i, serverPath: sp } : i);
+  saveSettings({ ...store, instances: next });
+  return { ok: true, instances: next.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0 })) };
+}
+
 function saveSettings(settings) {
   // Accept either a fully nested store (has instances[]) or the flat view (normal
   // callers). flattenActive strips instances, so a flat object is unambiguous.
@@ -326,4 +364,4 @@ function saveSettingsFor(instanceId, flat) {
   writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
-module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, INSTANCE_ACCENTS, removeInstance };
+module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, INSTANCE_ACCENTS, removeInstance, relinkInstance, sanitizeInstanceName, INSTANCE_NAME_MAX };

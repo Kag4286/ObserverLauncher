@@ -172,7 +172,7 @@ function renderInstanceList(){
   wrap.hidden=list.length===0;
   if(list.length===0)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
-  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||'',i.accent||'',i.artSeed||0])]);
+  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||'',i.accent||'',i.artSeed||0,!!i.missing])]);
   if(sig===lastInstSig){
     // Same list/active/names -> just refresh the dots (status can change without a rebuild).
     host.querySelectorAll('.inst-item').forEach(row=>{
@@ -189,23 +189,28 @@ function renderInstanceList(){
     const st=instanceDotStatus(inst.id,activeId);
     // A div (not a button) so the rename/remove icon buttons can live INSIDE it without nesting
     // <button> elements (invalid HTML). Click anywhere on the row switches; the icons stopPropagation.
+    // 5.4.0: a missing folder (deleted, or a drive that is not mounted) greys the row, shows a
+    // relink button, and the dot reads as stopped. We never auto-remove the instance.
+    const isMissing=!!inst.missing;
     const row=document.createElement('div');
-    row.className='inst-item'+(isActive?' active':'');
+    row.className='inst-item'+(isActive?' active':'')+(isMissing?' missing':'');
     row.dataset.instance=inst.id;
     row.setAttribute('role','listitem');
     row.tabIndex=0;
-    row.title=t('inst.switchTip');
+    row.title=isMissing?t('inst.missingTip'):t('inst.switchTip');
     // Stagger reveal: same cadence as tab-content rows (--stagger per index, capped so a long
     // list never waits). Re-runs on every render, so add/remove/switch animates.
     row.style.animationDelay=(idx*28)+'ms';
-    row.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,st)
-      +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>'
+    row.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,isMissing?'stopped':st)
+      +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+(isMissing?' <i class="inst-missing-tag">'+esc(t('inst.missing'))+'</i>':'')+'</span>'
       +'<span class="inst-acts">'
+        +(isMissing?'<button type="button" class="inst-act" data-act="relink" title="'+esc(t('inst.relink'))+'" aria-label="'+esc(t('inst.relink'))+'">↻</button>':'')
         +'<button type="button" class="inst-act" data-act="rename" title="'+esc(t('inst.rename'))+'" aria-label="'+esc(t('inst.rename'))+'">✎</button>'
         +'<button type="button" class="inst-act" data-act="remove" title="'+esc(t('inst.remove'))+'" aria-label="'+esc(t('inst.remove'))+'">✕</button>'
       +'</span>';
     row.onclick=e=>{ if(e.target.closest('.inst-act'))return; switchInstance(inst.id); };
     row.onkeydown=e=>{ if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.inst-act')){e.preventDefault();switchInstance(inst.id);} };
+    row.querySelector('[data-act="relink"]')?.addEventListener('click',e=>{e.stopPropagation();relinkInstancePrompt(inst)});
     row.querySelector('[data-act="rename"]').onclick=e=>{e.stopPropagation();renameInstancePrompt(inst)};
     row.querySelector('[data-act="remove"]').onclick=e=>{e.stopPropagation();removeInstancePrompt(inst)};
     host.appendChild(row);
@@ -402,6 +407,31 @@ async function addExistingInstance(folder){
   toast(t('inst.added'),'success');
   return add.id;
 }
+// 5.4.0: one entry point for adding a server. A single choice modal replaces the two rail buttons,
+// which were easy to mix up ("+ Add instance" vs "Add existing folder").
+function openAddServerModal(){
+  const m=$('#addServerModal');if(!m)return;
+  m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  trapFocus(m);
+  setTimeout(()=>$('#asNew')?.focus(),20);
+}
+function closeAddServerModal(){
+  const m=$('#addServerModal');if(!m||m.hidden)return;
+  m.classList.remove('show');m.hidden=true;
+  releaseFocus();
+}
+// 5.4.0: relink an instance whose folder went missing to a new folder. Reuses the instances:relink
+// IPC; the backend refuses a folder already owned by another instance.
+async function relinkInstancePrompt(inst){
+  let folder;
+  try{ folder=await window.observer.pickFolder({title:t('inst.pickExisting')}); }catch(e){ return toast(e?.message||'Could not open the folder picker.','error'); }
+  if(!folder)return;
+  let r;
+  try{ r=await window.observer.instanceRelink({id:inst.id,serverPath:folder}); }catch(e){ return toast(e?.message||'Could not relink the folder.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Could not relink the folder.','error');
+  await refreshFromState();
+  toast(t('inst.relinked'),'success');
+}
 async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t('toast.cmdInvalid'));const r=await window.observer.command(c);if(!r.ok)toast(r.error)}
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
@@ -416,7 +446,7 @@ $('#nav')?.addEventListener('keydown', e=>{
   else if(e.key==='End'){ e.preventDefault(); items[items.length-1]?.focus(); }
 });
 $$('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));$$('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));$$('[data-command]').forEach(b=>b.onclick=()=>{pushCmdHistory(b.dataset.command);command(b.dataset.command)});$$('[data-open]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.open));$$('[data-import]').forEach(b=>b.onclick=async()=>{const r=await window.observer.importContent(b.dataset.import);if(r.ok){state.files=r.files;refreshUI();toast(t('toast.importedRestart'))}else if(!r.cancelled)toast(r.error)});
-$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#addExistingBtn')?.addEventListener('click',addExistingInstance);$('#welcomeCreateBtn')?.addEventListener('click',()=>openNewServerWizard());$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true;const s=$('#logSearch');if(s){s.value='';const sc=$('#logSearchClear');if(sc)sc.hidden=true}logQuery='';updateLogHint()};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
+$('#chooseFolder').onclick=chooseFolder;$('#browseBtn').onclick=chooseFolder;$('#addServerBtn')?.addEventListener('click',openAddServerModal);$('#asNew')?.addEventListener('click',()=>{closeAddServerModal();openNewServerWizard()});$('#asExisting')?.addEventListener('click',()=>{closeAddServerModal();addExistingInstance()});$('#asCancel')?.addEventListener('click',closeAddServerModal);$('#addServerModal')?.addEventListener('click',e=>{if(e.target.id==='addServerModal')closeAddServerModal()});$('#welcomeCreateBtn')?.addEventListener('click',()=>openNewServerWizard());$('#exportConsole').onclick=async()=>{const btn=$('#exportConsole');const orig=btn.textContent;btn.disabled=true;try{const r=await window.observer.exportConsole();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');toast(t('con.exported',{n:r.count}),'success')}catch(e){toast(e?.message||t('con.exportFailed'),'error')}finally{btn.disabled=false;btn.textContent=orig}};$('#clearConsole').onclick=()=>{const o=$('#logOutput');o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`;o.classList.remove('has-content');const j=$('#logJump');if(j)j.hidden=true;const s=$('#logSearch');if(s){s.value='';const sc=$('#logSearchClear');if(sc)sc.hidden=true}logQuery='';updateLogHint()};$('#commandForm').onsubmit=async e=>{e.preventDefault();const v=$('#commandInput').value;pushCmdHistory(v);await command(v);$('#commandInput').value=''};
 function updateLogHint(){
   const countVisible=$$('#logOutput .log-line:not([hidden])').length;
   const hint=$('.log-hint');

@@ -12,7 +12,7 @@ All notable changes to ObserverLauncher are documented here. Format follows
 
 ## [5.4.0] — 2026-10-12
 
-**The Performance chart keeps 24 hours of history and survives a restart.** No settings migration.
+**The Performance chart keeps 24 hours of history and survives a restart. Missing instance folders are now flagged, and adding a server is one clear choice.** No settings migration.
 
 ### Added — 24h range + disk persistence
 - **The coarse metrics ring is now persisted to disk.** A new module `src/main/metrics-store.js`
@@ -32,10 +32,34 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - Instance ids are validated before use as a file name (a non-conforming id is hashed); a bad id can
   never escape the metrics folder.
 
+### Added — missing folder flag + relink
+- **`listInstances()` now reports a `missing` flag** when an instance's `serverPath` is empty or no
+  longer exists on disk. The rail greys that row, tags it "folder not found", shows a relink action,
+  and Start is blocked with a specific hint. The instance is NEVER auto-removed: the folder may only
+  be unavailable for now (unmounted drive, network share).
+- **New `relinkInstance(id, serverPath)`** (and the `instances:relink` IPC) points an instance at a
+  new folder. It refuses a folder already owned by another instance, the same rule `addInstance`
+  enforces, and re-seeds ctx so the runtime folder/watcher follow.
+
+### Fixed — instance names could be unbounded
+- **`addInstance` did not cap or clean a display name.** A long folder basename, or a `name` passed
+  by the MCP `create_instance` tool, was stored as-is; a name with a newline could break the rail and
+  the toast. Both paths now go through one `sanitizeInstanceName()` (control chars collapsed to
+  spaces, whitespace trimmed, capped at `INSTANCE_NAME_MAX = 60`), the same rule `renameInstance`
+  already applied. The toast also gained a `max-width` so a long name wraps instead of stretching
+  across the window.
+
+### Changed — one entry point for adding a server
+- **The two rail buttons ("+ Add instance" and "Add existing folder") are replaced by a single
+  "Add server" button** that opens a small choice modal: create a fresh server, or add an existing
+  folder. The two old buttons sat next to each other and were easy to confuse.
+
 ### Tests
 - New `tests/metrics-store.test.js` (append + buffered flush, load oldest-first with corrupt lines
   skipped, age filter, trim above/below threshold, delete, path-safety fallback, missing file -> []).
-- `tests/metrics-long-ring.test.js` still green with the raised cap. `npm test` green (102 files).
+- New `tests/instance-missing-relink.test.js` (missing flag for gone/empty paths, relink success and
+  refusal of empty/unknown/owned folders). i18n 1060 keys x 7.
+- `tests/metrics-long-ring.test.js` still green with the raised cap. `npm test` green; e2e 12 green.
 
 ## [5.3.1] — 2026-10-12
 

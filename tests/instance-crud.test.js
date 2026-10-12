@@ -85,11 +85,26 @@ try {
   ok('remove last: flat view safe', typeof S.loadSettings().memoryMax === 'number');
 
   // Persistence: a second load reads what we wrote (instance array survives a round-trip).
-  S.addInstance({ serverPath: '/srv/Persist' });
+  const persist = S.addInstance({ serverPath: '/srv/Persist' });
   const raw = JSON.parse(fs.readFileSync(path.join(userData, 'settings.json'), 'utf8'));
   ok('persisted: has instances[]', Array.isArray(raw.instances) && raw.instances.length === 1);
   ok('persisted: per-instance keys inside instance', raw.instances[0].serverPath === '/srv/Persist' && 'memoryMax' in raw.instances[0]);
   ok('persisted: no flat serverPath at top', raw.serverPath === undefined);
+
+  // 5.4.0: name sanitize + cap, shared by addInstance and renameInstance.
+  ok('sanitize: control chars -> spaces', S.sanitizeInstanceName('a\nb\tc') === 'a b c');
+  ok('sanitize: collapses whitespace + trims', S.sanitizeInstanceName('  a   b  ') === 'a b');
+  ok('sanitize: caps at INSTANCE_NAME_MAX', S.sanitizeInstanceName('x'.repeat(200)).length === S.INSTANCE_NAME_MAX);
+  ok('sanitize: INSTANCE_NAME_MAX is 60', S.INSTANCE_NAME_MAX === 60);
+  const longAdd = S.addInstance({ name: 'y'.repeat(200), serverPath: '/srv/LongName' });
+  ok('addInstance caps a long name', longAdd.ok === true && longAdd.instance.name.length === 60);
+  const nlAdd = S.addInstance({ name: 'line1\nline2', serverPath: '/srv/Newline' });
+  ok('addInstance strips newlines', nlAdd.ok === true && nlAdd.instance.name === 'line1 line2');
+  S.removeInstance(longAdd.id); S.removeInstance(nlAdd.id);
+  const rnLong = S.renameInstance(persist.id, 'z'.repeat(200));
+  ok('renameInstance caps a long name', rnLong.ok === true && rnLong.name.length === 60);
+  const rnNl = S.renameInstance(persist.id, 'line1\nline2');
+  ok('renameInstance strips newlines', rnNl.ok === true && rnNl.name === 'line1 line2');
 } finally {
   fs.rmSync(userData, { recursive: true, force: true });
 }

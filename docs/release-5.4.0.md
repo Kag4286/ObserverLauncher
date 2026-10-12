@@ -18,6 +18,16 @@ Now the launcher saves the samples to a small file on disk as it collects them. 
 
 The saving is done in small batches about once a minute, so it does not slow the app down or wear out your disk. If you remove a server instance, its saved history is deleted with it.
 
+## One button to add a server
+
+Adding a server used to mean choosing between two buttons in the sidebar, and it was easy to pick the wrong one. There is now a single **Add server** button that asks what you want: create a fresh server, or point the launcher at a folder you already have. The choice is the first thing you see, so there is nothing to guess.
+
+## A warning when a server folder is gone
+
+If you delete or move a server folder outside the launcher, the instance used to stay in the list as if nothing happened. Now the launcher notices. The instance is greyed out, tagged **folder not found**, and the Start button is disabled with a clear reason.
+
+You have two ways out. Point the instance at the folder's new location with **Relink folder**, which keeps your settings and history. Or remove the instance from the list. The launcher never deletes an instance on its own, because a folder can be missing only for a moment, like an external drive that is not plugged in.
+
 ## Upgrading
 
 Install 5.4.0 over your current version. No settings change, no migration. Your servers, worlds and settings are untouched.

@@ -569,5 +569,5 @@ $('#nswChooseFolder')?.addEventListener('click',async()=>{
   }
   nsw.folder=f;nswRender();
 });
-// Rail '+ Add instance' button opens this same wizard (step 1 picks the folder).
-$('#addInstanceBtn')?.addEventListener('click',()=>openNewServerWizard());
+// 5.4.0: the rail now has ONE "Add server" button that opens a choice modal (see 08-shell.js);
+// the 'create new' choice calls openNewServerWizard() from there.

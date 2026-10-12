@@ -116,8 +116,11 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   const cd=$('#consoleLiveDot'), cl=$('#consoleLiveLabel'); if(cd&&cl){ cd.className='live-dot'+(state.status==='running'?' on':state.status==='starting'||state.status==='stopping'?' busy':''); cl.textContent={starting:t('top.starting'),running:t('con.live'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||'stopped']||t('top.offline'); }
   // P0.1: disable Start when no folder / no runnable jar, highlight welcome card
   const hasFolder=!!s.serverPath; const hasJar=!!(f.jar||f.launchScript); const startBtn=$('#startBtn'), stopBtn=$('#stopBtn'), welcomeCard=$('#welcomeCard');
-  const canStart=hasFolder && hasJar && !!j.ok && state.status==='stopped';
-  if(startBtn){startBtn.disabled=!canStart; if(!hasFolder||!hasJar) startBtn.title=!hasFolder?t('top.startTipFolder'):!j.ok?t('top.startTipJava'):t('top.startTipNoJar'); else if(state.status!=='stopped') startBtn.title={starting:t('top.startTipStarting'), stopping:t('top.startTipStopping'), running:t('top.startTipRunning')}[state.status]||''; else startBtn.title='';}
+  // 5.4.0: if the ACTIVE instance's folder is gone, Start is blocked with a specific hint.
+  const activeInst=(Array.isArray(state.instances)?state.instances:[]).find(i=>i.id===state.activeInstanceId);
+  const folderMissing=!!(activeInst&&activeInst.missing);
+  const canStart=hasFolder && hasJar && !!j.ok && state.status==='stopped' && !folderMissing;
+  if(startBtn){startBtn.disabled=!canStart; if(folderMissing) startBtn.title=t('inst.missingTip'); else if(!hasFolder||!hasJar) startBtn.title=!hasFolder?t('top.startTipFolder'):!j.ok?t('top.startTipJava'):t('top.startTipNoJar'); else if(state.status!=='stopped') startBtn.title={starting:t('top.startTipStarting'), stopping:t('top.startTipStopping'), running:t('top.startTipRunning')}[state.status]||''; else startBtn.title='';}
   if(stopBtn) stopBtn.disabled=state.status==='stopped';
   // Restart is offered only while the server is fully running. While it is starting or stopping a
   // restart would race the in-flight transition, so we hide the button instead.

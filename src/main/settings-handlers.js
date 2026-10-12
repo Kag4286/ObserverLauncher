@@ -5,7 +5,7 @@ const path = require('path');
 // B1 (v3.0.0): no top-level electron require (throws in plain Node). Data paths go through
 // dataDir()/tempDir(); `dialog`/`app` are required LAZILY inside the GUI-only handlers.
 const { dataDir, tempDir } = require('./data-dir.js');
-const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance } = require('./settings.js');
+const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance, relinkInstance } = require('./settings.js');
 const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
@@ -287,6 +287,24 @@ function registerSettings(ipcMain, ctx) {
       try { ctx.javaInfo = await detectJava(merged.javaPath || 'java'); } catch {}
       return { ok: true, activeInstanceId: ctx.activeInstanceId, java: ctx.javaInfo };
     });
+  });
+
+  // 5.4.0: point an instance at a new folder after its old one went missing. Re-seeds ctx so the
+  // runtime folder/watcher/java follow, the same way instances:switch does.
+  ipcMain.handle('instances:relink', async (_, { id, serverPath } = {}) => {
+    const target = String(id || '');
+    const r = relinkInstance(target, serverPath);
+    if (!r.ok) return r;
+    try { ctx.seedInstances(); } catch {}
+    // If the relinked instance is the ACTIVE one, repoint its runtime folder + watcher now.
+    if (ctx.activeInstanceId === target) {
+      return await ctx.runInInstance(target, async () => {
+        try { ctx.currentServerPath = loadSettings().serverPath || ''; } catch {}
+        try { ctx.watchServerFolder(); } catch {}
+        return { ok: true, instances: r.instances };
+      });
+    }
+    return { ok: true, instances: r.instances };
   });
 
   ipcMain.handle('instances:rename', async (_, { id, name } = {}) => {

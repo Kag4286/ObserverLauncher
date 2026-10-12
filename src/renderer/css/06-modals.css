@@ -486,6 +486,12 @@ html.motion-lite #fileBrowser:not([hidden]),html.motion-lite #fileEditor:not([hi
 /* In-app prompt (replaces the unsupported window.prompt) — single text input + actions. */
 .pm-input{margin:12px 18px 0;width:calc(100% - 36px);padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg-inset,var(--bg-2));color:var(--text);font:500 13px var(--font-ui);outline:none;transition:border-color var(--dur-fast) var(--ease-standard),box-shadow var(--dur-fast) var(--ease-standard)}
 .pm-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+/* 5.4.0: Add-server choice modal — two large stacked options (create new vs add existing). */
+.as-choices{display:flex;flex-direction:column;gap:10px;padding:14px 18px 0}
+.as-choice{display:flex;flex-direction:column;gap:4px;text-align:left;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel);color:var(--text);cursor:pointer;transition:border-color var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard)}
+.as-choice:hover{border-color:var(--accent);background:var(--bg-2)}
+.as-choice b{font:700 14px var(--font-ui)}
+.as-choice span{font:500 12px var(--font-ui);color:var(--text-muted);line-height:1.5}
 
 /* ============ MCP SECTION HIGHLIGHT (0.9.0) ============ */
 /* Make the MCP/AI block stand out: cyan left edge + tinted header + live pill. */
