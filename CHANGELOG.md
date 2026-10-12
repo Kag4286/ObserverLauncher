@@ -10,6 +10,32 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.3.1] — 2026-10-12
+
+**Language follows Apply, and the last hard-coded English strings are translated.** No settings migration.
+
+### Fixed — language switched before Apply
+- **The Settings language dropdown live-applied on change, unlike motion level and beginner mode**
+  (which need Apply since 5.2.0). `#languageSelect` sits inside `#settings`, so the generic onEdit
+  handler now marks the form dirty and Apply persists it; the onboarding dropdown stays live-apply.
+- **Apply no longer refuses a preference change when no server folder is set yet.** The guard only
+  blocks CLEARING a folder that was set; a fresh install with no folder can still change language.
+
+### Changed — the remaining hard-coded strings are now translated
+- **Onboarding modal** (card meta/hints, footer), **New Server wizard** (Popular badge, versions
+  loading, RAM hint, review note, starting download, Next), **player inspector** saved-data note.
+- **Server properties editor**: all 47 properties (label + hint) and the 5 numeric validators now
+  resolve through `t()` instead of inline English.
+- **World backup rows** (Restore/Delete/LATEST), **world-map load error**, **console "Recent" group**,
+  **proxy config title/hint**, overview hero default name + RAM hint + Start tooltips, chart canvas
+  labels, proxy diagnostic, two error toasts.
+
+Technical `title=`/`aria-label=` accessibility attributes and placeholder examples (e.g.
+`minecraft:diamond`, `-Xms4G`) are deliberately left in English.
+
+### Tests
+- E2E language tests updated to pick-then-Apply. `npm test` green; i18n now 1040 keys x 7 locales.
+
 ## [5.3.0] — 2026-10-12
 
 **Marketplace software label + CurseForge dependencies; 1h/6h Performance charts; clearer unsigned-installer note.** No settings migration.
