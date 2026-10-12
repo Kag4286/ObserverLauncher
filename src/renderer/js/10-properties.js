@@ -44,11 +44,11 @@ $('#saveProperties').onclick=()=>withBusy($('#saveProperties'),async()=>{
   }
   const p={}; let firstInvalid=null;
   const validators={
-    'max-players':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>100000) return 'Max players must be an integer 1–100000'; },
-    'server-port':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>65535) return 'Server port must be 1–65535'; },
-    'view-distance':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<2||n>32) return 'View distance must be 2–32'; },
-    'simulation-distance':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<2||n>32) return 'Simulation distance must be 2–32'; },
-    'max-world-size':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>29999984) return 'Max world size must be 1–29999984'; },
+    'max-players':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>100000) return t('propErr.max-players'); },
+    'server-port':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>65535) return t('propErr.server-port'); },
+    'view-distance':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<2||n>32) return t('propErr.view-distance'); },
+    'simulation-distance':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<2||n>32) return t('propErr.simulation-distance'); },
+    'max-world-size':v=>{ const n=Number(v); if(!Number.isInteger(n)||n<1||n>29999984) return t('propErr.max-world-size'); },
   };
   $$('[data-property]').forEach(input=>{
     const key=input.dataset.property;
