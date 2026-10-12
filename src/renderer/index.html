@@ -643,7 +643,7 @@
           </div>
         </div>
         <div class="inspect-panel" id="pdPanelEdit">
-        <div class="inspect-note">Stop the server before editing saved data. A backup of the original <code>.dat</code> is saved automatically. While the server is running, use the Live actions tab instead.</div>
+        <div class="inspect-note" data-i18n="pd.editNote">Stop the server before editing saved data. A backup of the original .dat is saved automatically. While the server is running, use the Live actions tab instead.</div>
         <div class="inspect-stats"><label><span data-i18n="pd.health">Health</span><input id="pdHealth" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.food">Food</span><input id="pdFood" type="number" min="0" max="20" placeholder="0–20"></label><label><span data-i18n="pd.saturation">Saturation</span><input id="pdSaturation" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.xp">XP level</span><input id="pdXpLevel" type="number" min="0"></label><label><span data-i18n="pd.totalXp">Total XP</span><input id="pdXpTotal" type="number" min="0"></label><label><span data-i18n="pd.gamemode">Gamemode</span><select id="pdGameType"><option value="0">Survival</option><option value="1">Creative</option><option value="2">Adventure</option><option value="3">Spectator</option></select></label></div>
         <label class="inspect-check"><input id="pdClearInventory" type="checkbox"><span data-i18n="pd.clearInv">Clear inventory, armor and offhand (Ender chest untouched)</span></label>
         <div class="pd-offline-actions"><button class="btn primary" id="savePlayerData" data-i18n="pd.apply">Apply changes</button><span class="text-muted" id="pdOfflineHint"></span></div>
@@ -672,11 +672,11 @@
       </button>
     </div>
     <div class="onboarding-grid">
-      <button class="onboarding-card primary" id="obCreateNew"><span class="card-icon"><img src="./assets/icons/ui/cube.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.create">Create a new server</h3><p data-i18n="ob.createSub">Recommended for first time. Pick an empty folder, we download Vanilla and guide you. No manual JAR hunting.</p><span class="card-meta">Beginner • 2 min • Vanilla → Paper later</span><small class="card-hint">Advanced: you can switch to Paper/Purpur/Fabric in the wizard after.</small></div><span class="card-arrow">→</span></button>
-      <button class="onboarding-card" id="obPickExisting"><span class="card-icon"><img src="./assets/icons/ui/funnel.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.pick">I already have a server</h3><p data-i18n="ob.pickSub">Point the launcher at an existing folder — it will detect JAR, worlds and configs instantly.</p><span class="card-meta">Experienced • Import • Keep your worlds</span><small class="card-hint">Tip: Works with any server type — Vanilla, Paper, Forge, etc.</small></div><span class="card-arrow">→</span></button>
-      <button class="onboarding-card ghost" id="obSkip"><span class="card-icon"><img src="./assets/icons/ui/gem.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.skip">Explore on my own</h3><p data-i18n="ob.skipSub">Skip the guide and browse the interface. You can create or import later from the Overview.</p><span class="card-meta">Flexible • No commitment</span></div><span class="card-arrow">→</span></button>
+      <button class="onboarding-card primary" id="obCreateNew"><span class="card-icon"><img src="./assets/icons/ui/cube.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.create">Create a new server</h3><p data-i18n="ob.createSub">Recommended for first time. Pick an empty folder, we download Vanilla and guide you. No manual JAR hunting.</p><span class="card-meta" data-i18n="ob.metaCreate">Beginner • 2 min • Vanilla → Paper later</span><small class="card-hint" data-i18n="ob.hintCreate">Advanced: you can switch to Paper/Purpur/Fabric in the wizard after.</small></div><span class="card-arrow">→</span></button>
+      <button class="onboarding-card" id="obPickExisting"><span class="card-icon"><img src="./assets/icons/ui/funnel.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.pick">I already have a server</h3><p data-i18n="ob.pickSub">Point the launcher at an existing folder — it will detect JAR, worlds and configs instantly.</p><span class="card-meta" data-i18n="ob.metaPick">Experienced • Import • Keep your worlds</span><small class="card-hint" data-i18n="ob.hintPick">Tip: Works with any server type — Vanilla, Paper, Forge, etc.</small></div><span class="card-arrow">→</span></button>
+      <button class="onboarding-card ghost" id="obSkip"><span class="card-icon"><img src="./assets/icons/ui/gem.svg" alt="" style="width:24px;height:24px;image-rendering:pixelated"></span><div><h3 data-i18n="ob.skip">Explore on my own</h3><p data-i18n="ob.skipSub">Skip the guide and browse the interface. You can create or import later from the Overview.</p><span class="card-meta" data-i18n="ob.metaSkip">Flexible • No commitment</span></div><span class="card-arrow">→</span></button>
     </div>
-    <div class="onboarding-footer"><label class="check"><input type="checkbox" id="onboardingDontShow"> Don't show this guide again</label><span class="text-muted">You can reopen it from Launcher settings → Show welcome guide again.</span></div>
+    <div class="onboarding-footer"><label class="check"><input type="checkbox" id="onboardingDontShow"> <span data-i18n="ob.dontShow">Don't show this guide again</span></label><span class="text-muted" data-i18n="ob.reopen">You can reopen it from Launcher settings → Show welcome guide again.</span></div>
   </div>
 </div>
 <div id="newServerModal" class="modal-overlay" hidden>
@@ -721,7 +721,7 @@
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpStart">Start here</p>
             <div class="nsw2-grid">
               <div class="nsw2-cardwrap"><button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="vanilla" aria-label="About Vanilla">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
+              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent" data-i18n="nsw.popular">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpPlugin">Plugin servers</p>
             <div class="nsw2-grid">
@@ -755,7 +755,7 @@
           </div>
           <div class="nsw-version-picker" id="nswVersionPicker" hidden>
             <div class="nsw-version-search"><span class="search-icon">⌕</span><input id="nswVersionInput" placeholder="Filter below or type a version — e.g. 26.2, 26.1, 1.20.1" autocomplete="off"><button class="version-clear" id="nswVersionClear" hidden title="Clear">×</button></div>
-            <div class="nsw-version-chips" id="nswVersionChips"><span class="nsw2-chiploading">Loading versions…</span></div>
+            <div class="nsw-version-chips" id="nswVersionChips"><span class="nsw2-chiploading" data-i18n="nsw.versionsLoading">Loading versions…</span></div>
             <div class="nsw-version-info" id="nswVersionInfo" data-i18n="nsw.verInfo">Versions load live from the official API for the software you picked.</div>
             <div class="nsw-java" id="nswJavaCheck" hidden></div>
           </div>
@@ -764,7 +764,7 @@
         <!-- STEP 4 · MEMORY -->
         <div class="nsw-step" data-step="4">
           <h2 data-i18n="nsw.memoryT">How much memory?</h2>
-          <p class="text-muted nsw2-lead" id="nswRamHint">Beginners: 2–4 GB is plenty for friends. Large worlds/modpacks need more.</p>
+          <p class="text-muted nsw2-lead" id="nswRamHint" data-i18n="nsw.ramHint">Beginners: 2–4 GB is plenty for friends. Large worlds/modpacks need more.</p>
           <div class="nsw2-memory-head">
             <div class="nsw2-memory-num"><b id="nswMemoryValue">4</b><span>GB</span></div>
             <div class="nsw2-memory-desc ok" id="nswRamDesc">Good for 5-10 players</div>
@@ -785,15 +785,15 @@
           <p class="text-muted nsw2-lead" data-i18n="nsw.reviewLead">Everything is editable — go Back any time before creating.</p>
           <div class="nsw-tpl-banner" id="nswTplBanner" hidden></div>
           <div class="nsw-summary" id="nswSummary"></div>
-          <small class="field-hint nsw2-review-note">The Minecraft EULA is accepted automatically on first start (can be changed in Settings).</small>
+          <small class="field-hint nsw2-review-note" data-i18n="nsw.reviewNote">The Minecraft EULA is accepted automatically on first start (can be changed in Settings).</small>
           <p class="proxy-notice" id="nswSpigotHint" hidden data-i18n-html="nsw.spigotHint">Spigot needs <b>Git</b> installed (BuildTools compiles from source) — missing Git fails the build after ~5 min.</p>
           <div class="nsw-progress set-progress" id="nswProgress" hidden>
             <div class="set-progress-track"><div class="set-progress-fill indeterminate" id="nswProgressFill"></div></div>
-            <div class="nsw-progress-row"><span class="set-progress-label" id="nswProgressLabel">Starting download…</span><button class="btn sm danger-ghost" id="nswCancel" data-i18n="nsw.cancel">Cancel</button></div>
+            <div class="nsw-progress-row"><span class="set-progress-label" id="nswProgressLabel" data-i18n="nsw.startingDownload">Starting download…</span><button class="btn sm danger-ghost" id="nswCancel" data-i18n="nsw.cancel">Cancel</button></div>
           </div>
         </div>
 
-        <div class="nsw-actions"><button class="btn secondary" id="nswBack" hidden data-i18n="nsw.back">Back</button><span class="nsw-actions-spacer"></span><button class="btn primary" id="nswNext">Next</button></div>
+        <div class="nsw-actions"><button class="btn secondary" id="nswBack" hidden data-i18n="nsw.back">Back</button><span class="nsw-actions-spacer"></span><button class="btn primary" id="nswNext" data-i18n="nsw.next">Next</button></div>
       </div>
     </div>
   </div>
