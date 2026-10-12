@@ -22,6 +22,8 @@ Download the latest release:
 
 Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.2.1.AppImage` and run it. No root needed.
 
+> **Windows SmartScreen note.** The installer is not code-signed yet, so Windows may show a "Windows protected your PC" / "Unknown publisher" warning on first run. Click **More info → Run anyway**. The Linux AppImage is unaffected. To be sure a download is intact, compare it against the SHA-256 in the release notes.
+
 From source (Node.js 18 or newer):
 
 ```bash
