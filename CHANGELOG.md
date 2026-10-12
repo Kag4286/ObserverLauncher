@@ -10,6 +10,33 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.4.0] — 2026-10-12
+
+**The Performance chart keeps 24 hours of history and survives a restart.** No settings migration.
+
+### Added — 24h range + disk persistence
+- **The coarse metrics ring is now persisted to disk.** A new module `src/main/metrics-store.js`
+  appends each coarse sample (one per 10s) to `<dataDir>/metrics/<instanceId>.jsonl`. The ring cap
+  is raised from 2160 (6h) to 8640 (24h), and the renderer gains a `24h` range chip next to
+  `15m / 1h / 6h`. Before this, all history was in-memory and reset on every app restart.
+- **Writes are buffered and flushed at most once a minute** (`recordSample` accumulates lines in
+  memory; a flush happens when the interval elapses). `flushAll()` runs on `before-quit` so the last
+  minute is not lost. A 10s sample rate therefore costs ~1440 flush operations/day, not 8640.
+- **A periodic trim rewrites the file atomically** once it passes `TRIM_LINE_THRESHOLD` (2x the 24h
+  sample count), keeping only the retained window. `writeFileAtomic` means a crash mid-trim cannot
+  truncate the store.
+- **Load on boot:** `seedInstances` restores `metricsLong` from disk for a NEW instance state (first
+  boot, or freshly added). A re-seed keeps the in-memory ring, so live samples are never clobbered by
+  stale disk data.
+- **`instances:remove` deletes the instance's metrics file** so it does not linger on disk.
+- Instance ids are validated before use as a file name (a non-conforming id is hashed); a bad id can
+  never escape the metrics folder.
+
+### Tests
+- New `tests/metrics-store.test.js` (append + buffered flush, load oldest-first with corrupt lines
+  skipped, age filter, trim above/below threshold, delete, path-safety fallback, missing file -> []).
+- `tests/metrics-long-ring.test.js` still green with the raised cap. `npm test` green (102 files).
+
 ## [5.3.1] — 2026-10-12
 
 **Language follows Apply, and the last hard-coded English strings are translated.** No settings migration.

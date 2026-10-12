@@ -250,9 +250,15 @@ function createContext() {
       // existing state object and must survive a re-seed (settings change). freshInstState()
       // supplies defaults for a brand-new instance id.
       const next = new Map();
+      const metricsStore = require('./metrics-store.js');
       for (const i of list) {
         const prev = ctx.instances && ctx.instances.get(i.id);
-        next.set(i.id, Object.assign(freshInstState(), prev, i));
+        const st = Object.assign(freshInstState(), prev, i);
+        // 5.4.0: a brand-new instance state (first boot, or freshly added) restores its persisted
+        // coarse metrics ring from disk so the 24h chart is populated immediately. A re-seed keeps
+        // the in-memory ring (prev exists), so live samples are never clobbered by stale disk data.
+        if (!prev) { try { st.metricsLong = metricsStore.loadSamples(i.id, metricsStore.RETENTION_MS); } catch {} }
+        next.set(i.id, st);
       }
       ctx.instances = next;
       ctx.activeInstanceId = store.activeInstanceId || (list[0] && list[0].id) || 'default';

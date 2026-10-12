@@ -555,9 +555,9 @@ TPS   19.8        MSPT   4.2ms
 CPU   32%         RAM    3.2 GB
 ```
 
-- Time range control: `15m · 1h · 6h`. 15m reads the raw 1s ring (30 min); 1h/6h read a coarse
-  10s ring (6 h cap) and downsample to <=200 points. Rings are in-memory (history resets on app
-  restart) — 24h retention is still deferred (section 18).
+- Time range control: `15m · 1h · 6h · 24h`. 15m reads the raw 1s ring (30 min); the others read a
+  coarse 10s ring (24 h cap) and downsample to <=200 points. The coarse ring is persisted to disk
+  (per-instance JSONL) so the 24h range survives an app restart (5.4.0); the raw ring stays in-memory.
 - Muted grid, strong current line, soft area fill.
 - Only the active metric uses the instance accent; alerts use warning/danger.
 
@@ -664,8 +664,8 @@ Needs backend / larger scope (DECIDE per item, may defer past 4.0.0):
 
 - Persisted per-instance accent COLOR picker (settings field + schema).
 - Seed/software-generated instance art.
-- Metrics retention beyond 6 h (charts 24h) — needs persistence across app restarts. The 6h
-  in-memory ring shipped in 5.3.0.
+- Metrics retention beyond 24 h. The 6h in-memory ring shipped in 5.3.0; the 24h range plus disk
+  persistence shipped in 5.4.0. Longer windows would need downsampling on disk.
 - Any new MCP tool or IPC channel (channel names are STABLE — never rename).
 
 ---

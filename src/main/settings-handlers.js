@@ -315,6 +315,8 @@ function registerSettings(ipcMain, ctx) {
     const r = removeInstance(target);
     if (!r.ok) return r;
     try { ctx.seedInstances(); } catch {}
+    // 5.4.0: drop the instance's persisted metrics file so it does not linger on disk.
+    try { require('./metrics-store.js').deleteStore(target); } catch {}
     // F1 (mirror the 2.2.0 instances:switch fix): this handler still runs inside the ALS scope of the
     // PREVIOUS active instance - which is the one just DELETED when the active instance was removed.
     // Writing ctx.currentServerPath here would call instState() -> instances.get(deletedId) -> undefined

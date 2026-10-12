@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.4.0" date="2026-10-12">
+      <description>
+        <p>The Performance tab keeps a full day of history and now saves it to disk, so the 24h chart is still there after you restart the app.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.4.0.md</url>
+    </release>
     <release version="5.3.1" date="2026-10-12">
       <description>
         <p>Fix: changing the interface language now follows the Apply button (like the other settings) instead of switching instantly, and a fresh install with no server folder can still change it. Also translated the last remaining English strings (onboarding, the New Server wizard and the server properties editor) into all seven languages.</p>

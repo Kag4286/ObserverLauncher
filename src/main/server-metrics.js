@@ -2,6 +2,7 @@
 // Owns the per-second CPU/RAM sampling of the server's Java process and the metric parsing.
 const os = require('os');
 const platform = require('./platform');
+const metricsStore = require('./metrics-store.js');
 
 // BUGFIX: PS output can carry a culture comma ("45,6712") even after we ask
 // for InvariantCulture (old PS, localized shims). Normalize before Number() so
@@ -91,7 +92,9 @@ const METRICS_HISTORY_CAP = 1800;
 // same shape at 1/10 the memory and is plenty for a chart that draws ~200 points. Fed from
 // pushHistory so the two rings can never drift.
 const METRICS_LONG_INTERVAL_MS = 10000;
-const METRICS_LONG_CAP = 2160;
+// 5.4.0: raised from 2160 (6h) to 8640 (24h at one sample / 10s). The ring is now backed by a
+// JSONL file (metrics-store.js) so it survives a restart instead of resetting on every launch.
+const METRICS_LONG_CAP = 8640;
 function pushHistory(ctx, sample) {
   if (!Array.isArray(ctx.metricsHistory)) ctx.metricsHistory = [];
   ctx.metricsHistory.push(sample);
@@ -101,6 +104,10 @@ function pushHistory(ctx, sample) {
   if (!last || (sample.t - last.t) >= METRICS_LONG_INTERVAL_MS) {
     ctx.metricsLong.push(sample);
     if (ctx.metricsLong.length > METRICS_LONG_CAP) ctx.metricsLong.splice(0, ctx.metricsLong.length - METRICS_LONG_CAP);
+    // 5.4.0: persist the coarse sample so the 24h range survives a restart. Guarded on ctx.inst so
+    // pure unit tests (a plain ctx object) never touch the disk; recordSample itself buffers and
+    // flushes at most once a minute.
+    if (typeof ctx.inst === 'function') { try { metricsStore.recordSample(ctx.inst(), sample); } catch {} }
   }
 }
 // Pure: filter history to the last `minutes`, downsample to at most `maxSamples` so a big window

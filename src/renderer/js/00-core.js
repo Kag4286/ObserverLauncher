@@ -61,12 +61,14 @@ let state = { settings:{serverPath:'',javaPath:'',memoryMin:2,memoryMax:6,autoEu
 let samples = Array.from({length:38},()=>({tps:null,mspt:null,cpu:null,ram:null}));
 // v5.3.0: Performance range selector. `samples` stays the 38-point ring that feeds the sparkline and
 // the 15m view. `samplesLong` is a client-side 10s-resolution ring (seeded from state.metricsLong) so
-// the 1h/6h views do not depend on the server pushing a second stream every tick. `chartSamples` is
+// the 1h/6h/24h views do not depend on the server pushing a second stream every tick. `chartSamples` is
 // what metricChart draws - it aliases `samples` for 15m and a downsampled slice of samplesLong otherwise.
 let samplesLong = [];
 let perfRange = '15m';
 let chartSamples = samples;
-const PERF_LONG_MS = 10000, PERF_LONG_CAP = 2160;
+// 5.4.0: cap raised from 2160 (6h) to 8640 (24h at one sample / 10s); the server ring is now
+// persisted to disk, so a restart repopulates the whole 24h window.
+const PERF_LONG_MS = 10000, PERF_LONG_CAP = 8640;
 let selectedPlayer = null; let marketSort = 'downloads';
 let lastInspectData=null; // kept so icons:update can re-render the open inspector (now text-only, but keep for compat)
 let invSearchQuery='', invShowEmpty=false, invSortBy='slot';

@@ -84,7 +84,7 @@ function rebuildSamples(history,historyLong){
 // v5.3.0: pick what metricChart draws for the active range. 15m uses the live 38-point ring
 // (chartSamples aliases samples). 1h/6h slice samplesLong by age, then downsample to <=200 points so
 // the canvas draw stays cheap and the line reads cleanly. Pure apart from reading the module vars.
-const PERF_RANGE_MS={ '15m':15*60*1000, '1h':60*60*1000, '6h':6*60*60*1000 };
+const PERF_RANGE_MS={ '15m':15*60*1000, '1h':60*60*1000, '6h':6*60*60*1000, '24h':24*60*60*1000 };
 function computeChartSamples(){
   if(perfRange==='15m'){ chartSamples=samples; return; }
   const spanMs=PERF_RANGE_MS[perfRange]||PERF_RANGE_MS['15m'];
