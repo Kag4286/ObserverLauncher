@@ -42,9 +42,14 @@ test('World Map and Settings tabs open', async () => {
   await expect(win.locator('#settings')).toHaveClass(/active/);
 });
 
-test('language switch updates the UI strings', async () => {
+test('language switch updates the UI strings after Apply', async () => {
+  // v5.3.1: the language dropdown follows the edit->Apply flow (like motion level + beginner
+  // mode). Picking a value only marks the form dirty; clicking Apply persists it and repaints.
   await win.locator('.nav-item[data-tab="settings"]').click();
   await selectByValue(win, '#languageSelect', 'vi');
+  await win.locator('#saveSettings').click();
   await expect(win.locator('#pageTitle')).toHaveText(/Cài đặt/i);
   await selectByValue(win, '#languageSelect', 'en');
+  await win.locator('#saveSettings').click();
+  await expect(win.locator('#pageTitle')).toHaveText(/Settings/i);
 });

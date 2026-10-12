@@ -271,15 +271,15 @@ function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;co
   const draw=(key,color,max,normalize)=>{const good=chartSamples.map((v,i)=>({i,v:v[key]})).filter(x=>x.v!==null);if(!good.length)return;const denom=Math.max(1,chartSamples.length-1);ctx.beginPath();good.forEach((x,j)=>{const n=normalize?normalize(x.v):Math.min(x.v,max)/max;const px=p+x.i*(w-p*2)/denom,py=h-p-n*(h-p*2);j?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke()};
   if(mode==='resource'){
     draw('cpu',cWarn,100);draw('ram',cSuccess,100);
-    if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText('100%',4,p+4);ctx.fillText('0%',4,h-p+4);ctx.fillText('Live server telemetry',w-120,h-8)}
+    if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText('100%',4,p+4);ctx.fillText('0%',4,h-p+4);ctx.fillText(t('chart.live'),w-120,h-8)}
   } else if(mode==='tick'){
     draw('tps',cAccent,20);
     // MSPT plotted on the SAME up=good axis as TPS: normalized as 1-min(mspt/100,1), so a rising
     // line always means "healthier" for both series, instead of TPS-up/MSPT-down being opposite.
     draw('mspt',cDanger,100,v=>1-Math.min(v,100)/100);
-    if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText('Target',4,p-4);ctx.fillText('Danger zone',4,h-6);ctx.fillText('Live server telemetry',w-120,h-8)}
+    if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText(t('chart.target'),4,p-4);ctx.fillText(t('chart.danger'),4,h-6);ctx.fillText(t('chart.live'),w-120,h-8)}
   } else {
     draw('tps',cAccent,20);draw('cpu',cWarn,100);draw('ram',cSuccess,100);
-    if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText('20 TPS',4,p+4);ctx.fillText('0',16,h-p+4);ctx.fillText('Live server telemetry',w-120,h-8)}
+    if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText('20 TPS',4,p+4);ctx.fillText('0',16,h-p+4);ctx.fillText(t('chart.live'),w-120,h-8)}
   }
 }

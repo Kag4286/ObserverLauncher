@@ -84,7 +84,9 @@ test('Settings category nav toggles panes and sizes the glider', async () => {
 
 test('language switch re-derives the JS-owned page title when changing tabs', async () => {
   await gotoTab(win, 'settings');
+  // v5.3.1: pick + Apply (the language dropdown is no longer live-apply).
   await selectByValue(win, '#languageSelect', 'vi');
+  await win.locator('#saveSettings').click();
 
   const titleSettings = await win.locator('#pageTitle').innerText();
   await gotoTab(win, 'console');
@@ -99,6 +101,7 @@ test('language switch re-derives the JS-owned page title when changing tabs', as
   // #languageSelect only exists on the Settings tab, so switch back before resetting.
   await gotoTab(win, 'settings');
   await selectByValue(win, '#languageSelect', 'en');
+  await win.locator('#saveSettings').click();
 });
 
 // Set a <select> value AND persist it in the SAME synchronous tick (no await between). A background

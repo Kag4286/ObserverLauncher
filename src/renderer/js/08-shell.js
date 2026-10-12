@@ -238,8 +238,8 @@ function renderInstanceAppearance(){
 async function setInstanceAppearance(patch){
   const inst=activeInstanceMeta();
   if(!inst)return;
-  let r;try{ r=await window.observer.instanceStyle({id:inst.id,...patch}); }catch(e){ return toast(e?.message||'Could not save appearance.','error'); }
-  if(!r||!r.ok)return toast((r&&r.error)||'Could not save appearance.','error');
+  let r;try{ r=await window.observer.instanceStyle({id:inst.id,...patch}); }catch(e){ return toast(e?.message||t('err.saveAppearance'),'error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||t('err.saveAppearance'),'error');
   const next=(state.instances||[]).map(i=>i.id===inst.id?{...i,accent:r.accent,artSeed:r.artSeed}:i);
   state={...state,instances:next};
   renderInstanceAppearance();
@@ -380,8 +380,8 @@ async function switchInstance(id){
   if(!id||id===state.activeInstanceId)return;
   let r;
   try{ r=await window.observer.instanceSwitch(id); }
-  catch(e){ return toast(e?.message||'Could not switch instance.','error'); }
-  if(!r||!r.ok)return toast((r&&r.error)||'Could not switch instance.','error');
+  catch(e){ return toast(e?.message||t('err.switchInstance'),'error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||t('err.switchInstance'),'error');
   await refreshFromState();
 }
 // v2.0.0 Phase B: add an EXISTING server folder as a new instance, without the wizard. For users
@@ -458,7 +458,11 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const folderInput=$('#serverFolderInput'), javaInput=$('#javaPathInput');
   if(folderInput) folderInput.style.borderColor='';
   if(javaInput) javaInput.style.borderColor='';
-  if(!next.serverPath){ if(folderInput){ folderInput.style.borderColor='var(--danger)'; folderInput.focus(); } return toast(t('set.errFolderReq'),'error'); }
+  // v5.3.1: only REFUSE when the user is CLEARING a folder that was set (a destructive change —
+  // the folder roots every file op). When there was never a folder (fresh install), preference
+  // settings like language/motion must still save, so fall through. The backend already skips its
+  // serverPath check when the value is empty, so this stays consistent.
+  if(!next.serverPath && state.settings.serverPath){ if(folderInput){ folderInput.style.borderColor='var(--danger)'; folderInput.focus(); } return toast(t('set.errFolderReq'),'error'); }
   if(next.memoryMax < next.memoryMin) return toast(t('set.errMemOrder'),'error');
   if(next.memoryMax>32) return toast(t('set.errMemHigh'),'error');
   if(next.memoryMin<1) return toast(t('set.errMemMin'),'error');
@@ -477,7 +481,11 @@ $('#saveRamOverview').onclick=()=>withBusy($('#saveRamOverview'),async()=>{
   if(next.memoryMax<next.memoryMin)return toast(t('set.errMemOrder'),'error');
   const r=await window.observer.saveSettings(next);state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
 });
-$('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value;applyLocale();const next={...getSettings(),locale:currentLocale};const r=await window.observer.saveSettings(next);state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();renderJvmPreview();if(!$('#newServerModal').hidden)nswRender();if(!$('#installModal').hidden){imRenderCompat();imRenderWarns()}};
+// v5.3.1: the language dropdown now follows the SAME edit->Apply flow as the other settings.
+// It used to live-apply on change, which was inconsistent (motion level + beginner mode need Apply).
+// #languageSelect sits inside #settings, so the generic onEdit handler marks the form dirty; Apply
+// persists it and refreshUI() -> applyLocale() repaints. The onboarding dropdown (#obLangSelect)
+// stays live-apply: choosing a language during first-run setup is a different moment.
 // Performance tab: offline banner CTA reuses the main Start button so there is
 // exactly one start path (same guards, same toasts, no duplicated logic).
 $('#perfStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
