@@ -232,14 +232,14 @@ async function wmLoad(){
     r = await window.observer.worldmapLoad();
   } catch (e) {
     wmShow('none');
-    toast(`Could not load world data: ${e?.message || e}`, 'error');
+    toast(t('wm.loadFail',{m:e?.message||e}), 'error');
     return;
   }
   if (!r) { wmShow('none'); return }
   wm.level=(r&&r.level&&r.level.ok)?r.level:null;
   wm.players=(r&&r.players&&r.players.players)||[];
   wm.waypoints=(r&&r.waypoints)||[];
-  if(!wm.level){wmShow('none');if(r.error)toast(`World Map: ${r.error}`,'error');return}
+  if(!wm.level){wmShow('none');if(r.error)toast(t('nav.worldmap')+': '+r.error,'error');return}
   wmShow('app');
   // MODDED HONESTY: custom biomes get approximate colours and custom dimensions can't be drawn.
   // Show a short note (JS-owned text — NOT data-i18n, or applyLocale would clobber it) when the
