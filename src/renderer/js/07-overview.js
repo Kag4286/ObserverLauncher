@@ -52,7 +52,7 @@ function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale
   $('#worldsProxyNotice').hidden=!proxy;$('#playersProxyNotice').hidden=!proxy;
   $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
   const pt=$('.prop-toolbar');if(pt)pt.hidden=proxy;
-  $('#propertiesTitle').textContent=proxy?'Proxy configuration (velocity.toml)':t('prop.title');$('#propertiesHint').textContent=proxy?'Raw file — Velocity generates this on first run, edit carefully (real TOML syntax).':t('prop.sub');
+  $('#propertiesTitle').textContent=proxy?t('prop.proxyTitle'):t('prop.title');$('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
   if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{});
    renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');renderWorlds(f.worlds||[]);renderBackups(f.backups||[]);
    const wc=$('#worldsCountPill'), bc=$('#backupsCountPill'), be=$('#backupEmpty'); if(wc) wc.textContent=String((f.worlds||[]).length); if(bc) bc.textContent=String((f.backups||[]).length); if(be) be.hidden=(f.backups||[]).length>0;
@@ -69,7 +69,7 @@ const have=j.ok?javaMajorOf(j.version):null;
 const mismatch=j.ok&&need&&have!=null&&have<need;
 const tooNew=j.ok&&need&&have!=null&&have>need;
 n.className='java-notice '+(!j.ok?'bad':(is32||mismatch)?'warn':'ok');
-if(!j.ok)n.textContent=t('set.javaBad',{m:j.message||'Set a Java path or use java from PATH.'});
+if(!j.ok)n.textContent=t('set.javaBad',{m:j.message||t('set.javaPathHint')});
 else if(mismatch)n.textContent=t('set.javaNeed',{need,have});
 else if(is32)n.textContent=t('set.java32',{v:j.version,p:j.path});
 else if(tooNew)n.textContent=t('set.javaNewer',{have,need});
