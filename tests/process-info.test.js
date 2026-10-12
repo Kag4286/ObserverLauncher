@@ -18,10 +18,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   ok('pid "x" -> null', await platform.getProcessInfo('x') === null);
   ok('huge pid -> null', await platform.getProcessInfo(2 ** 31 - 1) === null);
 
-  // A real long-lived child: identity must be reported.
+  // A real long-lived child: identity must be reported. POLL instead of a fixed sleep: on a busy
+  // CI runner (and on Windows, where getProcessInfo goes through a PowerShell WMI query) the new
+  // process can take longer than a few hundred ms to show up, which made this a flaky failure.
   const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' });
-  await sleep(250); // let the process table settle
-  const info = await platform.getProcessInfo(child.pid);
+  let info = null;
+  for (let i = 0; i < 20 && !info; i++) { await sleep(150); info = await platform.getProcessInfo(child.pid); }
   ok('live child -> alive object', !!info && info.alive === true);
   ok('live child name mentions node', !!info && /node/i.test(String(info.name)));
   ok('live child has a start time', !!info && Number.isFinite(info.startTimeMs) && info.startTimeMs > 0);
