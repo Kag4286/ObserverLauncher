@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security report
+    url: https://github.com/Kag4286/ObserverLauncher/security/advisories/new
+    about: Report a security problem privately. Do not open a public issue for it.
+  - name: Question or idea
+    url: https://github.com/Kag4286/ObserverLauncher/discussions
+    about: Ask a question or discuss an idea before filing an issue.

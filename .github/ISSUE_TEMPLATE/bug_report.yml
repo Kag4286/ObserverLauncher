@@ -1,0 +1,64 @@
+name: Bug report
+about: Something is broken or behaves unexpectedly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The more detail you give, the faster it can be fixed.
+        For a security problem, do NOT open a public issue. Use the private report link instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what actually happened.
+      placeholder: I clicked Start and the server never came up. I expected it to boot in a few seconds.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the app
+        2. ...
+        3. See the error
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: The launcher's Console tab, or the server's logs/latest.log if the server process itself failed.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: From the release you downloaded, or package.json.
+      placeholder: 5.3.0
+    validations:
+      required: true
+
+  - type: input
+    id: server-software
+    attributes:
+      label: Server software and version
+      description: If the bug is about a specific server.
+      placeholder: Paper 1.21.4 / NeoForge 21.1
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 24H2 / Ubuntu 24.04
+    validations:
+      required: true
