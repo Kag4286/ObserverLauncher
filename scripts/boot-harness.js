@@ -40,16 +40,23 @@ function setupTempEnv(prefix, instanceName) {
   return { root, dataDir, serverDir, cleanup };
 }
 
-// Resolve + download a Java-matched Paper jar (pin 26.2 / JDK 25). Returns { ok, dl } or
+// Resolve + download a Java-matched Paper jar. Prefers the pinned 26.2 (JDK 25); if that version no
+// longer has a stable build, falls back to the newest stable version. Returns { ok, dl } or
 // { ok:false, outage:true, error } when PaperMC is down (the caller SKIPs, does not fail).
 async function fetchPaper(serverDir) {
-  const { downloadFillProject } = require('../src/main/adapters/papermc.js');
+  const { downloadFillProject, resolveStableVersion } = require('../src/main/adapters/papermc.js');
   const { download } = require('../src/main/http.js');
   let dl;
   try { dl = await resolvePaperWithRetry(downloadFillProject, '26.2'); }
   catch (e) {
     if (isServiceOutage(e)) return { ok: false, outage: true, error: e.message };
-    throw e;
+    // v5.3.0: the pinned version stopped resolving (Paper can retire a stable build for an old MC
+    // version). Fall back to the newest STABLE version rather than failing CI on a moving
+    // third-party target — the boot smoke is about the LAUNCHER flow, not one exact jar.
+    let stable = null;
+    try { stable = await resolveStableVersion('paper'); } catch { /* outage handled by the retry below */ }
+    if (!stable) throw e;
+    dl = await resolvePaperWithRetry(downloadFillProject, stable.version);
   }
   await download(dl.url, path.join(serverDir, dl.name), null, null, { maxBytes: 1024 * 1024 * 1024 });
   return { ok: true, dl };
