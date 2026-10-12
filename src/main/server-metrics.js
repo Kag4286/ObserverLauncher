@@ -86,10 +86,22 @@ async function metricsTick(ctx, st) {
 }
 // Ring buffer of samples, capped at ~1800 (30 min at 1 sample/s). Oldest dropped first.
 const METRICS_HISTORY_CAP = 1800;
+// v5.3.0: a second, coarser ring for the 1h/6h chart ranges. 1 sample / 10s, capped at 2160
+// (= 6 hours). Keeping raw 1s history for 6h would be 21,600 samples per instance; 10s keeps the
+// same shape at 1/10 the memory and is plenty for a chart that draws ~200 points. Fed from
+// pushHistory so the two rings can never drift.
+const METRICS_LONG_INTERVAL_MS = 10000;
+const METRICS_LONG_CAP = 2160;
 function pushHistory(ctx, sample) {
   if (!Array.isArray(ctx.metricsHistory)) ctx.metricsHistory = [];
   ctx.metricsHistory.push(sample);
   if (ctx.metricsHistory.length > METRICS_HISTORY_CAP) ctx.metricsHistory.splice(0, ctx.metricsHistory.length - METRICS_HISTORY_CAP);
+  if (!Array.isArray(ctx.metricsLong)) ctx.metricsLong = [];
+  const last = ctx.metricsLong[ctx.metricsLong.length - 1];
+  if (!last || (sample.t - last.t) >= METRICS_LONG_INTERVAL_MS) {
+    ctx.metricsLong.push(sample);
+    if (ctx.metricsLong.length > METRICS_LONG_CAP) ctx.metricsLong.splice(0, ctx.metricsLong.length - METRICS_LONG_CAP);
+  }
 }
 // Pure: filter history to the last `minutes`, downsample to at most `maxSamples` so a big window
 // doesn't blow the AI context window. Returns {samples, count, sourceCount, from, to, spanMinutes}.
@@ -155,4 +167,4 @@ function startMetrics(ctx) {
   }, 1000);
 }
 
-module.exports = { parseMetricValue, startMetrics, metricsTick, pushHistory, queryHistory, METRICS_HISTORY_CAP };
+module.exports = { parseMetricValue, startMetrics, metricsTick, pushHistory, queryHistory, METRICS_HISTORY_CAP, METRICS_LONG_CAP, METRICS_LONG_INTERVAL_MS };

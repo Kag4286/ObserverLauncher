@@ -63,6 +63,7 @@ function createContext() {
       monitoredPid: null,
       live: { tps: null, mspt: null, players: [] },
       metricsHistory: [],
+      metricsLong: [], // v5.3.0: 10s-resolution ring for the 1h/6h chart ranges
       currentSoftware: null,
       autoPollTimer: null,
       suppressStatusUntil: 0,
@@ -113,7 +114,7 @@ function createContext() {
   // Single source of truth: every per-instance field. Keep in sync with freshInstState().
   const INST_FIELDS = [
     'currentServerPath', 'serverProcess', 'javaInfo', 'consoleBuffer', 'sampleTimer',
-    'previousCpu', 'monitoredPid', 'live', 'metricsHistory', 'currentSoftware',
+    'previousCpu', 'monitoredPid', 'live', 'metricsHistory', 'metricsLong', 'currentSoftware',
     'autoPollTimer', 'suppressStatusUntil', 'lastManualCommandAt', 'manualStop',
     'restartAfterStop', 'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
     'schedulerLastFired', 'serverStatus', 'waitingForDone', 'runtimeInstanceId',

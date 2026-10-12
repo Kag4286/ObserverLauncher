@@ -71,11 +71,35 @@ function repaintConsole(lines){
   o.scrollTop=o.scrollHeight;
 }
 // B4: rebuild the chart ring from the active instance's sampled history after a switch.
-function rebuildSamples(history){
+function rebuildSamples(history,historyLong){
   const arr=(Array.isArray(history)?history:[]).slice(-38);
   samples=arr.map(s=>({tps:s.tps??null,mspt:s.mspt??null,cpu:s.cpu??null,ram:s.ram??null}));
   while(samples.length<38) samples.unshift({tps:null,mspt:null,cpu:null,ram:null});
+  // v5.3.0: seed the coarse ring used by the 1h/6h ranges from the server's metricsLong snapshot.
+  if(Array.isArray(historyLong)) samplesLong=historyLong.slice(-PERF_LONG_CAP).map(s=>({t:Number(s.t)||0,tps:s.tps??null,mspt:s.mspt??null,cpu:s.cpu??null,ram:s.ram??null}));
+  computeChartSamples();
   try{ drawOvSpark(); }catch{}
+  try{ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
+}
+// v5.3.0: pick what metricChart draws for the active range. 15m uses the live 38-point ring
+// (chartSamples aliases samples). 1h/6h slice samplesLong by age, then downsample to <=200 points so
+// the canvas draw stays cheap and the line reads cleanly. Pure apart from reading the module vars.
+const PERF_RANGE_MS={ '15m':15*60*1000, '1h':60*60*1000, '6h':6*60*60*1000 };
+function computeChartSamples(){
+  if(perfRange==='15m'){ chartSamples=samples; return; }
+  const spanMs=PERF_RANGE_MS[perfRange]||PERF_RANGE_MS['15m'];
+  const cutoff=Date.now()-spanMs;
+  let win=samplesLong.filter(s=>s&&s.t>=cutoff);
+  if(!win.length&&samplesLong.length)win=[samplesLong[samplesLong.length-1]];
+  const MAXP=200;
+  if(win.length>MAXP){const step=win.length/MAXP,out=[];for(let i=0;i<MAXP;i++)out.push(win[Math.floor(i*step)]);if(out[out.length-1]!==win[win.length-1])out.push(win[win.length-1]);win=out;}
+  chartSamples=win.length?win:[{tps:null,mspt:null,cpu:null,ram:null}];
+}
+function setPerfRange(range){
+  if(!PERF_RANGE_MS[range])range='15m';
+  perfRange=range;
+  $$('#perfRangeChips .filter-chip').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
+  computeChartSamples();
   try{ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
 }
 const channelOrder=['overview','console','players','performance','content','marketplace','worlds','properties'];
@@ -328,7 +352,7 @@ async function refreshFromState(){
   try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
   resetInstanceViews();
   repaintConsole(state.logs);
-  rebuildSamples(state.metricsHistory);
+  rebuildSamples(state.metricsHistory,state.metricsLong);
   refreshUI();
 }
 // F1 (3.2.5): per-instance views must be dropped when the active instance changes, or they keep
@@ -457,6 +481,9 @@ $('#languageSelect').onchange=async()=>{currentLocale=$('#languageSelect').value
 // Performance tab: offline banner CTA reuses the main Start button so there is
 // exactly one start path (same guards, same toasts, no duplicated logic).
 $('#perfStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
+// v5.3.0: Performance chart time-range chips (15m / 1h / 6h). setPerfRange re-derives chartSamples
+// from the right ring and repaints both charts.
+$('#perfRangeChips')?.addEventListener('click',e=>{const b=e.target.closest('.filter-chip');if(b&&b.dataset.range)setPerfRange(b.dataset.range)});
 // v4.0.0 Overview hero: reuse the single Start path; Open console jumps to the console tab.
 $('#heroStartBtn')?.addEventListener('click',()=>$('#startBtn')?.click());
 $('#heroConsoleBtn')?.addEventListener('click',()=>switchTab('console'));
@@ -514,7 +541,12 @@ function drawOvSpark(){
 }
 window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const key=(v.players||[]).slice().sort().join(',');if(key!==lastLivePlayersKey){lastLivePlayersKey=key;try{renderPlayers()}catch{}}
-});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}]; try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
+});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}];
+  // v5.3.0: mirror into the coarse 10s ring so the 1h/6h ranges keep filling live (not only on the
+  // initial state snapshot). computeChartSamples() then re-derives chartSamples for the active range.
+  const _nowMs=Date.now(), _lastLong=samplesLong[samplesLong.length-1];
+  if(!_lastLong||(_nowMs-_lastLong.t)>=PERF_LONG_MS){ samplesLong.push({t:_nowMs,tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}); if(samplesLong.length>PERF_LONG_CAP)samplesLong.splice(0,samplesLong.length-PERF_LONG_CAP); }
+  computeChartSamples(); try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
   const tpsFmt=x=>x.toFixed(2);
   try{const c=$('#tps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{} try{const c=$('#perfTps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{}
   const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—'}

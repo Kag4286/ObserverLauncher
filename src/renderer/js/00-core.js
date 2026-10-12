@@ -59,6 +59,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeKpiTip()});
 window.addEventListener('resize',closeKpiTip);
 let state = { settings:{serverPath:'',javaPath:'',memoryMin:2,memoryMax:6,autoEula:true}, files:{plugins:[],mods:[],datapacks:[],worlds:[],backups:[],properties:{}}, running:false, live:{players:[]} };
 let samples = Array.from({length:38},()=>({tps:null,mspt:null,cpu:null,ram:null}));
+// v5.3.0: Performance range selector. `samples` stays the 38-point ring that feeds the sparkline and
+// the 15m view. `samplesLong` is a client-side 10s-resolution ring (seeded from state.metricsLong) so
+// the 1h/6h views do not depend on the server pushing a second stream every tick. `chartSamples` is
+// what metricChart draws - it aliases `samples` for 15m and a downsampled slice of samplesLong otherwise.
+let samplesLong = [];
+let perfRange = '15m';
+let chartSamples = samples;
+const PERF_LONG_MS = 10000, PERF_LONG_CAP = 2160;
 let selectedPlayer = null; let marketSort = 'downloads';
 let lastInspectData=null; // kept so icons:update can re-render the open inspector (now text-only, but keep for compat)
 let invSearchQuery='', invShowEmpty=false, invSortBy='slot';
@@ -260,7 +268,7 @@ function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;co
     // Target reference line at the very top (20 TPS / 0ms MSPT — the "perfect tick" line).
     ctx.setLineDash([4,4]);ctx.strokeStyle=cMuted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p,p);ctx.lineTo(w-p,p);ctx.stroke();ctx.setLineDash([]);
   }
-  const draw=(key,color,max,normalize)=>{const good=samples.map((v,i)=>({i,v:v[key]})).filter(x=>x.v!==null);if(!good.length)return;ctx.beginPath();good.forEach((x,j)=>{const n=normalize?normalize(x.v):Math.min(x.v,max)/max;const px=p+x.i*(w-p*2)/(samples.length-1),py=h-p-n*(h-p*2);j?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke()};
+  const draw=(key,color,max,normalize)=>{const good=chartSamples.map((v,i)=>({i,v:v[key]})).filter(x=>x.v!==null);if(!good.length)return;const denom=Math.max(1,chartSamples.length-1);ctx.beginPath();good.forEach((x,j)=>{const n=normalize?normalize(x.v):Math.min(x.v,max)/max;const px=p+x.i*(w-p*2)/denom,py=h-p-n*(h-p*2);j?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke()};
   if(mode==='resource'){
     draw('cpu',cWarn,100);draw('ram',cSuccess,100);
     if(expanded){ctx.fillStyle=cMuted;ctx.font=`11px ${cFont}`;ctx.fillText('100%',4,p+4);ctx.fillText('0%',4,h-p+4);ctx.fillText('Live server telemetry',w-120,h-8)}

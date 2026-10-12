@@ -49,6 +49,8 @@ function registerSettings(ipcMain, ctx) {
       // M5/B4: the active instance's sampled history (ring buffer) so the renderer can repaint
       // the chart immediately after an instance switch instead of waiting for fresh metrics.
       metricsHistory: ctx.metricsHistory,
+      // v5.3.0: the coarser 6h ring, so the 1h/6h chart ranges repaint immediately on load/switch.
+      metricsLong: ctx.metricsLong,
       systemMemoryGB: Math.round(os.totalmem() / (1024 ** 3)),
       javaRequired,
       mcp: (() => {
@@ -250,6 +252,7 @@ function registerSettings(ipcMain, ctx) {
       logs: Array.isArray(st.consoleBuffer) ? st.consoleBuffer : [],
       live: st.live || { tps: null, mspt: null, players: [] },
       metricsHistory: Array.isArray(st.metricsHistory) ? st.metricsHistory : [],
+      metricsLong: Array.isArray(st.metricsLong) ? st.metricsLong : [],
       java: st.javaInfo || null,
       files, eulaAccepted, javaRequired,
       active: key === ctx.activeInstanceId,

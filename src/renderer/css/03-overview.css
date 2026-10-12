@@ -291,6 +291,11 @@ html.motion-lite .hero.is-running{animation:none;box-shadow:0 0 0 1px var(--inst
 .perf-status-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
 .perf-status .btn{margin-left:auto;flex-shrink:0}
 #performance.is-live .perf-status{display:none}
+/* v5.3.0: time-range chips for the Performance charts (15m / 1h / 6h). Right-aligned, calm. */
+.perf-range{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.perf-range .filter-chip{font:600 11px var(--font-ui);padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--field);color:var(--text-dim);cursor:pointer}
+.perf-range .filter-chip:hover{border-color:var(--border-hover);color:var(--text)}
+.perf-range .filter-chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 /* v4.0.0: KPI numbers live in ONE calm surface divided by hairlines (was 4 neon-topped cards). */
 .perf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .perf-stat{padding:var(--space-4) var(--space-5);display:flex;flex-direction:column;gap:var(--space-2);border-left:1px solid var(--border)}

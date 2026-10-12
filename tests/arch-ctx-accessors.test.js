@@ -33,7 +33,7 @@ const literal = src.slice(litStart, litEnd);
 // Migrated per-instance fields (add here as M4b converts each one).
 const MIGRATED = [
   'currentServerPath', 'serverProcess', 'javaInfo', 'consoleBuffer', 'sampleTimer',
-  'previousCpu', 'monitoredPid', 'live', 'metricsHistory', 'currentSoftware',
+  'previousCpu', 'monitoredPid', 'live', 'metricsHistory', 'metricsLong', 'currentSoftware',
   'autoPollTimer', 'suppressStatusUntil', 'lastManualCommandAt', 'manualStop',
   'restartAfterStop', 'restartTimer', 'restartAttempts', 'shutdownTimer', 'adoptWatchTimer', 'autoBackupTimer', 'schedulerTimer',
   'schedulerLastFired', 'serverStatus', 'waitingForDone', 'runtimeInstanceId',
