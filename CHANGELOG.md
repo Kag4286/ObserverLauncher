@@ -10,6 +10,42 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.3.0] — 2026-10-12
+
+**Marketplace software label + CurseForge dependencies; 1h/6h Performance charts; clearer unsigned-installer note.** No settings migration.
+
+### Fixed — Marketplace labelled every Paper-family server as "Paper"
+- **The install modal's "YOUR SERVER" cell showed the coarse matching family, not the real software.**
+  `imDetectServer` (renderer) returned `loader:'paper'` for Paper, Purpur, Leaf and Folia alike, so a
+  Leaf server read "YOUR SERVER: paper". It now returns BOTH `loader` (the coarse family - leaf/purpur/
+  folia all accept Paper plugins, so the compat match is deliberately unchanged) and `software` (the
+  exact jar name) for the label. `neoforge` is matched before `forge` in the renderer too (a
+  "neoforge" jar contains "forge"), matching the main-process detectors that were already correct.
+
+### Added — CurseForge dependencies are listed
+- **`mapCfFileToVersion` hard-coded `dependencies: []`, so a CurseForge project's version picker showed
+  none.** It now carries `cfDependencies(file)`. CurseForge publishes no official `relationType`
+  table, so every entry stays `uncertain` and the one-click auto-install is HIDDEN for CurseForge
+  items (the MCP planner already refused to auto-install uncertain CF deps). Modrinth deps keep their
+  auto-install button.
+
+### Added — Performance chart 1h and 6h ranges
+- **The Performance charts only drew the live 38-point ring (~30 min of raw 1s samples).** A second,
+  coarse 10s ring (`metricsLong`, 2160 samples = 6h) is now fed from the SAME `pushHistory` call as
+  the raw ring, so the two can never drift. New `15m / 1h / 6h` range chips: 15m keeps the raw ring;
+  1h/6h slice the coarse ring by age and downsample to <=200 points. History is in-memory (resets on
+  app restart); 24h + persistence is deferred. DESIGN.md 16.1 + section 18 updated.
+
+### Changed — unsigned-installer guidance
+- **The README Install section now tells users what to do about the Windows SmartScreen warning**
+  (the installer is unsigned: More info -> Run anyway), and how to verify the SHA-256.
+- **Site download note corrected.** It previously claimed the installers were code-signed by the
+  SignPath Foundation. The SignPath OSS application was not approved (insufficient public reputation),
+  so the note now states the installer is unsigned and how to proceed.
+
+### Tests
+- `tests/metrics-long-ring.test.js` (9) + `tests/curseforge.test.js` +3. `npm test` 100 files green.
+
 ## [5.2.1] — 2026-10-10
 
 **Fix: the address the launcher shared could be a virtual adapter friends cannot reach.** No settings

@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.3.0" date="2026-10-12">
+      <description>
+        <p>Marketplace fixes: the compatibility panel now shows your exact server software (Leaf, Purpur, Folia - not just "Paper"), and CurseForge projects list their dependencies. The Performance tab gains 1h and 6h chart ranges. The Windows installer now explains the SmartScreen warning.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.3.0.md</url>
+    </release>
     <release version="5.2.1" date="2026-10-10">
       <description>
         <p>Fix: the LAN address the launcher shares for friends to join could be a virtual network adapter (VPN, Docker, virtual machine) that is unreachable. The real WiFi/Ethernet address is now preferred.</p>
