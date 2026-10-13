@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.5.0" date="2026-10-13">
+      <description>
+        <p>The MCP server now advertises an in-client dashboard for the metrics tool: a supporting AI client such as Claude Desktop draws line charts for TPS, MSPT, CPU, RAM and players right beside the result. Clients that do not support MCP Apps still get the same data as text.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.5.0.md</url>
+    </release>
     <release version="5.4.0" date="2026-10-12">
       <description>
         <p>The Performance tab keeps a full day of history and now saves it to disk, so the 24h chart is still there after you restart the app.</p>

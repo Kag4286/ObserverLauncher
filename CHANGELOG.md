@@ -10,6 +10,31 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.5.0] — 2026-10-13
+
+**The MCP Apps dashboard is live: `get_metrics_history` now renders line charts inside a supporting MCP client.** No settings migration.
+
+### Added — MCP Apps full (SEP-1865)
+- **A real in-host dashboard replaces the 5.1.0 spike.** The `ui://observerlauncher/dashboard` resource
+  is now a dependency-free chart page: on load it sends the `ui/initialize` handshake, then draws a
+  line chart per metric (TPS, MSPT, CPU, RAM, players) from the tool result's `structuredContent`.
+  It posts `ui/notifications/size-changed` so the host sizes the iframe, and re-renders on every
+  `message`. No bundler, no SDK: the app already ships no node_modules and the MCP bridge runs on the
+  app's own Electron binary.
+- **`get_metrics_history` advertises the UI** via `_meta.ui.resourceUri` (SEP-1865). A host that
+  supports MCP Apps fetches the resource and renders it beside the result; a host that does not
+  simply ignores the field and shows the text as before.
+- **`server.js` `/tools` forwards each tool's `_meta`** so the client can see the UI binding.
+  `UI_META` in tools.js is the single place a tool is bound to a `ui://` resource.
+- Verified end to end on Claude Desktop: the tool result renders the five-chart dashboard. OpenCode
+  Desktop does not yet render MCP Apps (its renderer PR is still unmerged), so there it shows text
+  only, which is the expected fallback.
+
+### Tests
+- `tests/mcp-surface.test.js` gained 7 checks: the dashboard has a canvas + the handshake and reads
+  `structuredContent`, no leftover spike text, `get_metrics_history` carries the `_meta` binding, only
+  UI tools carry `_meta`, and `server.js` forwards it. `npm test` green.
+
 ## [5.4.0] — 2026-10-12
 
 **The Performance chart keeps 24 hours of history and survives a restart. Missing instance folders are now flagged, and adding a server is one clear choice.** No settings migration.

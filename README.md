@@ -38,10 +38,10 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-5.4.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-5.4.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-5.5.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-5.5.0.AppImage` |
 
-Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.4.0.AppImage` and run it. No root needed.
+Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.5.0.AppImage` and run it. No root needed.
 
 > **Windows SmartScreen note.** The installer is not code-signed, so Windows may show a "Windows
 > protected your PC" or "Unknown publisher" warning on first run. Click **More info**, then **Run

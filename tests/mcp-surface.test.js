@@ -78,13 +78,24 @@ check('callApp uses a settled guard', /let settled = false;/.test(bridgeSrc));
 check('create_instance exists', !!getTool('create_instance'));
 check('create_instance is write', getTool('create_instance')?.risk === 'write');
 
-// --- 5.1.0 C spike: ui:// resource ---
+// --- 5.1.0 spike + 5.5.0 full: ui:// resource ---
 check('1 UI resource', UI_RESOURCES.length === 1);
 check('ui resource has mcp-app mime', UI_RESOURCES[0].mimeType === 'text/html;profile=mcp-app');
 const ui = resolveUiResource('ui://observerlauncher/dashboard');
 check('resolveUiResource returns html', ui && /text\/html/.test(ui.mimeType) && /ObserverLauncher/.test(ui.text));
 check('resolveUiResource unknown -> null', resolveUiResource('ui://nope') === null);
 check('resolveResource ignores ui://', resolveResource('ui://observerlauncher/dashboard') === null);
+// 5.5.0: the dashboard is a real chart page with the MCP Apps handshake, not the static spike.
+check('dashboard renders a canvas chart', ui && /<canvas/.test(ui.text));
+check('dashboard does the ui/initialize handshake', ui && /ui\/initialize/.test(ui.text));
+check('dashboard reads structuredContent', ui && /structuredContent/.test(ui.text));
+check('dashboard has no leftover spike text', ui && !/MCP Apps spike/.test(ui.text));
+// get_metrics_history advertises the UI resource via _meta (SEP-1865), and server.js forwards it.
+const gmp = getTool('get_metrics_history');
+check('get_metrics_history carries _meta.ui.resourceUri', !!(gmp && gmp._meta && gmp._meta.ui && gmp._meta.ui.resourceUri === 'ui://observerlauncher/dashboard'));
+check('only UI tools carry _meta', TOOLS.filter(t => t._meta).length === 1);
+const srvSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'mcp', 'server.js'), 'utf8');
+check('server.js forwards _meta in /tools', /t\._meta \? \{ _meta: t\._meta \}/.test(srvSrc));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

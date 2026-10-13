@@ -254,6 +254,8 @@ function startMcpServer(ctx) {
         inputSchema: t.inputSchema,
         ...(t.annotations ? { annotations: t.annotations } : {}),
         ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
+        // 5.5.0 MCP Apps (SEP-1865): _meta carries ui.resourceUri for tools that render a UI.
+        ...(t._meta ? { _meta: t._meta } : {}),
       }));
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ tools }));

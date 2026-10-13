@@ -1259,6 +1259,13 @@ const OUTPUT_SCHEMAS = {
   search_marketplace: S({ results: { type: 'array', items: { type: 'object' } } }),
 };
 
+// 5.5.0 MCP Apps (SEP-1865): tools that render an in-host UI. The value is the tool's `_meta`; a
+// host that supports MCP Apps reads _meta.ui.resourceUri, fetches that `ui://` resource and shows
+// it beside the result. A host that does not support it simply ignores the field.
+const UI_META = {
+  get_metrics_history: { ui: { resourceUri: 'ui://observerlauncher/dashboard', visibility: ['model', 'app'] } },
+};
+
 const TOOLS = [
   { name: 'get_status', risk: 'read', description: 'Server status, folder, jar, software and Java info.', inputSchema: S(), handler: tGetStatus },
   { name: 'read_console', risk: 'read', description: 'Recent console/log lines.', inputSchema: S({ lines: { type: 'number' } }), handler: tReadConsole },
@@ -1340,6 +1347,7 @@ const TOOLS = [
   ...t,
   annotations: { ...TOOL_ANNOTATIONS[t.risk], openWorldHint: OPEN_WORLD_TOOLS.has(t.name) },
   ...(OUTPUT_SCHEMAS[t.name] ? { outputSchema: OUTPUT_SCHEMAS[t.name] } : {}),
+  ...(UI_META[t.name] ? { _meta: UI_META[t.name] } : {}),
 }));
 
 function getTool(name) { return TOOLS.find(t => t.name === name) || null; }
