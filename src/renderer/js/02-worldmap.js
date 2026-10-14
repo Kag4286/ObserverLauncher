@@ -316,8 +316,10 @@ function wmDraw(){
   ctx.strokeStyle='rgba(34,197,94,.25)';ctx.lineWidth=1.5;
   const[ax]=toS(0,0);ctx.beginPath();ctx.moveTo(ax,0);ctx.lineTo(ax,H);ctx.stroke();
   const[,ay]=toS(0,0);ctx.beginPath();ctx.moveTo(0,ay);ctx.lineTo(W,ay);ctx.stroke();
-  // markers
   ctx.textBaseline='top';
+  // markers: drawn AFTER the terrain layer (see the drawMarkers() call below) so a freshly
+  // loaded chunk's terrain never paints over the player dot and its label.
+  const drawMarkers=()=>{
   // BUGFIX (markers hard to see): spawn and player used to be the SAME 5px dot
   // (only the colour differed) with a faint 1.5px black outline, so on the dark
   // canvas + terrain wash they were nearly invisible. Give each type a distinct
@@ -355,6 +357,7 @@ function wmDraw(){
       ctx.fillStyle='rgba(232,244,248,.9)';ctx.fillText(coordText,lx,ly+12);
     }
   }
+  };
   // terrain / biome layer (behind grid/markers). When real biome data for the viewport has
   // been loaded (wm.biomes), each cell is coloured by its chunk's actual surface biome; cells
   // without data fall back to the seed-coloured approximation. Only explored chunks render
@@ -404,6 +407,7 @@ function wmDraw(){
       flushRun();
     }
   }
+  drawMarkers();
   wmScheduleBiomes();
   // biome status hint (top-left): a loading indicator while a fetch is in flight, or a
   // "zoom in" note when the viewport is too wide / the backend hit its chunk cap.

@@ -22,6 +22,10 @@ This builds on the metrics charts from 5.5.0. It is the same in-client dashboard
 
 This is the MCP Apps standard, and it stays additive. A client that does not support it still shows the same data as text. Verified on Claude Desktop.
 
+## A world map fix
+
+Player markers could disappear under the terrain. Once a chunk's real terrain loaded, it was drawn on top of the player dot and the name label, so an active player became hard to spot. The markers now draw on top of the terrain, so a player is always visible.
+
 ## Upgrading
 
 Install 5.6.0 over your current version. No settings change, no migration. Your servers, worlds and settings are untouched.

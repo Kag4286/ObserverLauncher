@@ -26,6 +26,12 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - `UI_META` in tools.js is still the single place a tool is bound to a `ui://` resource; it now lists
   four tools. A host without MCP Apps ignores `_meta` and shows the text result as before.
 
+### Fixed — world map player markers could be hidden under freshly loaded terrain
+- **The marker pass ran before the terrain/biome pass**, so once a chunk's real terrain loaded it
+  painted over the player dot and its name/coordinate label. The code comment already said the
+  terrain belongs behind the markers; the draw order did not match. Markers are now drawn LAST
+  (`drawMarkers()` after the terrain loop), so a player is always readable on top of any background.
+
 ### Tests
 - `tests/mcp-surface.test.js` now checks the four UI-bound tools carry `_meta`, that the dashboard has
   both the check and player renderers, and that only those four tools carry `_meta`. `npm test` green.
