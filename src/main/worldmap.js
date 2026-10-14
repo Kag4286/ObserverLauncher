@@ -314,6 +314,61 @@ function readChunkNbt(fp, sectorOff) {
   return nbt.parse(raw).then(p => nbt.simplify(p.parsed));
 }
 
+// ============ SURFACE BLOCK (5.6.0) ============
+// The biome alone decides only the green tints; the SURFACE BLOCK decides whether a column reads as
+// grass, sand, stone, snow or water. A block_states paletted container packs 16x16x16 block ids in
+// y-major order, MIN 4 bits per entry (unlike biomes, which use min 1). Returns the block Name at
+// (x,y,z) in a section, or null when the section carries no block palette.
+const AIR_BLOCK = /^(?:minecraft:)?(?:air|cave_air|void_air)$/;
+function blockAt(section, x, y, z) {
+  const bs = section && section.block_states;
+  if (!bs || !Array.isArray(bs.palette) || !bs.palette.length) return null;
+  const pal = bs.palette;
+  const nameOf = e => (e && (e.Name || e)) || null;
+  if (!bs.data || !bs.data.length) return nameOf(pal[0]); // single-block section
+  const bits = Math.max(4, Math.ceil(Math.log2(pal.length)));
+  const idx = y * 256 + z * 16 + x;
+  const perLong = Math.floor(64 / bits);
+  const li = Math.floor(idx / perLong);
+  if (li >= bs.data.length) return null;
+  const off = (idx % perLong) * bits;
+  const v = Number((toBigLong(bs.data[li]) >> BigInt(off)) & ((1n << BigInt(bits)) - 1n));
+  return nameOf(pal[v]);
+}
+// A 4x4 grid of surface block names (one per cell), or null. Uses OCEAN_FLOOR (highest SOLID block
+// under any water) so a water column resolves to the ground beneath it, not the water itself; the
+// renderer adds the water on top. Falls back to a slightly lower y when the first read is air
+// (a flower/plant sits above the ground). Pure-ish (reads only the parsed NBT), unit-tested.
+function surfaceBlocksFromChunk(nbtData, motion, ocean, RES = 4) {
+  if (!nbtData || !Array.isArray(nbtData.sections) || !motion || !ocean) return null;
+  const secByY = new Map();
+  for (const s of nbtData.sections) secByY.set(s.Y | 0, s);
+  const step = 16 / RES;
+  const out = new Array(RES * RES).fill(null);
+  for (let oz = 0; oz < RES; oz++) {
+    for (let ox = 0; ox < RES; ox++) {
+      const votes = {};
+      for (let dz = 0; dz < step; dz++) {
+        for (let dx = 0; dx < step; dx++) {
+          const x = ox * step + dx, z = oz * step + dz, i = z * 16 + x;
+          const solidY = ocean[i] | 0;
+          let name = null;
+          for (let y = solidY; y >= solidY - 2 && y >= 0; y--) {
+            const sy = Math.floor(y / 16);
+            const nm = blockAt(secByY.get(sy), x, y - sy * 16, z);
+            if (nm && !AIR_BLOCK.test(nm)) { name = nm; break; }
+          }
+          if (name) votes[name] = (votes[name] || 0) + 1;
+        }
+      }
+      let best = null, bn = -1;
+      for (const k in votes) if (votes[k] > bn) { bn = votes[k]; best = k; }
+      out[oz * RES + ox] = best;
+    }
+  }
+  return out;
+}
+
 // Cache: region file path -> { mtime, [cx,cz] -> biome }. Avoids re-reading a region on every pan.
 const biomeRegionCache = new Map();
 
@@ -322,7 +377,7 @@ const biomeRegionCache = new Map();
 // palette (minecraft:plains) that must NOT be trusted (3.2.5 bugfix: The End rendered as overworld).
 // Split out so the status gate is unit-testable without a region file on disk.
 function biomeFromChunk(nbtData) {
-  let biome = null, biomeGrid = null, relief = null;
+  let biome = null, biomeGrid = null, relief = null, surface = null;
   if (nbtData && nbtData.Status === 'minecraft:full') {
     const secs = (nbtData.sections || []).slice().sort((a, b) => (a.Y | 0) - (b.Y | 0));
     for (const sec of secs.reverse()) { const b = sectionBiome(sec); if (b) { biome = b; biomeGrid = biomeGridFromSection(sec); break; } }
@@ -331,9 +386,10 @@ function biomeFromChunk(nbtData) {
       const motion = unpackHeightmap(hm.MOTION_BLOCKING);
       const ocean = unpackHeightmap(hm.OCEAN_FLOOR);
       relief = downsampleHeights(motion, ocean, 4);
+      try { surface = surfaceBlocksFromChunk(nbtData, motion, ocean, 4); } catch { surface = null; }
     }
   }
-  return { biome, biomeGrid, relief };
+  return { biome, biomeGrid, relief, surface };
 }
 
 async function readBiomes(root, levelName, dim, rect) {
@@ -368,22 +424,21 @@ async function readBiomes(root, levelName, dim, rect) {
           const cx = rx * 32 + (i % 32), cz = rz * 32 + Math.floor(i / 32);
           if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
           const ck = cx + ',' + cz;
-          if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) { const row = [cx, cz, rec.b]; if (rec.h) { row.push(rec.h, rec.w); if (rec.g) row.push(rec.g); } out.push(row); } continue; }
+          if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) { const row = [cx, cz, rec.b]; if (rec.h) { row.push(rec.h, rec.w, rec.g || null, rec.s || null); } out.push(row); } continue; }
           const nbtData = await readChunkNbt(fp, v >>> 8);
           // BUGFIX (3.2.5): only a FULLY generated chunk carries real biome data. An early-stage chunk
           // (status 'minecraft:structure_starts' or similar) still ships a PLACEHOLDER biome palette
           // (minecraft:plains) that was read as if real - so The End rendered with overworld colours.
           // scanExploredChunks() already trusts only 'minecraft:full'; readBiomes must match.
-          const { biome, biomeGrid, relief } = biomeFromChunk(nbtData);
+          const { biome, biomeGrid, relief, surface } = biomeFromChunk(nbtData);
           const rec = { b: biome };
-          if (relief) { rec.h = relief.heights; rec.w = relief.water; }
-          if (biomeGrid) rec.g = biomeGrid;
+          if (relief) { rec.h = relief.heights; rec.w = relief.water; rec.g = biomeGrid || null; rec.s = surface || null; }
           entry.chunks.set(ck, rec);
           // Push null-biome chunks too (as [cx,cz,null]) so the renderer can tell "checked, no
           // biome data" apart from "not fetched yet" and shade it differently. h/w (when present)
           // carry the real 4x4 heightmap + water mask; g (when present) the 16 per-cell biomes.
           const row = [cx, cz, biome];
-          if (relief) { row.push(relief.heights, relief.water); if (biomeGrid) row.push(biomeGrid); }
+          if (relief) { row.push(relief.heights, relief.water, biomeGrid || null, surface || null); }
           out.push(row);
         }
       }
@@ -427,4 +482,4 @@ function listDimensions(root, levelName) {
   return out;
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions };
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt };

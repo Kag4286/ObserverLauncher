@@ -50,23 +50,35 @@ function getTerrainColor(wx, wz, seedBig, dim) {
   return 'rgba(208,208,208,.97)';
 }
 
-let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,dragWp:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null,biomes:new Map(),biomeReqSeq:0,biomeTimer:null,lastBiomeRect:'',biomeLoading:false,biomeTooWide:false,biomeTruncated:false,terrainCache:new Map(),miniAt:0};
-// REAL biome colours (terrain-map style). Keyed by exact biome id with family fallbacks, so a
-// brand-new biome still gets a sensible colour instead of grey. Slightly desaturated to sit on
-// the dark canvas without glowing.
+let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,dragWp:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null,biomes:new Map(),biomeReqSeq:0,biomeTimer:null,lastBiomeRect:'',biomeLoading:false,biomeTooWide:false,biomeTruncated:false,terrainCache:new Map(),miniAt:0,biomeBlend:true,biomeBlendW:0.22};
+// REAL biome colours. Derived from the biome grass/foliage tint where Minecraft defines one, else
+// the cubiomes/AMIDST reference palette, each pulled toward the dark canvas so the map reads as a
+// terrain preview rather than a neon heat map. Keyed by exact biome id with family fallbacks, so a
+// brand-new or modded biome still gets a sensible colour instead of grey.
 const BIOME_COLORS={
-  ocean:'#2E5A8A',deep_ocean:'#1E3F63',warm_ocean:'#3A7CA5',lukewarm_ocean:'#3E7EA0',cold_ocean:'#274E77',frozen_ocean:'#2B4C6B',deep_cold_ocean:'#1C3A57',deep_frozen_ocean:'#1E3D55',deep_lukewarm_ocean:'#2A5878',
+  // --- oceans & rivers (blue ramp: deep = dark, warm = teal) ---
+  ocean:'#2E5A8A',deep_ocean:'#1E3F63',warm_ocean:'#2F8FA0',lukewarm_ocean:'#3585A0',cold_ocean:'#254A72',frozen_ocean:'#2A4A6A',deep_cold_ocean:'#1A3452',deep_frozen_ocean:'#1C3A55',deep_lukewarm_ocean:'#285570',
   river:'#3E7FB0',frozen_river:'#4E7C9E',beach:'#C9BE8A',snowy_beach:'#D5D8DA',stony_shore:'#8A8477',
-  plains:'#6FA84E',sunflower_plains:'#7FB255',snowy_plains:'#D7DCE0',ice_spikes:'#C6D2DE',meadow:'#86B562',
-  forest:'#3F7A3A',flower_forest:'#568F45',birch_forest:'#6E9A55',old_growth_birch_forest:'#7BA25E',dark_forest:'#2E5A2E',taiga:'#4E7A5A',snowy_taiga:'#5C7C72',old_growth_pine_taiga:'#3F6B4A',old_growth_spruce_taiga:'#3D6448',
+  // --- temperate grassland ---
+  plains:'#7CA94E',sunflower_plains:'#8CB255',snowy_plains:'#DCE1E5',ice_spikes:'#BCCAD6',meadow:'#8CBE63',
+  // --- forests ---
+  forest:'#4E8A3C',flower_forest:'#5E9846',birch_forest:'#78A056',old_growth_birch_forest:'#85A85F',dark_forest:'#2F5A2A',pale_garden:'#778272',
+  taiga:'#4F7C58',snowy_taiga:'#5C7C72',old_growth_pine_taiga:'#427047',old_growth_spruce_taiga:'#406B47',
+  // --- jungles ---
   jungle:'#2E7D32',sparse_jungle:'#4E8B3E',bamboo_jungle:'#5C9A3E',
-  desert:'#D8C77A',badlands:'#B5713E',eroded_badlands:'#A85E33',wooded_badlands:'#9C6B3F',savanna:'#B0A24E',savanna_plateau:'#A99A44',windswept_savanna:'#9E9143',
+  // --- dry / hot ---
+  desert:'#D9C97C',badlands:'#B4744A',eroded_badlands:'#A55F33',wooded_badlands:'#9C6B3F',savanna:'#BCB05E',savanna_plateau:'#B3A550',windswept_savanna:'#A89A46',
+  // --- wetland ---
   swamp:'#5A6B45',mangrove_swamp:'#4E6B4A',
-  snowy_slopes:'#D7DCE0',snowy_plains_peaks:'#D7DCE0',grove:'#5E7C6A',snowy_taiga_peaks:'#6A8277',
-  windswept_hills:'#8A8A7E',windswept_gravelly_hills:'#97968B',windswept_forest:'#5E7A55',jagged_peaks:'#C9CDD2',frozen_peaks:'#DCE2E6',stony_peaks:'#9A9C92',
-  mushroom_fields:'#8A7C8E',
-  nether_wastes:'#7A3B33',crimson_forest:'#8E2E3E',warped_forest:'#2E7A72',soul_sand_valley:'#5A4A3E',basalt_deltas:'#54545C',
+  // --- mountains / cold ---
+  snowy_slopes:'#DCE1E5',grove:'#5E7C6A',windswept_hills:'#8A8A7E',windswept_gravelly_hills:'#97968B',windswept_forest:'#5E7A55',jagged_peaks:'#C9CDD2',frozen_peaks:'#DCE2E6',stony_peaks:'#9A9C92',
+  // --- special ---
+  mushroom_fields:'#8A7C8E',cherry_grove:'#B6DB61',
+  // --- nether ---
+  nether_wastes:'#7A3B33',crimson_forest:'#8E2E3E',warped_forest:'#2E7A72',soul_sand_valley:'#5A4A3E',basalt_deltas:'#54545C',sulfur_caves:'#ABA64F',
+  // --- end ---
   the_end:'#C9C29A',end_highlands:'#C2BB92',end_midlands:'#B8B189',small_end_islands:'#A8A17C',end_barrens:'#9C9577',
+  // --- caves ---
   the_void:'#0A0F14',dripstone_caves:'#8A7355',lush_caves:'#4E8A5A',deep_dark:'#1E3A4A',
 };
 // Brightness tint by surface height for a subtle relief (0..~320 → ~0.72..1.25).
@@ -86,9 +98,60 @@ function mixHex(a,b,t){
   const bl=Math.round((na&255)*(1-t)+(nb&255)*t);
   return '#'+((1<<24)+(r<<16)+(g<<8)+bl).toString(16).slice(1);
 }
-// Colors depend only on a chunk's own data (biome + 4x4 heights + water), NOT the camera, so we
-// compute them ONCE per chunk and reuse across every frame/pan. Before this, biomeColor/shadeHex/
-// mixHex (all string parsing) ran for every on-screen cell on every draw — the main source of pan lag.
+// 5.6.0 SURFACE BLOCK colours: the biome decides the green tint, the surface block decides whether
+// a column reads as grass / sand / stone / snow / water. Without this a desert cell and a plains
+// cell at the same height differed only by biome hue. Keys are the bare block name (no namespace).
+const BLOCK_COLORS={
+  grass_block:'#6B9E44',podzol:'#5B4330',mycelium:'#6E636B',moss_block:'#4E7A3A',
+  dirt:'#79553A',coarse_dirt:'#75553B',rooted_dirt:'#906E4E',mud:'#3A3A44',muddy_mangrove_roots:'#40404A',
+  sand:'#D9CF97',red_sand:'#BF6B36',gravel:'#7A7370',clay:'#9AA2AA',
+  stone:'#7E7E7E',andesite:'#8A8A8A',diorite:'#BCBCBC',granite:'#9A6B5A',deepslate:'#4B4B4B',tuff:'#6E6D64',calcite:'#D8D6CC',
+  terracotta:'#985E43',red_terracotta:'#8E3B26',orange_terracotta:'#A15325',yellow_terracotta:'#BA8523',white_terracotta:'#D2B6A1',light_gray_terracotta:'#876A61',brown_terracotta:'#4D3323',
+  snow:'#E9EDF0',snow_block:'#E9EDF0',powder_snow:'#E9EDF0',ice:'#8FBFE0',packed_ice:'#8FB4D6',blue_ice:'#6FA8DC',
+  water:'#2E5A8A',kelp:'#2E5A8A',seagrass:'#2E5A8A',
+  netherrack:'#6E2B26',soul_sand:'#52403A',soul_soil:'#4A3830',crimson_nylium:'#7A2733',warped_nylium:'#2E6B60',basalt:'#4E4E54',blackstone:'#3A3236',magma_block:'#8A3B1E',lava:'#C24A0F',
+  end_stone:'#D5D0A0',obsidian:'#15121E',bedrock:'#333338',
+  mossy_cobblestone:'#5A6B4E',cobblestone:'#6E6E6E',diorite_stairs:'#BCBCBC',
+};
+function blockColor(name){
+  if(!name)return null;
+  const k=String(name).replace(/^minecraft:/,'');
+  return BLOCK_COLORS[k]||null;
+}
+// Mix a surface block colour with the biome tint (grass/foliage hue) so grass stays green per biome
+// while sand stays sand. t small so the block colour dominates.
+function surfaceColor(blockName,biomeId){
+  const b=blockColor(blockName);
+  if(!b)return null;
+  const bare=String(blockName||'').replace(/^minecraft:/,'');
+  if(bare==='grass_block'||bare==='moss_block'||bare==='podzol'||bare==='mycelium'){
+    // tint the grass toward the biome hue (forest darker, savanna yellow-green...)
+    return mixHex(b,biomeColor(biomeId),0.45);
+  }
+  return b;
+}
+// 5.6.0 light intra-chunk blend: average each cell a little with its 4 neighbours so biome edges
+// stop looking like a hard checkerboard. Cross-chunk edges are left sharp (a neighbour chunk's
+// colours may not be loaded yet); the 4x4 biome grid already gives real intra-chunk edges to soften.
+function blendCells(colors,w){
+  if(!(w>0))return colors;
+  const out=colors.slice();
+  for(let z=0;z<4;z++){
+    for(let x=0;x<4;x++){
+      const i=z*4+x;
+      const n=[];
+      if(x>0)n.push(colors[i-1]);if(x<3)n.push(colors[i+1]);
+      if(z>0)n.push(colors[i-4]);if(z<3)n.push(colors[i+4]);
+      if(!n.length||!colors[i])continue;
+      let acc=colors[i];
+      for(const c of n)acc=mixHex(acc,c,w/n.length);
+      out[i]=acc;
+    }
+  }
+  return out;
+}
+// Colors depend only on a chunk's own data (biome + 4x4 heights + water + surface block), NOT the
+// camera, so we compute them ONCE per chunk and reuse across every frame/pan.
 const wmColorCache=new Map();
 function wmChunkColors(ck,cx,cz){
   // W1 (3.2.5): key BOTH caches by dimension so data can NEVER leak across dims, regardless of any
@@ -100,22 +163,25 @@ function wmChunkColors(ck,cx,cz){
   const rec=wm.biomes.get(key);
   let out;
   if(rec&&rec[2]!==undefined){
-    // rec = [cx, cz, biome, heights?, water?, grid?]. rec[5] (1.2.0) is a 4x4 grid of per-cell
-    // biome ids — real biome boundaries inside one chunk (coastlines, forest edges) instead of a
-    // single flat colour. Falls back to the whole-chunk biome when the grid is absent.
-    const grid=rec[5];
+    // rec = [cx, cz, biome, heights?, water?, grid?, surface?]. rec[5] (1.2.0) is a 4x4 grid of
+    // per-cell biome ids; rec[6] (5.6.0) is a 4x4 grid of surface block names. When a surface
+    // block is known we colour by IT (tinted by biome for grass), else fall back to the biome hue.
+    const grid=rec[5], surface=rec[6];
     const base=biomeColor(rec[2]);
     if(rec[3]){
       out=new Array(16);
       for(let i=0;i<16;i++){
-        const cellBase=grid?biomeColor(grid[i]):base;
-        let c=shadeHex(cellBase,rec[3][i]);
+        const bid=grid?grid[i]:rec[2];
+        let c=(surface&&surfaceColor(surface[i],bid))||biomeColor(bid);
+        c=shadeHex(c,rec[3][i]);
         if(rec[4]&&rec[4][i])c=mixHex(c,'#2E5A8A',0.6);
         out[i]=c;
       }
+      if(wm.biomeBlend)out=blendCells(out,wm.biomeBlendW);
     } else if(grid){
       out=new Array(16);
-      for(let i=0;i<16;i++)out[i]=grid[i]?biomeColor(grid[i]):'#20262E';
+      for(let i=0;i<16;i++)out[i]=grid[i]?((surface&&surfaceColor(surface[i],grid[i]))||biomeColor(grid[i])):'#20262E';
+      if(wm.biomeBlend)out=blendCells(out,wm.biomeBlendW);
     } else out=[rec[2]?base:'#20262E'];
   } else if(rec){ out=['#20262E']; }
   else { out=null; } // not loaded — caller uses seed wash
@@ -202,7 +268,7 @@ function wmScheduleBiomes(){
     // Each row is [cx, cz, biome, heights?, water?] — store the whole record so the renderer can
     // draw real 4x4 relief + water when present.
     for(const row of r.biomes){if(row&&row.length>=2){wmSetBiome(row[0]+','+row[1],row,fetchDim);added++}}
-    if(added||wm.biomeTruncated)wmDraw();
+    if(added||wm.biomeTruncated){wmDraw();wmRenderLegend();}
   },220);
 }
 // Fetch a bounded square of chunks around a centre, ignoring the zoom/viewport limit. Used on
@@ -262,6 +328,7 @@ async function wmLoad(){
   wm.cam={x:f.x,z:f.z};if(wm.zoom<0.1)wm.zoom=0.25;
   // A1: a reload must not keep stale biome colours from a previous world/session.
   wmClearCaches();
+  _wmLgSig='';
   wmLoadChunks(wm.dim);
   wmRenderList();wmRenderLegend();wmDraw();
   // C: at the default zoom the viewport spans tens of thousands of chunks, so the normal
@@ -464,10 +531,40 @@ const WM_LEGEND={
   nether:[['nether','#7A3B33']],
   end:[['end','#C9C29A']]
 };
+// 5.6.0: the legend is DYNAMIC when real biome data is loaded - it lists the biomes actually
+// present in the fetched chunks (top 12 by chunk count) with their exact colours, so the key always
+// matches the map instead of showing a fixed handful. Falls back to the static representative
+// swatches before any biome data arrives, so the legend is never empty.
+function wmLegendRows(){
+  const counts=new Map();
+  for(const rec of wm.biomes.values()){
+    if(!rec||rec[2]==null)continue;
+    const grid=rec[5];
+    if(grid){ for(const b of grid){ if(b)counts.set(b,(counts.get(b)||0)+1); } }
+    else counts.set(rec[2],(counts.get(rec[2])||0)+1);
+  }
+  if(!counts.size)return WM_LEGEND[wm.dim]||WM_LEGEND.overworld;
+  return [...counts.entries()]
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,12)
+    .map(([id])=>[String(id).replace(/^minecraft:/,''),biomeColor(id)]);
+}
+// Signature guard: the legend is rebuilt on every biome fetch, and rebuilding innerHTML on every
+// pan would flicker. Rebuild only when the visible biome set actually changes (and cache the map).
+let _wmLgSig='';
 function wmRenderLegend(){
   const box=$('#wmLgGrid');if(!box)return;
-  const rows=WM_LEGEND[wm.dim]||WM_LEGEND.overworld;
-  box.innerHTML=rows.map(([k,c])=>`<span class="wm-lg-chip"><i style="background:${c}"></i>${esc(t('wm.lg.'+k))}</span>`).join('');
+  const rows=wmLegendRows();
+  const sig=rows.map(r=>r[0]).join('|');
+  if(sig===_wmLgSig)return;
+  _wmLgSig=sig;
+  box.innerHTML=rows.map(([k,c])=>{
+    // Static legend rows have a wm.lg.<key> translation; a dynamic biome id usually does not, so
+    // fall back to its prettified name. t() returns the key itself when it is missing.
+    const label=t('wm.lg.'+k);
+    const text=label==='wm.lg.'+k?k.replace(/_/g,' '):label;
+    return `<span class="wm-lg-chip" title="${esc(k)}"><i style="background:${c}"></i>${esc(text)}</span>`;
+  }).join('');
 }
 // FEATURE: click-to-inspect — click a marker for a popup with exact coords +
 // Copy; click empty map for that point's coords. (Hover already shows coords

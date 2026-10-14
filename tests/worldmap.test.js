@@ -102,6 +102,27 @@ fs.writeFileSync(path.join(root, 'usercache.json'), JSON.stringify([{ uuid: uuid
   ck('biome grid: plains at [1]', multi && multi[1] === 'minecraft:plains');
   ck('biome grid: plains at [15]', multi && multi[15] === 'minecraft:plains');
 
+  // --- surface block (5.6.0): blockAt + surfaceBlocksFromChunk ---
+  // single-block section: no data -> palette[0]. block_states is the snake_case key nbt.simplify
+  // produces; the palette entry is an object with a Name after simplify.
+  const stoneSec = { block_states: { palette: [{ Name: 'minecraft:stone' }] } };
+  ck('blockAt single-block -> palette[0]', wm.blockAt(stoneSec, 0, 0, 0) === 'minecraft:stone');
+  ck('blockAt missing palette -> null', wm.blockAt({}, 0, 0, 0) === null);
+  ck('blockAt null section -> null', wm.blockAt(null, 0, 0, 0) === null);
+  // multi-block: index = y*256 + z*16 + x, 4 bits/entry (min). Fill one cell with sand, rest stone.
+  const idx = 0 * 256 + 2 * 16 + 3; // y0, z2, x3 -> idx 35
+  const cells = new Array(256).fill(0); cells[idx] = 1;
+  const multiSec = { block_states: { palette: [{ Name: 'minecraft:stone' }, { Name: 'minecraft:sand' }], data: packBits(cells, 4) } };
+  ck('blockAt multi picks the right cell', wm.blockAt(multiSec, 3, 0, 2) === 'minecraft:sand');
+  ck('blockAt multi other cell is stone', wm.blockAt(multiSec, 0, 0, 0) === 'minecraft:stone');
+  // surfaceBlocksFromChunk: a chunk whose whole surface column is sand -> every cell sand.
+  const motion2 = new Array(256).fill(64), ocean2 = new Array(256).fill(64);
+  const flatChunk = { sections: [{ Y: 4, block_states: { palette: [{ Name: 'minecraft:sand' }] } }] };
+  const surf = wm.surfaceBlocksFromChunk(flatChunk, motion2, ocean2, 4);
+  ck('surface grid length 16', Array.isArray(surf) && surf.length === 16);
+  ck('surface grid all sand', surf && surf.every(s => s === 'minecraft:sand'));
+  ck('surface grid null without heights', wm.surfaceBlocksFromChunk(flatChunk, null, null, 4) === null);
+
   // --- listDimensions (1.4.0): modded-dimension detection ---
   const dimRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-wmdim-'));
   const wd = path.join(dimRoot, 'world', 'dimensions');

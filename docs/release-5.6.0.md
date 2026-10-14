@@ -22,6 +22,14 @@ This builds on the metrics charts from 5.5.0. It is the same in-client dashboard
 
 This is the MCP Apps standard, and it stays additive. A client that does not support it still shows the same data as text. Verified on Claude Desktop.
 
+## The world map looks more like the real world
+
+The map used to approximate biomes with a hand-written colour list, so some biomes were clearly wrong (badlands and snowy plains) and newer biomes were missing. The colours now follow Minecraft's own biome tints where it has them, plus a reference palette, and cover the biomes added in recent versions.
+
+It also reads the actual surface block of each column now, not just the height. A desert cell shows sand, a mountain cell shows stone, a snowy cell shows snow, and grass keeps the tint of its biome. Biome edges are softened a little so they read as terrain instead of a grid.
+
+The legend at the side is now live: it lists the biomes that are actually on screen, with their exact colours, instead of a fixed short list.
+
 ## A world map fix
 
 Player markers could disappear under the terrain. Once a chunk's real terrain loaded, it was drawn on top of the player dot and the name label, so an active player became hard to spot. The markers now draw on top of the terrain, so a player is always visible.

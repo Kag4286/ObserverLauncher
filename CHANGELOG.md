@@ -26,6 +26,21 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - `UI_META` in tools.js is still the single place a tool is bound to a `ui://` resource; it now lists
   four tools. A host without MCP Apps ignores `_meta` and shows the text result as before.
 
+### Changed — world map: real colours, surface blocks, dynamic legend
+- **Biome colours rewritten from real data.** The hand-tuned table was approximate (badlands and
+  snowy plains were visibly off) and missed new biomes. It now follows the biome grass/foliage tint
+  where Minecraft defines one, else the cubiomes/AMIDST reference palette, and covers pale_garden,
+  cherry_grove and sulfur_caves.
+- **Surface block detection.** `biomeFromChunk` now also reads the surface block of each 4x4 cell
+  (`blockAt` + `surfaceBlocksFromChunk`, pure + unit-tested). The renderer colours by that block
+  (sand stays sand, stone stays stone) tinted by biome for grass, so a desert cell no longer looks
+  like plains at the same height. Chunks without block data fall back to the biome hue.
+- **Light intra-chunk blend** on the 4x4 grid so biome edges stop reading as a hard checkerboard.
+  Cross-chunk edges stay sharp (a neighbour may not be loaded yet).
+- **Dynamic biome legend.** The legend now lists the biomes actually present in the loaded chunks
+  (top 12 by count) with their exact colours, and keeps the static swatches only before any data
+  arrives. Rebuilds only when the visible biome set changes.
+
 ### Fixed — world map player markers could be hidden under freshly loaded terrain
 - **The marker pass ran before the terrain/biome pass**, so once a chunk's real terrain loaded it
   painted over the player dot and its name/coordinate label. The code comment already said the
