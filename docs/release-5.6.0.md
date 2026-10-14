@@ -30,6 +30,10 @@ It also reads the actual surface block of each column now, not just the height. 
 
 The legend at the side is now live: it lists the biomes that are actually on screen, with their exact colours, instead of a fixed short list.
 
+## A console fix
+
+The chips under Quick commands → Recent used the operating system's default button look, so on Windows they showed as pale system buttons instead of matching the dark theme. They now follow the same style as the other command buttons.
+
 ## A world map fix
 
 Player markers could disappear under the terrain. Once a chunk's real terrain loaded, it was drawn on top of the player dot and the name label, so an active player became hard to spot. The markers now draw on top of the terrain, so a player is always visible.

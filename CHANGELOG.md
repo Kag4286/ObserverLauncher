@@ -41,6 +41,12 @@ All notable changes to ObserverLauncher are documented here. Format follows
   (top 12 by count) with their exact colours, and keeps the static swatches only before any data
   arrives. Rebuilds only when the visible biome set changes.
 
+### Fixed — console "Recent" command chips used the OS default button style
+- **The buttons under Quick commands → Recent had only a `border-radius` rule**, so every other
+  property (background, border, colour, font) fell back to the OS default control style. On Windows
+  that rendered as pale system chips that clashed with the dark theme. They now match the
+  `.help-cards` buttons (dark panel, themed border, monospace).
+
 ### Fixed — world map player markers could be hidden under freshly loaded terrain
 - **The marker pass ran before the terrain/biome pass**, so once a chunk's real terrain loaded it
   painted over the player dot and its name/coordinate label. The code comment already said the

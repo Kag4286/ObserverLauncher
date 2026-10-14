@@ -277,7 +277,12 @@ html.motion-lite .hero.is-running{animation:none;box-shadow:0 0 0 1px var(--inst
 .help-cards button:hover{border-color:var(--accent);background:var(--accent-weak)}
 .help-cards button:hover b{color:var(--accent)}
 .help-note{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);color:var(--text-dim);font:500 10px var(--font-ui);line-height:1.5}
-.command-help .recent-commands button{border-radius:3px}
+.recent-commands{display:grid;gap:5px}
+/* BUGFIX (5.6.0): these buttons had only a border-radius, so every other property fell back to the
+   OS default control style (light chip, system font) and clashed with the dark design system. Give
+   them the same treatment as .help-cards button. */
+.recent-commands button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:var(--panel);border:1px solid var(--border);color:var(--text-muted);padding:7px 10px;border-radius:3px;cursor:pointer;font:500 11px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:border-color .1s,background .1s,color .1s}
+.recent-commands button:hover{border-color:var(--accent);background:var(--accent-weak);color:var(--text)}
 /* PERFORMANCE — glanceable redesign: one status, 4 quiet numbers, 2 calm charts.
    Details live behind a disclosure so first-time users see ~15 words, not ~150. */
 #performance.tab.active{display:flex;flex-direction:column;flex:1;min-height:0;gap:12px}
