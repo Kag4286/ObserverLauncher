@@ -1,36 +1,118 @@
-# ObserverLauncher
+<div align="center">
 
-A desktop app for hosting a Minecraft: Java Edition server on your own Windows or Linux PC. It
-downloads the server software, sets up Java, edits the config, opens the firewall, and backs up
-your worlds. You pick a folder, choose a server type, and press Start.
+<img src="build/icon.png" width="92" alt="ObserverLauncher icon">
 
-Everything runs locally. No account, no telemetry, no cloud service.
+<h1>ObserverLauncher</h1>
+
+<p><b>Run a Minecraft: Java Edition server on your own Windows or Linux PC.</b><br>
+No terminal, no account, no cloud. Pick a folder, choose a server type, press Start.</p>
 
 [![Release](https://img.shields.io/github/v/release/Kag4286/ObserverLauncher?label=release)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 [![Tests](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml/badge.svg)](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
-> Website: [observerlauncher-site.kag4286.workers.dev](https://observerlauncher-site.kag4286.workers.dev). Per-release notes are in [CHANGELOG.md](CHANGELOG.md).
+[Website](https://observerlauncher-site.kag4286.workers.dev) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+
+<img src="docs/screenshot-overview.png" width="780" alt="ObserverLauncher Overview tab">
+
+</div>
 
 ## What this is
 
-ObserverLauncher is a **server-hosting** app. It is not a client launcher for joining servers: if
-you want to play on someone else's server, use Prism Launcher or the official launcher. This app is
-for running the server itself, for you and your friends, from your own machine.
+ObserverLauncher is a **server hosting** app. It is not a client launcher for joining servers. If you want to play on someone else's server, use Prism Launcher or the official launcher. This app is for running the server itself, for you and your friends, from your own machine.
 
-The goal is to cover the setup that normally needs a terminal and a wiki: getting the right jar,
-matching the Java version, writing the config, opening the firewall, and taking backups you can
-actually restore.
+The goal is to cover the setup that normally needs a terminal and a wiki: getting the right jar, matching the Java version, writing the config, opening the firewall, and taking backups you can actually restore.
 
 ## Project status
 
-This is an early project maintained by one developer. It is not widely used, and there is no
-community around it yet.
+An early project maintained by one developer. It is not widely used, and there is no community around it yet.
 
-The core flow works: create a server, start and stop it, watch the console, manage players and
-content, and take backups. It is tested on Windows, and CI boots a real Paper server on Linux to
-check that path. Outside that core, expect rough edges, and please report what breaks.
+The core flow works: create a server, start and stop it, watch the console, manage players and content, and take backups. It is tested on Windows, and CI boots a real Paper server on Linux to check that path. Outside that core, expect rough edges. Please report what breaks.
+
+## Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**Server setup**
+Downloads Vanilla, Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot or Velocity from official sources. Version lists load live, so new Minecraft releases appear without an app update. Java is checked against the jar and can be installed for you.
+
+</td>
+<td width="50%" valign="top">
+
+**Console**
+Live output with timestamps, level filters, search, command history and log export.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Performance**
+TPS, MSPT, CPU and RAM graphs with 15m / 1h / 6h / 24h ranges. History persists to disk, so it survives a restart.
+
+</td>
+<td width="50%" valign="top">
+
+**Players**
+One roster for online, whitelisted, banned and OP players. The inspector reads equipment, inventory and ender chest, runs live actions, and edits saved data while the server is stopped.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Marketplace**
+Search Modrinth, Hangar, SpigotMC and CurseForge in one box. Compatibility is checked against the detected server before install. Modrinth dependencies resolve, and `.mrpack` files import and export.
+
+</td>
+<td width="50%" valign="top">
+
+**Content editor**
+Edit `server.properties`, `spigot.yml`, plugin configs and `whitelist.json`, with syntax highlighting and JSON validation. A collapsible tree keeps large folders manageable.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**World map**
+Renders terrain and real biomes from your world save, with surface blocks, waypoints, an explored-chunk overlay, jump-to-coordinates and PNG export.
+
+</td>
+<td width="50%" valign="top">
+
+**Backups**
+Manual or scheduled ZIP snapshots of world folders, taken with `save-off` / `save-all` so worlds are not archived mid-write. Restore is built in and zip-slip checked.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Multi-instance**
+Run several servers at once. Each instance has its own folder, Java runtime, RCON, schedule, backups and tunnel.
+
+</td>
+<td width="50%" valign="top">
+
+**AI integration (MCP)**
+The app can act as an MCP server so an AI client reads and controls the server. Read tools run freely, write tools ask, destructive tools always ask. Workflow prompts, resource templates, an audit log, and in-client metric charts on supporting clients.
+
+</td>
+</tr>
+</table>
+
+## Screenshots
+
+<table>
+<tr>
+<td align="center" width="50%"><b>World map</b><br><img src="docs/screenshot-worldmap.png" width="420" alt="World map"></td>
+<td align="center" width="50%"><b>MCP / AI integration</b><br><img src="docs/screenshot-MCP.png" width="420" alt="MCP / AI integration"></td>
+</tr>
+</table>
 
 ## Install
 
@@ -43,10 +125,7 @@ Download the latest release:
 
 Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.6.0.AppImage` and run it. No root needed.
 
-> **Windows SmartScreen note.** The installer is not code-signed, so Windows may show a "Windows
-> protected your PC" or "Unknown publisher" warning on first run. Click **More info**, then **Run
-> anyway**. The Linux AppImage is unaffected. To be sure a download is intact, compare it against the
-> SHA-256 in the release notes.
+> **Windows SmartScreen note.** The installer is not code-signed, so Windows may show a "Windows protected your PC" or "Unknown publisher" warning on first run. Click **More info**, then **Run anyway**. The Linux AppImage is unaffected. To be sure a download is intact, compare it against the SHA-256 in the release notes.
 
 From source (Node.js 18 or newer):
 
@@ -65,41 +144,7 @@ Auto-update uses GitHub Releases and works with the NSIS installer and the AppIm
 4. Accept the Minecraft EULA (the app can do this on first start).
 5. Set memory and press **Start**.
 
-To let friends join, open **How friends can join**. On the same network, share the local address.
-Otherwise forward the port on your router, or click **Share to internet** (Playit.gg) for a public
-address with no router setup.
-
-## Screenshots
-
-<table>
-<tr>
-<td align="center" width="50%"><b>Overview</b><br><img src="docs/screenshot-overview.png" width="420" alt="Overview"></td>
-<td align="center" width="50%"><b>World map</b><br><img src="docs/screenshot-worldmap.png" width="420" alt="World map"></td>
-</tr>
-<tr>
-<td align="center" colspan="2"><b>MCP / AI integration</b><br><img src="docs/screenshot-MCP.png" width="560" alt="MCP / AI integration"></td>
-</tr>
-</table>
-
-## What it does
-
-**Server setup.** Downloads Vanilla, Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot or Velocity from official sources. Version lists load live from each project's API, so new Minecraft releases appear without an app update. The app checks that your Java matches the jar before starting, and can install Java for you.
-
-**Console.** Live output with timestamps, level filters, search, command history and log export.
-
-**Performance.** TPS, MSPT, CPU and RAM graphs, with 15m / 1h / 6h ranges. Paper, Purpur, Leaf, Folia and Forge report TPS natively; Vanilla and Fabric need Spark.
-
-**Players.** One roster for online, whitelisted, banned and OP players. The inspector reads equipment, inventory and ender chest, runs live actions (gamemode, XP, give, heal, feed, kick), and edits saved data when the server is stopped.
-
-**Marketplace.** Search Modrinth, Hangar, SpigotMC and CurseForge in one box. Compatibility is checked against the detected server before install. Modrinth dependencies are resolved, and `.mrpack` files can be imported and exported.
-
-**Content editor.** Edit `server.properties`, `spigot.yml`, plugin configs, `whitelist.json` and more, with syntax highlighting and JSON validation. A collapsible folder tree keeps large server folders manageable.
-
-**World map.** Renders terrain and biomes from your world save, with waypoints, an explored-chunk overlay, jump-to-coordinates and PNG export.
-
-**Backups.** Manual or scheduled ZIP snapshots of world folders, taken with `save-off` / `save-all` so worlds are not archived mid-write. Restore is built in and zip-slip checked.
-
-**Multi-instance.** Run several servers at once. Each instance has its own folder, Java runtime, RCON, schedule, backups and tunnel.
+To let friends join, open **How friends can join**. On the same network, share the local address. Otherwise forward the port on your router, or click **Share to internet** (Playit.gg) for a public address with no router setup.
 
 ## Server software
 
@@ -165,11 +210,9 @@ Launcher data lives outside the server folder, in Electron's `userData` director
 
 ## Advanced usage
 
-Beyond the desktop window, the same backend runs without a GUI. This is optional; the app works
-fully on its own.
+Beyond the desktop window, the same backend runs without a GUI. This is optional; the app works fully on its own.
 
-**CLI.** The `observer` command maps one command per backend action. Useful for scripts and servers
-without a desktop.
+**CLI.** The `observer` command maps one command per backend action. Useful for scripts and servers without a desktop.
 
 ```bash
 observer status
@@ -181,20 +224,9 @@ observer init --template modded-performance
 
 Flags: `--json` for scripts, `--instance <id>` to target an instance, `--help`, `--version`.
 
-**MCP / AI integration.** The app can act as an MCP server so an AI client can read and control the
-server. Enable it in Settings under MCP / AI. It binds to 127.0.0.1 with a fresh token each launch.
-Read tools run freely, write tools ask for confirmation, and destructive tools always ask. When you
-enable **Auto-allow write tools**, the everyday lifecycle actions (start, stop, restart, force-stop)
-stop prompting, while data-destroying tools still always confirm. Every write and destroy call is
-written to an audit log. The tool list also advertises annotations and output schemas, offers
-workflow prompts such as "Diagnose my server", and exposes resource templates to read an instance's
-console or a server file by URI.
+**MCP / AI integration.** The app can act as an MCP server so an AI client can read and control the server. Enable it in Settings under MCP / AI. It binds to 127.0.0.1 with a fresh token each launch. Read tools run freely, write tools ask for confirmation, and destructive tools always ask. When you enable **Auto-allow write tools**, the everyday lifecycle actions (start, stop, restart, force-stop) stop prompting, while data-destroying tools still always confirm. Every write and destroy call is written to an audit log. The tool list also advertises annotations and output schemas, offers workflow prompts such as "Diagnose my server", and exposes resource templates to read an instance's console or a server file by URI. On clients that support MCP Apps, the metrics tool draws charts in the client.
 
-**Remote access.** An optional loopback-only HTTP server for checking on a running server from
-another device. Open `http://127.0.0.1:<port>/` for a small dashboard (status, console, players), or
-call the JSON API from a script. With Read-only off you can also start, stop, restart and kick. A
-token and an optional IP allowlist guard every request; it can never install, delete or edit files.
-Use Tailscale to reach it from anywhere. Full guide: [docs/remote.md](docs/remote.md).
+**Remote access.** An optional loopback-only HTTP server for checking on a running server from another device. Open `http://127.0.0.1:<port>/` for a small dashboard (status, console, players), or call the JSON API from a script. With Read-only off you can also start, stop, restart and kick. A token and an optional IP allowlist guard every request; it can never install, delete or edit files. Use Tailscale to reach it from anywhere. Full guide: [docs/remote.md](docs/remote.md).
 
 **Docker.** Run the headless backend in a container:
 
@@ -203,11 +235,9 @@ observer docker create --type fabric --ram 4 --port 25565 --out my-server
 cd my-server && mkdir -p server data && docker compose up -d
 ```
 
-The launcher is PID 1 and the JVM is its child, with the server folder and launcher data in two
-volumes. Full guide: [docs/docker.md](docs/docker.md).
+The launcher is PID 1 and the JVM is its child, with the server folder and launcher data in two volumes. Full guide: [docs/docker.md](docs/docker.md).
 
-**Modpack CI/CD.** A modpack can be a declarative `modpack.json`, verified in CI before anything is
-downloaded:
+**Modpack CI/CD.** A modpack can be a declarative `modpack.json`, verified in CI before anything is downloaded:
 
 ```bash
 observer modpack verify modpack.json   # resolve items, check loader/MC, deps
@@ -218,9 +248,7 @@ Full guide: [docs/modpack.md](docs/modpack.md).
 
 ## For developers
 
-The app has three layers: renderer (UI, no Node access), preload (the only IPC bridge), and main
-(Electron, a thin composition root that registers feature modules). A headless entry point runs the
-same backend without Electron, which is what the CLI and Docker image use.
+The app has three layers: renderer (UI, no Node access), preload (the only IPC bridge), and main (Electron, a thin composition root that registers feature modules). A headless entry point runs the same backend without Electron, which is what the CLI and Docker image use.
 
 ```
 src/renderer/   UI (html + css + locales + js, loaded in numeric order)
@@ -239,22 +267,18 @@ npm test          # unit/regression suite
 npm run test:e2e  # Playwright tests against the real app
 ```
 
-Build the installers with `npm run build:win`, `npm run build:linux` or `npm run build:all`. Releases
-run through GitHub Actions on a `v*` tag.
+Build the installers with `npm run build:win`, `npm run build:linux` or `npm run build:all`. Releases run through GitHub Actions on a `v*` tag.
 
-There is more in [CONTRIBUTING.md](CONTRIBUTING.md): the module layout, the multi-instance model,
-the Minecraft data-format traps, the MCP/remote/Docker details, and the guidelines for changes.
+There is more in [CONTRIBUTING.md](CONTRIBUTING.md): the module layout, the multi-instance model, the Minecraft data-format traps, the MCP/remote/Docker details, and the guidelines for changes.
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. A useful bug
-report includes what you clicked, what you expected, and the Console output.
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. A useful bug report includes what you clicked, what you expected, and the Console output.
 
 ## License
 
 [Apache-2.0](LICENSE) © ObserverLauncher contributors. See [NOTICE](NOTICE) for third-party attributions.
 
-Windows installers are not code-signed yet. See [CODE_SIGNING.md](CODE_SIGNING.md) for how the project
-plans to sign them and what to do about the SmartScreen warning in the meantime.
+Windows installers are not code-signed yet. See [CODE_SIGNING.md](CODE_SIGNING.md) for how the project plans to sign them and what to do about the SmartScreen warning in the meantime.
 
 ObserverLauncher is an unofficial tool. It is not affiliated with, endorsed by or associated with Mojang, Microsoft, or any server-software project. Minecraft is a trademark of Mojang Synergies AB. Running a server requires accepting the [Minecraft EULA](https://www.minecraft.net/en-us/eula).
