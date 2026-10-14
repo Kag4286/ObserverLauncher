@@ -85,15 +85,22 @@ const ui = resolveUiResource('ui://observerlauncher/dashboard');
 check('resolveUiResource returns html', ui && /text\/html/.test(ui.mimeType) && /ObserverLauncher/.test(ui.text));
 check('resolveUiResource unknown -> null', resolveUiResource('ui://nope') === null);
 check('resolveResource ignores ui://', resolveResource('ui://observerlauncher/dashboard') === null);
-// 5.5.0: the dashboard is a real chart page with the MCP Apps handshake, not the static spike.
-check('dashboard renders a canvas chart', ui && /<canvas/.test(ui.text));
+// 5.5.0/5.6.0: the dashboard is a real multi-mode page with the MCP Apps handshake, not the spike.
+check('dashboard renders a canvas chart', ui && /["']canvas["']/.test(ui.text));
 check('dashboard does the ui/initialize handshake', ui && /ui\/initialize/.test(ui.text));
 check('dashboard reads structuredContent', ui && /structuredContent/.test(ui.text));
 check('dashboard has no leftover spike text', ui && !/MCP Apps spike/.test(ui.text));
-// get_metrics_history advertises the UI resource via _meta (SEP-1865), and server.js forwards it.
-const gmp = getTool('get_metrics_history');
-check('get_metrics_history carries _meta.ui.resourceUri', !!(gmp && gmp._meta && gmp._meta.ui && gmp._meta.ui.resourceUri === 'ui://observerlauncher/dashboard'));
-check('only UI tools carry _meta', TOOLS.filter(t => t._meta).length === 1);
+// 5.6.0: multi-mode renderer (metrics chart / health checks / player chips).
+check('dashboard renders health checks', ui && /renderChecks/.test(ui.text));
+check('dashboard renders players', ui && /renderPlayers/.test(ui.text));
+// UI tools advertise the UI resource via _meta (SEP-1865), and server.js forwards it.
+const UI_TOOL_NAMES = ['get_metrics_history', 'diagnose_server', 'doctor_report', 'list_players'];
+for (const n of UI_TOOL_NAMES) {
+  const t = getTool(n);
+  check(n + ' carries _meta.ui.resourceUri', !!(t && t._meta && t._meta.ui && t._meta.ui.resourceUri === 'ui://observerlauncher/dashboard'));
+}
+check('only UI tools carry _meta', TOOLS.filter(t => t._meta).length === UI_TOOL_NAMES.length);
+check('every UI tool renders a supported mode', UI_TOOL_NAMES.every(n => /^get_metrics_history|^diagnose_server|^doctor_report|^list_players$/.test(n)));
 const srvSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'mcp', 'server.js'), 'utf8');
 check('server.js forwards _meta in /tools', /t\._meta \? \{ _meta: t\._meta \}/.test(srvSrc));
 

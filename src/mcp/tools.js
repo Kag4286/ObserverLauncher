@@ -1264,6 +1264,9 @@ const OUTPUT_SCHEMAS = {
 // it beside the result. A host that does not support it simply ignores the field.
 const UI_META = {
   get_metrics_history: { ui: { resourceUri: 'ui://observerlauncher/dashboard', visibility: ['model', 'app'] } },
+  diagnose_server: { ui: { resourceUri: 'ui://observerlauncher/dashboard', visibility: ['model', 'app'] } },
+  doctor_report: { ui: { resourceUri: 'ui://observerlauncher/dashboard', visibility: ['model', 'app'] } },
+  list_players: { ui: { resourceUri: 'ui://observerlauncher/dashboard', visibility: ['model', 'app'] } },
 };
 
 const TOOLS = [

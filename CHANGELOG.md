@@ -10,6 +10,26 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.6.0] — 2026-10-14
+
+**The MCP Apps dashboard now covers three more tools: server health, the full doctor report, and the player list.** No settings migration.
+
+### Added — MCP Apps on more tools
+- **`diagnose_server` and `doctor_report` render a health-check list.** Each check shows a coloured
+  badge (ok / warn / error / info), its id, the detail line and the fix when one is given, plus a
+  summary count in the header. Easier to scan than a JSON array of checks.
+- **`list_players` renders player chips**, grouped into Online / Whitelist / Operators / Banned /
+  Known with a count per group. The online group is highlighted.
+- **One dashboard resource, three render modes.** `ui://observerlauncher/dashboard` sniffs the tool
+  result shape: `samples` -> line charts (5.5.0), `checks` -> the health list, `online`/`whitelist`
+  -> the player chips. The metrics view is unchanged.
+- `UI_META` in tools.js is still the single place a tool is bound to a `ui://` resource; it now lists
+  four tools. A host without MCP Apps ignores `_meta` and shows the text result as before.
+
+### Tests
+- `tests/mcp-surface.test.js` now checks the four UI-bound tools carry `_meta`, that the dashboard has
+  both the check and player renderers, and that only those four tools carry `_meta`. `npm test` green.
+
 ## [5.5.0] — 2026-10-13
 
 **The MCP Apps dashboard is live: `get_metrics_history` now renders line charts inside a supporting MCP client.** No settings migration.
