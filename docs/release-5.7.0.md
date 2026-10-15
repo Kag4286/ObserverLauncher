@@ -6,11 +6,11 @@ The internet tunnel sets itself up now, and Bedrock players can join a Java serv
 
 ---
 
-## The tunnel address fills itself in
+## A note on the tunnel address
 
-Sharing your server over the internet uses Playit.gg. Before, after starting the tunnel you had to open the Playit dashboard, find the address it gave you, copy it, and paste it back into the app. That was the fiddly part.
+Sharing your server over the internet uses Playit.gg, and you still copy the public address from the Playit dashboard into the app, as before.
 
-Now the app reads the address from the Playit agent's own log and fills it in for you. Start the tunnel and the address appears. If it does not show up for some reason, there is a **Detect** button to scan the log again, and the paste box is still there as a backup. Nothing breaks if the agent changes how it prints its log.
+We looked into filling that address in automatically by reading it from the Playit agent on your PC. It turned out Playit does not keep the address anywhere local. The command-line tool has no way to list tunnels, the config file only holds a secret key, and the agent's log only reports how many tunnels exist, never their names or addresses. The address lives only on the Playit dashboard. So the app keeps the copy-paste step, and there is nothing to fix here until Playit changes how its agent works.
 
 ## Bedrock players can join (GeyserMC)
 

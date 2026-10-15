@@ -134,9 +134,11 @@ function switchTab(tab){
   }
   if(tab==='marketplace'&&!$('#marketResults').innerHTML)$('#marketSearch').click();
   if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource');}catch{}})}); }
-  // Sparkline was 0-sized while Overview was hidden — redraw on reveal (same class of bug as
-  // the hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
-  if(tab==='overview')requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));
+  // v5.7.0: Overview re-fetches files on entry so a jar dropped into plugins/mods by hand (Geyser,
+  // Floodgate, a mod) surfaces without an app restart, and the Geyser/Bedrock card appears at once.
+  // The sparkline was 0-sized while Overview was hidden — redraw on reveal (same class of bug as the
+  // hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
+  if(tab==='overview'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));}
   if(tab==='players')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
   if(tab==='content'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates()}
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
@@ -655,13 +657,7 @@ async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();a
 function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelStart'),msg=$('#tunnelMsg');if(!pill)return;
   const st=s?.status||'stopped';pill.textContent=st==='running'?t('tun.live'):st==='installing'?t('tun.installing'):st==='starting'?t('tun.starting'):st==='error'?t('tun.error'):t('tun.off');pill.className='tunnel-pill '+st;
   if(startBtn)startBtn.disabled=st==='installing'||st==='starting';
-  // v5.7.0: auto-fill the address box from the detected address, but never clobber what the user is
-  // currently typing (only fill when the box is empty or already mirrors the detected value).
-  const addrInput=$('#tunnelManual');
-  if(addrInput&&s&&typeof s.address==='string'&&s.address){if(!addrInput.value||addrInput.dataset.auto==='1'){addrInput.value=s.address;addrInput.dataset.auto='1'}}
   if(msg){if(st==='installing'){msg.hidden=false;msg.textContent=t('tun.downloading')}else if(st==='error'){msg.hidden=false;msg.textContent=t('tun.serviceError')}else{msg.hidden=true;msg.textContent=''}}}
-// v5.7.0: the Detect button asks the backend to scan the agent log for a public address.
-$('#tunnelDetectBtn')?.addEventListener('click',async()=>{const b=$('#tunnelDetectBtn');b.disabled=true;try{const r=await window.observer.tunnelDetect();if(r&&r.ok){const inp=$('#tunnelManual');if(inp){inp.value=r.address;inp.dataset.auto='1'}toast(t('tun.detected',{a:r.address}),'success')}else toast((r&&r.error)||t('tun.detectFail'),'error')}catch(e){toast(e?.message||t('tun.detectFail'),'error')}finally{b.disabled=false}});
 window.observer.onTunnelStatus(applyTunnelStatus);
 refreshTunnelUI();
 setInterval(refreshTunnelUI,15000);

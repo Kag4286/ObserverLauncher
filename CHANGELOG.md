@@ -14,14 +14,19 @@ All notable changes to ObserverLauncher are documented here. Format follows
 
 **The Playit tunnel address is detected automatically, and Bedrock crossplay (GeyserMC) is now surfaced.** No settings migration.
 
-### Added — Playit tunnel address auto-detect
-- **The app now reads the public tunnel address from the agent log** instead of asking the user to
-  copy it from the dashboard. While the Playit service runs, the app attaches (`playit attach -s`),
-  scans each new line for a Playit host, and fills the address box. `parseTunnelAddress` accepts
-  `.ply.gg` / `.playit.gg` / `.playit.plus` / `.joinmc.link` hosts with an optional port, and skips a
-  bare dashboard URL. The manual paste box stays as a fallback, so a log-format change cannot break it.
-- **New `tunnel:detect` IPC + a Detect button** scan the buffered agent log on demand. `tunnelSnapshot`
-  now carries the per-instance `address`. The log tail is reaped on service stop and on app quit.
+### Changed — Playit address is paste-only (auto-detect was not possible)
+- **Investigated auto-detecting the Playit public address and dropped it.** Playit does NOT expose the
+  tunnel address anywhere local: the CLI has no tunnel/address command (`account` only has
+  `login-url`), `playit.toml` holds only the secret key, and the daemon log (`playitd.log`) only
+  reports `tunnel_count`, never the domain. The address lives only on the playit.gg dashboard. So the
+  paste box stays the one path, and its validator (`isSafeTunnelAddress`) is kept. The `tunnelSnapshot`
+  still carries the per-instance `address` (read from settings).
+
+### Fixed — a jar dropped into plugins/mods by hand needed an app restart
+- **The Overview tab did not re-fetch files when opened** (unlike Performance / Players / Content),
+  so a Geyser/Floodgate/mod jar dropped into the server folder by hand did not surface — and the new
+  Bedrock-crossplay panel stayed hidden — until the app restarted. `switchTab('overview')` now
+  re-fetches `files:get` and calls `refreshUI()` on entry.
 
 ### Added — GeyserMC (Bedrock crossplay) support
 - **`serverFiles()` reports a `geyser` flag** when a Geyser or Floodgate jar is present in

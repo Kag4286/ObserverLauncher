@@ -118,7 +118,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 // Stop the MCP server and remove its bridge config on the way out, so a stale token/port file
 // never lingers to confuse the next launch.
-app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { require('./main/tunnel.js').stopTunnelLog(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} try { require('./main/metrics-store.js').flushAll(); } catch {} });
+app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} try { require('./main/metrics-store.js').flushAll(); } catch {} });
 setupQuitHandler(ctx);
 
 // Exported for smoke tests (require without launching Electron windows).

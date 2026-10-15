@@ -30,15 +30,7 @@ ok('phase is case-insensitive', t.parseServiceStatus('phase: Running') === 'runn
 ok('no phase -> null', t.parseServiceStatus('nonsense output') === null);
 ok('empty -> null', t.parseServiceStatus('') === null);
 
-// --- v5.7.0: tunnel address parsing + validation ---
-ok('address: plain ply.gg host', t.parseTunnelAddress('tunnel ready: abc123.tun.ply.gg') === 'abc123.tun.ply.gg');
-ok('address: host with port', t.parseTunnelAddress('connect to abc.gl.at.ply.gg:25565 now') === 'abc.gl.at.ply.gg:25565');
-ok('address: joinmc.link host', t.parseTunnelAddress('your address is name.joinmc.link') === 'name.joinmc.link');
-ok('address: playit.plus host', t.parseTunnelAddress('shared on xyz.playit.plus') === 'xyz.playit.plus');
-ok('address: bare playit.gg is not an address', t.parseTunnelAddress('open https://playit.gg/account/tunnels') === null);
-ok('address: no host -> null', t.parseTunnelAddress('starting the agent...') === null);
-ok('address: empty -> null', t.parseTunnelAddress('') === null);
-ok('address: null -> null', t.parseTunnelAddress(null) === null);
+// --- v5.7.0: tunnel address validation (the user pastes it; Playit does not expose it locally) ---
 ok('safe address: plain host ok', t.isSafeTunnelAddress('abc.tun.ply.gg') === true);
 ok('safe address: host:port ok', t.isSafeTunnelAddress('abc.tun.ply.gg:25565') === true);
 ok('safe address: empty ok (clears)', t.isSafeTunnelAddress('') === true);

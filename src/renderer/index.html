@@ -135,14 +135,14 @@
               <li data-i18n-html="tun.step1">Click <b>Set up Playit</b> above — the app installs the agent and starts its background service.</li>
               <li data-i18n-html="tun.step2">Open the <b>Playit dashboard</b> and sign in (free account).</li>
               <li data-i18n-html="tun.step3">Create a <b>Minecraft Java</b> tunnel pointing at <code>127.0.0.1</code> on your server port (default <code>25565</code>).</li>
-              <li data-i18n-html="tun.step4">The app reads the public address from the agent log and fills the box below. If it does not appear, press <b>Detect</b>, or paste the address the dashboard shows.</li>
+              <li data-i18n-html="tun.step4">Copy the public address it gives you and paste it below.</li>
             </ol>
           </details></div>
           <p class="text-muted tunnel-msg" id="tunnelMsg" hidden></p>
           <div class="set-toggle tunnel-auto"><div class="set-toggle-info"><b data-i18n="tun.autoOn">Keep it on automatically</b><small data-i18n="tun.autoSub">Start the Playit service whenever the server runs, and stop it when the server stops.</small></div><label class="switch"><input type="checkbox" id="autoTunnelQuick"><span class="slider"></span></label></div>
           <div class="tunnel-manual">
             <label class="text-muted" data-i18n="tun.manualLabel">Paste your Playit public address here (create it on the dashboard):</label>
-            <div class="tunnel-addr"><input id="tunnelManual" placeholder="name.tun.ply.gg" spellcheck="false"><button class="btn secondary sm" id="tunnelDetectBtn" data-i18n="tun.detect">Detect</button><button class="btn secondary sm" data-copy="#tunnelManual" data-i18n="conn.copy">Copy</button></div>
+            <div class="tunnel-addr"><input id="tunnelManual" placeholder="name.tun.ply.gg" spellcheck="false"><button class="btn secondary sm" data-copy="#tunnelManual" data-i18n="conn.copy">Copy</button></div>
           </div>
           </div>
         </details>
