@@ -10,6 +10,30 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [5.7.0] — 2026-10-15
+
+**The Playit tunnel address is detected automatically, and Bedrock crossplay (GeyserMC) is now surfaced.** No settings migration.
+
+### Added — Playit tunnel address auto-detect
+- **The app now reads the public tunnel address from the agent log** instead of asking the user to
+  copy it from the dashboard. While the Playit service runs, the app attaches (`playit attach -s`),
+  scans each new line for a Playit host, and fills the address box. `parseTunnelAddress` accepts
+  `.ply.gg` / `.playit.gg` / `.playit.plus` / `.joinmc.link` hosts with an optional port, and skips a
+  bare dashboard URL. The manual paste box stays as a fallback, so a log-format change cannot break it.
+- **New `tunnel:detect` IPC + a Detect button** scan the buffered agent log on demand. `tunnelSnapshot`
+  now carries the per-instance `address`. The log tail is reaped on service stop and on app quit.
+
+### Added — GeyserMC (Bedrock crossplay) support
+- **`serverFiles()` reports a `geyser` flag** when a Geyser or Floodgate jar is present in
+  `plugins/` or `mods/`. The Overview shows a Bedrock-crossplay panel only then.
+- **The panel explains the two-tunnel setup**: Playit's free plan cannot expose TCP and UDP at the
+  same time, so the Java TCP tunnel and the Bedrock UDP tunnel (local port 19132) are separate, and
+  a paid plan can combine them. It also points at Geyser's `config.yml` and Floodgate.
+
+### Tests
+- `tests/tunnel.test.js` +14 checks (address parse + validation). `tests/boot-state.test.js` +4
+  (geyser flag, real plugin/floodgate detection). i18n x7 (1069 keys). `npm test` green.
+
 ## [5.6.0] — 2026-10-14
 
 **The MCP Apps dashboard now covers three more tools: server health, the full doctor report, and the player list.** No settings migration.

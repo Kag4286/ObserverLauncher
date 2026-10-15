@@ -13,8 +13,23 @@ function ok(name, cond) {
 }
 
 const e = emptyServerFiles();
-for (const k of ['jar', 'launchScript', 'plugins', 'mods', 'datapacks', 'worlds', 'backups', 'properties', 'knownPlayers', 'whitelist', 'banned', 'ops']) {
+for (const k of ['jar', 'launchScript', 'plugins', 'mods', 'datapacks', 'worlds', 'backups', 'properties', 'knownPlayers', 'whitelist', 'banned', 'ops', 'geyser']) {
   ok(`empty has ${k}`, k in e);
+}
+// v5.7.0 GEYSER: empty snapshot reports no Bedrock crossplay.
+ok('empty geyser is false', e.geyser === false);
+// A server folder with a Geyser jar is detected as Bedrock-crossplay capable.
+{
+  const fs = require('fs'), os = require('os'), path = require('path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-geyser-'));
+  fs.mkdirSync(path.join(root, 'plugins'));
+  ok('no geyser jar -> false', serverFiles(root).geyser === false);
+  fs.writeFileSync(path.join(root, 'plugins', 'Geyser-Spigot.jar'), 'x');
+  ok('geyser plugin -> true', serverFiles(root).geyser === true);
+  fs.rmSync(path.join(root, 'plugins', 'Geyser-Spigot.jar'));
+  fs.writeFileSync(path.join(root, 'plugins', 'floodgate-spigot.jar'), 'x');
+  ok('floodgate plugin -> true', serverFiles(root).geyser === true);
+  fs.rmSync(root, { recursive: true, force: true });
 }
 ok('empty lists are arrays', [e.plugins, e.mods, e.datapacks, e.worlds, e.backups, e.knownPlayers].every(Array.isArray));
 ok('empty properties is object', e.properties && typeof e.properties === 'object');

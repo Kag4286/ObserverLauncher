@@ -38,7 +38,7 @@ function findPlayerDataFile(root, properties, uuid, name) {
   return null;
 }
 function emptyServerFiles() {
-  return { jar: null, launchScript: null, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {} };
+  return { jar: null, launchScript: null, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {}, geyser: false };
 }
 function serverFiles(root) {
   if (!root || !fs.existsSync(root)) return emptyServerFiles();
@@ -84,7 +84,14 @@ function serverFiles(root) {
     ...fileNames(datapackFolder).filter(x => /\.(zip|jar)(\.disabled)?$/i.test(x)),
     ...dirNames(datapackFolder),
   ];
-  return { jar, launchScript, plugins: fileNames('plugins').filter(x => /\.jar(\.disabled)?$/i.test(x)), mods: fileNames('mods').filter(x => /\.jar(\.disabled)?$/i.test(x)), datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties };
+  const plugins = fileNames('plugins').filter(x => /\.jar(\.disabled)?$/i.test(x));
+  const mods = fileNames('mods').filter(x => /\.jar(\.disabled)?$/i.test(x));
+  // v5.7.0 GEYSER: GeyserMC (Bedrock <-> Java) lets Bedrock players join a Java server. It ships
+  // as a plugin (plugins/Geyser-Spigot.jar) or a mod (mods/geyser-neoforge-*.jar); Floodgate is
+  // its companion for auth. Either name present (enabled OR .disabled) marks the server as a
+  // Bedrock-crossplay candidate, which the Overview surfaces with UDP-tunnel guidance.
+  const geyser = [...plugins, ...mods].some(x => /(^|\/)geyser|floodgate/i.test(x));
+  return { jar, launchScript, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
 }
 function detectSoftware(info) {
   const name = String(info.jar || info.launchScript || '');

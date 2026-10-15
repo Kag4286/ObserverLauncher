@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="5.7.0" date="2026-10-15">
+      <description>
+        <p>The Playit tunnel address is now detected automatically from the agent log instead of being copied by hand, and the app surfaces a Bedrock crossplay panel when GeyserMC is installed.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-5.7.0.md</url>
+    </release>
     <release version="5.6.0" date="2026-10-14">
       <description>
         <p>The in-client MCP Apps dashboard now covers more tools: the server health diagnosis and the full doctor report render a colour-coded check list, and the player list renders grouped player chips. The metrics charts from 5.5.0 are unchanged.</p>

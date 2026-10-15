@@ -151,6 +151,8 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   if(typeof renderInstanceList==='function')renderInstanceList();
   if(typeof renderInstanceAppearance==='function')renderInstanceAppearance();
   if(typeof renderTunnelOverview==='function')renderTunnelOverview();
+  // v5.7.0 GEYSER: surface the Bedrock-crossplay panel only when a Geyser/Floodgate jar is present.
+  {const gb=$('#geyserBox');if(gb)gb.hidden=!(hasFolder&&f.geyser)}
   requestAnimationFrame(()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')})}
 // FEATURE: plain-language setup checklist for beginners — one glance says what
 // is missing (folder / server file / Java / EULA) instead of making them decode
