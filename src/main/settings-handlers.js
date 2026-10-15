@@ -41,8 +41,9 @@ function registerSettings(ipcMain, ctx) {
     try {
       if (files.geyser) {
         const { inspectGeyser } = require('./geyser.js');
+        const { javaMajor } = require('./java.js');
         const hasFloodgate = [...(files.plugins || []), ...(files.mods || [])].some(x => /floodgate/i.test(x));
-        geyser = inspectGeyser(ctx.currentServerPath, { floodgate: hasFloodgate });
+        geyser = inspectGeyser(ctx.currentServerPath, { floodgate: hasFloodgate, javaMajor: javaMajor(ctx.javaInfo && ctx.javaInfo.version) });
       }
     } catch { geyser = null; }
     return {

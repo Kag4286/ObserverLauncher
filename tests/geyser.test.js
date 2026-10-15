@@ -50,9 +50,24 @@ ok('floodgate + auth-type online -> error', inspectGeyser(root, { floodgate: tru
 fs.writeFileSync(cfg, 'bedrock:\n  port: 19132\n  clone-remote-port: false\nadvanced:\n  bedrock:\n    use-haproxy-protocol: false\n');
 ok('haproxy false -> warn', inspectGeyser(root).issues.some(i => i.key === 'advanced.bedrock.use-haproxy-protocol'));
 
+// --- port conflict: query enabled on the Geyser UDP port -> error ---
+fs.writeFileSync(cfg, 'bedrock:\n  port: 19132\n  clone-remote-port: false\n');
+fs.writeFileSync(path.join(root, 'server.properties'), 'enable-query=true\nquery.port=19132\n');
+ok('query port clash -> error', inspectGeyser(root).issues.some(i => i.key === 'query.port'));
+fs.writeFileSync(path.join(root, 'server.properties'), 'enable-query=true\nquery.port=19133\n');
+ok('query on another port -> no clash', !inspectGeyser(root).issues.some(i => i.key === 'query.port'));
+fs.writeFileSync(path.join(root, 'server.properties'), 'enable-query=false\nquery.port=19132\n');
+ok('query disabled -> no clash', !inspectGeyser(root).issues.some(i => i.key === 'query.port'));
+
+// --- java version: below 21 -> error ---
+ok('java 17 -> error', inspectGeyser(root, { javaMajor: 17 }).issues.some(i => i.key === 'java'));
+ok('java 21 -> no java error', !inspectGeyser(root, { javaMajor: 21 }).issues.some(i => i.key === 'java'));
+ok('java unknown -> no java error', !inspectGeyser(root, {}).issues.some(i => i.key === 'java'));
+
 // --- clean config -> no issues ---
+fs.writeFileSync(path.join(root, 'server.properties'), '');
 fs.writeFileSync(cfg, 'bedrock:\n  port: 19132\n  clone-remote-port: false\nremote:\n  auth-type: floodgate\nadvanced:\n  bedrock:\n    use-haproxy-protocol: true\n');
-ok('clean config -> no issues', inspectGeyser(root, { floodgate: true }).issues.length === 0);
+ok('clean config -> no issues', inspectGeyser(root, { floodgate: true, javaMajor: 21 }).issues.length === 0);
 
 fs.rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed} passed, 0 failed`);

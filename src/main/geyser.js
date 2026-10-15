@@ -47,6 +47,20 @@ function parseSimpleYaml(text) {
   return root;
 }
 
+// server.properties is key=value (not YAML). Small dedicated reader so the port-conflict check can
+// see enable-query / query.port without pulling in the bigger server-files module.
+function readServerProperties(root) {
+  const out = {};
+  try {
+    const abs = path.join(root, 'server.properties');
+    if (!fs.existsSync(abs)) return out;
+    for (const line of fs.readFileSync(abs, 'utf8').split(/\r?\n/)) {
+      const i = line.indexOf('=');
+      if (i > 0 && !line.startsWith('#')) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    }
+  } catch {}
+  return out;
+}
 function readConfig(root, rel) {
   try {
     const abs = path.join(root, rel);
@@ -99,7 +113,24 @@ function inspectGeyser(root, opts = {}) {
   if (String(advBedrock['use-haproxy-protocol']).toLowerCase() === 'false') {
     out.issues.push({ level: 'warn', key: 'advanced.bedrock.use-haproxy-protocol', message: 'use-haproxy-protocol is false. Playit forwards the player IP with proxy-protocol-v2; without this, Bedrock clients often fail to connect.', fix: 'Set advanced.bedrock.use-haproxy-protocol to true (Playit uses proxy protocol v2).' });
   }
+  // PORT CONFLICT: the Minecraft query service also listens on a UDP port. If it is enabled on the
+  // same UDP port Geyser uses, one of them cannot bind. server.properties is key=value, not YAML.
+  try {
+    const props = readServerProperties(root);
+    const geyserPort = Number(bp) || 19132;
+    if (String(props['enable-query']).toLowerCase() === 'true') {
+      const qp = Number(props['query.port']);
+      if (Number.isFinite(qp) && qp === geyserPort) {
+        out.issues.push({ level: 'error', key: 'query.port', message: `The Minecraft query service uses UDP port ${qp}, the same port as Geyser. One of them will fail to start.`, fix: `Set query.port in server.properties to a different port (e.g. ${geyserPort + 1}), or disable enable-query.` });
+      }
+    }
+  } catch {}
+  // JAVA VERSION: Geyser needs Java 21+ (class file version 65). A server on Java 17 makes Geyser
+  // fail to load. opts.javaMajor is the detected major (from java.js), when known.
+  if (Number.isFinite(opts.javaMajor) && opts.javaMajor < 21) {
+    out.issues.push({ level: 'error', key: 'java', message: `GeyserMC needs Java 21 or newer, but the detected Java is ${opts.javaMajor}. Geyser will fail to load.`, fix: 'Install Java 21 (Settings → Java), or use a Geyser build that matches your Java.' });
+  }
   return out;
 }
 
-module.exports = { inspectGeyser, parseSimpleYaml, CONFIG_CANDIDATES };
+module.exports = { inspectGeyser, parseSimpleYaml, CONFIG_CANDIDATES, readServerProperties };

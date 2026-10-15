@@ -39,7 +39,9 @@ All notable changes to ObserverLauncher are documented here. Format follows
   `advanced.bedrock.use-haproxy-protocol: false` (Playit forwards with proxy-protocol-v2). It reads
   the config with a small built-in YAML parser (no new dependency) and covers every Geyser folder
   (Spigot/Velocity/BungeeCord plugins + Fabric/Forge/NeoForge mods). The Overview panel renders
-  'config looks good' or the list of problems with a fix for each. Pure + unit-tested.
+  'config looks good' or the list of problems with a fix for each. It also flags a **UDP port
+  clash** (the Minecraft query service on the same port as Geyser's Bedrock port, when `enable-query`
+  is on) and a **Java version below 21** (Geyser needs Java 21+). Pure + unit-tested (21 checks).
 - `settings:get` now carries a `geyser` field (the inspection result) so the renderer can show it.
 - **The panel explains the two-tunnel setup**: Playit's free plan cannot expose TCP and UDP at the
   same time, so the Java TCP tunnel and the Bedrock UDP tunnel (local port 19132) are separate, and
