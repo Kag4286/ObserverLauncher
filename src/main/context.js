@@ -34,6 +34,9 @@ function createContext() {
     tunnelClaimUrl: null,
     tunnelStartedByApp: false,
     tunnelRefreshing: false,
+    tunnelService: 'unknown', // 'running' | 'stopped' | 'not-installed' (mirrors `playit status`)
+    tunnelLog: [], // v5.7.0: recent agent log lines (ring), for auto-detecting the tunnel address
+    tunnelLogProc: null, // v5.7.0: the background `playit attach -s` log-tail process, if running
     // M10: which instances still want the (GLOBAL) Playit daemon. Stopping B must not kill a daemon
     // A still needs. Set<instanceId>; see tunnel-manager.js.
     tunnelDaemonUsers: new Set(),

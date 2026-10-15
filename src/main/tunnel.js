@@ -4,10 +4,12 @@
 // REALITY CHECK (learned live against Playit agent v1.0.10): the modern Playit agent is a DAEMON —
 // it runs as a background service (`playit start`), and the public tunnel is configured in the
 // playit.gg dashboard, NOT on the command line. Spawning `playit` directly just exits, and
-// `playit attach -s` only streams NEW logs (it does not replay an existing tunnel address). So the
-// app CANNOT reliably discover the public address itself. Therefore:
-//   - the app's job is to (a) make sure the service is running and (b) get the user to the dashboard;
-//   - the public address is entered MANUALLY by the user (the paste box in the UI), which always works.
+// `playit attach -s` only streams NEW log lines (it does not replay an existing tunnel address).
+// Therefore:
+//   - the app makes sure the service is running and can get the user to the dashboard;
+//   - v5.7.0: while the service runs we ALSO attach (`playit attach -s`) and scan each new log line
+//     for a Playit host, so the public address is usually detected automatically. The manual paste
+//     box stays as a fallback, so nothing breaks if the log format changes.
 // SECURITY: the provider is a fixed enum — no renderer string reaches the command line. The
 // dashboard/claim URLs are opened externally ONLY if https on a playit.gg host.
 const { spawn, spawnSync } = require('child_process');
@@ -85,6 +87,35 @@ async function checkAuthenticode(file) {
     if (r && r.ok) return String(r.stdout || '').trim() || null;
   } catch {}
   return null;
+}
+
+// v5.7.0: pull a Playit public address out of an agent log line. The agent prints the tunnel
+// address once it is live, but the wording changes between releases, so this accepts any host that
+// ends in a known Playit domain (with an optional :port) and ignores everything else. A bare
+// "playit.gg" (the dashboard / claim URL) has no label before it, so it never matches. Pure.
+const TUNNEL_HOST_RE = /\b([a-z0-9][a-z0-9.-]*\.(?:ply\.gg|playit\.gg|playit\.plus|joinmc\.link))(?::(\d{1,5}))?/i;
+function parseTunnelAddress(text) {
+  const m = String(text || '').match(TUNNEL_HOST_RE);
+  if (!m) return null;
+  return m[2] ? `${m[1]}:${m[2]}` : m[1];
+}
+// Shared validator for a public tunnel address (manual paste OR auto-detected). Plain host[:port]
+// only - never markup or a javascript:/data: URL, since it is echoed into the UI and copied to
+// friends. An empty string is allowed (clears the stored address).
+function isSafeTunnelAddress(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return true;
+  return s.length <= 200 && /^[A-Za-z0-9][A-Za-z0-9.-]*(:\d{1,5})?$/.test(s);
+}
+// Persist an address for the ACTIVE instance (same store the manual paste box writes to) and mirror
+// it on ctx so the next snapshot carries it. Returns the stored value.
+function setTunnelAddress(ctx, addr) {
+  const { loadSettings, saveSettings } = require('./settings.js');
+  const s = loadSettings();
+  s.tunnelAddress = String(addr == null ? '' : addr).trim();
+  saveSettings(s);
+  ctx.tunnelAddress = s.tunnelAddress;
+  return s.tunnelAddress;
 }
 
 // Only providers we explicitly support. Add 'pinggy' here when/if it ships.
@@ -218,7 +249,11 @@ function parseServiceStatus(text) {
 }
 
 function tunnelSnapshot(ctx) {
-  return { status: ctx.tunnelStatus || 'stopped', service: ctx.tunnelService || 'unknown', provider: ctx.tunnelProvider || null, port: resolveTargetPort(ctx) };
+  // The address is stored PER INSTANCE in settings, so read it from there (not the global ctx
+  // field) or a switch would show the previous instance's address.
+  let address = '';
+  try { address = require('./settings.js').loadSettings().tunnelAddress || ''; } catch {}
+  return { status: ctx.tunnelStatus || 'stopped', service: ctx.tunnelService || 'unknown', provider: ctx.tunnelProvider || null, port: resolveTargetPort(ctx), address };
 }
 
 // Ensure the Playit service is running. This is what the "Set up Playit" button does — it does NOT
@@ -257,9 +292,50 @@ async function ensurePlayitService(ctx, provider) {
   ctx.tunnelStartedByApp = true;
   ctx.tunnelService = 'running';
   ctx.tunnelStatus = 'running';
-  ctx.appendLog('Playit service started. Create/see your tunnel on the playit.gg dashboard, then paste the address into the box.', 'system');
+  // v5.7.0: watch the agent log for the public address so the user does not have to paste it.
+  startTunnelLog(ctx);
+  ctx.appendLog('Playit service started. The app will detect your public address; you can also create/see it on the playit.gg dashboard.', 'system');
   ctx.send('tunnel:status', tunnelSnapshot(ctx));
   return { ok: true, binary: bin };
+}
+
+// v5.7.0: tail the agent log so we can auto-detect the public address the dashboard would
+// otherwise make the user copy by hand. The existing note in this file documents that
+// `playit attach -s` streams NEW log lines, so we attach while the service runs, scan each line
+// for a Playit host, and store the first hit. Best-effort: if the flag or output changes, the
+// manual paste box still works, so nothing breaks. The process is reaped on stop + app quit.
+function startTunnelLog(ctx) {
+  stopTunnelLog(ctx);
+  const bin = findPlayitBinary();
+  if (!bin) return { ok: false, error: 'Playit agent not found.' };
+  let child;
+  try { child = spawn(bin, ['attach', '-s'], { windowsHide: true }); }
+  catch (e) { return { ok: false, error: e?.message || 'Could not attach to the Playit log.' }; }
+  ctx.tunnelLogProc = child;
+  const onChunk = buf => {
+    for (const raw of String(buf).split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      ctx.tunnelLog.push(line);
+      if (ctx.tunnelLog.length > 200) ctx.tunnelLog.splice(0, ctx.tunnelLog.length - 200);
+      const addr = parseTunnelAddress(line);
+      if (addr && addr !== ctx.tunnelAddress && isSafeTunnelAddress(addr)) {
+        setTunnelAddress(ctx, addr);
+        ctx.appendLog(`Tunnel address detected: ${addr}`, 'system');
+        ctx.send('tunnel:status', tunnelSnapshot(ctx));
+      }
+    }
+  };
+  child.stdout?.on('data', onChunk);
+  child.stderr?.on('data', onChunk);
+  child.on('error', () => { ctx.tunnelLogProc = null; });
+  child.on('close', () => { if (ctx.tunnelLogProc === child) ctx.tunnelLogProc = null; });
+  return { ok: true };
+}
+function stopTunnelLog(ctx) {
+  const p = ctx.tunnelLogProc;
+  ctx.tunnelLogProc = null;
+  if (p) { try { killTree(p.pid); } catch { try { p.kill(); } catch {} } }
 }
 
 // Ask the real service for its state and sync ctx (so the UI pill reflects reality even when the
@@ -279,6 +355,8 @@ async function refreshTunnel(ctx) {
     const phase = st.ok ? parseServiceStatus(st.stdout) : null;
     if (phase === 'running') { ctx.tunnelService = 'running'; ctx.tunnelStatus = 'running'; }
     else { ctx.tunnelService = phase || 'stopped'; ctx.tunnelStatus = 'stopped'; }
+    // While the service runs, keep the log tail alive so a tunnel address can still be detected.
+    if (phase === 'running' && !ctx.tunnelLogProc) startTunnelLog(ctx);
     return tunnelSnapshot(ctx);
   } finally {
     ctx.tunnelRefreshing = false;
@@ -293,6 +371,7 @@ function stopTunnel(ctx) {
   // when NO instance still wants it AND the app started it (never kill a user-run daemon).
   ctx.tunnelDaemonUsers = TM.removeUser(ctx.tunnelDaemonUsers, ctx.inst());
   if (TM.shouldStopDaemon(ctx.tunnelDaemonUsers, ctx.tunnelStartedByApp)) {
+    stopTunnelLog(ctx);
     const bin = findPlayitBinary();
     if (bin) { try { runPlayit(bin, ['stop'], 10000); } catch {} }
     ctx.tunnelStartedByApp = false;
@@ -341,6 +420,17 @@ function registerTunnel(ipcMain, ctx) {
   ipcMain.handle('tunnel:refresh', async () => {
     try { return await refreshTunnel(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not read the Playit status.' }; }
   });
+  // v5.7.0: scan the recent agent log lines on demand for a public address (used by a "Detect"
+  // button, and as a fallback if the live attach missed it). Persists the first hit it finds.
+  ipcMain.handle('tunnel:detect', async () => {
+    try {
+      const found = (ctx.tunnelLog || []).map(parseTunnelAddress).find(Boolean) || null;
+      if (!found || !isSafeTunnelAddress(found)) return { ok: false, error: 'No address found in the agent log yet.' };
+      setTunnelAddress(ctx, found);
+      ctx.send('tunnel:status', tunnelSnapshot(ctx));
+      return { ok: true, address: found };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not scan the agent log.' }; }
+  });
   ipcMain.handle('tunnel:open-url', async (_, url) => {
     if (!isSafePlayitUrl(url)) return { ok: false, error: 'Refused to open an untrusted link.' };
     try { await shell.openExternal(url); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || 'Could not open the link.' }; }
@@ -353,16 +443,12 @@ function registerTunnel(ipcMain, ctx) {
       // host or host:port (playit addresses look like NAME.tun.ply.gg / NAME.playit.gg), never markup
       // or a javascript:/data: URL. An empty value clears it.
       const raw = String(addr || '').trim();
-      const s = loadSettings();
-      if (raw === '') { s.tunnelAddress = ''; saveSettings(s); return { ok: true, address: '' }; }
-      if (raw.length > 200 || !/^[A-Za-z0-9][A-Za-z0-9.-]*(:\d{1,5})?$/.test(raw)) {
+      if (!isSafeTunnelAddress(raw)) {
         return { ok: false, error: 'Enter a plain address like NAME.tun.ply.gg (no links or symbols).' };
       }
-      s.tunnelAddress = raw;
-      saveSettings(s);
-      return { ok: true, address: s.tunnelAddress };
+      return { ok: true, address: setTunnelAddress(ctx, raw) };
     } catch (e) { return { ok: false, error: e?.message || 'Could not save the address.' }; }
   });
 }
 
-module.exports = { registerTunnel, ensurePlayitService, stopTunnel, autoStartTunnel, refreshTunnel, isSafePlayitUrl, isValidProvider, resolveTargetPort, findPlayitBinary, tunnelSnapshot, parseServiceStatus, pickPlayitAsset, installPlayitAgent, PROVIDERS, expectedSha256, sha256File, PLAYIT_PINNED_SHA256 };
+module.exports = { registerTunnel, ensurePlayitService, stopTunnel, autoStartTunnel, refreshTunnel, isSafePlayitUrl, isValidProvider, resolveTargetPort, findPlayitBinary, tunnelSnapshot, parseServiceStatus, pickPlayitAsset, installPlayitAgent, PROVIDERS, expectedSha256, sha256File, PLAYIT_PINNED_SHA256, parseTunnelAddress, isSafeTunnelAddress, startTunnelLog, stopTunnelLog };

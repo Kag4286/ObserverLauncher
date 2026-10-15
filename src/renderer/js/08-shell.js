@@ -655,7 +655,13 @@ async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();a
 function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelStart'),msg=$('#tunnelMsg');if(!pill)return;
   const st=s?.status||'stopped';pill.textContent=st==='running'?t('tun.live'):st==='installing'?t('tun.installing'):st==='starting'?t('tun.starting'):st==='error'?t('tun.error'):t('tun.off');pill.className='tunnel-pill '+st;
   if(startBtn)startBtn.disabled=st==='installing'||st==='starting';
+  // v5.7.0: auto-fill the address box from the detected address, but never clobber what the user is
+  // currently typing (only fill when the box is empty or already mirrors the detected value).
+  const addrInput=$('#tunnelManual');
+  if(addrInput&&s&&typeof s.address==='string'&&s.address){if(!addrInput.value||addrInput.dataset.auto==='1'){addrInput.value=s.address;addrInput.dataset.auto='1'}}
   if(msg){if(st==='installing'){msg.hidden=false;msg.textContent=t('tun.downloading')}else if(st==='error'){msg.hidden=false;msg.textContent=t('tun.serviceError')}else{msg.hidden=true;msg.textContent=''}}}
+// v5.7.0: the Detect button asks the backend to scan the agent log for a public address.
+$('#tunnelDetectBtn')?.addEventListener('click',async()=>{const b=$('#tunnelDetectBtn');b.disabled=true;try{const r=await window.observer.tunnelDetect();if(r&&r.ok){const inp=$('#tunnelManual');if(inp){inp.value=r.address;inp.dataset.auto='1'}toast(t('tun.detected',{a:r.address}),'success')}else toast((r&&r.error)||t('tun.detectFail'),'error')}catch(e){toast(e?.message||t('tun.detectFail'),'error')}finally{b.disabled=false}});
 window.observer.onTunnelStatus(applyTunnelStatus);
 refreshTunnelUI();
 setInterval(refreshTunnelUI,15000);
