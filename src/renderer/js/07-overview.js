@@ -151,8 +151,19 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   if(typeof renderInstanceList==='function')renderInstanceList();
   if(typeof renderInstanceAppearance==='function')renderInstanceAppearance();
   if(typeof renderTunnelOverview==='function')renderTunnelOverview();
-  // v5.7.0 GEYSER: surface the Bedrock-crossplay panel only when a Geyser/Floodgate jar is present.
-  {const gb=$('#geyserBox');if(gb)gb.hidden=!(hasFolder&&f.geyser)}
+  // v5.7.0 GEYSER: surface the Bedrock-crossplay panel only when a Geyser/Floodgate jar is present,
+  // and render the config check (clone-remote-port / auth-type / haproxy / port).
+  {const gb=$('#geyserBox');if(gb)gb.hidden=!(hasFolder&&f.geyser);
+   const gc=$('#geyserCheck');
+   if(gc){const info=state.geyser;
+     if(!f.geyser){gc.hidden=true;gc.innerHTML=''}
+     else if(!info){gc.hidden=true;gc.innerHTML=''}
+     else if(!info.issues||!info.issues.length){gc.hidden=false;gc.innerHTML='<div class="diag-head"><span class="diag-icon ok">✓</span><div><b>'+esc(t('geyser.checkOk'))+'</b><p>'+esc(t('geyser.checkOkSub'))+'</p></div></div>'}
+     else{gc.hidden=false;
+       const hasErr=info.issues.some(it=>it.level==='error');
+       gc.innerHTML='<p class="eyebrow">'+esc(t('geyser.checkT'))+'</p><p class="text-muted">'+esc(t(hasErr?'geyser.checkErr':'geyser.checkWarn'))+'</p>'+info.issues.map(it=>'<div class="diag-head"><span class="diag-icon '+esc(it.level==='error'?'':'warn')+'">'+(it.level==='error'?'✕':'!')+'</span><div><b>'+esc(it.message)+'</b><p>'+esc(it.fix)+'</p></div></div>').join('')}
+   }
+  }
   requestAnimationFrame(()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')})}
 // FEATURE: plain-language setup checklist for beginners — one glance says what
 // is missing (folder / server file / Java / EULA) instead of making them decode

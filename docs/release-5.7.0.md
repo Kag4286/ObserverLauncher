@@ -18,6 +18,17 @@ GeyserMC lets people on Bedrock (phones, consoles) join a Java server. If your s
 
 The important catch: Playit's free plan cannot open a TCP tunnel and a UDP tunnel at the same time. Java needs TCP, Bedrock needs UDP. So you create a second, separate UDP tunnel for Bedrock on port 19132. The panel walks through it, and mentions that a paid Playit plan can combine the two into one.
 
+## A Geyser config check
+
+If you run GeyserMC, the Bedrock crossplay panel now reads Geyser's own `config.yml` and tells you if something is off before a player hits a wall. The common traps it checks:
+
+- `clone-remote-port` left on, which makes Geyser ignore your Bedrock port and reuse the Java one, so the Playit UDP tunnel never reaches it.
+- A Bedrock port that is not the default 19132, which your UDP tunnel then has to match.
+- Floodgate installed but `auth-type` not set to `floodgate`, which makes Bedrock players get asked for a Java account.
+- `use-haproxy-protocol` left off, which Playit needs because it forwards the player address with proxy protocol v2.
+
+When the config is fine, the panel just says so. When it is not, each problem comes with the exact setting to change.
+
 ## Upgrading
 
 Install 5.7.0 over your current version. No settings change, no migration. Your servers, worlds and settings are untouched.

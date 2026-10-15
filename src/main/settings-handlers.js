@@ -35,12 +35,23 @@ function registerSettings(ipcMain, ctx) {
       eulaAccepted = readEula(ctx.currentServerPath);
       javaRequired = requiredJavaForServer(ctx.currentServerPath, serverFiles) || null;
     } catch {}
+    // v5.7.0 GEYSER: when a Geyser/Floodgate jar is present, inspect its config.yml so the Overview
+    // panel can flag the common mistakes (clone-remote-port, auth-type, haproxy, non-default port).
+    let geyser = null;
+    try {
+      if (files.geyser) {
+        const { inspectGeyser } = require('./geyser.js');
+        const hasFloodgate = [...(files.plugins || []), ...(files.mods || [])].some(x => /floodgate/i.test(x));
+        geyser = inspectGeyser(ctx.currentServerPath, { floodgate: hasFloodgate });
+      }
+    } catch { geyser = null; }
     return {
       settings,
       instances: inst.instances,
       activeInstanceId: inst.activeInstanceId,
       java: ctx.javaInfo,
       files,
+      geyser,
       eulaAccepted,
       status: ctx.serverStatus,
       running: ctx.serverStatus === 'running',

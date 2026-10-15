@@ -31,6 +31,16 @@ All notable changes to ObserverLauncher are documented here. Format follows
 ### Added — GeyserMC (Bedrock crossplay) support
 - **`serverFiles()` reports a `geyser` flag** when a Geyser or Floodgate jar is present in
   `plugins/` or `mods/`. The Overview shows a Bedrock-crossplay panel only then.
+- **New `src/main/geyser.js` inspects Geyser's `config.yml`** and flags the mistakes that most often
+  stop Bedrock players from joining: `clone-remote-port: true` (Geyser ignores its Bedrock port and
+  reuses the Java one, so a Playit UDP tunnel points at the wrong port), a non-default `bedrock.port`
+  (the UDP tunnel must match it), `remote.auth-type` not set to `floodgate` when Floodgate is
+  installed (Bedrock players get asked for a Java account), and
+  `advanced.bedrock.use-haproxy-protocol: false` (Playit forwards with proxy-protocol-v2). It reads
+  the config with a small built-in YAML parser (no new dependency) and covers every Geyser folder
+  (Spigot/Velocity/BungeeCord plugins + Fabric/Forge/NeoForge mods). The Overview panel renders
+  'config looks good' or the list of problems with a fix for each. Pure + unit-tested.
+- `settings:get` now carries a `geyser` field (the inspection result) so the renderer can show it.
 - **The panel explains the two-tunnel setup**: Playit's free plan cannot expose TCP and UDP at the
   same time, so the Java TCP tunnel and the Bedrock UDP tunnel (local port 19132) are separate, and
   a paid plan can combine them. It also points at Geyser's `config.yml` and Floodgate.
