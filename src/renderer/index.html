@@ -149,18 +149,20 @@
         <!-- v5.7.0 GEYSER: shown only when a Geyser/Floodgate jar is detected. Playit's free tier
              cannot expose TCP and UDP at once, so Bedrock crossplay needs its own UDP tunnel. -->
         <details class="tunnel-box" id="geyserBox" hidden>
-          <summary class="tunnel-head"><b data-i18n="geyser.title">Bedrock crossplay (GeyserMC)</b><span class="tunnel-pill" id="geyserPill">●</span><span class="tunnel-chevron">▸</span></summary>
+          <summary class="tunnel-head"><b data-i18n="geyser.title">Bedrock crossplay (GeyserMC)</b><span class="tunnel-pill" id="geyserPill">OFF</span><span class="tunnel-chevron">▸</span></summary>
           <div class="tunnel-body">
             <p class="text-muted" data-i18n="geyser.sub">GeyserMC lets Bedrock players (phone, console) join your Java server. It needs a UDP tunnel in addition to the Java TCP one.</p>
             <div id="geyserCheck" hidden></div>
-            <ol class="tunnel-steps">
-              <li data-i18n-html="geyser.step1">On the <b>Playit dashboard</b>, create a second tunnel: type <b>Minecraft Bedrock</b>, local port <code>19132</code>, protocol <b>UDP</b>.</li>
-              <li data-i18n-html="geyser.step2">Set <code>bedrock</code> port in Geyser's <code>config.yml</code> to <code>19132</code> (default). Floodgate handles Bedrock auth.</li>
-              <li data-i18n-html="geyser.step3">Share the Bedrock address it gives you. Bedrock players add it under <b>Servers</b>.</li>
-            </ol>
             <div class="tunnel-actions"><button class="btn secondary sm" id="geyserTestBtn" data-i18n="geyser.test">Test connection</button></div>
             <p class="text-muted" id="geyserTestMsg" hidden></p>
-            <p class="text-muted" data-i18n="geyser.note">Playit's free plan cannot expose TCP and UDP at the same time, so the Java tunnel and this Bedrock tunnel are separate. A paid plan can combine them.</p>
+            <details class="tunnel-help"><summary data-i18n="geyser.techT">Set up the Bedrock tunnel (technical)</summary>
+              <ol class="tunnel-steps">
+                <li data-i18n-html="geyser.step1">On the <b>Playit dashboard</b>, create a second tunnel: type <b>Minecraft Bedrock</b>, local port <code>19132</code>, protocol <b>UDP</b>, and turn on <b>Proxy Protocol v2</b>.</li>
+                <li data-i18n-html="geyser.step2">Set the <code>bedrock</code> port in Geyser's <code>config.yml</code> to <code>19132</code> (default). Floodgate handles Bedrock auth.</li>
+                <li data-i18n-html="geyser.step3">Share the Bedrock address it gives you. Bedrock players add it under <b>Servers</b>.</li>
+              </ol>
+              <p class="text-muted" data-i18n="geyser.note">Playit's free plan cannot expose TCP and UDP at the same time, so the Java tunnel and this Bedrock tunnel are separate. A paid plan can combine them.</p>
+            </details>
           </div>
         </details>
         </div>

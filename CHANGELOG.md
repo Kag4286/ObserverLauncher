@@ -42,6 +42,11 @@ All notable changes to ObserverLauncher are documented here. Format follows
   'config looks good' or the list of problems with a fix for each. It also flags a **UDP port
   clash** (the Minecraft query service on the same port as Geyser's Bedrock port, when `enable-query`
   is on) and a **Java version below 21** (Geyser needs Java 21+). Pure + unit-tested (21 checks).
+- **A status pill** on the Geyser panel: LIVE while the server runs, OFF while stopped, and a red
+  CHECK when the config check found an error (the server is up but Bedrock players still fail).
+- **The 3 technical steps moved behind a "Set up the Bedrock tunnel (technical)" disclosure**, so the
+  panel reads plainly for a beginner (sub + config check + Test connection) and the proxy-protocol /
+  port / config.yml detail waits until it is asked for.
 - **New `geyser:test` IPC + a "Test connection" button** in the panel run Geyser's own
   `geyser connectiontest 127.0.0.1 <port>` through the console (RCON-first) and show the reply. Needs
   the server running. Read-only; it changes nothing.

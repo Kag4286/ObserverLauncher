@@ -154,6 +154,15 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   // v5.7.0 GEYSER: surface the Bedrock-crossplay panel only when a Geyser/Floodgate jar is present,
   // and render the config check (clone-remote-port / auth-type / haproxy / port).
   {const gb=$('#geyserBox');if(gb)gb.hidden=!(hasFolder&&f.geyser);
+   // Status pill: Geyser runs INSIDE the Java server, so its state follows the server — LIVE while
+   // running, OFF while stopped. If the config check found an ERROR, show a warning even when
+   // running (the server is up but Bedrock players will still fail).
+   const gp=$('#geyserPill');
+   if(gp&&f.geyser){const gi=state.geyser;const hasErr=!!(gi&&gi.issues&&gi.issues.some(it=>it.level==='error'));
+     if(hasErr&&state.running){gp.textContent=t('geyser.pillWarn');gp.className='tunnel-pill error'}
+     else if(state.running){gp.textContent=t('tun.live');gp.className='tunnel-pill running'}
+     else{gp.textContent=t('tun.off');gp.className='tunnel-pill'}
+   }
    const gc=$('#geyserCheck');
    if(gc){const info=state.geyser;
      if(!f.geyser){gc.hidden=true;gc.innerHTML=''}
