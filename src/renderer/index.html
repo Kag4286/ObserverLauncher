@@ -158,6 +158,8 @@
               <li data-i18n-html="geyser.step2">Set <code>bedrock</code> port in Geyser's <code>config.yml</code> to <code>19132</code> (default). Floodgate handles Bedrock auth.</li>
               <li data-i18n-html="geyser.step3">Share the Bedrock address it gives you. Bedrock players add it under <b>Servers</b>.</li>
             </ol>
+            <div class="tunnel-actions"><button class="btn secondary sm" id="geyserTestBtn" data-i18n="geyser.test">Test connection</button></div>
+            <p class="text-muted" id="geyserTestMsg" hidden></p>
             <p class="text-muted" data-i18n="geyser.note">Playit's free plan cannot expose TCP and UDP at the same time, so the Java tunnel and this Bedrock tunnel are separate. A paid plan can combine them.</p>
           </div>
         </details>

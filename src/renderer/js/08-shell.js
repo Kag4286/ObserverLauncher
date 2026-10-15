@@ -651,6 +651,8 @@ async function loadConnectInfo(){
 
 $('#tunnelStart').onclick=()=>withBusy($('#tunnelStart'),async()=>{if(!await confirmDialog({title:t('tun.start'),body:t('tun.confirm'),ok:t('tun.start'),danger:true}))return;const r=await window.observer.tunnelStart('playit');if(!r.ok)return toast(r.error,'error');toast(t('tun.started'),'success')});
 $('#tunnelDashboard').onclick=()=>window.observer.tunnelOpenUrl('https://playit.gg/account/tunnels');
+// v5.7.0 GEYSER: run Geyser's own connectiontest and show the reply.
+$('#geyserTestBtn')?.addEventListener('click',async()=>{const b=$('#geyserTestBtn'),m=$('#geyserTestMsg');b.disabled=true;if(m){m.hidden=false;m.textContent=t('geyser.testing')}try{const r=await window.observer.geyserTest();if(m){m.textContent=(r&&r.ok)?(r.reply||t('geyser.testOk')):((r&&r.error)||t('geyser.testFail'))}}catch(e){if(m)m.textContent=e?.message||t('geyser.testFail')}finally{b.disabled=false}});
 $('#autoTunnelQuick')?.addEventListener('change',async()=>{const next={...getSettings(),autoTunnel:$('#autoTunnelQuick').checked};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return}state={...state,settings:next,java:r.java};if($('#autoTunnelInput'))$('#autoTunnelInput').checked=next.autoTunnel;toast(next.autoTunnel?t('tun.autoOnToast'):t('tun.autoOffToast'),'success')});
 const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim());window.observer.saveManualTunnel(tunnelManual.value.trim())})}
 async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();applyTunnelStatus(s)}catch{}}

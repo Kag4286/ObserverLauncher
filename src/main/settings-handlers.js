@@ -360,6 +360,31 @@ function registerSettings(ipcMain, ctx) {
     });
   });
 
+  // v5.7.0 GEYSER: run Geyser's own `connectiontest` and hand the reply back so the Overview panel
+  // can show it. Needs the server running (the command goes through the console). Read-only.
+  ipcMain.handle('geyser:test', async () => {
+    try {
+      if (ctx.serverStatus !== 'running' || !ctx.serverProcess) return { ok: false, error: 'Start the server first — Geyser needs to be loaded to run the test.' };
+      const files = serverFiles(ctx.currentServerPath);
+      const hasFloodgate = [...(files.plugins || []), ...(files.mods || [])].some(x => /floodgate/i.test(x));
+      const { inspectGeyser } = require('./geyser.js');
+      const info = inspectGeyser(ctx.currentServerPath, { floodgate: hasFloodgate });
+      const bedrock = (info.config && info.config.bedrock && typeof info.config.bedrock === 'object') ? info.config.bedrock : {};
+      const port = String(bedrock.port || '').trim() || '19132';
+      const { sendConsoleCommand } = require('./server-lifecycle.js');
+      // Mark where the reply should start: Geyser's response is logged a moment AFTER the command.
+      const before = (ctx.consoleBuffer || []).length;
+      const r = await sendConsoleCommand(ctx, `geyser connectiontest 127.0.0.1 ${port}`);
+      if (!r || r.ok === false) return { ok: false, error: (r && r.error) || 'Could not send the test command.' };
+      // Geyser logs the result ("Success! ..." or an error). Wait briefly, then collect any NEW
+      // console lines that look like the reply. If none arrive, tell the user to read the Console.
+      await new Promise(res => setTimeout(res, 1500));
+      const tail = (ctx.consoleBuffer || []).slice(before).map(l => String((l && l.text) || '')).filter(Boolean);
+      const reply = tail.find(t => /connection|success|fail|refused|timeout|geyser/i.test(t)) || tail[tail.length - 1] || '';
+      return { ok: true, reply: String(reply || '').trim() || 'Test sent — check the Console tab for the result.' };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not run the Geyser test.' }; }
+  });
+
   ipcMain.handle('onboarding:complete', async () => {
     const s = loadSettings();
     s.onboarded = true;
