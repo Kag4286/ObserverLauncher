@@ -29,6 +29,17 @@ const cfg = path.join(root, 'plugins', 'Geyser-Spigot', 'config.yml');
 ok('no config: found true, configPath null', (() => { const r = inspectGeyser(root); return r.found === true && r.configPath === null; })());
 ok('no config: warns to start once', inspectGeyser(root).issues.some(i => i.key === 'config'));
 
+// --- dynamic scan: a folder name that is NOT in the fixed list is still found ---
+{
+  const root2 = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-geyser2-'));
+  fs.mkdirSync(path.join(root2, 'plugins', 'Geyser-CustomName'), { recursive: true });
+  fs.writeFileSync(path.join(root2, 'plugins', 'Geyser-CustomName', 'config.yml'), 'bedrock:\n  port: 19132\n  clone-remote-port: false\n');
+  const { findGeyserConfig } = require('../src/main/geyser.js');
+  ok('dynamic scan finds custom folder', findGeyserConfig(root2) === 'plugins/Geyser-CustomName/config.yml');
+  ok('dynamic scan -> config loaded', inspectGeyser(root2).configPath === 'plugins/Geyser-CustomName/config.yml');
+  fs.rmSync(root2, { recursive: true, force: true });
+}
+
 // --- clone-remote-port true -> error ---
 fs.writeFileSync(cfg, 'bedrock:\n  port: 19132\n  clone-remote-port: true\nremote:\n  auth-type: floodgate\n');
 {

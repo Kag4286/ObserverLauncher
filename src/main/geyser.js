@@ -7,8 +7,11 @@
 const fs = require('fs');
 const path = require('path');
 
-// Where Geyser drops its config, most-likely first. Covers Spigot/Paper (plugins) and Fabric/Forge/
-// NeoForge (mods), plus the common jar name variants.
+// Where Geyser drops its config. Geyser's folder name differs per platform (Geyser-Spigot,
+// Geyser-Velocity, Geyser-Fabric, ...) AND a Spigot plugin can also live in a subfolder. Rather than
+// hard-code every name (which missed the user's actual folder), scan plugins/ and mods/ for any
+// directory whose name contains "geyser" and use its config.yml. CONFIG_CANDIDATES is only a
+// fallback for the case where the folder was renamed to something without "geyser".
 const CONFIG_CANDIDATES = [
   'plugins/Geyser-Spigot/config.yml',
   'plugins/Geyser-Velocity/config.yml',
@@ -17,6 +20,20 @@ const CONFIG_CANDIDATES = [
   'mods/GeyserForge/config.yml',
   'mods/Geyser-NeoForge/config.yml',
 ];
+// Find a Geyser config by scanning for a geyser-named folder under plugins/ and mods/. Returns the
+// path relative to root (for the display) or null. Pure-ish (readdir only).
+function findGeyserConfig(root) {
+  for (const base of ['plugins', 'mods']) {
+    let entries = [];
+    try { entries = fs.readdirSync(path.join(root, base), { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isDirectory() || !/geyser/i.test(e.name)) continue;
+      const rel = `${base}/${e.name}/config.yml`;
+      try { if (fs.existsSync(path.join(root, rel))) return rel; } catch {}
+    }
+  }
+  return null;
+}
 
 // Minimal YAML reader: returns a nested object from 2-space-indented `key: value` lines. List items
 // (`- ...`) and everything after a `#` comment are skipped; a blank/comment line never breaks the
@@ -75,7 +92,10 @@ function inspectGeyser(root, opts = {}) {
   const out = { found: false, configPath: null, config: null, issues: [] };
   if (!root) return out;
   let config = null, configPath = null;
-  for (const rel of CONFIG_CANDIDATES) {
+  // Dynamic scan first (handles any platform folder name), then the fixed fallback list.
+  const scanned = findGeyserConfig(root);
+  const tries = scanned ? [scanned, ...CONFIG_CANDIDATES] : CONFIG_CANDIDATES;
+  for (const rel of tries) {
     const c = readConfig(root, rel);
     if (c) { config = c; configPath = rel; break; }
   }
@@ -133,4 +153,4 @@ function inspectGeyser(root, opts = {}) {
   return out;
 }
 
-module.exports = { inspectGeyser, parseSimpleYaml, CONFIG_CANDIDATES, readServerProperties };
+module.exports = { inspectGeyser, parseSimpleYaml, CONFIG_CANDIDATES, readServerProperties, findGeyserConfig };
