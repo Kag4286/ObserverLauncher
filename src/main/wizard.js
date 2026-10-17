@@ -240,17 +240,32 @@ function registerWizard(ipcMain, ctx) {
   ipcMain.handle('templates:list', async () => {
     try {
       const { listTemplates } = require('./templates.js');
-      return { ok: true, templates: listTemplates() };
+      const { listUserTemplates } = require('./template-store.js');
+      // v6.0.0 G5: built-in templates + the user's saved ones (user ones carry user:true).
+      return { ok: true, templates: [...listTemplates(), ...listUserTemplates().map(t => ({ id: t.id, name: t.name, description: t.description, software: t.software, version: t.version, memoryGB: t.memoryGB, port: t.port, user: true }))] };
     } catch (error) { return { ok: false, error: error?.message || 'Could not load templates.' }; }
   });
   ipcMain.handle('templates:plan', async (_, id) => {
     try {
+      const key = String(id || '');
       const { templatePlan } = require('./templates.js');
-      const plan = templatePlan(String(id || ''));
+      // A user template resolves through the SAME planner as a built-in one.
+      let tpl = null;
+      if (key.startsWith('user-')) tpl = require('./template-store.js').findUserTemplate(key);
+      const plan = tpl ? templatePlan(tpl) : templatePlan(key);
       if (!plan) return { ok: false, error: 'Unknown template.' };
       if (plan.ok === false) return { ok: false, error: (plan.errors || []).join(', ') };
       return { ok: true, plan };
     } catch (error) { return { ok: false, error: error?.message || 'Could not resolve the template.' }; }
+  });
+  // v6.0.0 G5: save the CURRENT server config as a user template.
+  ipcMain.handle('templates:save', async (_, input) => {
+    try { return require('./template-store.js').saveTemplate(input); }
+    catch (error) { return { ok: false, error: error?.message || 'Could not save the template.' }; }
+  });
+  ipcMain.handle('templates:delete', async (_, id) => {
+    try { return require('./template-store.js').deleteTemplate(id); }
+    catch (error) { return { ok: false, error: error?.message || 'Could not delete the template.' }; }
   });
 }
 

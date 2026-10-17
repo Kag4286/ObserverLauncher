@@ -194,7 +194,7 @@
             <summary><span data-i18n="set.advT">Advanced — JVM arguments</span><span class="set-chevron">▸</span></summary>
             <div class="set-row-input mono"><input id="jvmArgsInput" spellcheck="false" placeholder="-Xms4G -Xmx6G -XX:+UseG1GC ..."><button type="button" class="btn secondary" id="applyAikarFlags" data-i18n="set.aikar">Use Aikar's flags</button></div>
             <!-- v6.0.0 G3: JVM preset library (fills the field from current min/max memory). -->
-            <div class="jvm-presets" id="jvmPresetRow"><span class="field-hint" data-i18n="set.presetLabel">Presets:</span><button type="button" class="filter-chip" data-jvm-preset="aikar" data-i18n="set.preset.aikar">Aikar's</button><button type="button" class="filter-chip" data-jvm-preset="g1" data-i18n="set.preset.g1">G1 tuned</button><button type="button" class="filter-chip" data-jvm-preset="zgc" data-i18n="set.preset.zgc">ZGC</button></div>
+            <div class="jvm-presets" id="jvmPresetRow"><span class="field-hint" data-i18n="set.presetLabel">Presets:</span><button type="button" class="filter-chip" data-jvm-preset="aikar" data-i18n="set.preset.aikar">Aikar's</button><button type="button" class="filter-chip" data-jvm-preset="g1" data-i18n="set.preset.g1">G1 tuned</button><button type="button" class="filter-chip" data-jvm-preset="zgc" data-i18n="set.preset.zgc">ZGC</button><button type="button" class="jvm-preset-help" id="jvmPresetHelp" title="Explain presets" aria-label="Explain presets">?</button></div>
             <div class="jvm-preview" id="jvmPreview" hidden></div>
             <small id="systemRamHint" class="field-hint" data-i18n="set.advHint">When set, this overrides the two memory fields. Use it for any allocation and Java flags.</small>
           </details>
@@ -430,6 +430,7 @@
             <button type="button" class="filter-chip" data-prop-filter="security" data-i18n="prop.chipSecurity">Security</button>
           </div>
           <button type="button" class="btn secondary sm" id="propHistoryBtn" style="margin-left:auto" data-i18n="prop.history">History</button>
+          <button type="button" class="btn secondary sm" id="saveAsTemplateBtn" data-i18n="prop.saveAsTemplate">Save as template</button>
         </div>
         <div class="prop-body">
           <div id="propertiesGrid" class="properties-groups"></div>
@@ -625,7 +626,7 @@
           <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="upd.mode">Update policy</b><small data-i18n="upd.modeSub">How the app handles new versions. The manual button always works.</small></div><select class="launcher-select" id="updatePolicySelect" style="max-width:220px"><option value="auto" data-i18n="upd.modeAuto">Automatic</option><option value="ask" data-i18n="upd.modeAsk">Ask me first</option><option value="off" data-i18n="upd.modeOff">Off</option></select></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="upd.mode">Update policy</b><small data-i18n="upd.modeSub">How the app handles new versions. The manual button always works.</small></div><select class="ol-select" id="updatePolicySelect" style="max-width:220px"><option value="auto" data-i18n="upd.modeAuto">Automatic</option><option value="ask" data-i18n="upd.modeAsk">Ask me first</option><option value="off" data-i18n="upd.modeOff">Off</option></select></div>
             <div class="input-row"><span class="hint" id="updateStatus"></span><button type="button" class="btn secondary sm" id="checkUpdateBtn" style="margin-left:auto" data-i18n="upd.check">Check for updates</button></div>
           </section>
           </div>

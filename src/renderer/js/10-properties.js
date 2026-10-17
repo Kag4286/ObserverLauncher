@@ -70,6 +70,19 @@ function openPropHistory(){
   }).catch(()=>{ if(list)list.innerHTML=`<p class="text-muted">${esc(t('prop.historyEmpty'))}</p>` });
 }
 function closePropHistory(){const m=$('#propHistoryModal');if(!m||m.hidden)return;releaseFocus();m.hidden=true;}
+// v6.0.0 G5: save the current server config as a reusable template.
+$('#saveAsTemplateBtn')?.addEventListener('click',()=>withBusy($('#saveAsTemplateBtn'),async()=>{
+  if(isProxyServer())return toast(t('prop.tplProxy'),'error');
+  const name=await promptDialog({title:t('prop.saveAsTemplate'),placeholder:t('prop.tplNamePh')});
+  if(!name)return;
+  const properties={};
+  $$('[data-property]').forEach(input=>{properties[input.dataset.property]=input.type==='checkbox'?(input.checked?'true':'false'):input.value.trim()});
+  const jar=(state.files&&state.files.jar)||'';
+  const sw=/paper/i.test(jar)?'paper':/purpur/i.test(jar)?'purpur':/fabric/i.test(jar)?'fabric':/neoforge/i.test(jar)?'neoforge':/forge/i.test(jar)?'forge':/leaf/i.test(jar)?'leaf':'vanilla';
+  const r=await window.observer.templatesSave({name,software:sw,memoryGB:Number($('#memoryMaxInput')?.value)||4,port:Number(properties['server-port'])||25565,properties});
+  if(!r||!r.ok)return toast((r&&r.error)||t('prop.tplFail'),'error');
+  toast(t('prop.tplSaved',{n:name}),'success');
+}));
 $('#propHistoryBtn')?.addEventListener('click',openPropHistory);
 $('#propHistoryClose')?.addEventListener('click',closePropHistory);
 $('#propHistoryModal')?.addEventListener('click',e=>{if(e.target.id==='propHistoryModal')closePropHistory()});

@@ -281,6 +281,10 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .prop-hist-diff .dl{display:block}
 .prop-hist-diff .dl.add{color:var(--success)}
 .prop-hist-diff .dl.del{color:var(--danger)}
+/* v6.0.0 G3: JVM preset help button (top-right, separate from the chips). */
+.jvm-presets{display:flex;align-items:center;gap:4px;flex-wrap:wrap;position:relative;padding-right:28px;margin-top:6px}
+.jvm-preset-help{position:absolute;right:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:700 12px var(--font-ui);cursor:pointer;display:grid;place-items:center;transition:all var(--dur-micro)}
+.jvm-preset-help:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel-raised)}
 @media(max-width:900px){.properties-grid{grid-template-columns:1fr}}
 
 /* ---------- LAUNCHER SETTINGS polish ---------- */

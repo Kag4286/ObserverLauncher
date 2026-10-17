@@ -691,6 +691,7 @@ function applyJvmPreset(name){
   return true;
 }
 $('#jvmPresetRow')?.addEventListener('click',e=>{const b=e.target.closest('[data-jvm-preset]');if(!b)return;applyJvmPreset(b.dataset.jvmPreset);toast(t('set.presetFilled',{n:t('set.preset.'+b.dataset.jvmPreset)}))});
+$('#jvmPresetHelp')?.addEventListener('click',()=>{toast(t('set.presetHelp.aikar'),undefined);setTimeout(()=>toast(t('set.presetHelp.zgc')),2500);setTimeout(()=>toast(t('set.presetHelp.g1')),5000);});
 $('#applyAikarFlags').onclick=()=>{applyJvmPreset('aikar');toast(t('set.aikarFilled'))};
 $('#showWelcomeAgain').onclick=()=>showOnboarding();
 
