@@ -562,6 +562,18 @@ $('#ramPresets')?.addEventListener('click',e=>{
   if($('#memoryMaxInput'))$('#memoryMaxInput').value=gb;
   $$('#ramPresets .ram-preset').forEach(x=>x.classList.toggle('active',Number(x.dataset.ram)===gb));
 });
+// v6.0.0 F1: send a webhook test. Save the current settings first so the URL/events being tested are
+// the ones in the form, then call the test IPC.
+$('#webhookTestBtn')?.addEventListener('click',()=>withBusy($('#webhookTestBtn'),async()=>{
+  const next=getSettings();
+  if(!next.webhookUrl)return toast(t('wh.noUrl'),'error');
+  const saved=await window.observer.saveSettings(next);
+  if(!saved||!saved.ok)return toast((saved&&saved.error)||t('wh.saveFail'),'error');
+  state={...state,settings:next,java:saved.java};markSettingsSaved();refreshUI();
+  const r=await window.observer.webhookTest();
+  if(!r||!r.ok)return toast((r&&r.error)||t('wh.testFail'),'error');
+  toast(t('wh.testOk'),'success');
+}));
 $('#saveRamOverview').onclick=()=>withBusy($('#saveRamOverview'),async()=>{
   const next=getSettings();
   if(next.memoryMax<next.memoryMin)return toast(t('set.errMemOrder'),'error');

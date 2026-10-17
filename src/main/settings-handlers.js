@@ -477,6 +477,18 @@ function registerSettings(ipcMain, ctx) {
     } catch (e) { return { ok: false, error: e?.message || 'Could not repair the Geyser config.' }; }
   });
 
+  // v6.0.0 F1: send a test message to the configured webhook so the user can confirm the URL works.
+  ipcMain.handle('webhook:test', async () => {
+    try {
+      const s = loadSettings();
+      if (!s.webhookUrl) return { ok: false, error: 'Set a webhook URL first.' };
+      if (!require('./webhook.js').isSafeWebhookUrl(s.webhookUrl)) return { ok: false, error: 'That URL is not a public http(s) address.' };
+      const r = await require('./webhook.js').fire({ ...s, webhookEvents: require('./webhook.js').EVENTS }, { type: 'start', instance: 'ObserverLauncher test' });
+      if (!r.sent) return { ok: false, error: r.reason || 'The webhook did not accept the message.' };
+      return { ok: true, status: r.status };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not send the test.' }; }
+  });
+
   ipcMain.handle('onboarding:complete', async () => {
     const s = loadSettings();
     s.onboarded = true;

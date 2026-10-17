@@ -15,6 +15,19 @@ const { serverFiles, detectSoftware, readEula, writeEula, parseServerLine, build
 const { RconClient, desiredRconProps } = require('./rcon.js');
 const platform = require('./platform');
 const { killTree } = require('./kill.js');
+const webhook = require('./webhook.js');
+
+// v6.0.0 F1: fire a user-configured webhook for a server event. Fire-and-forget + fail-silent: never
+// blocks a lifecycle action, never logs (a wrong URL must not spam). Settings are read per event so a
+// URL change takes effect immediately. `detail` is optional text (e.g. a crash category).
+function fireWebhook(ctx, ev) {
+  try {
+    const s = require('./settings.js').loadSettings();
+    if (!s || !s.webhookUrl) return;
+    const instance = (() => { try { return require('./settings.js').listInstances().instances.find(i => i.id === ctx.inst())?.name || ''; } catch { return ''; } })();
+    webhook.fire(s, { ...ev, instance }).catch(() => {});
+  } catch {}
+}
 // Metrics sampling and auto-poll were split into their own modules (behaviour unchanged).
 // Re-exported below so existing callers (app-lifecycle.js, tests) keep working.
 const { parseMetricValue, startMetrics } = require('./server-metrics.js');
@@ -400,6 +413,8 @@ async function startServerInternal(ctx, settings) {
         ctx.restartAttempts = 0;
         ctx.setServerStatus('running');
         ctx.pushFiles();
+        // v6.0.0 F1: notify the user's webhook that the server is up (fail-silent).
+        fireWebhook(ctx, { type: 'start' });
         // M6: the server is now accepting RCON connections — attach (stdin stays as fallback).
         try { connectRcon(ctx, rconCfg, instId); } catch {}
         try { require('./tunnel.js').autoStartTunnel(ctx).catch(() => {}); } catch {}
@@ -416,6 +431,9 @@ async function startServerInternal(ctx, settings) {
       const isAutoPollStatus = duringPoll
         && /(spark-worker-pool|players online|TPS from last|Tick durations|CPU usage from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|\(system\)|\(process\)|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^spark tps$|^list$)/i.test(x);
       if (!isAutoPollStatus) ctx.appendLog(x);
+      // v6.0.0 F1: fire the player_join webhook when a join line appears (before parseServerLine
+      // mutates the list, so we can compare). Fail-silent.
+      try { const j = String(x).replace(/§./g, '').match(/:\s+([\w.-]+) joined the game/i); if (j && !ctx.live.players.includes(j[1])) fireWebhook(ctx, { type: 'player_join', player: j[1] }); } catch {}
       parseServerLine(x, ctx.live, ctx.send);
     });
   }));
@@ -444,18 +462,24 @@ async function startServerInternal(ctx, settings) {
     } catch {}
     // v6.0.0 D2: on an UNEXPECTED exit, analyse the newest crash report (if any) and push a summary to
     // the renderer so the console can show a plain-language cause + fixes without leaving the app.
+    // F1: also fire the crash (or manual stop) webhook here.
     if (!wasManual) {
+      let crashCat = null;
       try {
         const doctor = require('./mcp/doctor.js');
         const latest = doctor.latestCrashReport(ctx.currentServerPath);
         if (latest) {
           const text = fs.readFileSync(latest.file, 'utf8');
           const cls = doctor.classifyCrash(text);
+          crashCat = cls.category;
           const sum = doctor.summarizeCrashText(text);
           ctx.send('crash:analysis', { name: latest.name, category: cls.category, confidence: cls.confidence, hints: cls.hints, description: sum.description, version: sum.version, cause: sum.cause });
           ctx.appendLog(`Crash report analysed: ${cls.category} (${cls.confidence}). Open the crash panel for details.`, 'error');
         }
       } catch {}
+      fireWebhook(ctx, { type: 'crash', detail: crashCat || `exit code ${code ?? 'none'}` });
+    } else {
+      fireWebhook(ctx, { type: 'stop' });
     }
     // A user-requested restart: relaunch with the settings captured at request time. teardown()
     // (just below) clears the flag, so read it first.

@@ -59,6 +59,9 @@ function defaultGlobal() {
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
     remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remotePort: 0, remoteBind: '',
     playitPath: '', pinggyPath: '', motionLevel: 'full', curseforgeApiKey: '',
+    // v6.0.0 F1: webhook notifications (Discord-compatible). Empty URL = off. webhookEvents is the
+    // subscribed list; webhookFormat is 'discord' (default) or 'generic'.
+    webhookUrl: '', webhookEvents: ['start', 'stop', 'crash'], webhookFormat: 'discord',
     // 4.0.0: auto-check for app updates on startup (global). v6.0.0 H4: replaced the boolean with a
     // 3-way policy read by setupAutoUpdater:
     //   'auto' = check on startup AND download automatically, then prompt to install
