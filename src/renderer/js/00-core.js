@@ -107,6 +107,35 @@ const _ERR_MAP=[
   [/checksum|sha-?256/i,'toast.errChecksum'],
   [/is not a directory|ENOENT|no such file/i,'toast.errNotFound'],
 ];
+// v6.0.0 G1: render a Minecraft MOTD preview from a server.properties motd value. Handles the
+// section-sign color/format codes (§0-§f, §l bold, §o italic, §n underline, §m strike, §r reset,
+// §k obfuscated -> shown as the literal chars). PURE + safe: every text segment is escaped BEFORE
+// the wrap, so a hostile motd cannot inject markup. Returns '' for an empty value.
+const _MC_COLORS={0:'#000000',1:'#0000AA',2:'#00AA00',3:'#00AAAA',4:'#AA0000',5:'#AA00AA',6:'#FFAA00',7:'#AAAAAA',8:'#555555',9:'#5555FF',a:'#55FF55',b:'#55FFFF',c:'#FF5555',d:'#FF55FF',e:'#FFFF55',f:'#FFFFFF'};
+function renderMotdPreview(text){
+  const s=String(text||'');
+  if(!s) return '';
+  let color='', bold=false, italic=false, underline=false, strike=false;
+  let out='';
+  const escSeg=(t)=>{ if(!t) return ''; const style=[]; if(color)style.push('color:'+color); if(bold)style.push('font-weight:700'); if(italic)style.push('font-style:italic'); if(underline)style.push('text-decoration:underline'); if(strike)style.push('text-decoration:line-through'); return style.length?('<span style="'+style.join(';')+'">'+esc(t)+'</span>'):esc(t); };
+  let i=0;
+  while(i<s.length){
+    if(s[i]==='\u00a7' && i+1<s.length){
+      const c=s[i+1].toLowerCase();
+      if(_MC_COLORS[c]){ color=_MC_COLORS[c]; bold=italic=underline=strike=false; i+=2; continue; }
+      if(c==='l'){bold=true;i+=2;continue} if(c==='o'){italic=true;i+=2;continue}
+      if(c==='n'){underline=true;i+=2;continue} if(c==='m'){strike=true;i+=2;continue}
+      if(c==='r'){color='';bold=italic=underline=strike=false;i+=2;continue}
+      if(c==='k'){ i+=2; continue; } // obfuscated: drop the code, keep readable text
+      // unknown code: render the two chars literally (escaped)
+      out+=escSeg('\u00a7'+s[i+1]); i+=2; continue;
+    }
+    // gather a run of plain chars up to the next code
+    let j=i; while(j<s.length && s[j]!=='\u00a7') j++;
+    out+=escSeg(s.slice(i,j)); i=j;
+  }
+  return out;
+}
 function friendlyError(msg){
   const m=String(msg==null?'':msg);
   for(const [re,key] of _ERR_MAP){ if(re.test(m)){ const s=t(key); if(s!==key) return s; } }

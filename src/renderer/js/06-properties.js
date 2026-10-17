@@ -69,7 +69,9 @@ function propRow(k,v){
   // cannot animate — the same reason every other select in the app carries this class).
   else if(PROP_ENUMS[k])ctl=`<span class="prop-ctl"><select class="ol-select" data-property="${esc(k)}">${(PROP_ENUMS[k].includes(val)?PROP_ENUMS[k]:[...PROP_ENUMS[k],val]).map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></span>`;
   else ctl=`<span class="prop-ctl"><input data-property="${esc(k)}" value="${esc(val)}" placeholder="${esc(hint)}" spellcheck="false"></span>`;
-  return `<label data-prop-row data-prop-search="${search}" title="${title}" class="prop-row${isBool?' is-bool':''}"><span class="prop-label">${esc(label)}<small class="prop-key">${esc(k)}</small></span>${ctl}</label>`;
+  // v6.0.0 G1: the motd field shows a live preview below it (colored/formatted like the in-game MOTD).
+  const preview=k==='motd'?`<span class="prop-motd-preview" data-motd-preview>${renderMotdPreview(val)}</span>`:'';
+  return `<label data-prop-row data-prop-search="${search}" title="${title}" class="prop-row${isBool?' is-bool':''}"><span class="prop-label">${esc(label)}<small class="prop-key">${esc(k)}</small></span>${ctl}${preview}</label>`;
 }
 // 5.4.0: unsaved-changes tracking. The form counts as dirty only while it DIFFERS from the last
 // rendered/saved snapshot, so switching difficulty back to its original value clears the cue.

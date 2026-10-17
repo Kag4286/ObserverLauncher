@@ -43,6 +43,9 @@ $$('[data-prop-filter]').forEach(c=>c.onclick=()=>{
 // a switch never marked the form dirty, so the Apply pulse never appeared (and a background
 // refreshUI could then re-render the grid and drop the edit). Listen to BOTH.
 const markPropsDirty=e=>{const el=e.target;if(!el||!(el.closest?.('#propertiesGrid')||el.id==='propertiesRaw'))return;
+  // v6.0.0 G1: live MOTD preview. When the motd field changes, re-render its preview span in place
+  // (no grid rebuild, so the input keeps focus and caret).
+  if(el.dataset&&el.dataset.property==='motd'){const pv=el.closest('[data-prop-row]')?.querySelector('[data-motd-preview]');if(pv)pv.innerHTML=renderMotdPreview(el.value);}
   // Compare against the last snapshot so returning a field to its original value clears the cue.
   let cur=null;try{cur=snapshotPropsForm()}catch{}
   propsDirty=_propsBaseline===null?true:(cur!==_propsBaseline);

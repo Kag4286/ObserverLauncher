@@ -552,6 +552,16 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });
+// v6.0.0 G1: RAM presets. A click sets min=max=preset and marks the buttons active; the user still
+// presses Apply (we do not auto-save). A preset above the system RAM is disabled (cannot allocate it).
+$('#ramPresets')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-ram]'); if(!b) return;
+  const gb=Number(b.dataset.ram);
+  if(!Number.isFinite(gb)||gb<1) return;
+  if($('#memoryMinInput'))$('#memoryMinInput').value=gb;
+  if($('#memoryMaxInput'))$('#memoryMaxInput').value=gb;
+  $$('#ramPresets .ram-preset').forEach(x=>x.classList.toggle('active',Number(x.dataset.ram)===gb));
+});
 $('#saveRamOverview').onclick=()=>withBusy($('#saveRamOverview'),async()=>{
   const next=getSettings();
   if(next.memoryMax<next.memoryMin)return toast(t('set.errMemOrder'),'error');

@@ -186,6 +186,8 @@
             <div class="ov-ram-info"><b data-i18n="ov.limit">ALLOCATE RAM (GB)</b><small data-i18n="ov.limitHint">Restart the server to apply a new allocation</small></div>
             <div class="ov-ram-controls">
               <input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn primary sm" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button>
+              <!-- v6.0.0 G1: one-click RAM presets set max (= min). -->
+              <span class="ram-presets" id="ramPresets"><button type="button" class="filter-chip ram-preset" data-ram="2">2 GB</button><button type="button" class="filter-chip ram-preset" data-ram="4">4 GB</button><button type="button" class="filter-chip ram-preset" data-ram="6">6 GB</button><button type="button" class="filter-chip ram-preset" data-ram="8">8 GB</button></span>
             </div>
           </div>
           <details class="set-fold">

@@ -269,6 +269,8 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .prop-ctl input:focus,.prop-ctl select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .prop-ctl select{cursor:pointer}
 .prop-row.is-bool .prop-ctl{justify-content:flex-end}
+/* v6.0.0 G1: MOTD live preview, full-width under the motd row's label+input. */
+.prop-motd-preview{grid-column:1 / -1;display:block;margin-top:6px;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:600 13px var(--font-mono);white-space:pre-wrap;word-break:break-word;min-height:18px}
 @media(max-width:900px){.properties-grid{grid-template-columns:1fr}}
 
 /* ---------- LAUNCHER SETTINGS polish ---------- */
