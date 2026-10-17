@@ -53,6 +53,48 @@ const markPropsDirty=e=>{const el=e.target;if(!el||!(el.closest?.('#propertiesGr
 };
 document.addEventListener('input',markPropsDirty);
 document.addEventListener('change',markPropsDirty);
+// v6.0.0 G2: server.properties history modal — list snapshots, show a line diff, restore one.
+let _propHistSel=null;
+function openPropHistory(){
+  const m=$('#propHistoryModal'); if(!m) return; m.hidden=false; void m.offsetWidth; trapFocus(m);
+  _propHistSel=null;
+  const restore=$('#propHistoryRestore'); if(restore)restore.disabled=true;
+  const d=$('#propHistoryDiff'); if(d){d.hidden=true;d.innerHTML=''}
+  const list=$('#propHistoryList'); if(list)list.innerHTML=`<p class="text-muted">${esc(t('prop.historyLoading'))}</p>`;
+  window.observer.propertiesHistory().then(r=>{
+    if(!list)return;
+    if(!r||!r.ok){list.innerHTML=`<p class="text-muted">${esc((r&&r.error)||t('prop.historyEmpty'))}</p>`;return}
+    const snaps=r.snapshots||[];
+    if(!snaps.length){list.innerHTML=`<p class="text-muted">${esc(t('prop.historyEmpty'))}</p>`;return}
+    list.innerHTML=snaps.map(s=>`<button type="button" class="prop-hist-row" data-t="${s.t}"><span>${esc(new Date(s.t).toLocaleString())}</span><small>${s.size} B</small></button>`).join('');
+  }).catch(()=>{ if(list)list.innerHTML=`<p class="text-muted">${esc(t('prop.historyEmpty'))}</p>` });
+}
+function closePropHistory(){const m=$('#propHistoryModal');if(!m||m.hidden)return;releaseFocus();m.hidden=true;}
+$('#propHistoryBtn')?.addEventListener('click',openPropHistory);
+$('#propHistoryClose')?.addEventListener('click',closePropHistory);
+$('#propHistoryModal')?.addEventListener('click',e=>{if(e.target.id==='propHistoryModal')closePropHistory()});
+$('#propHistoryList')?.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-t]'); if(!b) return;
+  const t0=Number(b.dataset.t); _propHistSel=t0;
+  $$('#propHistoryList .prop-hist-row').forEach(x=>x.classList.toggle('active',x===b));
+  const restore=$('#propHistoryRestore'); if(restore)restore.disabled=false;
+  const d=$('#propHistoryDiff'); if(!d)return;
+  d.hidden=false; d.innerHTML=`<p class="text-muted">${esc(t('prop.historyLoading'))}</p>`;
+  try{
+    const r=await window.observer.propertiesDiff(t0);
+    if(!r||!r.ok){d.innerHTML=`<p class="text-muted">${esc((r&&r.error)||'—')}</p>`;return}
+    const diff=r.diff;
+    d.innerHTML=(diff.added||diff.removed?`<p class="text-muted">+${diff.added} / -${diff.removed}</p>`:'')+'<pre class="prop-hist-diff">'+diff.lines.map(l=>`<span class="dl ${l.type==='+'?'add':l.type==='-'?'del':''}">${esc(l.type+l.text)}</span>`).join('')+'</pre>';
+  }catch{d.innerHTML=`<p class="text-muted">—</p>`}
+});
+$('#propHistoryRestore')?.addEventListener('click',()=>withBusy($('#propHistoryRestore'),async()=>{
+  if(_propHistSel==null)return;
+  if(!await confirmDialog({title:t('prop.historyRestore'),body:esc(t('prop.historyRestoreConfirm')),ok:t('prop.historyRestore'),danger:true}))return;
+  const r=await window.observer.propertiesRestore(_propHistSel);
+  if(!r||!r.ok)return toast((r&&r.error)||t('prop.historyRestoreFail'),'error');
+  toast(t('prop.historyRestored'),'success'); closePropHistory();
+  try{ const s=await window.observer.getState(); state={...state,...s}; refreshUI(); }catch{}
+}));
 $('#saveProperties').onclick=()=>withBusy($('#saveProperties'),async()=>{
   if(isProxyServer()){
     const raw=$('#propertiesRaw').value;

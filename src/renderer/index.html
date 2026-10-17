@@ -193,6 +193,8 @@
           <details class="set-fold">
             <summary><span data-i18n="set.advT">Advanced — JVM arguments</span><span class="set-chevron">▸</span></summary>
             <div class="set-row-input mono"><input id="jvmArgsInput" spellcheck="false" placeholder="-Xms4G -Xmx6G -XX:+UseG1GC ..."><button type="button" class="btn secondary" id="applyAikarFlags" data-i18n="set.aikar">Use Aikar's flags</button></div>
+            <!-- v6.0.0 G3: JVM preset library (fills the field from current min/max memory). -->
+            <div class="jvm-presets" id="jvmPresetRow"><span class="field-hint" data-i18n="set.presetLabel">Presets:</span><button type="button" class="filter-chip" data-jvm-preset="aikar" data-i18n="set.preset.aikar">Aikar's</button><button type="button" class="filter-chip" data-jvm-preset="g1" data-i18n="set.preset.g1">G1 tuned</button><button type="button" class="filter-chip" data-jvm-preset="zgc" data-i18n="set.preset.zgc">ZGC</button></div>
             <div class="jvm-preview" id="jvmPreview" hidden></div>
             <small id="systemRamHint" class="field-hint" data-i18n="set.advHint">When set, this overrides the two memory fields. Use it for any allocation and Java flags.</small>
           </details>
@@ -427,6 +429,7 @@
             <button type="button" class="filter-chip" data-prop-filter="network" data-i18n="prop.chipNetwork">Network</button>
             <button type="button" class="filter-chip" data-prop-filter="security" data-i18n="prop.chipSecurity">Security</button>
           </div>
+          <button type="button" class="btn secondary sm" id="propHistoryBtn" style="margin-left:auto" data-i18n="prop.history">History</button>
         </div>
         <div class="prop-body">
           <div id="propertiesGrid" class="properties-groups"></div>
@@ -841,6 +844,15 @@
     <ul id="blockedList" class="blocked-list"></ul>
     <p id="blockedHint" class="field-hint"></p>
     <div class="modal-actions"><button type="button" class="btn secondary" id="blockedClose" data-i18n="im.close">Close</button><button type="button" class="btn primary" id="blockedCheck" data-i18n="cfi.check">Check</button></div>
+  </div>
+</div>
+<div id="propHistoryModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="propHistoryTitle">
+  <div class="modal confirm-modal">
+    <div class="confirm-head"><span class="confirm-ico">↺</span><h2 id="propHistoryTitle" data-i18n="prop.historyTitle">server.properties history</h2></div>
+    <p class="confirm-body text-muted" data-i18n="prop.historySub">A snapshot is saved before every change. Pick one to see the diff, then restore it if you want.</p>
+    <div class="prop-history-list" id="propHistoryList"></div>
+    <div class="prop-history-diff" id="propHistoryDiff" hidden></div>
+    <div class="confirm-actions"><button type="button" class="btn secondary" id="propHistoryClose" data-i18n="cf.cancel">Close</button><button type="button" class="btn primary" id="propHistoryRestore" disabled data-i18n="prop.historyRestore">Restore selected</button></div>
   </div>
 </div>
 <div id="confirmModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="cfTitle" aria-describedby="cfBody">

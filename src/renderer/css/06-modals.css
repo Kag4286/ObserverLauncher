@@ -271,6 +271,16 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .prop-row.is-bool .prop-ctl{justify-content:flex-end}
 /* v6.0.0 G1: MOTD live preview, full-width under the motd row's label+input. */
 .prop-motd-preview{grid-column:1 / -1;display:block;margin-top:6px;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:600 13px var(--font-mono);white-space:pre-wrap;word-break:break-word;min-height:18px}
+/* v6.0.0 G2: server.properties history modal. */
+.prop-history-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;margin:8px 0}
+.prop-hist-row{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel);color:var(--text);font:600 12px var(--font-ui);cursor:pointer;text-align:left;transition:border-color var(--dur-micro),background var(--dur-micro)}
+.prop-hist-row:hover{background:var(--panel-raised);border-color:var(--border-strong)}
+.prop-hist-row.active{border-color:var(--brand);background:var(--brand-soft)}
+.prop-hist-row small{color:var(--text-dim);font:500 11px var(--font-mono)}
+.prop-hist-diff{max-height:240px;overflow:auto;margin:0;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:500 11px var(--font-mono);white-space:pre-wrap;word-break:break-word}
+.prop-hist-diff .dl{display:block}
+.prop-hist-diff .dl.add{color:var(--success)}
+.prop-hist-diff .dl.del{color:var(--danger)}
 @media(max-width:900px){.properties-grid{grid-template-columns:1fr}}
 
 /* ---------- LAUNCHER SETTINGS polish ---------- */

@@ -680,10 +680,18 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
  // Periodically redraw charts while the Performance tab is open (fixes a 0x0 canvas when the tab
  // was hidden as metrics arrived).
  setInterval(()=>{ try{ if(document.getElementById('performance')?.classList.contains('active')){ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); } }catch{} }, 2000);
-// FEATURE: Aikar's flags preset (a widely recommended JVM/G1GC config for Paper/Purpur servers),
-// auto-filled from the current memoryMin/memoryMax instead of making the user type the long flag string.
-function aikarFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Dusing.aikars.flags=https://mcflags.emc.gs -Dfile.encoding=UTF-8`}
-$('#applyAikarFlags').onclick=()=>{const min=Number($('#memoryMinInput').value)||2,max=Number($('#memoryMaxInput').value)||6;$('#jvmArgsInput').value=aikarFlags(min,max);toast(t('set.aikarFilled'))};
+// v6.0.0 G3: the preset builders (aikarFlags / zgcFlags / g1TunedFlags / JVM_PRESETS) live in
+// 00-core.js so they are unit-tested without the DOM; this file only wires them to the input.
+function applyJvmPreset(name){
+  const fn=JVM_PRESETS[String(name||'').toLowerCase()];
+  if(typeof fn!=='function'||!$('#jvmArgsInput'))return false;
+  const min=Number($('#memoryMinInput')?.value)||2, max=Number($('#memoryMaxInput')?.value)||6;
+  $('#jvmArgsInput').value=fn(min,max);
+  try{ renderJvmPreview(); }catch{}
+  return true;
+}
+$('#jvmPresetRow')?.addEventListener('click',e=>{const b=e.target.closest('[data-jvm-preset]');if(!b)return;applyJvmPreset(b.dataset.jvmPreset);toast(t('set.presetFilled',{n:t('set.preset.'+b.dataset.jvmPreset)}))});
+$('#applyAikarFlags').onclick=()=>{applyJvmPreset('aikar');toast(t('set.aikarFilled'))};
 $('#showWelcomeAgain').onclick=()=>showOnboarding();
 
 // FEATURE: "How friends can join" — surfaces the LAN address (instant, no network call) and lets the

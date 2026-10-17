@@ -49,8 +49,43 @@ function registerContent(ipcMain, ctx) {
     let total = 0;
     for (const [k, v] of Object.entries(props || {})) total += String(k).length + String(v).length;
     if (total > 1024 * 1024) return { ok: false, error: 'Properties payload is too large (max 1 MB).' };
+    // v6.0.0 G2: snapshot the CURRENT file before overwriting, so every save is reversible.
+    try { const cur = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8'); require('./properties-history.js').recordSnapshot(typeof ctx.inst === 'function' ? ctx.inst() : 'default', cur); } catch {}
     writeFileAtomic(path.join(ctx.currentServerPath, 'server.properties'), buildPropertiesContent(ctx.currentServerPath, props));
     return { ok: true };
+  });
+
+  // v6.0.0 G2: list / view / diff / restore server.properties snapshots for the active instance.
+  // Shared resolve used by diff and restore so their guard/load sequences cannot drift (gotcha #20).
+  const resolveSnapshot = t => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const h = require('./properties-history.js');
+    const id = typeof ctx.inst === 'function' ? ctx.inst() : 'default';
+    const snap = h.getSnapshot(id, t);
+    if (!snap.ok) return snap;
+    return { ok: true, h, id, snap };
+  };
+  ipcMain.handle('properties:history', async () => {
+    try { return { ok: true, snapshots: require('./properties-history.js').listSnapshots(typeof ctx.inst === 'function' ? ctx.inst() : 'default') }; }
+    catch (e) { return { ok: false, error: e?.message || 'Could not read history.' }; }
+  });
+  ipcMain.handle('properties:diff', async (_, t) => {
+    try {
+      const r = resolveSnapshot(t);
+      if (!r.ok) return r;
+      let cur = ''; try { cur = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8'); } catch {}
+      return { ok: true, diff: r.h.diffLines(r.snap.content, cur) };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not diff.' }; }
+  });
+  ipcMain.handle('properties:restore', async (_, t) => {
+    try {
+      const r = resolveSnapshot(t);
+      if (!r.ok) return r;
+      // Snapshot the CURRENT file first so the restore itself is reversible.
+      try { const cur = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8'); r.h.recordSnapshot(r.id, cur); } catch {}
+      writeFileAtomic(path.join(ctx.currentServerPath, 'server.properties'), r.snap.content);
+      return { ok: true };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not restore.' }; }
   });
 
   ipcMain.handle('properties:raw-get', async () => {
