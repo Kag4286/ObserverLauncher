@@ -53,6 +53,22 @@ ok('null stored safe', classifyOrphan(null, javaInfo).action === 'clear');
   ok('scan B -> ask (t2)', scan.find(r => r.instanceId === 'B').action === 'ask');
   ok('scan C -> clear (gone)', scan.find(r => r.instanceId === 'C').action === 'clear');
 
+  // v6.0.0 FIX: cmd.exe (pid 400) is GONE but a recorded javaPid (401) is still alive -> scan must
+  // classify against the java pid (kill the leftover), not forget it because the parent died.
+  {
+    const stored2 = [{ instanceId: 'D', pid: 400, javaPid: 401, javaPidStartedAt: 1700000000000, processStartedAt: 1700000000000, serverPath: '/srv/d', status: 'running' }];
+    const info2 = pid => pid === 401 ? { alive: true, name: 'java', startTimeMs: 1700000000000 } : null; // 400 gone, 401 alive
+    const scan2 = await scanOrphans(async pid => info2(pid), stored2);
+    ok('scan D: parent gone + java alive -> classified against java pid', scan2.length === 1 && scan2[0].stored.pid === 401);
+    // A live java whose parent died is a real server the user may still want -> ASK (t2), not a
+    // silent clear. The fix's point is that the java is now SEEN (not leaked/forgotten).
+    ok('scan D: leftover java -> ask (t2), not forgotten', scan2[0].action === 'ask');
+    // Choosing STOP kills the java pid 401.
+    const killed2 = [];
+    await applyOrphanAction({ ...scan2[0], action: 'kill' }, { clearInstanceProcess: () => {}, killTree: pid => killed2.push(pid) });
+    ok('scan D: stop choice kills the java pid 401', killed2.includes(401));
+  }
+
   // applyOrphanAction: inject clear + killTree spies (no real process touched).
   const cleared = [], killed = [];
   const deps = { clearInstanceProcess: id => cleared.push(id), killTree: pid => killed.push(pid) };

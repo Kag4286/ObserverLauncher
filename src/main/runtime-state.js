@@ -32,8 +32,14 @@ function writeAll(state) {
 function setInstanceProcess(instanceId, info) {
   if (!info || !info.pid) return;
   const s = readAll();
-  s.processes[String(instanceId || 'default')] = {
+  const key = String(instanceId || 'default');
+  const prev = s.processes[key] || {};
+  s.processes[key] = {
     pid: Number(info.pid),
+    // v6.0.0 FIX: the real java pid, when known, so orphan cleanup can find a java that outlived
+    // its cmd.exe parent (a Windows run.bat that detached java). Preserved across updates.
+    javaPid: Number.isFinite(Number(info.javaPid)) ? Number(info.javaPid) : (prev.javaPid || null),
+    javaPidStartedAt: Number.isFinite(Number(info.javaPidStartedAt)) ? Number(info.javaPidStartedAt) : (prev.javaPidStartedAt || null),
     processStartedAt: Number.isFinite(info.processStartedAt) ? info.processStartedAt : null,
     serverPath: info.serverPath || '',
     updatedAt: Date.now(),

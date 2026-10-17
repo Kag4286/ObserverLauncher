@@ -562,24 +562,27 @@ async function forceStopServer(ctx) {
   ctx.appendLog('Force stop requested — terminating the server process…', 'system');
   ctx.setServerStatus('stopping');
   killTree(proc.pid);
-  // POSIX killTree only signals the direct child: when launched via run.sh the
-  // real java process is a grandchild, so hunt it down too (best effort).
-  // Whatever is still alive after 3s gets SIGKILL — force means force.
-  if (process.platform !== 'win32') {
-    try {
-      const javaPid = await Promise.race([
-        platform.findJavaDescendant(proc.pid),
-        new Promise(resolve => setTimeout(() => resolve(null), 4000))
-      ]).catch(() => null);
-      if (javaPid && javaPid !== proc.pid) killTree(javaPid);
-    } catch {}
-    setTimeout(() => {
-      if (ctx.serverProcess === proc) {
-        try { process.kill(proc.pid, 'SIGKILL'); } catch {}
-        try { if (ctx.monitoredPid) process.kill(ctx.monitoredPid, 'SIGKILL'); } catch {}
-      }
-    }, 3000);
-  }
+  // v6.0.0 FIX (real process leak): kill the TRACKED java pid on EVERY platform. On Windows a
+  // server launched via run.bat often detaches java (`start /b java ...`), so killing the cmd.exe
+  // tree alone (taskkill /T) leaves java.exe running as an orphan that never exits. On POSIX the
+  // java process is a grandchild of the bash we spawned. ctx.monitoredPid is the real java pid the
+  // metrics sampler resolved, so kill it directly even when no ancestor walk would find it.
+  if (ctx.monitoredPid && ctx.monitoredPid !== proc.pid) { try { killTree(ctx.monitoredPid); } catch {} }
+  // Best effort: when monitoredPid was never resolved (a fast force-stop), hunt a descendant once.
+  try {
+    const javaPid = await Promise.race([
+      platform.findJavaDescendant(proc.pid),
+      new Promise(resolve => setTimeout(() => resolve(null), 4000))
+    ]).catch(() => null);
+    if (javaPid && javaPid !== proc.pid && javaPid !== ctx.monitoredPid) killTree(javaPid);
+  } catch {}
+  // Whatever is still alive after 3s gets force-killed on both the parent and the java pid.
+  setTimeout(() => {
+    if (ctx.serverProcess === proc) {
+      try { killTree(proc.pid); } catch {}
+      try { if (ctx.monitoredPid) killTree(ctx.monitoredPid); } catch {}
+    }
+  }, 3000);
   return { ok: true };
 }
 

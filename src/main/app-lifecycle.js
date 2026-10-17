@@ -95,6 +95,38 @@ function setupAutoUpdater(ctx, ipcMain) {
 
 function setupQuitHandler(ctx) {
   let quitHandled = false;
+  // v6.0.0 FIX (process leak): collect the pids to stop for EVERY instance, not just the active one.
+  // A background instance's java, or a detached java whose cmd.exe is gone, must be killed on quit or
+  // it survives the launcher. Returns [{ id, serverPid, extraPids[] }] inside the instance's ALS scope.
+  const gatherRunningInstances = () => {
+    const out = [];
+    let ids = [];
+    try { ids = [...ctx.instances.keys()]; } catch {}
+    // Always include the active instance even if it is not in the map yet.
+    const active = ctx.activeInstanceId || 'default';
+    if (!ids.includes(active)) ids.push(active);
+    for (const id of ids) {
+      try {
+        ctx.runInInstance(id, () => {
+          const proc = ctx.serverProcess;
+          const build = ctx.buildProcess;
+          if (!proc && !build) return;
+          const extra = [];
+          if (ctx.monitoredPid) extra.push(ctx.monitoredPid);
+          // The runtime record may carry a detached java pid the in-memory handle never saw.
+          try {
+            const rec = require('./runtime-state.js').getInstanceProcess(id);
+            if (rec && rec.javaPid) extra.push(rec.javaPid);
+          } catch {}
+          out.push({ id, serverPid: proc && proc.pid ? proc.pid : (build && build.pid ? build.pid : null), proc, extraPids: extra.filter(Boolean) });
+          ctx.manualStop = true;
+          try { if (proc && proc.stdin && proc.stdin.writable) proc.stdin.write('stop\r\n'); } catch {}
+          if (build) { try { killTree(build.pid); } catch {} }
+        });
+      } catch {}
+    }
+    return out;
+  };
   app.on('before-quit', event => {
     clearTimeout(ctx.restartTimer);
     clearInterval(ctx.sampleTimer);
@@ -103,17 +135,22 @@ function setupQuitHandler(ctx) {
     clearInterval(ctx.schedulerTimer);
     // 2.4.0: stop the persistent PowerShell host so its process does not linger after quit.
     try { require('./platform/ps-host.js').dispose(); } catch {}
-    if (quitHandled || (!ctx.serverProcess && !ctx.buildProcess)) return;
+    if (quitHandled) return;
+    const targets = gatherRunningInstances();
+    if (!targets.length) return;
     event.preventDefault();
     quitHandled = true;
-    ctx.manualStop = true;
-    try { if (ctx.serverProcess?.stdin?.writable) ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
-    if (ctx.buildProcess) killTree(ctx.buildProcess.pid);
     const deadline = Date.now() + 10000;
     const waitStop = setInterval(() => {
-      if (ctx.serverProcess && Date.now() < deadline) return;
+      // Still inside the timeout? Check every instance's server pid again.
+      let anyAlive = false;
+      for (const t of targets) { if (t.serverPid) { anyAlive = true; break; } }
+      if (anyAlive && Date.now() < deadline) return;
       clearInterval(waitStop);
-      if (ctx.serverProcess) killTree(ctx.serverProcess.pid);
+      for (const t of targets) {
+        if (t.serverPid) { try { killTree(t.serverPid); } catch {} }
+        for (const p of t.extraPids) { try { killTree(p); } catch {} }
+      }
       setTimeout(() => app.quit(), 200);
     }, 250);
   });

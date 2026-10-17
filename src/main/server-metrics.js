@@ -36,6 +36,13 @@ async function metricsTick(ctx, st) {
     if (found) {
       ctx.monitoredPid = found;
       st.javaRetryCount = 0;
+      // v6.0.0 FIX (process leak): persist the real java pid so orphan cleanup on a later launch can
+      // find a java that outlived its cmd.exe parent (a Windows run.bat that detached java).
+      try {
+        // Persist the real java pid AND its OS creation time (the PID-reuse guard orphan cleanup uses).
+        const jinfo = await platform.getProcessInfo(found).catch(() => null);
+        require('./runtime-state.js').setInstanceProcess(ctx.inst(), { pid: ctx.serverProcess.pid, javaPid: found, javaPidStartedAt: jinfo && jinfo.startTimeMs || null, serverPath: ctx.currentServerPath });
+      } catch {}
     } else {
       st.javaRetryCount++;
       // BUGFIX (2.4.0): a run.bat server's root pid is cmd.exe, NOT java — measuring that showed

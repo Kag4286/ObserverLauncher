@@ -42,6 +42,20 @@ async function scanOrphans(getInfo, storedMap) {
     let info = null;
     try { info = await getInfo(rec.pid); } catch { info = null; }
     const stored = { pid: rec.pid, processStartedAt: rec.processStartedAt, serverPath: rec.serverPath, status: rec.status };
+    // v6.0.0 FIX (process leak): the recorded pid is often cmd.exe (run.bat); java may outlive it.
+    // When the parent pid is gone but a recorded javaPid is still alive, classify against the java
+    // pid so the orphan java is found (and killed) instead of being forgotten.
+    if ((!info || info.alive !== true) && rec.javaPid) {
+      let jinfo = null;
+      try { jinfo = await getInfo(rec.javaPid); } catch { jinfo = null; }
+      if (jinfo && jinfo.alive === true) {
+        const jstored = { ...stored, pid: rec.javaPid, processStartedAt: rec.javaPidStartedAt || stored.processStartedAt };
+        // Treat a stale 'running' record as a leftover to KILL (the parent is gone, nobody owns it).
+        const cls = classifyOrphan(jstored, jinfo, { assumedStatus: 'stopped' });
+        out.push({ instanceId: rec.instanceId, stored: jstored, procInfo: jinfo, ...cls });
+        continue;
+      }
+    }
     out.push({ instanceId: rec.instanceId, stored, procInfo: info, ...classifyOrphan(stored, info) });
   }
   return out;
