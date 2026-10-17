@@ -129,4 +129,45 @@ function recordManifestEntry(root, entry) {
   writeJsonList(root, 'observerlauncher-manifest.json', list);
 }
 
-module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, verifyFileHash, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp };
+// v6.0.0 H1: a tiny transaction journal so a multi-file install can be rolled back on failure.
+// Every touch is recorded: a NEW file is deleted on rollback; an OVERWRITTEN file is restored from a
+// backup captured the first time it was touched. commit() discards backups; rollback() reverses in
+// reverse order (last touch undone first). Pure fs; the caller decides when to commit/rollback.
+class FileTransaction {
+  constructor() { this.entries = []; this.seq = 0; }
+  // Record that `absPath` is about to be created or overwritten. Captures a backup when it exists.
+  // Call BEFORE the write so rollback can restore the old bytes. Idempotent per path (one backup).
+  touch(absPath) {
+    const already = this.entries.find(e => e.path === absPath);
+    if (already) return;
+    let existed = false;
+    try { existed = fs.existsSync(absPath) && fs.statSync(absPath).isFile(); } catch { existed = false; }
+    const entry = { path: absPath, existed, backup: null };
+    if (existed) {
+      const bak = `${absPath}.txbak-${process.pid}-${Date.now()}-${this.seq++}`;
+      try { fs.copyFileSync(absPath, bak); entry.backup = bak; } catch { entry.existed = false; }
+    }
+    this.entries.push(entry);
+  }
+  // Discard backups — the transaction succeeded.
+  commit() {
+    for (const e of this.entries) { if (e.backup) { try { fs.rmSync(e.backup, { force: true }); } catch {} } }
+    this.entries = [];
+  }
+  // Undo every touch in reverse: restore overwritten files, delete newly created ones. Returns the
+  // number of paths restored/removed. Best-effort; a single failure does not stop the rest.
+  rollback() {
+    let restored = 0;
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const e = this.entries[i];
+      try {
+        if (e.existed && e.backup && fs.existsSync(e.backup)) { fs.copyFileSync(e.backup, e.path); try { fs.rmSync(e.backup, { force: true }); } catch {} restored++; }
+        else if (!e.existed) { try { fs.rmSync(e.path, { force: true }); restored++; } catch {} }
+      } catch { /* best-effort */ }
+    }
+    this.entries = [];
+    return restored;
+  }
+}
+
+module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, verifyFileHash, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp, FileTransaction };

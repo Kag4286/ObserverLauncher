@@ -32,10 +32,26 @@ async function createWindow(ctx) {
   await ctx.win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 
+// v6.0.0 H4: resolve the update policy from a settings object. Falls back to the old
+// `autoCheckUpdates` boolean ONCE so an existing profile is not lost: true -> 'ask', false -> 'off'.
+// Pure + exported so a test can pin it without electron-updater.
+const UPDATE_POLICIES = ['auto', 'ask', 'off'];
+function updatePolicyOf(settings) {
+  const s = settings || {};
+  if (UPDATE_POLICIES.includes(s.updatePolicy)) return s.updatePolicy;
+  if (s.autoCheckUpdates === false) return 'off';
+  return 'ask';
+}
+
 function setupAutoUpdater(ctx, ipcMain) {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.autoDownload = false;
-  autoUpdater.on('update-available', v => ctx.send('app:update-available', v));
+  const policy = (() => { try { return updatePolicyOf(loadSettings()); } catch { return 'ask'; } })();
+  autoUpdater.on('update-available', v => {
+    ctx.send('app:update-available', v);
+    // 'auto' downloads the update as soon as it is known; 'ask'/'off' wait for the user.
+    if (policy === 'auto') { try { autoUpdater.downloadUpdate().catch(() => {}); } catch {} }
+  });
   autoUpdater.on('update-not-available', () => ctx.send('app:update-none', {}));
   autoUpdater.on('download-progress', p => ctx.send('app:update-progress', p));
   autoUpdater.on('update-downloaded', () => ctx.send('app:update-downloaded', {}));
@@ -43,10 +59,8 @@ function setupAutoUpdater(ctx, ipcMain) {
   // silently did nothing — the button stayed on "Checking…" forever. Surface it to the renderer.
   autoUpdater.on('error', err => ctx.send('app:update-error', { message: err?.message || String(err) }));
   // Only check automatically when actually packaged — electron-updater has no app-update.yml in dev.
-  // 4.0.0: honour the "check on startup" setting (default ON); the manual button still works either way.
-  let autoCheck = true;
-  try { autoCheck = loadSettings().autoCheckUpdates !== false; } catch {}
-  if (app.isPackaged && autoCheck) autoUpdater.checkForUpdates().catch(err => ctx.send('app:update-error', { message: err?.message || String(err) }));
+  // 'off' skips the startup check entirely; the manual button still works either way.
+  if (app.isPackaged && policy !== 'off') autoUpdater.checkForUpdates().catch(err => ctx.send('app:update-error', { message: err?.message || String(err) }));
 
   // Every handler resolves {ok:false} instead of rejecting, so the renderer's await never throws
   // an unhandled rejection and the UI can always show a reason.
@@ -123,4 +137,4 @@ async function initApp(ctx, ipcMain) {
   startScheduler(ctx);
 }
 
-module.exports = { killTree, createWindow, setupAutoUpdater, setupQuitHandler, initApp };
+module.exports = { killTree, createWindow, setupAutoUpdater, setupQuitHandler, initApp, updatePolicyOf, UPDATE_POLICIES };

@@ -272,6 +272,10 @@ function nswRender(){
     $('#nswSummary').innerHTML=rows+warn;
   }
   const spigotHint=$('#nswSpigotHint'); if(spigotHint) spigotHint.hidden=!(nsw.step===5&&nsw.software==='spigot');
+  // v6.0.0 A3: crossplay note on Review for the software Geyser ships for (plugins on Bukkit-family,
+  // mods on Fabric/Forge/NeoForge). Velocity is a proxy with no world, so it is excluded.
+  const cp=$('#nswCrossplayHint');
+  if(cp){const geyserOk=['vanilla','paper','purpur','leaf','folia','spigot','fabric','forge','neoforge'].includes(nsw.software);cp.hidden=!(nsw.step===5&&geyserOk);}
 }
 $$('[data-software]').forEach(c=>c.onclick=()=>{
   if(nsw.software===c.dataset.software)return;

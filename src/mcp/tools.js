@@ -274,6 +274,21 @@ async function tSetRawProperties(ctx, a) {
   writeFileAtomic(path.join(root, 'velocity.toml'), content);
   return { ok: true };
 }
+// A1 (v6.0.0): repair the SAFE Geyser config problems. Re-inspects (never trusts caller input) and
+// writes at the LINE level with a backup. bedrock.port is opt-in (it changes the tunnel port).
+async function tApplyGeyserFix(ctx, a) {
+  const root = needPath(ctx);
+  const files = serverFiles(root);
+  if (!files.geyser) return { ok: false, error: 'This server has no Geyser or Floodgate jar.' };
+  const { inspectGeyser, planGeyserFix, applyGeyserFix } = require('../main/geyser.js');
+  const hasFloodgate = [...(files.plugins || []), ...(files.mods || [])].some(x => /floodgate/i.test(x));
+  const info = inspectGeyser(root, { floodgate: hasFloodgate });
+  if (!info.configPath) return { ok: false, error: 'Geyser config.yml was not found. Start the server once so Geyser creates it.' };
+  const plan = planGeyserFix(info, { includeBedrockPort: a && a.includeBedrockPort === true });
+  if (plan.length === 0) return { ok: true, result: { changed: [], skipped: [], backup: null } };
+  const res = applyGeyserFix(root, info.configPath, plan);
+  return { ok: !!res.ok, result: res, ...(res.ok ? {} : { error: res.error }) };
+}
 // SECURITY: write/edit only touch the SAME allowlisted text extensions the built-in editor
 // accepts (editor.ALLOWED). Without this an AI could overwrite a .jar/.dat with text — silently
 // corrupting a plugin or player file — via a plain 'write' tier tool.
@@ -1308,6 +1323,7 @@ const TOOLS = [
   { name: 'send_console_command', risk: 'write', description: 'Send one command to the running server.', inputSchema: S({ command: STR('single-line command') }, ['command']), handler: tSendCommand },
   { name: 'set_property', risk: 'write', description: 'Set one server.properties key.', inputSchema: S({ key: STR('property key'), value: STR('value') }, ['key']), handler: tSetProperty },
   { name: 'set_raw_properties', risk: 'write', description: 'Replace velocity.toml content.', inputSchema: S({ content: STR('full file') }, ['content']), handler: tSetRawProperties },
+  { name: 'apply_geyser_fix', risk: 'write', description: 'Repair the safe GeyserMC config problems (clone-remote-port, remote.auth-type, advanced.bedrock.use-haproxy-protocol) in Geyser config.yml. Writes at the line level with a timestamped backup; never re-serializes the file. Pass includeBedrockPort:true to also reset bedrock.port to 19132.', inputSchema: S({ includeBedrockPort: { type: 'boolean', description: 'also reset bedrock.port to 19132 (default false)' } }), handler: tApplyGeyserFix },
   { name: 'write_file', risk: 'write', description: 'Write a text file inside the server folder.', inputSchema: S({ path: STR('relative path'), content: STR('full content') }, ['path', 'content']), handler: tWriteFile },
   { name: 'edit_file', risk: 'write', description: 'Replace oldString with newString in a file.', inputSchema: S({ path: STR('relative path'), oldString: STR('exact text'), newString: STR('replacement') }, ['path', 'oldString', 'newString']), handler: tEditFile },
   { name: 'create_backup', risk: 'write', description: 'Create a world backup (ZIP).', inputSchema: S(), handler: tCreateBackup },

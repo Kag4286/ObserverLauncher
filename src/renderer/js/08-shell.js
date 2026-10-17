@@ -30,12 +30,13 @@ function flushLogs(){
   const sweep=logQueue.length<=3;
   const frag=document.createDocumentFragment();
   let added=0, lastVisible=null;
+  const names=consolePlayerNames();
   while(logQueue.length && added<80){
     const line=logQueue.shift();
     const d=document.createElement('div'), level=logLevel(line);
     d.className=`log-line ${line.type||''}${sweep?' sweep':''}`; d.dataset.level=level;
     d.dataset.text=String(line.text||'').slice(0,2000); // search index (trimmed to keep the DOM lean)
-    d.innerHTML=`<span class="lvl">${LOG_BADGE[level]||'INF'}</span><span class="time">${esc(line.time)}</span> ${esc(line.text)}`;
+    d.innerHTML=`<span class="lvl">${LOG_BADGE[level]||'INF'}</span><span class="time">${esc(line.time)}</span> ${linkifyKnownPlayers(line.text, names)}`;
     if(!logVisible(level,line.text)) d.hidden=true; else lastVisible=d;
     frag.appendChild(d); added++;
   }
@@ -48,6 +49,25 @@ function flushLogs(){
   else if(lastVisible && !lastVisible.hidden){ const j=$('#logJump'); if(j) j.hidden=false; }
   if(logQueue.length) requestAnimationFrame(flushLogs); else logFlushScheduled=false;
 }
+// v6.0.0 H6: the set of player names a console line may link to. Online players (live) plus the
+// server's known/whitelist/op players (files). Only these exact names become clickable links, so an
+// ordinary word is never mistaken for a player.
+function consolePlayerNames(){
+  const set=new Set();
+  try{ for(const p of (state.live?.players||[])){ const n=typeof p==='string'?p:(p&&p.name); if(isSafePlayerName(n)) set.add(n); } }catch{}
+  try{ const f=state.files||{}; for(const k of ['knownPlayers','whitelist','ops']){ for(const p of (f[k]||[])){ const n=typeof p==='string'?p:(p&&p.name); if(isSafePlayerName(n)) set.add(n); } } }catch{}
+  return [...set];
+}
+// One delegated click handler for every console player link. Resolves the UUID from known players
+// (if any) and opens the existing inspector; a name with no stored UUID still opens it (offline).
+$('#logOutput')?.addEventListener('click',e=>{
+  const a=e.target.closest('.log-player'); if(!a) return;
+  e.preventDefault();
+  const name=a.dataset.player; if(!isSafePlayerName(name)) return;
+  let uuid=null;
+  try{ const known=state.files?.knownPlayers||[]; const hit=known.find(p=>(typeof p==='string'?p:p&&p.name)===name); if(hit&&typeof hit==='object') uuid=hit.uuid||null; }catch{}
+  if(typeof openPlayerInspector==='function') openPlayerInspector(uuid,name);
+});
 function addLog(line){ logQueue.push(line); if(!logFlushScheduled){ logFlushScheduled=true; requestAnimationFrame(flushLogs); } }
 function addLogsBatch(lines){ if(!lines||!lines.length) return; logQueue.push(...lines); if(!logFlushScheduled){ logFlushScheduled=true; requestAnimationFrame(flushLogs); } }
 // B4: replace the whole console with another instance's buffer on switch. Unlike flushLogs
@@ -59,11 +79,12 @@ function repaintConsole(lines){
   const arr=Array.isArray(lines)?lines:[];
   if(!arr.length){ o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`; return; }
   const frag=document.createDocumentFragment();
+  const names=consolePlayerNames();
   for(const line of arr){
     const d=document.createElement('div'), level=logLevel(line);
     d.className=`log-line ${line.type||''}`; d.dataset.level=level;
     d.dataset.text=String(line.text||'').slice(0,2000);
-    d.innerHTML=`<span class="lvl">${LOG_BADGE[level]||'INF'}</span><span class="time">${esc(line.time)}</span> ${esc(line.text)}`;
+    d.innerHTML=`<span class="lvl">${LOG_BADGE[level]||'INF'}</span><span class="time">${esc(line.time)}</span> ${linkifyKnownPlayers(line.text, names)}`;
     if(!logVisible(level,line.text)) d.hidden=true;
     frag.appendChild(d);
   }
@@ -84,21 +105,28 @@ function rebuildSamples(history,historyLong){
 // v5.3.0: pick what metricChart draws for the active range. 15m uses the live 38-point ring
 // (chartSamples aliases samples). 1h/6h slice samplesLong by age, then downsample to <=200 points so
 // the canvas draw stays cheap and the line reads cleanly. Pure apart from reading the module vars.
-const PERF_RANGE_MS={ '15m':15*60*1000, '1h':60*60*1000, '6h':6*60*60*1000, '24h':24*60*60*1000 };
+const PERF_RANGE_MS={ '15m':15*60*1000, '1h':60*60*1000, '6h':6*60*60*1000, '24h':24*60*60*1000, '7d':7*24*60*60*1000, '30d':30*24*60*60*1000 };
+// v6.0.0 D1: 7d/30d windows are served from disk (1m/1h rollups), fetched on demand and cached here.
+let samplesVeryLong=[]; let _veryLongFor=null; // _veryLongFor = the range currently loaded
 function computeChartSamples(){
   if(perfRange==='15m'){ chartSamples=samples; return; }
   const spanMs=PERF_RANGE_MS[perfRange]||PERF_RANGE_MS['15m'];
   const cutoff=Date.now()-spanMs;
-  let win=samplesLong.filter(s=>s&&s.t>=cutoff);
-  if(!win.length&&samplesLong.length)win=[samplesLong[samplesLong.length-1]];
+  const src=(perfRange==='7d'||perfRange==='30d')?samplesVeryLong:samplesLong;
+  let win=src.filter(s=>s&&s.t>=cutoff);
+  if(!win.length&&src.length)win=[src[src.length-1]];
   const MAXP=200;
   if(win.length>MAXP){const step=win.length/MAXP,out=[];for(let i=0;i<MAXP;i++)out.push(win[Math.floor(i*step)]);if(out[out.length-1]!==win[win.length-1])out.push(win[win.length-1]);win=out;}
   chartSamples=win.length?win:[{tps:null,mspt:null,cpu:null,ram:null}];
 }
-function setPerfRange(range){
+async function setPerfRange(range){
   if(!PERF_RANGE_MS[range])range='15m';
   perfRange=range;
   $$('#perfRangeChips .filter-chip').forEach(b=>b.classList.toggle('active',b.dataset.range===range));
+  // v6.0.0 D1: 7d/30d read the disk rollup for this instance (raw ring only holds 24h).
+  if((range==='7d'||range==='30d')&&_veryLongFor!==range){
+    try{const r=await window.observer.metricsLong(range);samplesVeryLong=(r&&r.ok&&Array.isArray(r.samples))?r.samples.map(s=>({t:Number(s.t)||0,tps:s.tps??null,mspt:s.mspt??null,cpu:s.cpu??null,ram:s.ram??null})):[];_veryLongFor=range;}catch{samplesVeryLong=[];_veryLongFor=range;}
+  }
   computeChartSamples();
   try{ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
 }
@@ -167,6 +195,9 @@ function instanceDotStatus(instId, activeId){
 // (same ids/names/active/locale) and only repaints the status dots in place, so the animation plays
 // only on a real change (add / remove / rename / switch).
 let lastInstSig='';
+// v6.0.0 H5: signature guard for the Settings tunnel-overview list. Without it the list rebuilt on
+// every refreshUI() and replayed the .tun-ov-row entry animation each time (memory gotcha 19).
+let lastTunOvSig='';
 function renderInstanceList(){
   const wrap=$('#instanceList'),host=$('#instanceItems');
   if(!wrap||!host)return;
@@ -294,6 +325,11 @@ function renderTunnelOverview(){
   sec.hidden=list.length<2;            // single instance -> the Overview tunnel panel already covers it
   if(list.length<2)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
+  // Rebuild only when the list/active/addresses change, so the entry animation runs on a real change,
+  // not on every status tick (v6.0.0 H5).
+  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||'',i.tunnelAddress||''])]);
+  if(sig===lastTunOvSig)return;
+  lastTunOvSig=sig;
   host.innerHTML='';
   list.forEach(inst=>{
     const st=instanceDotStatus(inst.id,activeId);
@@ -337,12 +373,17 @@ async function renameInstancePrompt(inst){
   const next=(state.instances||[]).map(i=>i.id===inst.id?{...i,name:r.name}:i);
   state={...state,instances:next};refreshUI();
 }
-// Remove an instance from the LIST ONLY (never deletes the folder). Refuses while it is running.
+// Remove an instance. v6.0.0 H3: a second dialog lets the user also delete the server FILES (default
+// keeps them). Refuses while the server is running. The backend re-guards every deletion.
 async function removeInstancePrompt(inst){
   if(inst.id===state.activeInstanceId && state.status!=='stopped')return toast(t('inst.stopFirst'),'error');
-  const ok=await confirmDialog({title:t('inst.remove'),body:esc(t('inst.removeConfirm',{n:inst.name||inst.serverPath||'Server'})),ok:t('inst.remove'),danger:true});
+  const name=inst.name||inst.serverPath||'Server';
+  const ok=await confirmDialog({title:t('inst.remove'),body:esc(t('inst.removeConfirm',{n:name})),ok:t('inst.remove'),danger:true});
   if(!ok)return;
-  let r; try{ r=await window.observer.instanceRemove(inst.id); }catch(e){ return toast(e?.message||'Remove failed.','error'); }
+  // v6.0.0 H3: second, explicit choice about the FILES. Default (Cancel) keeps them, so a hasty
+  // second Enter never deletes a world. Deleting files is permanent and states it plainly.
+  const delFiles=await confirmDialog({title:t('inst.removeFilesTitle'),body:esc(t('inst.removeFilesBody',{n:name,p:inst.serverPath||''})),ok:t('inst.deleteFiles'),cancel:t('inst.keepFiles'),danger:true});
+  let r; try{ r=await window.observer.instanceRemove(inst.id,{deleteFiles:delFiles}); }catch(e){ return toast(e?.message||'Remove failed.','error'); }
   if(!r||!r.ok)return toast((r&&r.error)||'Remove failed.','error');
   try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
   refreshUI();
@@ -379,6 +420,9 @@ function resetInstanceViews(){
     // entry, so staying on the tab would otherwise keep the previous world's seed/biomes).
     const wmTab=document.getElementById('worldmap');
     if(wmTab&&wmTab.classList.contains('active')&&typeof wmLoad==='function') wmLoad().catch(()=>{});
+    // v6.0.0 D1: drop the cached 7d/30d disk history so the next range pick re-fetches for the NEW
+    // instance instead of showing the previous instance's long window.
+    try{ samplesVeryLong=[]; _veryLongFor=null; }catch{}
   }catch{}
 }
 
@@ -653,6 +697,21 @@ $('#tunnelStart').onclick=()=>withBusy($('#tunnelStart'),async()=>{if(!await con
 $('#tunnelDashboard').onclick=()=>window.observer.tunnelOpenUrl('https://playit.gg/account/tunnels');
 // v5.7.0 GEYSER: run Geyser's own connectiontest and show the reply.
 $('#geyserTestBtn')?.addEventListener('click',async()=>{const b=$('#geyserTestBtn'),m=$('#geyserTestMsg');b.disabled=true;if(m){m.hidden=false;m.textContent=t('geyser.testing')}try{const r=await window.observer.geyserTest();if(m){m.textContent=(r&&r.ok)?(r.reply||t('geyser.testOk')):((r&&r.error)||t('geyser.testFail'))}}catch(e){if(m)m.textContent=e?.message||t('geyser.testFail')}finally{b.disabled=false}});
+// A1 (v6.0.0): repair the safe Geyser config problems in one click. Confirm first (it edits a file
+// the user owns), then re-fetch state so the panel reflects the repaired config.
+$('#geyserFixBtn')?.addEventListener('click',()=>withBusy($('#geyserFixBtn'),async()=>{if(!await confirmDialog({title:t('geyser.fix'),body:t('geyser.fixConfirm'),ok:t('geyser.fix')}))return;const safe=await window.observer.geyserApplyFix({});if(!safe||!safe.ok)return toast((safe&&safe.error)||t('geyser.fixFail'),'error');let changed=(safe.changed||[]).slice(),backup=safe.backup;const portIssue=!!(state.geyser&&state.geyser.issues&&state.geyser.issues.some(it=>it.key==='bedrock.port'));if(portIssue&&await confirmDialog({title:t('geyser.fixPort'),body:t('geyser.fixPortConfirm'),ok:t('geyser.fixPort')})){const pr=await window.observer.geyserApplyFix({includeBedrockPort:true});if(!pr||!pr.ok)toast((pr&&pr.error)||t('geyser.fixFail'),'error');else{changed=changed.concat(pr.changed||[]);backup=pr.backup||backup}}if(!changed.length)return toast(t('geyser.fixNone'),'success');toast(t('geyser.fixDone',{n:changed.length}),'success');if(backup)toast(t('geyser.fixBackup',{p:backup}),'success');try{const s=await window.observer.getState();state={...state,...s};refreshUI()}catch{}}));
+// v6.0.0 A2.5: Pinggy Bedrock UDP tunnel controls.
+function applyPinggyStatus(s){s=s||{};const pill=$('#pinggyPill'),start=$('#pinggyStartBtn'),stop=$('#pinggyStopBtn'),copy=$('#pinggyCopyBtn'),row=$('#pinggyAddrRow'),addr=$('#pinggyAddr'),hint=$('#pinggyHint');const st=s.status||'stopped';
+  if(pill){pill.textContent=st==='running'?t('pg.running'):st==='starting'?t('pg.starting'):st==='error'?t('pg.error'):t('pg.off');pill.className='tunnel-pill '+(st==='running'?'running':st==='error'?'error':'')}
+  if(start){start.hidden=st==='running'||st==='starting';start.disabled=st==='starting'}
+  if(stop)stop.hidden=!(st==='running'||st==='starting')
+  if(s.address){if(addr)addr.value=s.address;if(row)row.hidden=false;if(copy)copy.hidden=false;if(hint)hint.textContent=t('pg.shareHint')}else{if(row)row.hidden=true;if(copy)copy.hidden=true}
+}
+$('#pinggyStartBtn')?.addEventListener('click',()=>withBusy($('#pinggyStartBtn'),async()=>{const r=await window.observer.pinggyStart('udp');if(!r||!r.ok)return toast((r&&r.error)||t('pg.startFail'),'error');toast(t('pg.started'),'success');applyPinggyStatus({status:'running',address:r.address})}));
+$('#pinggyStopBtn')?.addEventListener('click',()=>withBusy($('#pinggyStopBtn'),async()=>{const r=await window.observer.pinggyStop();if(r&&r.ok){toast(t('pg.stopped'),'success');applyPinggyStatus({status:'stopped'})}else toast((r&&r.error)||t('pg.stopFail'),'error')}));
+$('#pinggyCopyBtn')?.addEventListener('click',async()=>{const v=$('#pinggyAddr')?.value;if(!v)return;try{await navigator.clipboard.writeText(v);toast(t('toast.copied'),'success')}catch{toast(t('toast.copyFailed'),'error')}});
+if(window.observer.onPinggyStatus)window.observer.onPinggyStatus(applyPinggyStatus);
+try{window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{})}catch{}
 $('#autoTunnelQuick')?.addEventListener('change',async()=>{const next={...getSettings(),autoTunnel:$('#autoTunnelQuick').checked};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return}state={...state,settings:next,java:r.java};if($('#autoTunnelInput'))$('#autoTunnelInput').checked=next.autoTunnel;toast(next.autoTunnel?t('tun.autoOnToast'):t('tun.autoOffToast'),'success')});
 const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim());window.observer.saveManualTunnel(tunnelManual.value.trim())})}
 async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();applyTunnelStatus(s)}catch{}}

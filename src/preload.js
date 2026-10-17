@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('observer', {
   marketVersions: () => ipcRenderer.invoke('market:versions'), marketSearch: query => ipcRenderer.invoke('market:search', query), marketInstall: item => ipcRenderer.invoke('market:install', item), marketDetail: item => ipcRenderer.invoke('market:detail', item), marketSpigotDetails: ids => ipcRenderer.invoke('market:spigot-details', ids), marketOpenExternal: url => ipcRenderer.invoke('market:open-external', url), marketCurseforgeStatus: () => ipcRenderer.invoke('market:curseforge-status'), wizardCreate: config => ipcRenderer.invoke('wizard:create', config), wizardCancel: () => ipcRenderer.invoke('wizard:cancel'), wizardVersions: software => ipcRenderer.invoke('wizard:versions', software), wizardJavaCheck: payload => ipcRenderer.invoke('wizard:java-check', payload), templatesList: () => ipcRenderer.invoke('templates:list'), templatesPlan: id => ipcRenderer.invoke('templates:plan', id), importModpack: () => ipcRenderer.invoke('modpack:import'), exportModpack: () => ipcRenderer.invoke('modpack:export'), verifyBlockedMods: payload => ipcRenderer.invoke('modpack:verify-blocked', payload), installMarketModpack: config => ipcRenderer.invoke('modpack:install-from-market', config), playerRead: uuid => ipcRenderer.invoke('player:read', uuid), playerSave: config => ipcRenderer.invoke('player:save', config), playerWhitelistToggle: config => ipcRenderer.invoke('player:whitelist-toggle', config), playerBanToggle: config => ipcRenderer.invoke('player:ban-toggle', config), playerOpToggle: config => ipcRenderer.invoke('player:op-toggle', config),
   networkInfo: () => ipcRenderer.invoke('network:info'), checkPublicIp: () => ipcRenderer.invoke('network:public-ip'), allowFirewall: port => ipcRenderer.invoke('network:allow-firewall', port), javaAutoInstall: () => ipcRenderer.invoke('java:auto-install'), javaList: () => ipcRenderer.invoke('java:list'), exportConsole: () => ipcRenderer.invoke('console:export'), pickPlayitFile: () => ipcRenderer.invoke('dialog:playit-file'),
   geyserTest: () => ipcRenderer.invoke('geyser:test'),
+  geyserApplyFix: opts => ipcRenderer.invoke('geyser:apply-fix', opts),
+  // v6.0.0 A2.3: per-instance Pinggy tunnel (Bedrock UDP).
+  pinggyStart: proto => ipcRenderer.invoke('pinggy:start', proto), pinggyStop: () => ipcRenderer.invoke('pinggy:stop'), pinggyGet: () => ipcRenderer.invoke('pinggy:get'), onPinggyStatus: cb => ipcRenderer.on('pinggy:status', (_, d) => cb(d)),
+  metricsLong: range => ipcRenderer.invoke('metrics:long', range),
   tunnelStart: provider => ipcRenderer.invoke('tunnel:start', provider), tunnelStop: () => ipcRenderer.invoke('tunnel:stop'), tunnelGet: () => ipcRenderer.invoke('tunnel:get'), tunnelOpenUrl: url => ipcRenderer.invoke('tunnel:open-url', url), onTunnelStatus: cb => ipcRenderer.on('tunnel:status', (_, d) => cb(d)), onTunnelProgress: cb => ipcRenderer.on('tunnel:progress', (_, d) => cb(d)),
   saveManualTunnel: addr => ipcRenderer.invoke('tunnel:set-address', addr),
   // 4.3.0 remote: reveal the long-lived token (trusted renderer only).
@@ -16,7 +20,7 @@ contextBridge.exposeInMainWorld('observer', {
   instanceSwitch: id => ipcRenderer.invoke('instances:switch', id),
   instanceRename: payload => ipcRenderer.invoke('instances:rename', payload),
   instanceStyle: payload => ipcRenderer.invoke('instances:style', payload),
-  instanceRemove: id => ipcRenderer.invoke('instances:remove', id),
+  instanceRemove: (id, opts) => ipcRenderer.invoke('instances:remove', id, opts),
   instanceSnapshot: id => ipcRenderer.invoke('instances:snapshot', id),
   instanceProbe: folder => ipcRenderer.invoke('instances:probe', folder),
   instanceRelink: payload => ipcRenderer.invoke('instances:relink', payload),

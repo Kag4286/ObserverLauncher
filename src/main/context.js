@@ -19,7 +19,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 // M5: channels that carry the ACTIVE instance's live state and are therefore gated in send()
 // so N background instances do not each push IPC + renderer redraws for an unseen view.
 // server:state is deliberately ABSENT (it is always sent - see setServerStatus).
-const GATED_CHANNELS = new Set(['server:metrics', 'server:live', 'server:files', 'server:log']);
+const GATED_CHANNELS = new Set(['server:metrics', 'server:live', 'server:files', 'server:log', 'pinggy:status']);
 
 function createContext() {
   const ctx = {
@@ -87,6 +87,14 @@ function createContext() {
       rcon: null, // M6: live RconClient for this instance, or null (stdin fallback)
       tpsUnsupported: false, // 2.2.0: set true when the server rejects our tps poll (e.g. `forge tps`) so we stop sending it
       sparkAvailable: false, // 2.4.0: server has Spark -> use `spark tps` when the native tps command is rejected
+      // v6.0.0 A2.3: Pinggy tunnel for THIS instance (Bedrock UDP). Unlike the Playit daemon
+      // (global, one process serves N tunnels), the Pinggy tunnel is an ssh child that forwards a
+      // SPECIFIC local port, so each instance owns its own process and state.
+      pinggyProcess: null,     // ssh child process, or null
+      pinggyProto: null,       // 'tcp' | 'udp' for the current tunnel, or null
+      pinggyAddress: '',       // resolved public address, e.g. 'udp://abc.run.pinggy-free.link:41140'
+      pinggyStatus: 'stopped', // 'stopped' | 'starting' | 'running' | 'error'
+      pinggyRestartTimer: null,// 55-minute auto-restart (a free Pinggy tunnel expires at 60 min)
       wizardAbort: null,
       contentWatcher: null,
       contentWatchers: null,
@@ -122,6 +130,7 @@ function createContext() {
     'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported', 'sparkAvailable',
     'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
     'edWatcher', 'edWatchMtime', 'edWatchDebounce',
+    'pinggyProcess', 'pinggyProto', 'pinggyAddress', 'pinggyStatus', 'pinggyRestartTimer',
   ];
   for (const f of INST_FIELDS) defInst(f);
 

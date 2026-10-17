@@ -58,8 +58,14 @@ function defaultGlobal() {
     // 3.3.0 remote management (Track A): OFF by default, read-only by default, no IP restriction by
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
     remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remotePort: 0, remoteBind: '',
-    playitPath: '', motionLevel: 'full', curseforgeApiKey: '',
-    // 4.0.0: auto-check for app updates on startup (global, default ON). Read by setupAutoUpdater.
+    playitPath: '', pinggyPath: '', motionLevel: 'full', curseforgeApiKey: '',
+    // 4.0.0: auto-check for app updates on startup (global). v6.0.0 H4: replaced the boolean with a
+    // 3-way policy read by setupAutoUpdater:
+    //   'auto' = check on startup AND download automatically, then prompt to install
+    //   'ask'  = check on startup, ask before downloading (default)
+    //   'off'  = never check automatically (the manual button still works)
+    // `autoCheckUpdates` is kept only so an old profile can be read once (see updatePolicyOf).
+    updatePolicy: 'ask',
     autoCheckUpdates: true,
   };
 }

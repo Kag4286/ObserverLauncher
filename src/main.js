@@ -48,6 +48,7 @@ const { registerWizard } = require('./main/wizard.js');
 const { registerSettings } = require('./main/settings-handlers.js');
 const { registerContent } = require('./main/content-handlers.js');
 const { registerTunnel, stopTunnel } = require('./main/tunnel.js');
+const { registerPinggy, stopAllPinggy } = require('./main/pinggy-tunnel.js');
 const { createWindow, setupAutoUpdater, setupQuitHandler, initApp } = require('./main/app-lifecycle.js');
 const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
 const { registerMcpConfirm } = require('./mcp/confirm.js');
@@ -84,6 +85,7 @@ registerWizard(ipcWrap, ctx);
 registerSettings(ipcWrap, ctx);
 registerContent(ipcWrap, ctx);
 registerTunnel(ipcWrap, ctx);
+registerPinggy(ipcWrap, ctx);
 registerMcpConfirm(ipcWrap, ctx);
 registerOrphanPrompt(ipcWrap, ctx);
 
@@ -118,7 +120,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 // Stop the MCP server and remove its bridge config on the way out, so a stale token/port file
 // never lingers to confuse the next launch.
-app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} try { require('./main/metrics-store.js').flushAll(); } catch {} });
+app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { stopAllPinggy(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} try { require('./main/metrics-store.js').flushAll(); } catch {} });
 setupQuitHandler(ctx);
 
 // Exported for smoke tests (require without launching Electron windows).

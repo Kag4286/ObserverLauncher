@@ -40,6 +40,7 @@ const MIGRATED = [
   'backupInProgress', 'lastAutoBackupAt', 'buildProcess', 'rcon', 'tpsUnsupported', 'sparkAvailable',
   'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
   'edWatcher', 'edWatchMtime', 'edWatchDebounce',
+  'pinggyProcess', 'pinggyProto', 'pinggyAddress', 'pinggyStatus', 'pinggyRestartTimer',
 ];
 for (const field of MIGRATED) {
   ok(`object literal has no flat '${field}:'`, !new RegExp(`\\b${field}\\s*:`).test(literal));

@@ -153,4 +153,95 @@ function inspectGeyser(root, opts = {}) {
   return out;
 }
 
-module.exports = { inspectGeyser, parseSimpleYaml, CONFIG_CANDIDATES, readServerProperties, findGeyserConfig };
+// --- A1 (v6.0.0): one-click config repair -------------------------------------------------------
+// inspectGeyser only READS. These functions WRITE back the safe fixes. The config is YAML with
+// comments and list items that parseSimpleYaml DROPS, so the parsed object must NEVER be
+// re-serialized (that would destroy the file). Every fix is a LINE-level value swap: find the line
+// whose key path matches, keep its indent and any trailing comment, replace only the value text.
+
+// Which issue keys can be auto-fixed, and to what value. `bedrock.port` is optional because
+// changing it also changes which local UDP port the tunnel must match; the caller opts in.
+const FIXABLE = {
+  'bedrock.clone-remote-port': { path: ['bedrock', 'clone-remote-port'], value: 'false' },
+  'remote.auth-type': { path: ['remote', 'auth-type'], value: 'floodgate' },
+  'advanced.bedrock.use-haproxy-protocol': { path: ['advanced', 'bedrock', 'use-haproxy-protocol'], value: 'true' },
+};
+const OPTIONAL_FIXABLE = {
+  'bedrock.port': { path: ['bedrock', 'port'], value: '19132' },
+};
+
+// Map every leaf key path in the YAML text to its 0-based line index. Mirrors the indent walk in
+// parseSimpleYaml but records the LINE, so a fix can rewrite exactly one line. Comments, blank lines
+// and list items are skipped; a branch (`key:` with no value) pushes a level.
+function yamlKeyLines(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const map = new Map();
+  const stack = [{ indent: -1, keys: [] }];
+  for (let i = 0; i < lines.length; i++) {
+    const noComment = lines[i].replace(/\s+#.*$/, '').replace(/\s+$/, '');
+    if (!noComment.trim() || /^\s*#/.test(noComment) || /^\s*-/.test(noComment)) continue;
+    const m = noComment.match(/^(\s*)([^:]+):\s*(.*)$/);
+    if (!m) continue;
+    const indent = m[1].length;
+    const key = m[2].trim();
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+    const path = [...stack[stack.length - 1].keys, key];
+    if (m[3].trim() === '') stack.push({ indent, keys: path });
+    else map.set(path.join('.'), i);
+  }
+  return { lines, map };
+}
+
+// Replace the VALUE on a YAML line, keeping indent, key and any trailing `# comment` byte-exact.
+function replaceYamlValue(line, newValue) {
+  const m = line.match(/^(\s*)([^:]+):(.*)$/);
+  if (!m) return null;
+  const cm = m[3].match(/^(.*?)(\s+#.*)$/);
+  const comment = cm ? cm[2] : '';
+  return `${m[1]}${m[2]}: ${newValue}${comment}`;
+}
+
+// Build the edits that can be applied safely, from an inspectGeyser result. Returns
+// [{ key, path (dotted yaml path), to }]. Empty when nothing is safely fixable.
+function planGeyserFix(inspection, opts = {}) {
+  const issues = (inspection && Array.isArray(inspection.issues)) ? inspection.issues : [];
+  const table = opts.includeBedrockPort ? { ...FIXABLE, ...OPTIONAL_FIXABLE } : FIXABLE;
+  const plan = [];
+  for (const issue of issues) {
+    const spec = table[issue.key];
+    if (!spec) continue;
+    plan.push({ key: issue.key, path: spec.path.join('.'), to: spec.value });
+  }
+  return plan;
+}
+
+// Apply a plan to the Geyser config.yml. Edits are line-level; the file is backed up first, then
+// written atomically. Returns { ok, changed, skipped, backup } or { ok:false, error }.
+function applyGeyserFix(root, configRel, plan) {
+  const { writeFileAtomic } = require('./fs-utils.js');
+  if (!root || !configRel) return { ok: false, error: 'No Geyser config to edit.' };
+  if (!Array.isArray(plan) || plan.length === 0) return { ok: false, error: 'Nothing to fix.' };
+  const abs = path.join(root, configRel);
+  let text;
+  try { text = fs.readFileSync(abs, 'utf8'); } catch { return { ok: false, error: 'Could not read the Geyser config.' }; }
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const { lines, map } = yamlKeyLines(text);
+  const changed = [];
+  const skipped = [];
+  for (const edit of plan) {
+    const idx = map.get(edit.path);
+    if (idx == null) { skipped.push(edit.key); continue; }
+    const replaced = replaceYamlValue(lines[idx], edit.to);
+    if (replaced == null || replaced === lines[idx]) { skipped.push(edit.key); continue; }
+    lines[idx] = replaced;
+    changed.push({ key: edit.key, to: edit.to });
+  }
+  if (changed.length === 0) return { ok: true, changed: [], skipped, backup: null };
+  // Backup before writing so the user can always go back.
+  const backup = `${abs}.bak-${Date.now()}`;
+  try { fs.copyFileSync(abs, backup); } catch { return { ok: false, error: 'Could not create a backup of the Geyser config.' }; }
+  try { writeFileAtomic(abs, lines.join(eol)); } catch (e) { return { ok: false, error: e?.message || 'Could not write the Geyser config.' }; }
+  return { ok: true, changed, skipped, backup };
+}
+
+module.exports = { inspectGeyser, parseSimpleYaml, CONFIG_CANDIDATES, readServerProperties, findGeyserConfig, planGeyserFix, applyGeyserFix, yamlKeyLines, FIXABLE, OPTIONAL_FIXABLE };

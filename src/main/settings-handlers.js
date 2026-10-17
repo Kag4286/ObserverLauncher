@@ -5,7 +5,7 @@ const path = require('path');
 // B1 (v3.0.0): no top-level electron require (throws in plain Node). Data paths go through
 // dataDir()/tempDir(); `dialog`/`app` are required LAZILY inside the GUI-only handlers.
 const { dataDir, tempDir } = require('./data-dir.js');
-const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance, relinkInstance } = require('./settings.js');
+const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance, relinkInstance, loadSettingsFor, loadSettingsStore } = require('./settings.js');
 const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
@@ -15,6 +15,43 @@ const { findFileRecursive } = require('./fs-utils.js');
 const platform = require('./platform');
 
 let javaInstalling = false;
+
+// v6.0.0 H3: decide whether a server folder may be DELETED recursively. Fail-closed: anything
+// suspicious returns { ok:false }. Blocks drive roots, the home dir, and Windows system folders so a
+// mis-set serverPath can never wipe C:\ or a user's profile. A normal server folder deep under a
+// user folder passes.
+const WIN_SYSTEM_DIRS = ['windows', 'program files', 'program files (x86)', 'programdata'];
+function safeServerFolderToDelete(folder) {
+  const raw = String(folder || '').trim();
+  if (!raw) return { ok: false, error: 'This profile has no folder to delete.' };
+  let resolved;
+  try { resolved = path.resolve(raw); } catch { return { ok: false, error: 'The folder path is invalid.' }; }
+  let stat;
+  try { stat = fs.statSync(resolved); } catch { return { ok: false, error: 'The folder no longer exists on disk.' }; }
+  if (!stat.isDirectory()) return { ok: false, error: 'The server path is not a folder.' };
+  const parsed = path.parse(resolved);
+  // Must have real depth (a drive root has root === dir).
+  if (parsed.root === resolved + path.sep || parsed.root === resolved) return { ok: false, error: 'Refusing to delete a drive root.' };
+  const segs = resolved.split(/[\\/]+/).filter(Boolean);
+  if (segs.length < 2) return { ok: false, error: 'Refusing to delete a top-level folder.' };
+  const home = String(process.env.USERPROFILE || process.env.HOME || '');
+  if (home && path.resolve(home) === resolved) return { ok: false, error: 'Refusing to delete your home folder.' };
+  const lower = resolved.toLowerCase();
+  for (const sys of WIN_SYSTEM_DIRS) {
+    const sysPath = path.resolve(parsed.root, sys);
+    if (lower === sysPath.toLowerCase() || lower === parsed.root.toLowerCase()) return { ok: false, error: 'Refusing to delete a system folder.' };
+  }
+  // A real server folder contains at least a jar / run script / world / server.properties. Require
+  // SOME Minecraft marker so we never nuke an arbitrary unrelated folder the user mis-picked.
+  const markers = ['server.properties', 'eula.txt', 'world', 'world_nether', 'world_the_end', 'mods', 'plugins', 'logs'];
+  let hasMarker = false;
+  for (const m of markers) { try { if (fs.existsSync(path.join(resolved, m))) { hasMarker = true; break; } } catch {} }
+  if (!hasMarker) {
+    try { if (fs.readdirSync(resolved).some(f => /\.jar$|^run\.(bat|sh)$/i.test(f))) hasMarker = true; } catch {}
+  }
+  if (!hasMarker) return { ok: false, error: 'This folder does not look like a Minecraft server, so its files were not deleted.' };
+  return { ok: true };
+}
 
 function registerSettings(ipcMain, ctx) {
   // GUI-only Electron modules. Required lazily and destructured loosely: in a headless process
@@ -242,6 +279,19 @@ function registerSettings(ipcMain, ctx) {
     } catch { return { ok: false }; }
   });
 
+  // v6.0.0 D1: load a long window (7d/30d) of metrics for the ACTIVE instance from disk. The raw
+  // in-memory ring only holds 24h, so 7d/30d read the 1m/1h rollup files. `range` is '7d' or '30d'.
+  // Returns { ok, samples } oldest-first, downsampled by the caller. Unknown range -> 24h raw.
+  ipcMain.handle('metrics:long', async (_, range) => {
+    try {
+      const store = require('./metrics-store.js');
+      const map = { '7d': store.RETENTION_MINUTE_MS, '30d': store.RETENTION_HOUR_MS };
+      const age = map[String(range || '')] || store.RETENTION_MS;
+      const id = typeof ctx.inst === 'function' ? ctx.inst() : 'default';
+      return { ok: true, samples: store.loadSamples(id, age) };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not read metrics history.' }; }
+  });
+
   // M11/B4: one-shot snapshot of ANY instance (not just the active one) without switching — status,
   // console tail, metrics history, files, java. Lets the renderer paint an instance before/without
   // making it active. Unknown id -> {ok:false}.
@@ -332,7 +382,7 @@ function registerSettings(ipcMain, ctx) {
     return setInstanceStyle(String(id || ''), { accent, artSeed });
   });
 
-  ipcMain.handle('instances:remove', async (_, id) => {
+  ipcMain.handle('instances:remove', async (_, id, opts) => {
     const target = String(id || '');
     // F2 (defense in depth): refuse to remove an instance whose server is running. Removing it drops
     // the id from settings, seedInstances rebuilds ctx.instances WITHOUT it, and the serverProcess
@@ -342,8 +392,29 @@ function registerSettings(ipcMain, ctx) {
     if (st && st.serverStatus && st.serverStatus !== 'stopped') {
       return { ok: false, error: 'Stop this instance\u2019s server before removing it.' };
     }
+    // v6.0.0 H3: optional DELETE FILES. The user picks "delete profile only" (default) or "delete
+    // profile AND files" in a dialog. Deleting files is destructive, so this path is guarded hard:
+    // the server must be stopped (checked above), the folder must be a REAL, non-trivial path, it
+    // must NOT be a drive root / home / a Windows system dir, and it must not be shared with another
+    // instance. The folder is removed only after the instance is removed from settings.
+    const deleteFiles = !!(opts && opts.deleteFiles === true);
+    const instBefore = (() => { try { return loadSettingsFor(target); } catch { return null; } })();
+    const folder = instBefore && instBefore.serverPath ? String(instBefore.serverPath) : '';
+    if (deleteFiles) {
+      const guard = safeServerFolderToDelete(folder);
+      if (!guard.ok) return guard;
+      // Refuse if another instance still points at the same folder (deleting it would break them).
+      try {
+        const others = loadSettingsStore().instances.filter(i => i.id !== target && i.serverPath && path.resolve(i.serverPath) === path.resolve(folder));
+        if (others.length) return { ok: false, error: 'Another server still uses this folder. Remove that one first.' };
+      } catch {}
+    }
     const r = removeInstance(target);
     if (!r.ok) return r;
+    if (deleteFiles) {
+      try { fs.rmSync(folder, { recursive: true, force: true, maxRetries: 3 }); }
+      catch (e) { return { ok: false, error: 'The profile was removed, but its folder could not be deleted: ' + (e?.message || e) }; }
+    }
     try { ctx.seedInstances(); } catch {}
     // 5.4.0: drop the instance's persisted metrics file so it does not linger on disk.
     try { require('./metrics-store.js').deleteStore(target); } catch {}
@@ -383,6 +454,26 @@ function registerSettings(ipcMain, ctx) {
       const reply = tail.find(t => /connection|success|fail|refused|timeout|geyser/i.test(t)) || tail[tail.length - 1] || '';
       return { ok: true, reply: String(reply || '').trim() || 'Test sent — check the Console tab for the result.' };
     } catch (e) { return { ok: false, error: e?.message || 'Could not run the Geyser test.' }; }
+  });
+
+  // A1 (v6.0.0): apply the SAFE Geyser config fixes in one click. The renderer confirms first;
+  // this handler re-inspects (never trusts a renderer-supplied plan), plans, and writes at the
+  // LINE level with a backup. opts.includeBedrockPort opts into resetting bedrock.port to 19132.
+  ipcMain.handle('geyser:apply-fix', async (_, opts) => {
+    try {
+      if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+      const files = serverFiles(ctx.currentServerPath);
+      if (!files.geyser) return { ok: false, error: 'This server has no Geyser or Floodgate jar.' };
+      const { inspectGeyser, planGeyserFix, applyGeyserFix } = require('./geyser.js');
+      const hasFloodgate = [...(files.plugins || []), ...(files.mods || [])].some(x => /floodgate/i.test(x));
+      const info = inspectGeyser(ctx.currentServerPath, { floodgate: hasFloodgate });
+      if (!info.configPath) return { ok: false, error: 'Geyser config.yml was not found. Start the server once so Geyser creates it.' };
+      const plan = planGeyserFix(info, { includeBedrockPort: !!(opts && opts.includeBedrockPort) });
+      if (plan.length === 0) return { ok: true, changed: [], skipped: [], backup: null };
+      const res = applyGeyserFix(ctx.currentServerPath, info.configPath, plan);
+      if (res.ok && res.changed && res.changed.length) ctx.appendLog(`Geyser config repaired (${res.changed.length} change(s)); backup: ${res.backup}`, 'system');
+      return res;
+    } catch (e) { return { ok: false, error: e?.message || 'Could not repair the Geyser config.' }; }
   });
 
   ipcMain.handle('onboarding:complete', async () => {
@@ -540,4 +631,4 @@ async function autoInstallJava(ctx) {
     }
 }
 
-module.exports = { registerSettings, autoInstallJava };
+module.exports = { registerSettings, autoInstallJava, safeServerFolderToDelete };

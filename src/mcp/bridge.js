@@ -229,6 +229,7 @@ const STATIC_TOOLS = [
   ['send_console_command', 'Send one command to the running server.'],
   ['set_property', 'Set one server.properties key.'],
   ['set_raw_properties', 'Replace velocity.toml content.'],
+  ['apply_geyser_fix', 'Repair the safe GeyserMC config problems (with a backup).'],
   ['write_file', 'Write a text file inside the server folder.'],
   ['edit_file', 'Replace oldString with newString in a file.'],
   ['create_backup', 'Create a world backup (ZIP).'],

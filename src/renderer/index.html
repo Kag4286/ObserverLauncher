@@ -153,8 +153,19 @@
           <div class="tunnel-body">
             <p class="text-muted" data-i18n="geyser.sub">GeyserMC lets Bedrock players (phone, console) join your Java server. It needs a UDP tunnel in addition to the Java TCP one.</p>
             <div id="geyserCheck" hidden></div>
-            <div class="tunnel-actions"><button class="btn secondary sm" id="geyserTestBtn" data-i18n="geyser.test">Test connection</button></div>
+            <div class="tunnel-actions"><button class="btn secondary sm" id="geyserTestBtn" data-i18n="geyser.test">Test connection</button><button class="btn primary sm" id="geyserFixBtn" hidden data-i18n="geyser.fix">Apply fix</button></div>
             <p class="text-muted" id="geyserTestMsg" hidden></p>
+            <!-- v6.0.0 A2.5: Pinggy carries the Bedrock UDP tunnel the free Playit plan cannot. -->
+            <div class="pinggy-block" id="pinggyBlock">
+              <div class="pinggy-head"><b data-i18n="pg.title">Bedrock tunnel (Pinggy)</b><span class="tunnel-pill" id="pinggyPill">OFF</span></div>
+              <p class="text-muted" data-i18n="pg.sub">Pinggy opens a public UDP tunnel to Geyser so Bedrock players can join. The free tunnel lasts about 60 minutes and restarts automatically.</p>
+              <div class="tunnel-actions">
+                <button class="btn primary sm" id="pinggyStartBtn" data-i18n="pg.start">Start Bedrock tunnel</button>
+                <button class="btn secondary sm" id="pinggyStopBtn" hidden data-i18n="pg.stop">Stop tunnel</button>
+                <button class="btn secondary sm" id="pinggyCopyBtn" hidden data-i18n="conn.copy">Copy</button>
+              </div>
+              <div class="tunnel-addr" id="pinggyAddrRow" hidden><input id="pinggyAddr" readonly spellcheck="false"><span class="text-muted" id="pinggyHint"></span></div>
+            </div>
             <details class="tunnel-help"><summary data-i18n="geyser.techT">Set up the Bedrock tunnel (technical)</summary>
               <ol class="tunnel-steps">
                 <li data-i18n-html="geyser.step1">On the <b>Playit dashboard</b>, create a second tunnel: type <b>Minecraft Bedrock</b>, local port <code>19132</code>, protocol <b>UDP</b>, and turn on <b>Proxy Protocol v2</b>.</li>
@@ -223,6 +234,8 @@
         <button type="button" class="filter-chip" data-range="1h">1h</button>
         <button type="button" class="filter-chip" data-range="6h">6h</button>
         <button type="button" class="filter-chip" data-range="24h">24h</button>
+        <button type="button" class="filter-chip" data-range="7d">7d</button>
+        <button type="button" class="filter-chip" data-range="30d">30d</button>
       </div>
       <div class="perf-charts">
         <article class="perf-chart"><div class="chart-head"><h3 data-i18n="perf.tickHead">Tick</h3><button class="text-btn" data-command="tps" data-i18n="perf.requestTps">Refresh</button></div><div class="chart-wrap"><canvas id="perfTickChart" width="1000" height="280"></canvas><div class="chart-empty" id="tickChartEmpty"><b data-i18n="perf.noTick">No data yet</b><span data-i18n="perf.noTickSub">Start the server to see live stats.</span></div></div><div class="chart-legend"><span><i class="legend-tps"></i> TPS</span><span><i class="legend-danger"></i> MSPT</span></div></article>
@@ -607,7 +620,7 @@
           <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="upd.autoCheck">Check for updates on startup</b><small data-i18n="upd.autoCheckSub">Looks for a new version when the app opens. You can always check manually below.</small></div><label class="switch"><input type="checkbox" id="autoCheckUpdatesInput"><span class="slider"></span></label></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="upd.mode">Update policy</b><small data-i18n="upd.modeSub">How the app handles new versions. The manual button always works.</small></div><select class="launcher-select" id="updatePolicySelect" style="max-width:220px"><option value="auto" data-i18n="upd.modeAuto">Automatic</option><option value="ask" data-i18n="upd.modeAsk">Ask me first</option><option value="off" data-i18n="upd.modeOff">Off</option></select></div>
             <div class="input-row"><span class="hint" id="updateStatus"></span><button type="button" class="btn secondary sm" id="checkUpdateBtn" style="margin-left:auto" data-i18n="upd.check">Check for updates</button></div>
           </section>
           </div>
@@ -804,6 +817,8 @@
           <p class="text-muted nsw2-lead" data-i18n="nsw.reviewLead">Everything is editable — go Back any time before creating.</p>
           <div class="nsw-tpl-banner" id="nswTplBanner" hidden></div>
           <div class="nsw-summary" id="nswSummary"></div>
+          <!-- v6.0.0 A3: crossplay note for software Geyser supports. Shown only when relevant. -->
+          <p class="field-hint" id="nswCrossplayHint" hidden data-i18n="nsw.crossplayHint">Want Bedrock players (phone, console) to join too? Install GeyserMC on the server, then use the Bedrock crossplay panel on Overview to open a free UDP tunnel (Pinggy). The app guides you there.</p>
           <small class="field-hint nsw2-review-note" data-i18n="nsw.reviewNote">The Minecraft EULA is accepted automatically on first start (can be changed in Settings).</small>
           <p class="proxy-notice" id="nswSpigotHint" hidden data-i18n-html="nsw.spigotHint">Spigot needs <b>Git</b> installed (BuildTools compiles from source) — missing Git fails the build after ~5 min.</p>
           <div class="nsw-progress set-progress" id="nswProgress" hidden>

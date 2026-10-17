@@ -1,9 +1,16 @@
-// modpack-build.js — assemble a modpack.json into a real server folder (v3.2.0 Phase D2).
+// modpack-build.js — assemble a modpack.json into a real server folder (v3.2.0 Phase D2; transactional
+// install v6.0.0 H1).
 //
 // WHY: verify proves a pack is CONSISTENT; build is what actually produces the artifact the boot-smoke
 // job (D1) consumes and that "publish" (D3) ships. It reuses the EXISTING download + hash-verify +
 // manifest-entry code paths (http.download, fs-utils.verifyFileHash, recordManifestEntry,
 // validate.isSafeDownloadUrl) so a built pack is identical to one installed through the GUI/MCP.
+//
+// TRANSACTIONAL (v6.0.0 H1): buildPack records every destination it touches in a FileTransaction. If
+// ANY step fails, the whole build is rolled back (new files removed, overwritten files restored) so a
+// failed pack install never leaves a half-written mods/ folder. A hash mismatch, an unsafe URL, or a
+// download error aborts the WHOLE pack, not just that one file. This matches the project rule that a
+// modpack install is all-or-nothing.
 //
 // Split for testability:
 //   - planBuild() is PURE: resolved items -> an ordered list of { dest, dir, url, hashes } (no I/O).
@@ -11,7 +18,7 @@
 //     run offline against fake writers. Network + disk only happen in the real caller (the CLI).
 const fs = require('fs');
 const path = require('path');
-const { safeTarget, verifyFileHash, recordManifestEntry } = require('./fs-utils.js');
+const { safeTarget, verifyFileHash, recordManifestEntry, FileTransaction } = require('./fs-utils.js');
 const { isSafeDownloadUrl } = require('./validate.js');
 const { serverFiles } = require('./server-files.js');
 
@@ -47,13 +54,16 @@ function planBuild(resolved, opts) {
 
 // Build a pack into `root` (the server folder). Resolved items must be already resolved (see
 // modpack-resolve.js). Progress via opts.onProgress(phase, detail).
-//   opts: { levelName?, download?, verify?, onProgress?, maxBytes? }
-// Returns { ok, root, installed: [{id,fileName}], skipped: [...], errors: [...] }.
+//   opts: { levelName?, download?, verify?, onProgress?, maxBytes?, transactional?: boolean }
+//     transactional (default TRUE): any error rolls back every file the build touched. Set false only
+//     for the legacy best-effort behaviour (a partial install is kept).
+// Returns { ok, root, installed: [{id,fileName}], skipped: [...], errors: [...], rolledBack?: n }.
 async function buildPack(root, resolved, opts) {
   const o = opts || {};
   const download = o.download || require('./http.js').download;
   const verify = o.verify || verifyFileHash;
   const onProgress = typeof o.onProgress === 'function' ? o.onProgress : () => {};
+  const transactional = o.transactional !== false;
   const out = { ok: true, root, installed: [], skipped: [], errors: [] };
 
   // Detect the level-name from the folder so datapacks land in the right world; fall back to 'world'.
@@ -62,24 +72,46 @@ async function buildPack(root, resolved, opts) {
 
   const { steps, skipped } = planBuild(resolved, { levelName });
   out.skipped = skipped;
+  const tx = new FileTransaction();
 
   for (const step of steps) {
     try {
       // SECURITY (SSRF): the URL comes from a registry API - never fetch a non-public host.
-      if (!isSafeDownloadUrl(step.url)) { out.errors.push({ id: step.id, error: 'Refused: the download URL is not on an allowlisted public host.' }); continue; }
+      if (!isSafeDownloadUrl(step.url)) { out.errors.push({ id: step.id, error: 'Refused: the download URL is not on an allowlisted public host.' }); if (transactional) break; else continue; }
       const destDir = safeTarget(root, step.dir);
+      if (!destDir) { out.errors.push({ id: step.id, error: 'Refused: the destination folder escapes the server folder.' }); if (transactional) break; else continue; }
       fs.mkdirSync(destDir, { recursive: true });
-      const dest = path.join(destDir, step.fileName);
+      const dest = safeTarget(root, path.join(step.dir, step.fileName));
+      if (!dest) { out.errors.push({ id: step.id, error: 'Refused: the destination file escapes the server folder.' }); if (transactional) break; else continue; }
+      // Record BEFORE writing so a rollback can remove/restore this path.
+      tx.touch(dest);
       onProgress('download', { id: step.id, fileName: step.fileName });
       await download(step.url, dest, null, null, { maxBytes: o.maxBytes || 2 * 1024 * 1024 * 1024 });
       // SECURITY (supply-chain): verify against the registry hash before keeping the file.
       const vh = verify(dest, step.hashes);
-      if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} out.errors.push({ id: step.id, error: vh.error }); continue; }
-      recordManifestEntry(root, { kind: step.kind, fileName: step.fileName, sourceUrl: step.url, source: step.source, projectId: step.projectId || undefined, versionId: step.versionId || undefined, gameVersion: step.gameVersion || undefined, version: step.version || undefined, installedAt: new Date().toISOString() });
+      if (!vh.ok) { out.errors.push({ id: step.id, error: vh.error }); if (transactional) break; else { try { fs.rmSync(dest, { force: true }); } catch {} continue; } }
       out.installed.push({ id: step.id, fileName: step.fileName });
     } catch (e) {
       out.errors.push({ id: step.id, error: (e && e.message) || String(e) });
+      if (transactional) break;
     }
+  }
+
+  if (out.errors.length && transactional) {
+    // Roll back every touched file, and do NOT write manifest entries for the aborted build.
+    try { out.rolledBack = tx.rollback(); } catch { out.rolledBack = 0; }
+    out.installed = [];
+    out.ok = false;
+    return out;
+  }
+
+  // Success (or non-transactional best-effort): keep the files and commit the transaction, then
+  // record manifest entries for what landed.
+  try { tx.commit(); } catch {}
+  for (const done of out.installed) {
+    const step = steps.find(s => s.id === done.id);
+    if (!step) continue;
+    try { recordManifestEntry(root, { kind: step.kind, fileName: step.fileName, sourceUrl: step.url, source: step.source, projectId: step.projectId || undefined, versionId: step.versionId || undefined, gameVersion: step.gameVersion || undefined, version: step.version || undefined, installedAt: new Date().toISOString() }); } catch {}
   }
   out.ok = out.errors.length === 0;
   return out;

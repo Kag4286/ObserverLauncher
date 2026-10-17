@@ -81,6 +81,21 @@ const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 // a SECOND command on the server stdin, so reject it HERE for instant
 // feedback (the backend re-validates as defense in depth).
 function isSafePlayerName(name){return typeof name==='string'&&/^[A-Za-z0-9_]{3,16}$/.test(name)}
+// v6.0.0 H6: turn KNOWN player names inside a console line into clickable links. PURE + safe:
+//   - the whole text is escaped first (never injects markup from a log line);
+//   - only names in `names` (the server's real known/online players) are linked, so an ordinary word
+//     like "join" is never turned into a link;
+//   - the alternation is capped (200 names) and names are word-boundary anchored.
+// Returns escaped HTML with <a class="log-player" data-player="Name">Name</a> for each hit. When
+// there are no names it returns esc(text) unchanged, so the caller can use it unconditionally.
+function linkifyKnownPlayers(text, names){
+  const html=esc(text);
+  const list=(Array.isArray(names)?names:[]).filter(isSafePlayerName).slice(0,200);
+  if(!list.length) return html;
+  const uniq=[...new Set(list)].sort((a,b)=>b.length-a.length);
+  const re=new RegExp('\\b('+uniq.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')\\b','g');
+  return html.replace(re,(m)=>'<a href="#" class="log-player" data-player="'+m+'">'+m+'</a>');
+}
 // UX (2.6.0): turn a raw backend/IPC error string into a short, human-readable sentence. Central
 // mapping so every tab (settings, properties, folder pick, wizard) reports failures the same way
 // instead of dumping a raw stack/errno. Falls back to the original text so nothing is lost.

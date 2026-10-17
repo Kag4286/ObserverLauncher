@@ -68,13 +68,19 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
     if (!r.ok && r.status !== 206) {
       // 416 = our partial is already the whole file (or stale) — caller validates the final size.
       if (r.status === 416) return { done: true };
-      throw new Error(`Download failed: ${r.status} ${r.statusText}`);
+      // H2: tag the HTTP status so download() can tell a permanent failure (403/404) from a
+      // transient one (5xx, 408, 429) and only retry the transient kind.
+      const err = new Error(`Download failed: ${r.status} ${r.statusText}`);
+      err.status = r.status;
+      throw err;
     }
     // If we asked for a range but the server ignored it (200), the body is the FULL file:
     // truncate our partial and start from zero so we don't append the whole thing twice.
     const resumed = have > 0 && r.status === 206;
     if (have > 0 && !resumed) have = 0;
-    const total = (Number(r.headers.get('content-length')) || 0) + have;
+    const clHeader = r.headers.get('content-length');
+    const contentLengthKnown = clHeader != null && Number.isFinite(Number(clHeader));
+    const total = (contentLengthKnown ? Number(clHeader) : 0) + have;
     let received = have;
     const fileHandle = fs.openSync(partPath, resumed ? 'a' : 'w');
     try {
@@ -97,6 +103,14 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
         if (onProgress) onProgress(received, total || received);
       }
     } finally { fs.closeSync(fileHandle); }
+    // H2: verify the final size against content-length when the server declared one. A short read
+    // that ended cleanly (server said N bytes, sent fewer, closed) would otherwise be kept as a
+    // corrupt file. Tagged retryable so download() resumes from the partial.
+    if (contentLengthKnown && total > 0 && received !== total) {
+      const err = new Error(`Download incomplete: got ${received} of ${total} bytes.`);
+      err.retryable = true;
+      throw err;
+    }
     return { done: true, received, total };
   } catch (error) {
     // NOTE: the .part file is intentionally KEPT so the next attempt can resume.
@@ -136,6 +150,12 @@ async function download(url, destination, onProgress, externalSignal, opts) {
         // A size-cap violation and a cancel are NOT retryable — do not loop on them.
         if (/exceeds the .* MB limit/.test(error?.message || '')) { try { fs.rmSync(partPath, { force: true }); } catch {} throw error; }
         if (externalSignal && externalSignal.aborted) throw error;
+        // H2: fail fast on a PERMANENT HTTP failure. A 4xx (except 408 Request Timeout and 429 Too
+        // Many Requests) will not change on retry, so retrying only wastes the backoff. Keep the
+        // .part file only on a transient failure so the next attempt can resume it.
+        const st = Number(error && error.status);
+        const permanent = Number.isFinite(st) && st >= 400 && st < 500 && st !== 408 && st !== 429;
+        if (permanent) { try { fs.rmSync(partPath, { force: true }); } catch {} throw error; }
         if (attempt < attempts) {
           // Keep the partial and let the next attempt resume — do NOT reset progress to 0.
           await new Promise(r => setTimeout(r, backoff[attempt - 1] || 6000));

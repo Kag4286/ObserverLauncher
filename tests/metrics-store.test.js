@@ -112,6 +112,31 @@ function ok(name, cond) { assert(cond, `FAIL: ${name}`); console.log(`PASS ${nam
     ok('missing file -> []', Array.isArray(store.loadSamples('nonexistent', 60000)) && store.loadSamples('nonexistent', 60000).length === 0);
   }
 
+  // 9) v6.0.0 D1: rollups (1m for 7d, 1h for 30d) + tiered loadSamples.
+  {
+    store._resetBuffers();
+    const id = 'rollup-x';
+    // Near now (so loadSamples' Date.now() cutoff keeps the samples): start of the PREVIOUS minute.
+    const nowMs = Date.now();
+    const base = nowMs - (nowMs % 60000) - 60000;
+    for (let i = 0; i < 6; i++) store.recordSample(id, { t: base + i * 10000, tps: 20, mspt: 5, cpu: 10, ram: 100, players: 2 });
+    store.recordSample(id, { t: base + 60000, tps: 10, mspt: 9, cpu: 30, ram: 200, players: 4 }); // closes the first minute
+    store.flushAll(); // also closes the still-open second-minute bucket
+    const m1 = fs.readFileSync(store.minutePath(id), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    ok('rollup: both minute buckets written (closed + flushed)', m1.length === 2);
+    ok('rollup: first minute avg tps', Math.abs(m1[0].tps - 20) < 0.001);
+    ok('rollup: minute bucket aligned', m1[0].t === base);
+    ok('rollup: first minute avg players', Math.abs(m1[0].players - 2) < 0.001);
+    const win3d = store.loadSamples(id, 3 * 24 * 60 * 60 * 1000);
+    ok('loadSamples: 3d window reads the 1m tier', win3d.length === 2 && Math.abs(win3d[0].tps - 20) < 0.001);
+    ok('rollup: hour file written', fs.existsSync(store.hourPath(id)));
+    store.deleteStore(id);
+    ok('delete: raw gone', !fs.existsSync(store.metricsPath(id)));
+    ok('delete: minute gone', !fs.existsSync(store.minutePath(id)));
+    ok('delete: hour gone', !fs.existsSync(store.hourPath(id)));
+    store._resetBuffers();
+  }
+
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log(`\n${passed} passed, 0 failed`);
   process.exit(0);
