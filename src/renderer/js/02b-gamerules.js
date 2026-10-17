@@ -13,10 +13,24 @@ async function loadGameRules() {
   const grid = $('#grGrid'); if (!grid) return;
   grid.innerHTML = `<p class="text-muted">${esc(t('gr.loading'))}</p>`;
   let r; try { r = await window.observer.gamerulesGet(); } catch (e) { r = { ok: false, error: e?.message }; }
-  if (!r || !r.ok) { grid.innerHTML = `<p class="text-muted">${esc((r && r.error) || t('gr.none'))}</p>`; return; }
+  if (!r || !r.ok) {
+    // Distinguish the two failure shapes so the hint is accurate: no level.dat yet vs a read error.
+    const msg = (r && r.error) === 'noWorld' ? t('gr.noWorld') : ((r && r.error) || t('gr.none'));
+    grid.innerHTML = `<p class="text-muted">${esc(msg)}</p>`; return;
+  }
   const rules = r.rules || {};
   const names = Object.keys(rules).sort();
-  if (!names.length) { grid.innerHTML = `<p class="text-muted">${esc(t('gr.none'))}</p>`; return; }
+  if (!names.length) {
+    // The world exists but has no GameRules compound yet (a brand-new world the server has not
+    // saved since generating, or one saved by an old build). Saving any rule creates the compound.
+    grid.innerHTML = `<p class="text-muted">${esc(t('gr.emptyWorld'))}</p>`;
+    // Still offer a Save path: render the common defaults so the user can set them.
+    const defaults = { doDaylightCycle: 'true', keepInventory: 'false', mobGriefing: 'true', naturalRegeneration: 'true', randomTickSpeed: '3', doMobSpawning: 'true' };
+    grid.innerHTML += Object.keys(defaults).map(n => `<label class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span><select class="ol-select" data-gr="${esc(n)}"><option value="true" ${defaults[n] === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${defaults[n] === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select></label>`).join('');
+    _grLoaded = true; _grDirty = false; updateGrSave();
+    if (window.enhanceAllSelects) try { window.enhanceAllSelects(grid); } catch {}
+    return;
+  }
   grid.innerHTML = names.map(n => {
     const v = String(rules[n]);
     let ctl;
