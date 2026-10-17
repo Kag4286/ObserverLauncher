@@ -187,6 +187,14 @@
 .set-toggle-info small{display:block;margin-top:3px;font:500 11px var(--font-ui);color:var(--text-muted);line-height:1.45}
 .set-hr{border:0;border-top:1px solid var(--border);margin:10px 0}
 .set-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+/* v6.0.0 F1: webhook event chips. A .filter-chip that CONTAINS a checkbox: hide the OS box, show the
+   chip active state, and add a check glyph when checked so the selection is obvious. */
+.wh-events{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.wh-events .filter-chip{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.wh-events .filter-chip input{position:absolute;opacity:0;width:0;height:0}
+.wh-events .filter-chip:has(input:checked){background:var(--accent-weak);border-color:var(--accent);color:var(--text)}
+.wh-events .filter-chip:has(input:checked)::before{content:'✓';font-weight:700;color:var(--accent)}
+.wh-events .filter-chip:focus-within{outline:1px solid var(--accent);outline-offset:1px}
 .set-chips .filter-chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .restart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
 .restart-grid label{font:500 11px var(--font-ui);color:var(--text-muted);display:flex;flex-direction:column;gap:6px}
