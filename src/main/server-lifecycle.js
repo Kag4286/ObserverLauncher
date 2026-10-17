@@ -442,6 +442,21 @@ async function startServerInternal(ctx, settings) {
         if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
       }
     } catch {}
+    // v6.0.0 D2: on an UNEXPECTED exit, analyse the newest crash report (if any) and push a summary to
+    // the renderer so the console can show a plain-language cause + fixes without leaving the app.
+    if (!wasManual) {
+      try {
+        const doctor = require('./mcp/doctor.js');
+        const latest = doctor.latestCrashReport(ctx.currentServerPath);
+        if (latest) {
+          const text = fs.readFileSync(latest.file, 'utf8');
+          const cls = doctor.classifyCrash(text);
+          const sum = doctor.summarizeCrashText(text);
+          ctx.send('crash:analysis', { name: latest.name, category: cls.category, confidence: cls.confidence, hints: cls.hints, description: sum.description, version: sum.version, cause: sum.cause });
+          ctx.appendLog(`Crash report analysed: ${cls.category} (${cls.confidence}). Open the crash panel for details.`, 'error');
+        }
+      } catch {}
+    }
     // A user-requested restart: relaunch with the settings captured at request time. teardown()
     // (just below) clears the flag, so read it first.
     const restartWith = ctx.restartAfterStop;

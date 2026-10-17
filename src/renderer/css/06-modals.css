@@ -291,6 +291,20 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .gr-name{font:600 12px var(--font-mono);color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis}
 .gr-row input,.gr-row select{max-width:130px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 8px;color:var(--text);font:12px var(--font-mono)}
 .gr-actions{display:flex;justify-content:flex-end;margin-top:4px}
+/* v6.0.0 D2: crash analysis panel (top of the Console tab). */
+.crash-panel{margin:0 0 14px;padding:14px 16px;border:1px solid var(--danger);border-radius:var(--r);background:var(--danger-weak)}
+.crash-head{display:flex;align-items:flex-start;gap:10px}
+.crash-ico{font-size:18px;color:var(--danger);line-height:1.2}
+.crash-head b{display:block;font:700 14px var(--font-ui);color:var(--text)}
+.crash-head p{margin:2px 0 0;font-size:12px}
+.crash-head .text-btn{margin-left:auto;font-size:14px;color:var(--text-muted)}
+.crash-cat{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.crash-badge{font:700 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;border:1px solid var(--danger);color:var(--danger);background:var(--field)}
+.crash-badge.warn{border-color:var(--warning);color:var(--warning)}
+.crash-hints{margin:10px 0 0;padding-left:18px;font-size:12.5px;color:var(--text-2);line-height:1.6}
+.crash-detail{margin-top:10px}
+.crash-detail summary{font:600 12px var(--font-ui);color:var(--text-muted);cursor:pointer}
+.crash-stack{margin:8px 0 0;padding:10px;max-height:200px;overflow:auto;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:500 11px var(--font-mono);white-space:pre-wrap;word-break:break-word}
 @media(max-width:900px){.properties-grid{grid-template-columns:1fr}}
 
 /* ---------- LAUNCHER SETTINGS polish ---------- */

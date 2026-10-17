@@ -730,6 +730,21 @@ $('#pinggyStartBtn')?.addEventListener('click',()=>withBusy($('#pinggyStartBtn')
 $('#pinggyStopBtn')?.addEventListener('click',()=>withBusy($('#pinggyStopBtn'),async()=>{const r=await window.observer.pinggyStop();if(r&&r.ok){toast(t('pg.stopped'),'success');applyPinggyStatus({status:'stopped'})}else toast((r&&r.error)||t('pg.stopFail'),'error')}));
 $('#pinggyCopyBtn')?.addEventListener('click',async()=>{const v=$('#pinggyAddr')?.value;if(!v)return;try{await navigator.clipboard.writeText(v);toast(t('toast.copied'),'success')}catch{toast(t('toast.copyFailed'),'error')}});
 if(window.observer.onPinggyStatus)window.observer.onPinggyStatus(applyPinggyStatus);
+// v6.0.0 D2: show the crash analysis banner when the main process detects a crash report after an
+// unexpected exit. Category + hints come from the pure doctor.classifyCrash; the stack trace is
+// collapsible.
+window.observer.onCrashAnalysis?.(a=>{
+  const panel=$('#crashPanel'); if(!panel||!a) return;
+  const cat=a.category||'unknown';
+  const catLabel=t('crash.cat.'+cat)||cat;
+  const sub=$('#crashSub'); if(sub) sub.textContent=t('crash.sub',{n:a.name||''});
+  const cc=$('#crashCat'); if(cc) cc.innerHTML=`<span class="crash-badge ${cat==='unknown'?'warn':'bad'}">${esc(catLabel)}</span><span class="text-muted">${esc(a.confidence||'')}${a.description?' · '+esc(a.description):''}${a.version?' · MC '+esc(a.version):''}</span>`;
+  const hints=$('#crashHints'); if(hints) hints.innerHTML=(a.hints||[]).map(h=>`<li>${esc(h)}</li>`).join('');
+  const stack=$('#crashStack'); if(stack) stack.textContent=(a.cause||[]).join('\n');
+  panel.hidden=false;
+  try{ switchTab('console'); }catch{}
+});
+$('#crashClose')?.addEventListener('click',()=>{const p=$('#crashPanel');if(p)p.hidden=true});
 try{window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{})}catch{}
 $('#autoTunnelQuick')?.addEventListener('change',async()=>{const next={...getSettings(),autoTunnel:$('#autoTunnelQuick').checked};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return}state={...state,settings:next,java:r.java};if($('#autoTunnelInput'))$('#autoTunnelInput').checked=next.autoTunnel;toast(next.autoTunnel?t('tun.autoOnToast'):t('tun.autoOffToast'),'success')});
 const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim());window.observer.saveManualTunnel(tunnelManual.value.trim())})}
