@@ -44,12 +44,31 @@ Some of you noticed Java processes still running in Task Manager after stopping 
 
 Now Force Stop ends the Java process too, quitting closes every running server, and the next launch finds a Java process that survived a crash instead of forgetting it.
 
+## Server settings got easier
+
+A few things in the settings side are new.
+
+The memory field on Overview has quick buttons for 2, 4, 6 or 8 GB. They set the amount; you still press Apply. A button larger than your machine's RAM is greyed out.
+
+The `motd` field shows a live preview with the colors and formatting you type, so you can see the server-list message before you save it.
+
+Server properties now keeps a history. Before every change, the old file is saved as a snapshot. A History button opens a list, shows you a line-by-line diff against the current file, and lets you restore an older version. Restoring is safe to undo, because the current file is saved first.
+
+The JVM arguments field has presets: Aikar's flags (the usual recommendation for Paper and Purpur), G1 tuned, and ZGC for very large servers. Pick one and it fills the arguments from your current memory. A small help button explains the difference.
+
+## Game rules, without the command line
+
+Game rules such as keep-inventory or the daylight cycle live inside the world, not in `server.properties`, and normally you set them one at a time through `/gamerule` while the server runs. The World Map tab now has a Game rules panel that lists every rule at once. Flip what you need and save; the server must be stopped, and `level.dat` is backed up first.
+
+## Save a setup as a template
+
+If you built a setup you like, a Save as template button in Server properties captures the software, memory, port and properties under a name. When you create a new server, your templates appear in the wizard next to the built-in ones.
+
 ## Smaller additions
 
-- The RAM field on Overview has quick buttons (2, 4, 6 or 8 GB). They set the amount; you still press Apply.
-- The `motd` field in Server properties shows a live preview with the colors and formatting you typed.
 - Player names in the console are now clickable and open that player's card.
 - A new server created from the wizard shows a short note about Bedrock crossplay when the software you picked supports it.
+- The update policy in Settings (Automatic, Ask me first, Off) uses the app's own dropdown, not the system one.
 
 ## Upgrading
 
