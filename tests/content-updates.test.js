@@ -24,6 +24,11 @@ ck('full entry -> object', !!updatable({ fileName: 'x.jar', projectId: 'p', sour
     { fileName: 'Broken.jar', kind: 'plugin', source: 'modrinth', projectId: 'x', versionId: 'v1' },
     { fileName: 'Spigot.jar', kind: 'plugin', source: 'spigot', projectId: '55', versionId: null },
   ]);
+  // v6.0.0: checkUpdates now only reports entries whose file STILL exists on disk, so create them.
+  fs.mkdirSync(path.join(root, 'plugins'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'mods'), { recursive: true });
+  for (const f of ['Old.jar', 'Same.jar', 'Broken.jar', 'Spigot.jar']) fs.writeFileSync(path.join(root, 'plugins', f), 'x');
+  fs.writeFileSync(path.join(root, 'mods', 'Legacy.jar'), 'x');
   const fakeResolve = async (item) => {
     if (item.id === 'luckperms') return { versionId: 'v2', filename: 'LuckPerms-2.jar', versionNumber: '5.5' };
     if (item.id === 'vault') return { versionId: 'v9', filename: 'Vault.jar' };

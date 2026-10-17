@@ -35,8 +35,20 @@ async function checkUpdates(root, opts) {
   const o = opts || {};
   const resolve = o.resolve || require('./marketplace.js').resolveMarketDownload;
   const entries = (readJsonList(root, 'observerlauncher-manifest.json') || []).filter(e => e && e.fileName);
+  // v6.0.0 FIX: only count entries whose file STILL exists in its folder. A manifest can hold a stale
+  // entry for a file the user deleted by hand, and counting it produced a bogus "N update(s)" on a
+  // server with zero installed content. Resolve the file's folder from its kind + level-name.
+  let levelName = 'world';
+  try { levelName = require('./server-files.js').serverFiles(root).properties['level-name'] || 'world'; } catch {}
+  const { contentFolder } = require('./content-ops.js');
+  const present = entries.filter(e => {
+    try {
+      const dir = contentFolder(e.kind || 'plugin', levelName);
+      return fs.existsSync(path.join(root, dir, e.fileName));
+    } catch { return false; }
+  });
   const items = [];
-  for (const e of entries) {
+  for (const e of present) {
     const u = updatable(e);
     if (!u) { items.push({ fileName: e.fileName, source: e.source || null, status: 'unknown', version: e.version || null, reason: 'installed before update tracking (no project id)' }); continue; }
     // Spigot has no public version API, so versionId is always null - report it explicitly instead
@@ -56,7 +68,7 @@ async function checkUpdates(root, opts) {
       items.push({ fileName: e.fileName, source: u.source, status: 'error', error: err?.message || String(err) });
     }
   }
-  return { ok: true, checked: entries.length, updates: items.filter(i => i.status === 'update').length, items };
+  return { ok: true, checked: present.length, updates: items.filter(i => i.status === 'update').length, items };
 }
 
 // Apply the updates checkUpdates found: download the newer build over the old, backing up the old
