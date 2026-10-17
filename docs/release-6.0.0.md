@@ -64,6 +64,14 @@ Game rules such as keep-inventory or the daylight cycle live inside the world, n
 
 If you built a setup you like, a Save as template button in Server properties captures the software, memory, port and properties under a name. When you create a new server, your templates appear in the wizard next to the built-in ones.
 
+## When the server crashes, the app reads the crash report for you
+
+If the server stops on its own (not because you pressed Stop), the app now finds the newest crash report and reads it. It opens the Console tab with a short banner: the likely cause in plain words (out of memory, wrong Java, two mods that conflict, a missing dependency, the port already in use, or a corrupt file) and a few things to try. The full stack trace is there behind a link if you want it. The app tells you what it thinks went wrong; it does not change your files on its own.
+
+## Get a message when something happens
+
+Settings has a Notifications section that can post to a Discord webhook. Paste a webhook address from your Discord server, pick which events you care about (start, stop, crash, player joins), and press Send test to check it works. It only sends from your own computer, and a bad address is ignored quietly instead of breaking anything.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.

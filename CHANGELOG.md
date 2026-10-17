@@ -61,6 +61,20 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - **G4. World game-rule editor.** New `gamerules.js` reads and writes the `GameRules` compound inside `level.dat`, so every rule can be set at once without the server running and without typing `/gamerule` one by one. Java `level.dat` is big-endian NBT and usually gzip'd; the gzip header is detected and preserved on write. The file is backed up before any write and the write is atomic; rule names are restricted. IPC `gamerules:get` / `gamerules:set` (set refuses while the server runs). The UI is a Game rules disclosure in the World Map tab: boolean rules as On/Off, and Save sends only the rules that actually changed.
 - **G5. Save config as template.** New `template-store.js` saves the current server config (software guessed from the jar, memory, port, server.properties) as a named template in the data dir. `templates:list` merges built-ins plus user templates; `templates:plan` resolves a user template through the same planner; `templates:save` / `templates:delete` added. A Save as template button in the properties toolbar (refuses a proxy).
 
+### Added — crash analysis (D2)
+- **When a server exits unexpectedly (not a manual stop), the teardown analyses the newest crash report.** It finds the report, classifies it with `doctor.classifyCrash` (out-of-memory, wrong Java, mod/mixin conflict, missing dependency, port in use, corrupt jar) and summarises it with `summarizeCrashText`, then pushes a `crash:analysis` event.
+- **The renderer shows a banner at the top of the Console tab:** the likely category, a hint list, and a collapsible stack trace, and switches to Console. The analysis engine already existed in `doctor.js` (used by the MCP doctor tools); D2 only wires it to the GUI. This shows hints; it does not auto-apply a fix (that stays the MCP `apply_fix` path).
+- `tests/crash-analysis.test.js` 7 checks.
+
+### Added — Discord webhook notifications (F1)
+- **New `webhook.js` posts a small JSON body to a user-configured webhook on server events:** start, stop, crash (with the D2 crash category), and player join. Fire-and-forget and fail-silent, so a wrong URL never blocks a server action or spams the console.
+- **Only public http(s) URLs are accepted:** loopback, private IPs and `file://` are rejected, reusing the same SSRF guard as downloads. Discord `{content}` and a generic `{event, instance, message}` body are both supported.
+- **Settings > Advanced gets a Notifications card:** the webhook URL (using the app's own field style), event checkboxes as chips, and a Send test button that saves the form first. Settings gain `webhookUrl` / `webhookEvents` / `webhookFormat`; new IPC `webhook:test`.
+- `tests/webhook.test.js` 18 checks (payloads, subscription gating, SSRF URL check, injected fetch).
+
+### Fixed — content update count included deleted files
+- **`checkUpdates()` counted every `observerlauncher-manifest.json` entry,** including ones whose file the user deleted by hand, so a server with zero installed content could still show "1 update(s) available". It now resolves each entry's folder (kind + level-name) and only counts entries whose file is still on disk. `tests/content-updates-stale.test.js` 5 checks; the old content-updates test now creates the files it references.
+
 ### Fixed — leftover Java processes after a force stop
 - **Root cause:** `forceStopServer()` killed only the `cmd.exe` tree on Windows (the `monitoredPid` kill sat inside a POSIX-only block), so a `run.bat` that detached java left `java.exe` running. `before-quit` only handled the active instance, and `runtime.json` only stored the `cmd.exe` pid, so a later launch could not find the orphan.
 - `forceStopServer()` now kills the tracked java pid on every platform, plus a descendant hunt, plus a 3-second force-kill of both the parent and the java pid.
@@ -69,7 +83,7 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - `tests/orphan.test.js` +3 checks.
 
 ### Tests
-- `npm test` 113 files, `npm run test:e2e` 13, i18n 7 locales x 1106 keys, arch 84 IPC channels.
+- `npm test` 120 files, `npm run test:e2e` 13, i18n 7 locales x 1166 keys, arch 92 IPC channels.
 
 ## [5.7.0] — 2026-10-15
 
