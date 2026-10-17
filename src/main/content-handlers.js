@@ -219,6 +219,23 @@ function registerContent(ipcMain, ctx) {
       return { level: null, players: { players: [] }, waypoints: [], levelName: 'world', error: error?.message || 'Could not read world data.' };
     }
   });
+  // v6.0.0 G4: read/write world game rules from level.dat (no server needed).
+  ipcMain.handle('gamerules:get', async () => {
+    try {
+      const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+      return await require('./gamerules.js').readGameRules(ctx.currentServerPath, lvlName);
+    } catch (error) { return { ok: false, error: error?.message || 'Could not read game rules.' }; }
+  });
+  ipcMain.handle('gamerules:set', async (_, changes) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    // Refuse while the server runs: it holds level.dat open and would overwrite our change on its next save.
+    if (ctx.serverStatus !== 'stopped') return { ok: false, error: 'Stop the server before changing game rules.' };
+    if (changes && typeof changes === 'object' && Object.keys(changes).length > 200) return { ok: false, error: 'Too many rule changes at once.' };
+    try {
+      const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+      return await require('./gamerules.js').writeGameRules(ctx.currentServerPath, lvlName, changes);
+    } catch (error) { return { ok: false, error: error?.message || 'Could not write game rules.' }; }
+  });
   ipcMain.handle('worldmap:chunks', async (_, dim) => {
     try {
       const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';

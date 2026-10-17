@@ -285,6 +285,12 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .jvm-presets{display:flex;align-items:center;gap:4px;flex-wrap:wrap;position:relative;padding-right:28px;margin-top:6px}
 .jvm-preset-help{position:absolute;right:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:700 12px var(--font-ui);cursor:pointer;display:grid;place-items:center;transition:all var(--dur-micro)}
 .jvm-preset-help:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel-raised)}
+/* v6.0.0 G4: game-rule editor grid (World Map tab). */
+.gr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px;margin:10px 0}
+.gr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel)}
+.gr-name{font:600 12px var(--font-mono);color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.gr-row input,.gr-row select{max-width:130px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 8px;color:var(--text);font:12px var(--font-mono)}
+.gr-actions{display:flex;justify-content:flex-end;margin-top:4px}
 @media(max-width:900px){.properties-grid{grid-template-columns:1fr}}
 
 /* ---------- LAUNCHER SETTINGS polish ---------- */

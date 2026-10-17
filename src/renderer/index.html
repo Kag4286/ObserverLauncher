@@ -412,6 +412,13 @@
               <summary data-i18n="wm.legend">Biome legend</summary>
               <div class="wm-lg-grid" id="wmLgGrid"></div>
             </details>
+            <!-- v6.0.0 G4: world game rules (level.dat). Lazy-loaded when the user opens it. -->
+            <details class="wm-legend" id="grBox">
+              <summary data-i18n="gr.title">Game rules</summary>
+              <p class="field-hint" data-i18n="gr.sub">Change the world's game rules without typing /gamerule. The server must be stopped. level.dat is backed up first.</p>
+              <div class="gr-grid" id="grGrid"></div>
+              <div class="gr-actions"><button class="btn primary sm" id="grSave" disabled data-i18n="gr.save">Save rules</button></div>
+            </details>
           </div>
         </section>
     <section id="properties" class="tab">
@@ -939,4 +946,4 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00b-instance-art.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00b-instance-art.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/02b-gamerules.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>
