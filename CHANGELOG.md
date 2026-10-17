@@ -10,6 +10,64 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.0.0] — UNRELEASED
+
+**Bedrock crossplay that works end to end, a month of metrics history, and a hardening pass.** No settings migration.
+
+> Written before the release ships. This section lists what has landed so far. The date and the user-facing note are finalized when 6.0.0 is tagged.
+
+### Added — Bedrock crossplay (Track A)
+
+**A1. One-click Geyser config repair.**
+- **`planGeyserFix(inspection)`** builds the edits for the three safe keys: `bedrock.clone-remote-port` to `false`, `remote.auth-type` to `floodgate` (only when Floodgate is installed), and `advanced.bedrock.use-haproxy-protocol` to `true`. `bedrock.port` is not repaired automatically because changing it also changes the port the Bedrock tunnel must match; it stays an instruction.
+- **`applyGeyserFix()` edits the YAML at the LINE level.** The existing `parseSimpleYaml()` drops comments and list items, so re-serializing the parsed object would destroy the file; instead it maps each key path to its line number and replaces only the value text, keeping the indent, the key and any trailing comment byte-exact.
+- The original file is copied to `config.yml.bak-<timestamp>` before the write, the write goes through `writeFileAtomic`, and the IPC handler re-inspects the config instead of trusting a renderer-supplied plan.
+- New IPC `geyser:apply-fix`, new MCP write tool `apply_geyser_fix` (registry plus bridge STATIC_TOOLS), and an "Apply fix" button in the Bedrock crossplay panel that appears only when a safe fix exists and confirms before writing.
+- `tests/geyser.test.js` 45 checks, including comment preservation, inline comments, CRLF, and the no-op re-apply.
+
+**A2. Pinggy for the Bedrock UDP tunnel.**
+- Why: Playit's free plan cannot expose TCP and UDP at once, so the Bedrock tunnel needs a second provider. Pinggy carries UDP.
+- **`src/main/pinggy.js`** is the pure adapter: `findSshBinary()` (settings `pinggyPath`, then the Windows OpenSSH path, then PATH), `buildPinggyArgs()` (ssh to `free.pinggy.io` on port 443 with host-key accept-new, keepalives, `ExitOnForwardFailure` and `-R0:localhost:<port>`), `parsePinggyAddress()` (`tcp|udp://host:port`), `isPinggyBanner()` and `spawnPinggy()` with a 25 s address timeout.
+- **Windows OpenSSH reads the password from a console handle, not stdin.** Piping the password does nothing when Electron spawns ssh without a console, and `BatchMode=yes` disables password auth entirely (it caused `Permission denied`). The adapter writes an `SSH_ASKPASS` helper script and sets `SSH_ASKPASS_REQUIRE=force`. Verified end to end: an address in about 2 seconds.
+- **`src/main/pinggy-tunnel.js`** is the per-instance orchestration. Unlike the global Playit daemon, a Pinggy tunnel is an ssh child that forwards one local port, so each instance owns its own process. A 55-minute timer restarts the tunnel before the 60-minute cutoff, and a 40-second start watchdog turns a stuck start into a clear error.
+- Timer and child-exit callbacks re-enter `ctx.runInInstance(ownId)`, so they never read or write another instance's state. `before-quit` calls `stopAllPinggy()` so a background instance's ssh child cannot outlive the app.
+- Pinggy runs alongside Playit (Playit stays on the Java TCP address, Pinggy carries Bedrock UDP). There is no automatic fallback: the button is explicit. The Pinggy address is not written into the Playit `tunnelAddress` field, which keeps the Java address and would reject a scheme'd value.
+- IPC `pinggy:start` / `pinggy:stop` / `pinggy:get` plus a gated `pinggy:status` push. Five per-instance ctx fields added in all three places (freshInstState, INST_FIELDS, the arch MIGRATED list).
+- 38 `pinggy.test.js` checks and 10 `pinggy-tunnel.test.js` checks.
+
+**A3. Wizard crossplay note.** The Review step shows a short note for the software Geyser supports (hidden for Velocity). The wizard does not accept a modpack, so a per-pack detection was dropped instead of faking one.
+
+SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the address format is `tcp|udp://<id>.run.pinggy-free.link:<port>`, and the free tunnel expires after 60 minutes.
+
+### Added — metrics beyond 24h (D1)
+- **`metrics-store.js` keeps three tiers:** the raw 10 s samples for 24 h (unchanged), 1-minute averaged rollups kept 7 days (`<id>.1m.jsonl`) and 1-hour averaged rollups kept 30 days (`<id>.1h.jsonl`).
+- A rollup bucket is closed when the minute or hour changes and on `flushAll()`, so the 30-day file is roughly 720 lines. `loadSamples()` picks the tier that fits the window.
+- New IPC `metrics:long` loads the 7d/30d window for the active instance. The renderer caches it per range and drops the cache when the instance switches.
+- Performance range chips `7d` and `30d`; the chart downsamples as before.
+- `tests/metrics-store.test.js` 25 checks (rollup averaging, tiered load, delete of all three files).
+
+### Added — hardening (Track H)
+- **H1. Transactional modpack install.** New `FileTransaction` in `fs-utils.js` (touch / commit / rollback: a new file is removed on rollback, an overwritten file is restored from a `.txbak` backup, reverse order). `buildPack()` is transactional by default (any unsafe URL, path escape, download error or hash mismatch rolls the whole build back and writes no manifest); `importMrpackFromPath()` wraps its download loop in the same journal. The CurseForge import path and the overrides copy are still best-effort and not wrapped yet.
+- **H2. Hardened downloads.** A permanent HTTP failure (4xx except 408 and 429) now fails fast and deletes the partial file instead of retrying four times; transient failures still retry and resume. The final byte count is checked against a declared `content-length`, so a body that ends early is retried instead of being kept as a corrupt file.
+- **H3. Delete dialog with a files choice.** Removing an instance asks twice: remove the profile, then (optionally) delete the server folder. `safeServerFolderToDelete()` is fail-closed: it refuses an empty or missing path, a drive root, the home folder, a Windows system folder, a folder that does not look like a Minecraft server, and a folder another instance still uses.
+- **H4. Update policy.** `autoCheckUpdates` (boolean) becomes `updatePolicy` with `auto` / `ask` / `off`. `updatePolicyOf()` is pure and keeps a one-time fallback to the old boolean so an existing profile is not lost. `auto` downloads an update as soon as it is known; `off` skips the startup check (the manual button still works).
+- **H5. Fix sweep.** `renderTunnelOverview()` rebuilt its list on every `refreshUI()` and replayed the entry animation each time; a signature guard now rebuilds only on a real change.
+- **H6. Clickable console player names.** `linkifyKnownPlayers()` escapes the line first and links only real known or online player names (word-boundary, capped), so an ordinary word is never a link. Clicking opens the player card. The startup splash and the layout-shift reservation were deferred.
+
+### Added — config depth (G1)
+- **RAM presets** on Overview: 2/4/6/8 GB chips set min and max together. A preset above the machine's RAM is disabled. Apply is still required.
+- **MOTD live preview** in Server properties: `renderMotdPreview()` turns section-sign colour and format codes into styled spans, escaping every text run before styling, so a hostile motd cannot inject markup. Re-rendered in place on input, so the field keeps focus.
+
+### Fixed — leftover Java processes after a force stop
+- **Root cause:** `forceStopServer()` killed only the `cmd.exe` tree on Windows (the `monitoredPid` kill sat inside a POSIX-only block), so a `run.bat` that detached java left `java.exe` running. `before-quit` only handled the active instance, and `runtime.json` only stored the `cmd.exe` pid, so a later launch could not find the orphan.
+- `forceStopServer()` now kills the tracked java pid on every platform, plus a descendant hunt, plus a 3-second force-kill of both the parent and the java pid.
+- `before-quit` walks every instance in its ALS scope and kills each server pid, its `monitoredPid` and any recorded `javaPid`.
+- `runtime-state.js` records `javaPid` and `javaPidStartedAt` when the metrics sampler resolves the real java; orphan cleanup classifies against that java pid when the recorded pid is gone (ask while it looks running, kill on stop).
+- `tests/orphan.test.js` +3 checks.
+
+### Tests
+- `npm test` 113 files, `npm run test:e2e` 13, i18n 7 locales x 1106 keys, arch 84 IPC channels.
+
 ## [5.7.0] — 2026-10-15
 
 **The Playit tunnel address is detected automatically, and Bedrock crossplay (GeyserMC) is now surfaced.** No settings migration.
