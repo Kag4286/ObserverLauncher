@@ -678,6 +678,30 @@ function drawOvSpark(){
   const line=(key,color,max)=>{const pts=data.map((s,i)=>({i,v:s[key]})).filter(p=>p.v!=null);if(pts.length<2)return;ctx.beginPath();pts.forEach((p,j)=>{const x=(p.i/(n-1))*w, y=h-2-(Math.min(p.v,max)/max)*(h-4);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke()};
   line('cpu',cCpu,100); line('tps',cTps,20);
 }
+// v6.0.0 D3/D4: paint the two Performance-tab alert banners from the same rings the charts use.
+// Runs on every metric tick; when there is no anomaly (or no data yet) the banner is hidden. Uses
+// textContent so a repeated identical alert does not rebuild the DOM. Skipped entirely when the
+// Performance tab is not the active one, so a background tick never touches an offscreen node.
+// A literal t() per cause so the i18n dead-key guard sees every key.
+function causeLabel(c){switch(c){case 'tick':return t('perf.anomaly.cause.tick');case 'players':return t('perf.anomaly.cause.players');case 'memory':return t('perf.anomaly.cause.memory');default:return t('perf.anomaly.cause.unknown');}}
+function paintAlert(el,titleHtml,bodyText){
+  if(!el)return;
+  if(!bodyText){if(!el.hidden)el.hidden=true;return}
+  const next=titleHtml+'|'+bodyText;
+  if(el.dataset.sig===next)return;
+  el.dataset.sig=next;
+  el.innerHTML='<b>'+esc(titleHtml)+'</b>'+esc(bodyText);
+  el.hidden=false;
+}
+function renderAnomalies(){
+  try{
+    if(!document.getElementById('performance')?.classList.contains('active'))return;
+    const a=detectTpsAnomaly(samples);
+    paintAlert($('#anomalyBanner'), a?t('perf.anomaly.tpsTitle'):'', a?t('perf.anomaly.tpsBody',{now:a.current.toFixed(2),base:a.baseline.toFixed(2),cause:causeLabel(a.cause)}):'');
+    const l=detectMemoryLeak(samplesLong);
+    paintAlert($('#leakBanner'), l?t('perf.anomaly.leakTitle'):'', l?t('perf.anomaly.leakBody',{pct:l.growthPerHour,hours:l.hours}):'');
+  }catch{}
+}
 window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const key=(v.players||[]).slice().sort().join(',');if(key!==lastLivePlayersKey){lastLivePlayersKey=key;try{renderPlayers()}catch{}}
 });window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}];
@@ -718,7 +742,7 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   if(tickEmpty) tickEmpty.hidden=!!(displayTps!=null || displayMspt!=null);
   if(resEmpty) resEmpty.hidden=!!(v.cpu!=null || ram!=null);
   const liveBadge=$('#resourceLiveBadge'); if(liveBadge){ liveBadge.textContent=v.running?t('perf.live'):t('perf.offlineBadge'); liveBadge.style.color=v.running?'var(--success)':'var(--text-dim)'; liveBadge.style.borderColor=v.running?'rgba(0,229,160,.25)':'var(--border)'; }
-  metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource')});
+  metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource'); try{renderAnomalies();}catch{}});
  // Fallback: if the main process is slow or misses a push, keep the UI in sync from
  // lastMetrics/live every 2s.
  setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const displayTps=v.tps??state.live?.tps??null; const displayMspt=v.mspt??state.live?.mspt??null; if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);

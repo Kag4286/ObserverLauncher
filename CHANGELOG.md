@@ -54,6 +54,12 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - Performance range chips `7d` and `30d`; the chart downsamples as before.
 - `tests/metrics-store.test.js` 25 checks (rollup averaging, tiered load, delete of all three files).
 
+### Added — Performance tab alerts (D3, D4)
+- **`detectTpsAnomaly(samples)`** in `00-core.js` compares the latest TPS to the median of the previous 30 samples and returns null unless the drop is at least 20% AND the current TPS is below 17. A small heuristic labels the likely cause: `tick` when MSPT is over 45, `players` when the online count rose by 3 or more, `memory` when RAM is over 85%, else `unknown`.
+- **`detectMemoryLeak(samples)`** splits the window into three equal time slices, takes the median RAM in each, and only reports when every slice rose strictly AND the median-to-median growth rate exceeds 2% per hour over at least 2 hours. A GC sawtooth averages out and does not trigger it.
+- The Performance tab has two inline alert banners (`#anomalyBanner`, `#leakBanner`). They are repainted on every metric tick from the same rings the charts use; a banner hides the moment the anomaly clears. Both helpers are pure and unit-tested via a VM DOM stub.
+- 8 new `perf.anomaly.*` keys x 7 locales (1187 total). `tests/anomaly.test.js` 26 checks.
+
 ### Added — hardening (Track H)
 - **H1. Transactional modpack install.** New `FileTransaction` in `fs-utils.js` (touch / commit / rollback: a new file is removed on rollback, an overwritten file is restored from a `.txbak` backup, reverse order). `buildPack()` is transactional by default (any unsafe URL, path escape, download error or hash mismatch rolls the whole build back and writes no manifest); `importMrpackFromPath()` wraps its download loop in the same journal. The CurseForge import path and the overrides copy are still best-effort and not wrapped yet.
 - **H2. Hardened downloads.** A permanent HTTP failure (4xx except 408 and 429) now fails fast and deletes the partial file instead of retrying four times; transient failures still retry and resume. The final byte count is checked against a declared `content-length`, so a body that ends early is retried instead of being kept as a corrupt file.

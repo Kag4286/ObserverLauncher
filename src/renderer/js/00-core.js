@@ -309,6 +309,66 @@ function applyMotionLevel(level){
   if(lite){ const b=document.querySelector('#bootSeq'); if(b) b.remove(); }
   const cv=document.querySelector('#ovSpark'); if(cv && !lite){ /* redraw happens on next metrics tick */ }
 }
+// v6.0.0 D3: TPS anomaly detection. Pure: takes the recent samples, returns null when the server
+// is healthy, or { current, baseline, dropPct, cause } when TPS has dropped sharply. Baseline is the
+// median of the samples BEFORE the last N, so a slow decline over the whole window is not flagged
+// as a single anomaly; only a step change is. `cause` is a heuristic label the UI translates.
+//   tick     -> mspt is also high (the server tick itself is slow)
+//   players  -> more players than the baseline window
+//   memory   -> heap is near the ceiling
+//   unknown  -> no obvious signal
+function detectTpsAnomaly(samples,opts){
+  const o=opts||{};
+  const win=Array.isArray(samples)?samples.filter(s=>s&&Number.isFinite(Number(s.tps))):[];
+  const baseWin=Number(o.baseWindow)||30;
+  const minBase=Number(o.minBase)||10;
+  if(win.length<baseWin+1)return null;
+  const recent=win.slice(-1)[0];
+  const cur=Number(recent.tps);
+  // Baseline is the window BEFORE the most recent sample, so the sample itself cannot inflate it.
+  const base=win.slice(-1-baseWin,-1).map(s=>Number(s.tps)).sort((a,b)=>a-b);
+  if(base.length<minBase)return null;
+  const baseline=base[Math.floor(base.length/2)];
+  if(baseline<=0)return null;
+  const drop=baseline-cur;
+  const dropPct=Math.round((drop/baseline)*100);
+  const minTps=Number(o.minTps)||17;
+  const minDropPct=Number(o.minDropPct)||20;
+  if(cur>=minTps||dropPct<minDropPct)return null;
+  const playersNow=Number(recent.players)||0;
+  const playersBase=win.slice(-1-baseWin,-1).reduce((m,s)=>Math.max(m,Number(s.players)||0),0);
+  let cause='unknown';
+  if(Number(recent.mspt)>45)cause='tick';
+  else if(playersNow-playersBase>=3)cause='players';
+  else if(Number(recent.ram)>85)cause='memory';
+  return { current:+cur.toFixed(2), baseline:+baseline.toFixed(2), dropPct, cause };
+}
+// v6.0.0 D4: memory-leak watch. Pure: takes the 10s ring (samplesLong) and returns null unless the
+// heap has risen steadily over the whole window. Splits the window into 3 equal slices, takes the
+// median ram in each, and only flags when every slice is strictly higher than the previous one AND
+// the average %/hour growth exceeds `minRatePct`. A GC sawtooth averages out and does not pass.
+function detectMemoryLeak(samples,opts){
+  const o=opts||{};
+  const minHours=Number(o.minHours)||2;
+  const minRatePct=Number(o.minRatePct)||2;
+  const rows=(Array.isArray(samples)?samples:[]).filter(s=>s&&Number.isFinite(Number(s.ram))&&Number.isFinite(Number(s.t)));
+  if(rows.length<9)return null;
+  const tMin=Number(rows[0].t), tMax=Number(rows[rows.length-1].t);
+  const spanH=(tMax-tMin)/(60*60*1000);
+  if(!Number.isFinite(spanH)||spanH<minHours)return null;
+  // 3 equal time slices, median ram in each.
+  const cuts=[tMin, tMin+(tMax-tMin)/3, tMin+2*(tMax-tMin)/3, tMax+1];
+  const med=[];
+  for(let i=0;i<3;i++){
+    const bucket=rows.filter(s=>Number(s.t)>=cuts[i]&&Number(s.t)<cuts[i+1]).map(s=>Number(s.ram)).sort((a,b)=>a-b);
+    if(!bucket.length)return null;
+    med.push(bucket[Math.floor(bucket.length/2)]);
+  }
+  if(!(med[0]<med[1]&&med[1]<med[2]))return null;
+  const ratePct=((med[2]-med[0])/Math.max(1,med[0]))*100/spanH;
+  if(ratePct<minRatePct)return null;
+  return { from:+med[0].toFixed(1), to:+med[2].toFixed(1), growthPerHour:+ratePct.toFixed(2), hours:+spanH.toFixed(1) };
+}
 function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;const ctx=canvas.getContext('2d');const r=canvas.getBoundingClientRect();if(!r.width||!r.height) return;const d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);const w=r.width,h=r.height,p=expanded?30:13;const cs=getComputedStyle(document.documentElement);const cAccent=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';const cWarn=cs.getPropertyValue('--chart-cpu').trim()||'#d6a24a';const cSuccess=cs.getPropertyValue('--chart-ram').trim()||'#2fd0a0';const cDanger=cs.getPropertyValue('--danger').trim()||'#e5566a';const cMuted=cs.getPropertyValue('--text-dim').trim()||'#5c6470';const cFont=cs.getPropertyValue('--font-ui').trim()||'Space Grotesk, sans-serif';ctx.clearRect(0,0,w,h);
   if(mode==='tick'){
     // Danger band: bottom 25% of the chart (roughly under ~15 TPS / over ~25ms MSPT) tinted red,

@@ -76,6 +76,10 @@ Settings has a Notifications section that can post to a Discord webhook. Paste a
 
 When you have more than one server in the rail, two buttons appear under the list: Start all and Stop all. The app skips a server that is already running, already booting, or whose folder is missing, so you are never starting a server twice. Booting them one at a time keeps your machine responsive.
 
+## Alerts when the server starts to struggle
+
+The Performance tab now shows a banner when the server's tick rate drops sharply or when the memory it uses keeps climbing. The tick banner suggests a likely cause from the numbers it already has (a slow tick, a jump in players, or memory pressure). The memory banner reports the growth rate so you can decide whether to restart before the server stalls. Both banners disappear on their own when the numbers recover.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.

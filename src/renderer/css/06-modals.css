@@ -291,6 +291,11 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .prop-hist-diff .dl.del{color:var(--danger)}
 /* v6.0.0 G3: JVM preset help button (top-right, separate from the chips). */
 .jvm-presets{display:flex;align-items:center;gap:4px;flex-wrap:wrap;position:relative;padding-right:28px;margin-top:6px}
+/* v6.0.0 D3/D4: inline alert banners on the Performance tab (TPS anomaly, memory leak). No
+   animation: the content changes once per metric tick, not on reveal, so a transition would only
+   add motion for a status that lingers. A soft warning border reads as advisory, not an error. */
+.perf-alert{margin:8px 0;padding:8px 12px;border:1px solid var(--warning,#d6a24a);border-left-width:3px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--text);font:500 12px var(--font-ui);line-height:1.45}
+.perf-alert b{display:block;font:700 12px var(--font-ui);color:var(--warning,#d6a24a);margin-bottom:2px}
 .jvm-preset-help{position:absolute;right:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:700 12px var(--font-ui);cursor:pointer;display:grid;place-items:center;transition:all var(--dur-micro)}
 .jvm-preset-help:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel-raised)}
 /* v6.0.0 G4: game-rule editor grid (World Map tab). */
