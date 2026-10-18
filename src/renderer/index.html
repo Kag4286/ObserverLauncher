@@ -311,6 +311,11 @@
           <ul id="modsList" class="file-list content-list" data-dk-kind="mod" hidden></ul>
           <ul id="datapacksList" class="file-list content-list" data-dk-kind="datapack" hidden></ul>
         </div>
+        <details class="dp-order" id="dpOrderBox" hidden>
+          <summary class="dp-order-summary"><span data-i18n="dp.orderT">Datapack load order</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
+          <p class="cell-sub" data-i18n="dp.orderSub">Lower packs run first; a later pack overrides a function from an earlier one. Reorder with the arrows. Saving needs the server stopped.</p>
+          <ul class="dp-order-list" id="dpOrderList"></ul>
+        </details>
         <div class="sec-note center" data-i18n="cnt.restart">New files load on the next server start — the launcher never hot-swaps content while running.</div>
         <details class="modpack-tools" id="modpackTools">
           <summary class="modpack-tools-summary"><span class="mp-tools-ico" aria-hidden="true">◫</span><span data-i18n="cnt.modpackTools">Modpack tools</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>

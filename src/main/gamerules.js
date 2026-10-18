@@ -88,6 +88,24 @@ async function readGameRules(root, levelName) {
   return { ok: true, rules: rulesFromGr(L.data.GameRules), source: path.relative(root, L.file) };
 }
 
+// SHARED: serialize the (already-mutated) NBT tree back to disk, preserving the original
+// compression. Both writeGameRules (G4) and datapack-order.writeDatapackOrder (C5c) write to
+// level.dat, so the serialize+atomic-write sequence lives here once (no-dup guard). The caller is
+// responsible for taking the backup BEFORE mutating; this function only writes.
+// Returns { ok:true } or { ok:false, error }.
+function saveLevelAtomic(L) {
+  const { file, rootTag, isGzip } = L;
+  let out;
+  try {
+    // Java level.dat is 'big'-endian NBT, usually gzip'd. Write uncompressed big-endian, then gzip
+    // if the original was gzip (preserving the format the game expects).
+    const raw = nbt.writeUncompressed(rootTag, 'big');
+    out = isGzip ? zlib.gzipSync(raw) : raw;
+  } catch (e) { return { ok: false, error: e?.message || 'Could not serialize level.dat.' }; }
+  try { writeFileAtomic(file, out); } catch (e) { return { ok: false, error: e?.message || 'Could not write level.dat.' }; }
+  return { ok: true };
+}
+
 // Write a batch of game-rule changes. Backs up level.dat first. Returns { ok, changed, skipped, backup }.
 async function writeGameRules(root, levelName, changes) {
   const L = await loadLevel(root, levelName);
@@ -103,15 +121,9 @@ async function writeGameRules(root, levelName, changes) {
     data.GameRules = { type: 'compound', name: 'GameRules', value: {} };
   }
   for (const c of res.changed) data.GameRules.value[c.name] = { type: 'string', value: c.value };
-  let out;
-  try {
-    // Java level.dat is 'big'-endian NBT, usually gzip'd. Write uncompressed big-endian, then gzip if
-    // the original was gzip (preserving the format the game expects).
-    const raw = nbt.writeUncompressed(rootTag, 'big');
-    out = isGzip ? zlib.gzipSync(raw) : raw;
-  } catch (e) { return { ok: false, error: e?.message || 'Could not serialize level.dat.' }; }
-  try { writeFileAtomic(file, out); } catch (e) { return { ok: false, error: e?.message || 'Could not write level.dat.' }; }
+  const saved = saveLevelAtomic({ file, rootTag, isGzip });
+  if (!saved.ok) return saved;
   return { ok: true, changed: res.changed, skipped: res.skipped, backup };
 }
 
-module.exports = { readGameRules, writeGameRules, applyRuleChanges, findLevelDat, RULE_RE };
+module.exports = { readGameRules, writeGameRules, applyRuleChanges, findLevelDat, loadLevel, saveLevelAtomic, RULE_RE };

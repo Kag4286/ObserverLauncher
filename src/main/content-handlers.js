@@ -142,6 +142,43 @@ function registerContent(ipcMain, ctx) {
 
   // CB4/CB5 (v3.3.0): update lifecycle in the GUI. Read-only check + a write that installs newer
   // builds (backs up the old file). Update is refused while the server runs (Windows locks jars).
+  // v6.0.0 C5a: validate a datapack's pack_format against the server's MC version. Read-only.
+  ipcMain.handle('content:validate-datapack', async (_, { fileName } = {}) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    try { return require('./content-ops.js').validateDatapack(ctx.currentServerPath, String(fileName || '')); }
+    catch (e) { return { ok: false, error: e?.message || 'Could not validate the datapack.' }; }
+  });
+  // v6.0.0 C5b: extract a .zip datapack into a folder. Refuses while the server runs.
+  ipcMain.handle('content:extract-datapack', async (_, { fileName } = {}) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverProcess) return { ok: false, error: 'Stop the server before extracting a datapack - a running server locks its files.' };
+    try {
+      const r = await require('./content-ops.js').extractDatapack(ctx.currentServerPath, String(fileName || ''), {});
+      return r.ok ? { ok: true, folder: r.folder, files: serverFiles(ctx.currentServerPath) } : r;
+    } catch (e) { return { ok: false, error: e?.message || 'Could not extract the datapack.' }; }
+  });
+
+  // v6.0.0 C5c: read + reorder the datapack load order stored in level.dat (Data.DataPacks.Enabled).
+  // Read is safe at any time; the write refuses while the server runs (level.dat is reloaded on start).
+  ipcMain.handle('datapacks:order', async () => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const levelName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+    try { return await require('./datapack-order.js').readDatapackOrder(ctx.currentServerPath, levelName); }
+    catch (e) { return { ok: false, error: e?.message || 'Could not read the datapack order.' }; }
+  });
+  ipcMain.handle('datapacks:reorder', async (_, { name, direction } = {}) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverProcess) return { ok: false, error: 'Stop the server before reordering datapacks - the world is rewritten on start.' };
+    const levelName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
+    try {
+      const mod = require('./datapack-order.js');
+      const cur = await mod.readDatapackOrder(ctx.currentServerPath, levelName);
+      if (!cur.ok) return cur;
+      const next = mod.reorderPack(cur.enabled, String(name || ''), direction === 'up' ? 'up' : 'down');
+      return await mod.writeDatapackOrder(ctx.currentServerPath, levelName, next);
+    } catch (e) { return { ok: false, error: e?.message || 'Could not reorder the datapacks.' }; }
+  });
+
   ipcMain.handle('content:updates', async () => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     try { const { checkUpdates } = require('./content-updates.js'); return await checkUpdates(ctx.currentServerPath); }

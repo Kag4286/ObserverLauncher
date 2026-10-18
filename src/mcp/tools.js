@@ -818,58 +818,22 @@ async function tToggleContent(ctx, a) {
 // 3.3.0: validate a datapack's pack.mcmeta against the server MC version (datapack.js is pure +
 // readJarEntry). Read-only.
 async function tValidateDatapack(ctx, a) {
+  // v6.0.0 C5a: the GUI IPC (content:validate-datapack) and this MCP tool share one helper so the
+  // classification rules cannot drift (content-ops.js validateDatapack).
   const root = needPath(ctx);
-  const name = String(a.name || '');
-  if (!name || path.basename(name) !== name) return { ok: false, error: 'Invalid file name.' };
-  const levelName = serverFiles(root).properties['level-name'] || 'world';
-  const target = safeTarget(root, path.join(levelName, 'datapacks', name));
-  if (!target || !fs.existsSync(target)) return { ok: false, error: 'Datapack not found.' };
-  const isDir = fs.statSync(target).isDirectory();
-  const { readPackMeta, parsePackMeta, classifyFormat } = require('../main/datapack.js');
-  const kind = isDir ? 'folder' : 'zip';
-  const metaRaw = readPackMeta(target, isDir);
-  if (!metaRaw.ok) return { ok: true, result: { name, kind, level: 'unknown', note: metaRaw.error } };
-  const meta = parsePackMeta(metaRaw.text);
-  if (meta.error) return { ok: true, result: { name, kind, level: 'warn', note: meta.error } };
-  const { detectServerTarget } = require('../main/server-compat.js');
-  const mc = (detectServerTarget(root, serverFiles(root)) || {}).mc || null;
-  return { ok: true, result: { name, kind, mc, ...classifyFormat(meta, mc) } };
+  const r = require('../main/content-ops.js').validateDatapack(root, String(a.name || ''));
+  if (!r.ok) return r;
+  return { ok: true, result: r.result };
 }
 // 3.3.0: extract a .zip datapack into a folder (reuses platform.extractArchive, which has the
 // zip-slip guard). Useful because a folder datapack is easier to edit + load than a zip.
 async function tExtractDatapack(ctx, a) {
+  // v6.0.0 C5b: shared with the GUI (content-ops.js extractDatapack) so the zip-slip guard and the
+  // single-top-folder flatten live in one place.
   const root = needPath(ctx);
-  const name = String(a.name || '');
-  if (!name || path.basename(name) !== name) return { ok: false, error: 'Invalid file name.' };
-  if (!/\.zip$/i.test(name)) return { ok: false, error: 'Only a .zip datapack can be extracted.' };
-  const levelName = serverFiles(root).properties['level-name'] || 'world';
-  const folder = path.join(levelName, 'datapacks');
-  const zipAbs = safeTarget(root, path.join(folder, name));
-  if (!zipAbs || !fs.existsSync(zipAbs)) return { ok: false, error: 'Datapack .zip not found.' };
-  const destName = name.replace(/\.zip$/i, '');
-  const destAbs = safeTarget(root, path.join(folder, destName));
-  if (!destAbs) return { ok: false, error: 'Unsafe destination path.' };
-  if (fs.existsSync(destAbs)) return { ok: false, error: `A folder named ${destName} already exists.` };
-  const platform = require('../main/platform');
-  const tmp = path.join(tempDir(), 'ob-dp-' + Date.now());
-  try {
-    fs.mkdirSync(tmp, { recursive: true });
-    const r = await platform.extractArchive(zipAbs, tmp);
-    if (!r.ok) { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {} return { ok: false, error: r.error || 'Could not extract the datapack.' }; }
-    // A pack zip often wraps everything in ONE top folder - flatten that so pack.mcmeta + data/
-    // land directly in the new datapack folder, matching how a hand-made datapack looks.
-    let srcRoot = tmp;
-    const top = fs.readdirSync(tmp);
-    if (top.length === 1 && fs.statSync(path.join(tmp, top[0])).isDirectory()) srcRoot = path.join(tmp, top[0]);
-    fs.mkdirSync(destAbs, { recursive: true });
-    for (const e of fs.readdirSync(srcRoot)) fs.cpSync(path.join(srcRoot, e), path.join(destAbs, e), { recursive: true });
-    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-    if (a.removeZip) { try { fs.rmSync(zipAbs, { force: true }); } catch {} }
-    return { ok: true, result: { folder: destName, files: serverFiles(root) } };
-  } catch (e) {
-    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-    return { ok: false, error: e?.message || 'Could not extract the datapack.' };
-  }
+  const r = await require('../main/content-ops.js').extractDatapack(root, String(a.name || ''), { removeZip: !!a.removeZip });
+  if (!r.ok) return r;
+  return { ok: true, result: { folder: r.folder, files: serverFiles(root) } };
 }
 async function tDeleteBackup(ctx, a) {
   const { resolveBackupFile } = require('../main/backups.js');

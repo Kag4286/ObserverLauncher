@@ -54,6 +54,14 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - Performance range chips `7d` and `30d`; the chart downsamples as before.
 - `tests/metrics-store.test.js` 25 checks (rollup averaging, tiered load, delete of all three files).
 
+### Added — Datapack manager UI (C5)
+- **Enable/disable/delete** on a datapack were already part of the shared content list. C5 adds the three datapack-specific actions that were only reachable from an MCP client.
+- **Validate** reads `pack.mcmeta` from a folder or a `.zip` (via `jar-read.js`) and classifies the `pack_format` against the server's Minecraft version. The GUI toast colour mirrors the verdict (ok, warn, unknown). The pure logic already existed in `datapack.js`.
+- **Extract** turns a `.zip` datapack into a sibling folder (reuses `platform.extractArchive`, which has the zip-slip guard, and flattens a single wrapper folder). Refused while the server runs. Both actions share their backend with the MCP `validate_datapack` / `extract_datapack` tools through new helpers in `content-ops.js`, so the GUI and the AI client cannot drift.
+- **Reorder** reads and writes the datapack load order stored in `level.dat` under `Data.DataPacks.Enabled` (a list-of-string). New `src/main/datapack-order.js`. Reads are safe any time; the write refuses while the server runs and takes a `.bak` of `level.dat` first. The `saveLevelAtomic` helper that serializes the NBT tree and writes it atomically was extracted out of `gamerules.js` so the two level.dat writers share one code path (the no-dup test enforces it).
+- The Content tab grows a small Datapack load-order panel under the datapack list (a disclosure with an order number and two arrow buttons per file). Built-in packs (vanilla, a mod-provided pack) show a tag instead of arrows.
+- New IPC `content:validate-datapack`, `content:extract-datapack`, `datapacks:order`, `datapacks:reorder`. 12 new keys x 7 locales (1208). `tests/datapack-order.test.js` 24 checks (real gzip round-trip). Arch channel count 100.
+
 ### Added — Multi-server controls, part 2 (E3, E4)
 
 **E3. Instance groups.**

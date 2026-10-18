@@ -54,7 +54,49 @@ function setContentKind(kind){
   if(imp){imp.dataset.import=kind;imp.textContent=t(kind==='datapack'?'cnt.importZip':'cnt.importJar')}
   if(open)open.dataset.open=CONTENT_META[kind].folder;
   if(mkt)mkt.dataset.marketJump=kind;
+  // v6.0.0 C5c: the load-order panel is datapack-only. Hide it elsewhere so it cannot be confused
+  // with the mod/plugin lists.
+  const dpBox=$('#dpOrderBox'); if(dpBox) dpBox.hidden=kind!=='datapack';
+  if(kind==='datapack') renderDatapackOrder();
   filterContentList();
+}
+// v6.0.0 C5c: read the enabled datapack list from level.dat (readDatapackOrder) and paint it with
+// up/down arrows. A pack that is a file under <world>/datapacks lives with 'file/<name>'; a pack
+// that is built into the game or a mod carries a short tag and no arrows (its position is fixed).
+let lastDpOrderSig='';
+// Mirror of datapack-order.js parsePackEntry for the renderer (the main module is not importable
+// from a classic script). Same 'file/<name>' contract; anything else is a builtin entry.
+function parsePackEntry(entry){
+  const s=String(entry||'');
+  if(!s)return null;
+  if(s.startsWith('file/'))return {kind:'file',name:s.slice(5)};
+  return {kind:s==='vanilla'?'vanilla':'builtin',name:s};
+}
+async function renderDatapackOrder(force){
+  const box=$('#dpOrderBox'),host=$('#dpOrderList');
+  if(!box||!host)return;
+  if(box.hidden)return;
+  let r; try{ r=await window.observer.datapacksOrder(); }catch{ r=null; }
+  if(!r||!r.ok){ host.innerHTML='<li class="dp-order-empty">'+esc((r&&r.error)||t('dp.orderFail'))+'</li>'; lastDpOrderSig=''; return; }
+  const enabled=Array.isArray(r.enabled)?r.enabled:[];
+  const sig=JSON.stringify(enabled);
+  if(!force&&sig===lastDpOrderSig)return;
+  lastDpOrderSig=sig;
+  if(!enabled.length){ host.innerHTML='<li class="dp-order-empty">'+esc(t('dp.orderEmpty'))+'</li>'; return; }
+  host.innerHTML=enabled.map((entry,i)=>{
+    const parsed=parsePackEntry(entry)||{kind:'builtin',name:entry};
+    const tag=parsed.kind==='vanilla'?esc(t('dp.tagVanilla')):parsed.kind==='builtin'?esc(t('dp.tagBuiltin')):'';
+    const arrows=parsed.kind==='file'
+      ? '<button type="button" data-dp-move="up" data-dp-name="'+esc(entry)+'" '+(i===enabled.length-1?'disabled':'')+' aria-label="'+esc(t('dp.moveUp'))+'">↑</button>'+'<button type="button" data-dp-move="down" data-dp-name="'+esc(entry)+'" '+(i===0?'disabled':'')+' aria-label="'+esc(t('dp.moveDown'))+'">↓</button>'
+      : '<span class="dp-order-tag">'+tag+'</span>';
+    return '<li class="dp-order-row"><span class="dp-order-idx">'+(i+1)+'</span><span class="dp-order-name">'+esc(parsed.name)+'</span>'+arrows+'</li>';
+  }).join('');
+  host.querySelectorAll('[data-dp-move]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    let r2; try{ r2=await window.observer.datapacksReorder({name:b.dataset.dpName,direction:b.dataset.dpMove}); }catch(e){ r2={ok:false,error:e?.message||'Reorder failed.'}; }
+    if(!r2||!r2.ok)return toast((r2&&r2.error)||'Reorder failed.','error');
+    await renderDatapackOrder(true);
+  });
 }
 // Hide rows in the ACTIVE list that don't contain the query (case-insensitive). Empty-state rows
 // (no data-name) stay visible so the friendly message is never hidden by a stray filter.
@@ -84,12 +126,25 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
     // version badge: shows the installed version, and "-> latest" when an update is available.
     const ver=info&&info.version?`<span class="file-ver mono">${esc(info.version)}${info.status==='update'&&info.latestNumber?' → '+esc(info.latestNumber):''}</span>`:'';
     const upBtn=(info&&info.status==='update'&&!off)?`<button class="text-btn" data-update-content="${esc(kind)}" data-update-file="${esc(x)}">${esc(t('cnt.update'))}</button>`:'';
-    return `<li data-name="${esc(x)}" class="${off?'is-disabled':''}" title="${esc(x)}"><span class="file-name">${esc(x)}</span>${ver}<button class="text-btn" data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}">${esc(t(off?'cnt.enable':'cnt.disable'))}</button>${upBtn}<button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`}).join('');
+    // v6.0.0 C5: datapack-only actions. Check validates pack_format against the server MC version;
+    // Extract turns a .zip datapack into a folder (disabled for a folder already, and for `.disabled`).
+    let dpBtns='';
+    if(kind==='datapack' && !off){
+      dpBtns+='<button class="text-btn" data-validate-dp="'+esc(x)+'">'+esc(t('cnt.validate'))+'</button>';
+      if(/\.zip$/i.test(x)) dpBtns+='<button class="text-btn" data-extract-dp="'+esc(x)+'">'+esc(t('cnt.extract'))+'</button>';
+    }
+    return `<li data-name="${esc(x)}" class="${off?'is-disabled':''}" title="${esc(x)}"><span class="file-name">${esc(x)}</span>${ver}${dpBtns}<button class="text-btn" data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}">${esc(t(off?'cnt.enable':'cnt.disable'))}</button>${upBtn}<button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`}).join('');
   // CB6 (v3.3.0): enable/disable a content file (rename <name> <-> <name>.disabled). Cheap + reversible.
+  if(kind==='datapack') { try{ renderDatapackOrder(); }catch{} }
   node.querySelectorAll('[data-toggle-content]').forEach(b=>b.onclick=async()=>{const r=await window.observer.toggleContent({kind,fileName:b.dataset.toggleFile});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI()});
   // CB5 (v3.3.0): update one file to its newer build (backup first). Refused while the server runs.
   node.querySelectorAll('[data-update-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.updateFile;if(!await confirmDialog({title:t('cnt.update'),body:t('cnt.confirmUpdate',{n:file}),ok:t('cnt.update')}))return;const r=await window.observer.contentUpdate({names:[file]});if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:file}),'error');state.files=r.files||state.files;await loadContentUpdates();toast(t('toast.updated',{n:file}),'success')});
-  node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('toast.deleted',{n:file}),'success')})
+  node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('toast.deleted',{n:file}),'success')});
+  // v6.0.0 C5a: validate a datapack's pack_format against the server's MC version. Read-only; the
+  // toast shape matches the level the backend reports (ok / warn / unknown).
+  node.querySelectorAll('[data-validate-dp]').forEach(b=>b.onclick=async()=>{const file=b.dataset.validateDp;let r;try{ r=await window.observer.contentValidateDatapack(file); }catch(e){ return toast(e?.message||'Validate failed.','error'); }if(!r||!r.ok)return toast((r&&r.error)||'Validate failed.','error');const lvl=r.result&&r.result.level;const note=r.result&&r.result.note||'';toast(note,lvl==='ok'?'success':lvl==='warn'?'error':undefined)});
+  // v6.0.0 C5b: extract a .zip datapack into a folder (zip-slip guarded, single-top-folder flatten).
+  node.querySelectorAll('[data-extract-dp]').forEach(b=>b.onclick=async()=>{const file=b.dataset.extractDp;if(!await confirmDialog({title:t('cnt.extract'),body:t('cnt.extractConfirm',{n:file}),ok:t('cnt.extract')}))return;let r;try{ r=await window.observer.contentExtractDatapack(file); }catch(e){ return toast(e?.message||'Extract failed.','error'); }if(!r||!r.ok)return toast((r&&r.error)||'Extract failed.','error');state.files=r.files||state.files;refreshUI();toast(t('toast.extracted',{n:r.folder}),'success')});
 }
 // Wire the segmented switch + filter once (delegation-free: elements are static in index.html).
 $$('#contentSeg .seg').forEach(b=>b.onclick=()=>setContentKind(b.dataset.ckind));

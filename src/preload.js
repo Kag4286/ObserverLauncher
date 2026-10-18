@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('observer', {
   metricsLong: range => ipcRenderer.invoke('metrics:long', range),
   // v6.0.0 F1: webhook notifications.
   webhookTest: () => ipcRenderer.invoke('webhook:test'),
+  contentValidateDatapack: fileName => ipcRenderer.invoke('content:validate-datapack', { fileName }),
+  contentExtractDatapack: fileName => ipcRenderer.invoke('content:extract-datapack', { fileName }),
+  datapacksOrder: () => ipcRenderer.invoke('datapacks:order'),
+  datapacksReorder: payload => ipcRenderer.invoke('datapacks:reorder', payload),
   onCrashAnalysis: cb => ipcRenderer.on('crash:analysis', (_, d) => cb(d)),
   tunnelStart: provider => ipcRenderer.invoke('tunnel:start', provider), tunnelStop: () => ipcRenderer.invoke('tunnel:stop'), tunnelGet: () => ipcRenderer.invoke('tunnel:get'), tunnelOpenUrl: url => ipcRenderer.invoke('tunnel:open-url', url), onTunnelStatus: cb => ipcRenderer.on('tunnel:status', (_, d) => cb(d)), onTunnelProgress: cb => ipcRenderer.on('tunnel:progress', (_, d) => cb(d)),
   saveManualTunnel: addr => ipcRenderer.invoke('tunnel:set-address', addr),

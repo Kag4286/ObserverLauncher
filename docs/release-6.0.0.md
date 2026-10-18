@@ -86,6 +86,12 @@ The rail now lets you tag a server with a short group name (for example, one gro
 
 The Overview tab gets an All servers table when you have more than one server. One row per server with its status, TPS, memory, player count and uptime. Click a row to switch to that server.
 
+## Datapacks get a manager of their own
+
+A datapack in the Content tab now has a Check button that reads its `pack.mcmeta` and tells you whether it matches the server's Minecraft version before you start. A .zip datapack has an Extract button that unpacks it into a folder next to the zip so you can edit its files. A folder datapack is also faster to load and easier to edit than a zip.
+
+Under the datapack list there is a Datapack load order panel. Minecraft applies datapacks in order, and a later pack overrides a function from an earlier one when both define the same thing. The panel shows the current order with arrows to move a pack up or down. Saving needs the server stopped. The world is backed up first.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.
