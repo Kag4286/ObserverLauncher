@@ -69,7 +69,13 @@ function readJarEntry(jarPath, entryName) {
   const entries = listEntries(buf);
   if (!entries) return { ok: false, error: 'not-a-zip' };
   const want = String(entryName).toLowerCase();
-  const entry = entries.find(e => e.name.toLowerCase() === want);
+  // v6.0.0 C5 fix: datapack .zips often nest pack.mcmeta under a top folder (MyPack/pack.mcmeta).
+  // Prefer an exact match; fall back to any entry that ends with /<name> and has no deeper slashes.
+  const entry = entries.find(e => e.name.toLowerCase() === want)
+    || entries.find(e => {
+      const n = e.name.toLowerCase();
+      return n.endsWith('/' + want) && n.split('/').length === 2;
+    });
   if (!entry) return { ok: false, error: 'entry-not-found' };
   const content = readEntry(buf, entry);
   return content == null ? { ok: false, error: 'entry-unreadable' } : { ok: true, content };

@@ -70,6 +70,30 @@ async function readDatapackOrder(root, levelName) {
   const L = await loadLevel(root, levelName);
   if (!L.ok) return L;
   const { enabled, disabled } = listsFromData(L.data);
+  // v6.0.0 C5 fix: a pack on disk is implicitly enabled unless it is in `disabled`. Minecraft does
+  // not add it to DataPacks.Enabled until the world reloads, so the GUI would otherwise show only
+  // builtin packs (vanilla, paper) and no arrows. Append any on-disk pack that is neither enabled
+  // nor disabled to the END of the list (the load order Minecraft uses on first discovery).
+  const levelNameSafe = String(levelName || 'world').replace(/[\\/]/g, '') || 'world';
+  const folder = require('path').join(root, levelNameSafe, 'datapacks');
+  try {
+    const files = fs.readdirSync(folder);
+    const disabledSet = new Set(disabled);
+    const seen = new Set(enabled.map(n => buildPackEntry(n)));
+    for (const f of files) {
+      const isZip = /\.zip$/i.test(f);
+      const name = isZip ? f.replace(/\.zip$/i, '') : f;
+      const entry = buildPackEntry(name);
+      if (seen.has(entry) || disabledSet.has(entry)) continue;
+      // Skip a folder that has a sibling .zip with the same base name (an extracted copy - Minecraft
+      // reads the folder and ignores the zip). Skip dotfiles + .disabled entries.
+      if (!isZip) {
+        try { if (!fs.statSync(require('path').join(folder, f)).isDirectory()) continue; } catch { continue; }
+      }
+      if (f.startsWith('.') || /\.disabled$/i.test(f)) continue;
+      enabled.push(entry);
+    }
+  } catch { /* datapacks folder missing -> nothing to append */ }
   return { ok: true, enabled, disabled, source: require('path').relative(root, L.file) };
 }
 
