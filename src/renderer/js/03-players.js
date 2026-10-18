@@ -31,11 +31,12 @@ function renderItemGrid(id,items){
   if(sortBy==='name') list.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
   else if(sortBy==='count') list.sort((a,b)=>(b.count||0)-(a.count||0));
   else list.sort((a,b)=>a.slot-b.slot);
-  if(!list.length){n.innerHTML=`<div class="inv-empty"><b>${esc(t('pd.noMatch'))}</b><span>${esc(t('pd.noMatchSub'))}</span></div>`;return}
+  if(!list.length){n.innerHTML=`<div style="grid-column:1/-1" class="inv-empty"><b>${esc(t('pd.noMatch'))}</b><span>${esc(t('pd.noMatchSub'))}</span></div>`;return}
   n.innerHTML=list.map((x,i)=>{
-    if(x.empty) return `<div class="inv-row empty" style="animation-delay:${i*18}ms"><span class="slot">#${x.slot}</span><span class="item-name muted">${esc(t('ply.emptySlot'))}</span><span class="count"></span></div>`;
+    if(x.empty) return `<div class="inv-cell empty" title="Slot ${x.slot}"></div>`;
     const label=itemLabel(x.id);
-    return `<div class="inv-row" style="animation-delay:${i*18}ms" title="${esc(label)} — ${esc(x.id)}"><span class="slot">#${x.slot}</span><span class="item-name">${esc(label)}</span><span class="count">×${x.count}</span></div>`;
+    const idNoPrefix=x.id.replace('minecraft:','').replace(/[^a-z0-9_]/g, '');
+    return `<div class="inv-cell" title="${esc(label)} ×${x.count}"><img src="tex://auto/item/${idNoPrefix}.png" alt=""><span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
