@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { loadSettings, getActiveInstanceId } = require('./settings.js');
+const { loadSettings, loadSettingsFor, saveSettingsFor, getActiveInstanceId } = require('./settings.js');
 const { setInstanceProcess, setInstanceStatus, clearInstanceProcess } = require('./runtime-state.js');
 const { validateStart } = require('./java.js');
 const { requiredJavaForServer } = require('./server-java.js');
@@ -172,12 +172,16 @@ function ensureRconInProperties(ctx, settings) {
     const content = buildPropertiesContent(root, { 'enable-rcon': 'true', 'rcon.port': String(desired.port), 'rcon.password': desired.password });
     require('./fs-utils.js').writeFileAtomic(path.join(root, 'server.properties'), content);
   }
-  // Persist the credentials on the instance so the next start reuses the same port/password.
+  // Persist the credentials on THIS instance so the next start reuses the same port/password.
+  // M12 pattern (mirror saveSettingsFor's caller): loadSettings/saveSettings always resolve the
+  // ACTIVE instance, so a background start-all would write this server's RCON creds onto whichever
+  // instance the user is looking at. Target ctx.inst() explicitly.
   try {
-    const cur = loadSettings();
+    const ownId = ctx.inst ? ctx.inst() : null;
+    const cur = ownId ? loadSettingsFor(ownId) : loadSettings();
     if (String(cur.rconPort) !== String(desired.port) || cur.rconPassword !== desired.password) {
-      cur.rconPort = desired.port; cur.rconPassword = desired.password;
-      require('./settings.js').saveSettings(cur);
+      const next = { ...cur, rconPort: desired.port, rconPassword: desired.password };
+      if (ownId) saveSettingsFor(ownId, next); else require('./settings.js').saveSettings(next);
     }
   } catch {}
   return { port: desired.port, password: desired.password };

@@ -614,34 +614,31 @@ $('#forceStopBtn').onclick=()=>withBusy($('#forceStopBtn'),async()=>{if(!await c
 // v6.0.0 E2: bulk Start all / Stop all. The backend is SEQUENTIAL and each instance runs in its
 // own ALS scope; the UI just shows a summary. withBusy prevents a double-click storm while a long
 // start-all is in flight (gotcha 18).
+// Shared failure toast for the bulk buttons: name the first failing instance and print its real
+// error (port clash, RAM, build running, Java missing), with a count of the rest.
+function bulkFailToast(failed,key){
+  if(!failed||!failed.length)return false;
+  const first=failed[0];
+  const inst=(state.instances||[]).find(i=>i.id===first.id);
+  const name=inst?.name||first.id;
+  const extra=failed.length>1?' '+t('inst.andMore',{n:failed.length-1}):'';
+  toast(t(key,{name,err:first.error||'failed'})+extra,'error');
+  return true;
+}
 $('#startAllBtn')?.addEventListener('click',()=>withBusy($('#startAllBtn'),async()=>{
   let r; try{ r=await window.observer.instancesStartAll(); }catch(e){ return toast(e?.message||'Start all failed.','error'); }
   if(!r||!r.ok)return toast((r&&r.error)||'Start all failed.','error');
   const n=r.started||0,failed=r.failed||[],s=(r.skipped||[]).length;
-  if(failed.length){
-    // Show the ACTUAL reason for the first failure (port clash, RAM budget, build running, Java
-    // missing) with the instance name, not just a count. Otherwise a blocked start is silent.
-    const first=failed[0];
-    const inst=(state.instances||[]).find(i=>i.id===first.id);
-    const name=inst?.name||first.id;
-    const extra=failed.length>1?' '+t('inst.andMore',{n:failed.length-1}):'';
-    toast(t('inst.startAllFailed',{name,err:first.error||'start failed'})+extra,'error');
-  }
-  else if(n)toast(t('inst.startAllDone',{n}),'success');
+  if(bulkFailToast(failed,'inst.startAllFailed'))return;
+  if(n)toast(t('inst.startAllDone',{n}),'success');
   else if(s)toast(t('inst.startAllNone'));
 }));
 $('#stopAllBtn')?.addEventListener('click',()=>withBusy($('#stopAllBtn'),async()=>{
   let r; try{ r=await window.observer.instancesStopAll(); }catch(e){ return toast(e?.message||'Stop all failed.','error'); }
   if(!r||!r.ok)return toast((r&&r.error)||'Stop all failed.','error');
   const n=r.stopped||0,failed=r.failed||[],s=(r.skipped||[]).length;
-  if(failed.length){
-    const first=failed[0];
-    const inst=(state.instances||[]).find(i=>i.id===first.id);
-    const name=inst?.name||first.id;
-    const extra=failed.length>1?' '+t('inst.andMore',{n:failed.length-1}):'';
-    toast(t('inst.stopAllFailed',{name,err:first.error||'stop failed'})+extra,'error');
-  }
-  else if(n)toast(t('inst.stopAllDone',{n}),'success');
+  if(bulkFailToast(failed,'inst.stopAllFailed'))return;
+  if(n)toast(t('inst.stopAllDone',{n}),'success');
   else if(s)toast(t('inst.stopAllNone'));
 }));
 window.observer.onLog(addLog);window.observer.onState(v=>{

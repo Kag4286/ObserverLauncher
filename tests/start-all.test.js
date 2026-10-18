@@ -92,4 +92,17 @@ const mk = (m) => (id) => m[id];
   ok('stop-all does NOT pass the wrapper object', !/planStopAll\(listInstances\(\)\s*,/.test(src));
 }
 
+// --- RCON creds must land on the STARTING instance, not the active one ---
+// ensureRconInProperties previously read/wrote loadSettings()/saveSettings(), which always resolve
+// the ACTIVE instance. A background start-all would write that server's rconPort/rconPassword onto
+// whichever instance the user was looking at. Guard the fix statically.
+{
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'server-lifecycle.js'), 'utf8');
+  ok('ensureRconInProperties targets ctx.inst()', /const ownId = ctx\.inst \? ctx\.inst\(\)/.test(src));
+  ok('ensureRconInProperties reads the starting instance', /loadSettingsFor\(ownId\)/.test(src));
+  ok('ensureRconInProperties saves the starting instance', /saveSettingsFor\(ownId,/.test(src));
+}
+
 console.log(`\n${passed} passed, 0 failed`);
