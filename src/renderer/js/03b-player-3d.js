@@ -231,15 +231,24 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // when the Player Inspector is opened multiple times.
   canvas.style.touchAction = 'none';
   canvas.addEventListener('pointerdown', e => {
+    e.preventDefault(); // Prevent native drag/selection, which locks the cursor and blocks pointermove
     dragging = true; lastX = e.clientX; lastY = e.clientY;
     canvas.setPointerCapture(e.pointerId);
+    canvas.style.cursor = 'grabbing';
   });
-  canvas.addEventListener('pointerup', e => {
+  const endDrag = (e) => {
+    if (!dragging) return;
     dragging = false;
-    canvas.releasePointerCapture(e.pointerId);
-  });
+    if (e && e.pointerId !== undefined && canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+    canvas.style.cursor = 'grab';
+  };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('lostpointercapture', endDrag);
   canvas.addEventListener('pointermove', e => {
     if (!dragging) return;
+    e.preventDefault();
     rotY += (e.clientX - lastX) * 0.01;
     rotX += (e.clientY - lastY) * 0.01;
     rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, rotX));
@@ -270,7 +279,9 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     const proj = mat4Perspective(Math.PI/4, rect.width/rect.height, 0.1, 100.0);
-    const view = mat4Translate(0, -18, -40); // Center the model
+    // Center the model. Total height is ~22 units (0 to 22).
+    // Translating by -11 puts the center at 0. Z=-35 makes it fill the canvas nicely.
+    const view = mat4Translate(0, -11, -35);
     const rot = mat4Multiply(mat4RotateX(rotX), mat4RotateY(rotY));
     const baseMvp = mat4Multiply(proj, mat4Multiply(view, rot));
 
