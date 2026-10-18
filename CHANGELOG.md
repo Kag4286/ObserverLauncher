@@ -65,6 +65,8 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - Settings gain `prometheusEnabled` (off) and `prometheusPort` (0 = random). Lifecycle hooks in `main.js` + `headless.js`, and `settings:save` toggles/restarts the server on a port change. A new card in Settings > Advanced has an on/off switch, a port field, and a live status line.
 - `tests/prometheus.test.js` 32 checks (format, escapeLabel, stopped-row omissions, server guards for Host/Origin/loopback, trailing-slash + query-string tolerance). 7 `prom.*` keys x 7 locales (1215).
 - **Trailing-slash fix:** PowerShell's `Invoke-WebRequest` (alias of `curl`) appends a trailing slash on `/metrics`, which the exact-string router returned 404 for. The route now parses the pathname and strips a trailing slash, so `http://127.0.0.1:<port>/metrics`, `/metrics/` and `/metrics?x=1` all return the same body.
+- **Status line reflects intent:** the Settings line reads the toggle as well as the backend state, so turning the switch on shows 'Prometheus will start on Apply' immediately and the saved line shows 'running on port X' after a successful Apply. A **Copy URL** button appears next to a running server so the correct port is one click away (the most common cause of a 404 is curling a stale port).
+- **Port field:** switched from `type=number` (which kept the OS spinner) to `type=text inputmode=numeric`, width-capped. `tests/prometheus-headless.test.js` boots a real headless ctx, enables Prometheus, and curls `/metrics` end to end (11 checks).
 
 ### Added — Datapack manager UI (C5)
 - **Enable/disable/delete** on a datapack were already part of the shared content list. C5 adds the three datapack-specific actions that were only reachable from an MCP client.

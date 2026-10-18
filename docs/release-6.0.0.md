@@ -96,6 +96,8 @@ Under the datapack list there is a Datapack load order panel. Minecraft applies 
 
 If you run Grafana, Settings > Advanced now has a Prometheus section. Turn it on and the app serves a `/metrics` endpoint on `127.0.0.1` in the standard Prometheus format: TPS, MSPT, CPU, RAM, player count and uptime for every server, labelled by instance. Point Prometheus at `http://127.0.0.1:<port>/metrics` and the numbers land in Grafana. The endpoint never leaves your machine.
 
+The section tells you what it is doing as you touch it. Flip the switch and it says the endpoint will start when you press Apply. After Apply it names the port it is listening on and shows a Copy URL button, so you never have to copy a port by hand.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.
