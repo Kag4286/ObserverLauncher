@@ -116,17 +116,24 @@ async function startPrometheus(ctx) {
   const { buildSnapshots } = require('./instances-snapshot.js');
   const { listInstances } = require('./settings.js');
   const version = (() => { try { return require('../../package.json').version; } catch { return 'dev'; } })();
+  // Privileged ports (<1024) throw EACCES on Windows and macOS. Fall back to a random free port
+  // (0) and persist the corrected value so the UI shows the real port, not a crash.
+  let port = Number(s.prometheusPort) || 0;
+  if (port > 0 && port < 1024) {
+    port = 0;
+    try { const cur = loadSettings(); cur.prometheusPort = 0; require('./settings.js').saveSettings(cur); } catch {}
+  }
   const srv = createPrometheusServer({
-    port: Number(s.prometheusPort) || 0,
+    port,
     version,
     snapshot: () => {
       const list = listInstances().instances;
       return buildSnapshots(list, (id) => (ctx.instances ? ctx.instances.get(id) : null));
     },
   });
-  const port = await srv.listen();
-  ctx.prometheusServer = srv; ctx.prometheusPort = port;
-  return { port };
+  const actualPort = await srv.listen();
+  ctx.prometheusServer = srv; ctx.prometheusPort = actualPort;
+  return { port: actualPort };
 }
 function stopPrometheus(ctx) {
   try { if (ctx.prometheusServer) ctx.prometheusServer.close(); } catch {}
