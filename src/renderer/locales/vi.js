@@ -117,7 +117,7 @@ window.LOCALES.vi = {
 'ply.unwhitelist':'Bỏ whitelist',
 'ply.unban':'Bỏ ban',
 'ply.kickHint':'Người chơi phải đang online',
-'ply.inspectHint':'Xem dữ liệu người chơi',
+'ply.leaderboard':'Bảng xếp hạng','ply.colPlayer':'Người chơi','ply.colPlaytime':'Thời gian chơi','ply.colDeaths':'Số lần chết','ply.colMobs':'Quái bị giết','ply.colBlocks':'Khối đã đào','ply.inspectHint':'Xem dữ liệu người chơi',
 'ply.noDataHint':'Không có dữ liệu đã lưu',
 'ply.bannedBadge':'Bị ban',
 'ply.stopBeforeEdit':'Dừng server trước khi sửa dữ liệu người chơi',

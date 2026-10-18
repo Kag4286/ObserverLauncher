@@ -46,6 +46,15 @@
 .inv-cell img{width:32px;height:32px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
 .inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:#fff;text-shadow:1px 1px 0 #000;pointer-events:none}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
+/* v6.0.0 Track B - B2: Leaderboard */
+.leaderboard-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto}
+.leaderboard-table{width:100%;border-collapse:collapse;font:500 13px var(--font-ui)}
+.leaderboard-table th{text-align:left;padding:12px 16px;font:700 10px var(--font-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);border-bottom:1px solid var(--border);background:var(--surface-2)}
+.leaderboard-table td{padding:10px 16px;border-bottom:1px solid var(--border);color:var(--text)}
+.leaderboard-table tr:last-child td{border-bottom:0}
+.leaderboard-table tr:hover td{background:var(--surface-3)}
+.leaderboard-table td:first-child{color:var(--text-muted);font-family:var(--font-mono)}
+.leaderboard-table td:nth-child(2){font-weight:600}
 .inspect-header{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px;background:var(--panel-raised);border:1px solid var(--border);border-radius:4px;margin-top:6px}
 .inspect-head-left{display:flex;gap:12px;align-items:center;min-width:0}
 .inspect-avatar{width:44px;height:44px;border-radius:4px;border:1px solid var(--border);background:var(--field);flex-shrink:0}

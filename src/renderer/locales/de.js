@@ -117,7 +117,7 @@ window.LOCALES.de = {
 'ply.unwhitelist':'Whitelist entfernen',
 'ply.unban':'Entbannen',
 'ply.kickHint':'Spieler muss online sein',
-'ply.inspectHint':'Spielerdaten ansehen',
+'ply.leaderboard':'Bestenliste','ply.colPlayer':'Spieler','ply.colPlaytime':'Spielzeit','ply.colDeaths':'Tode','ply.colMobs':'Mob-Kills','ply.colBlocks':'Blöcke abgebaut','ply.inspectHint':'Spielerdaten ansehen',
 'ply.noDataHint':'Keine gespeicherten Daten',
 'ply.bannedBadge':'Gebannt',
 'ply.stopBeforeEdit':'Server stoppen, bevor Spielerdaten bearbeitet werden',

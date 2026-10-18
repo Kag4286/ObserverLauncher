@@ -117,7 +117,7 @@ window.LOCALES.es = {
 'ply.unwhitelist':'Quitar whitelist',
 'ply.unban':'Desbanear',
 'ply.kickHint':'El jugador debe estar en línea',
-'ply.inspectHint':'Inspeccionar datos del jugador',
+'ply.leaderboard':'Clasificación','ply.colPlayer':'Jugador','ply.colPlaytime':'Tiempo jugado','ply.colDeaths':'Muertes','ply.colMobs':'Mobs eliminados','ply.colBlocks':'Bloques picados','ply.inspectHint':'Inspeccionar datos del jugador',
 'ply.noDataHint':'Sin datos guardados',
 'ply.bannedBadge':'Baneado',
 'ply.stopBeforeEdit':'Detén el servidor antes de editar datos del jugador',

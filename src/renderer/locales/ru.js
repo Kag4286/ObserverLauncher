@@ -117,7 +117,7 @@ window.LOCALES.ru = {
 'ply.unwhitelist':'Убрать из whitelist',
 'ply.unban':'Разбанить',
 'ply.kickHint':'Игрок должен быть онлайн',
-'ply.inspectHint':'Просмотр данных игрока',
+'ply.leaderboard':'Таблица лидеров','ply.colPlayer':'Игрок','ply.colPlaytime':'Время в игре','ply.colDeaths':'Смерти','ply.colMobs':'Убийства мобов','ply.colBlocks':'Блоков добыто','ply.inspectHint':'Просмотр данных игрока',
 'ply.noDataHint':'Нет сохранённых данных',
 'ply.bannedBadge':'Забанен',
 'ply.stopBeforeEdit':'Остановите сервер перед редактированием данных игрока',

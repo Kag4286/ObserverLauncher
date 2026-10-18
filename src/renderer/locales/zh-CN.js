@@ -117,7 +117,7 @@ window.LOCALES['zh-CN'] = {
 'ply.unwhitelist':'移出白名单',
 'ply.unban':'解封',
 'ply.kickHint':'玩家必须在线',
-'ply.inspectHint':'查看玩家数据',
+'ply.leaderboard':'排行榜','ply.colPlayer':'玩家','ply.colPlaytime':'游戏时间','ply.colDeaths':'死亡次数','ply.colMobs':'击杀生物','ply.colBlocks':'挖掘方块','ply.inspectHint':'查看玩家数据',
 'ply.noDataHint':'无已保存数据',
 'ply.bannedBadge':'已封禁',
 'ply.stopBeforeEdit':'编辑玩家数据前请先停止服务器',

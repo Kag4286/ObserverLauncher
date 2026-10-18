@@ -95,6 +95,16 @@ function registerContent(ipcMain, ctx) {
     if (!r.ok) return r;
     return { ok: true, mod, text: r.text };
   };
+  ipcMain.handle('player:analytics', async () => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    try {
+      const files = serverFiles(ctx.currentServerPath);
+      const levelName = files.properties['level-name'] || 'world';
+      const rows = require('./player-analytics.js').getPlayerAnalytics(ctx.currentServerPath, levelName, files.knownPlayers);
+      return { ok: true, rows };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
   ipcMain.handle('player:skin', async (_, { input } = {}) => {
     try { return await require('./skins.js').getSkin(String(input || '')); }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }

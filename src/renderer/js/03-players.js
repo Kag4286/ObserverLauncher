@@ -297,6 +297,46 @@ async function openPlayerInspector(uuid,name){
   renderPdEffects(d.effects);
   renderPdStats(d.stats);
 }
+// v6.0.0 Track B - B2: Leaderboard toggle
+let showLeaderboard = false;
+$('#toggleLeaderboardBtn')?.addEventListener('click', () => {
+  showLeaderboard = !showLeaderboard;
+  $('#toggleLeaderboardBtn').classList.toggle('primary', showLeaderboard);
+  $('#playersList').hidden = showLeaderboard;
+  $('#playersPager').hidden = showLeaderboard || $('#playersPager').hidden;
+  $('#playersLeaderboard').hidden = !showLeaderboard;
+  if (showLeaderboard) renderLeaderboard();
+  else renderPlayers();
+});
+
+async function renderLeaderboard() {
+  const tbody = $('#leaderboardBody');
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px">${esc(t('pd.loadingStats'))}</td></tr>`;
+  const r = await window.observer.playerAnalytics();
+  if (!r || !r.ok) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;color:var(--danger)">${esc(r?.error || 'Failed to load leaderboard')}</td></tr>`;
+    return;
+  }
+  if (!r.rows || !r.rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px">${esc(t('pd.noStats'))}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = r.rows.map((p, i) => {
+    const h = Math.floor(p.playTimeSec / 3600);
+    const m = Math.floor((p.playTimeSec % 3600) / 60);
+    const time = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${esc(p.name)}</td>
+      <td>${time}</td>
+      <td>${p.deaths}</td>
+      <td>${p.mobKills}</td>
+      <td>${p.blocksMined}</td>
+    </tr>`;
+  }).join('');
+}
+
 $('#playersList').addEventListener('click',async e=>{
   const btn=e.target.closest('[data-row-action]');if(!btn||btn.disabled)return;
   const action=btn.dataset.rowAction,name=btn.dataset.player,uuid=btn.dataset.uuid||null,p={uuid,name};
