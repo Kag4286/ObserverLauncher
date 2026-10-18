@@ -88,6 +88,33 @@ function registerContent(ipcMain, ctx) {
     } catch (e) { return { ok: false, error: e?.message || 'Could not restore.' }; }
   });
 
+  const loadProxyConfig = () => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const mod = require('./proxy-config.js');
+    const r = mod.readProxyConfig(ctx.currentServerPath);
+    if (!r.ok) return r;
+    return { ok: true, mod, text: r.text };
+  };
+  ipcMain.handle('proxy:servers:get', async () => {
+    const R = loadProxyConfig();
+    if (!R.ok) return R;
+    return { ok: true, ...R.mod.parseVelocityServers(R.text) };
+  });
+  ipcMain.handle('proxy:servers:add', async (_, { name, address } = {}) => {
+    const R = loadProxyConfig();
+    if (!R.ok) return R;
+    const added = R.mod.addVelocityServer(R.text, name, address);
+    if (!added.ok) return added;
+    return R.mod.writeProxyConfig(ctx.currentServerPath, added.text);
+  });
+  ipcMain.handle('proxy:servers:remove', async (_, { name } = {}) => {
+    const R = loadProxyConfig();
+    if (!R.ok) return R;
+    const removed = R.mod.removeVelocityServer(R.text, name);
+    if (!removed.ok) return removed;
+    return R.mod.writeProxyConfig(ctx.currentServerPath, removed.text);
+  });
+
   ipcMain.handle('properties:raw-get', async () => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     try { return { ok: true, content: fs.readFileSync(path.join(ctx.currentServerPath, 'velocity.toml'), 'utf8') }; }

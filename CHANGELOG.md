@@ -68,6 +68,14 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - **Status line reflects intent:** the Settings line reads the toggle as well as the backend state, so turning the switch on shows 'Prometheus will start on Apply' immediately and the saved line shows 'running on port X' after a successful Apply. A **Copy URL** button appears next to a running server so the correct port is one click away (the most common cause of a 404 is curling a stale port).
 - **Port field:** switched from `type=number` (which kept the OS spinner) to `type=text inputmode=numeric`, width-capped. `tests/prometheus-headless.test.js` boots a real headless ctx, enables Prometheus, and curls `/metrics` end to end (11 checks).
 
+### Added — Velocity backend manager (E1)
+- A Velocity proxy uses `velocity.toml` to list its backend servers. Editing that file by hand is easy to break (TOML syntax, quotes, priority list), so the Properties tab now shows a **Backend servers** card when the active server is a proxy (a `.jar` with "velocity" in its name).
+- `src/main/proxy-config.js` parses, adds and removes servers at the **line level**, so the user's own comments and the rest of the file are never re-serialized or lost (the same rule the Geyser config fixer follows).
+- New IPC `proxy:servers:get/add/remove`. 5 `prx.*` keys x 7 locales (1229). `tests/proxy-config.test.js` 20 checks. Arch channel count 104.
+
+### Fixed — Prometheus status field desync
+- The Settings line for the Prometheus endpoint compared the live backend state against the live toggle, but the Port **field** was compared against nothing. Typing a new port or flipping the toggle could leave the line saying 'running on port 61756' while the field below said `2`. The status helper now compares the toggle **and** the port field against the SAVED values; any difference shows 'Prometheus will start on Apply' and hides the Copy URL button, so the two can never disagree.
+
 ### Added — Docker compose export from the GUI (I2)
 - The pure generator in `docker.js` (Dockerfile, docker-compose.yml, .dockerignore, README.docker.md) already existed for `observer docker create`. A new **Export as Docker** card in Settings > Advanced calls it from the GUI: pick an output folder, and the four files are written based on the ACTIVE instance's software, port and memory.
 - New `writeDockerSetup(outDir, opts)` in `docker.js` owns the file list; the CLI was refactored to call it, so the two callers cannot drift on which files they emit. The helper uses `writeFileAtomic` so the arch guard stays green in `src/main`.

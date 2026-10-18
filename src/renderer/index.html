@@ -480,6 +480,16 @@
         <div class="prop-body">
           <div id="propertiesGrid" class="properties-groups"></div>
           <div id="propertiesNoResults" class="properties-no-results" hidden>No properties match “<span id="propertiesNoResultsQuery"></span>” — try a different search.</div>
+          <!-- v6.0.0 E1: Velocity backend servers panel. Hidden unless the active server is a proxy. -->
+          <div id="proxyServersPanel" class="proxy-servers" hidden>
+            <div class="sec-head"><h3 data-i18n="prx.serversT">Backend servers</h3><small data-i18n="prx.serversSub">The servers behind this proxy, in priority order.</small></div>
+            <div id="proxyServersList" class="proxy-servers-list"></div>
+            <form id="proxyServerAddForm" class="proxy-add-form">
+              <input id="proxyServerName" type="text" placeholder="Name (e.g. lobby)" data-i18n-placeholder="prx.namePh" required>
+              <input id="proxyServerAddr" type="text" placeholder="127.0.0.1:25565" data-i18n-placeholder="prx.addrPh" required>
+              <button type="submit" class="btn primary sm" data-i18n="prx.add">Add</button>
+            </form>
+          </div>
           <textarea id="propertiesRaw" class="raw-editor" hidden spellcheck="false" placeholder="velocity.toml will appear here after the server has been started once (Velocity generates it on first run)." aria-label="velocity.toml editor"></textarea>
         </div>
       </div>

@@ -102,6 +102,10 @@ The section tells you what it is doing as you touch it. Flip the switch and it s
 
 If you want to move a server to a Linux VPS, Settings > Advanced now has an Export as Docker button. Pick a folder, and the app writes a Dockerfile, a docker-compose.yml, a .dockerignore and a short README that run the same headless backend in a container. The image bundles Java, mounts your server folder and the launcher's data folder as volumes, and includes a healthcheck. Nothing leaves your machine until you copy the folder to the VPS yourself.
 
+## Manage a proxy's backend servers
+
+If you run a Velocity proxy, the Properties tab now lists the backend servers it forwards to. Add one by name and address, or remove an old one. The file is edited at the line level, so any comments and spacing you put in `velocity.toml` yourself are kept exactly as they were.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.

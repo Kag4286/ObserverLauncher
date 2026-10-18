@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('observer', {
   metricsLong: range => ipcRenderer.invoke('metrics:long', range),
   // v6.0.0 F1: webhook notifications.
   webhookTest: () => ipcRenderer.invoke('webhook:test'),
+  proxyServerGet: () => ipcRenderer.invoke('proxy:servers:get'),
+  proxyServerAdd: payload => ipcRenderer.invoke('proxy:servers:add', payload),
+  proxyServerRemove: payload => ipcRenderer.invoke('proxy:servers:remove', payload),
   contentValidateDatapack: fileName => ipcRenderer.invoke('content:validate-datapack', { fileName }),
   contentExtractDatapack: fileName => ipcRenderer.invoke('content:extract-datapack', { fileName }),
   datapacksOrder: () => ipcRenderer.invoke('datapacks:order'),

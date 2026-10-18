@@ -367,10 +367,19 @@ function updatePromStatus(){
   const live=state.prometheus||{};
   const copyBtn=$('#promCopyUrl');
   pl.hidden=false;
+  // If the toggle state or the port field differs from the saved settings, show the pending message.
+  const curPort = Number($('#prometheusPortInput')?.value || 0);
+  const savedPort = Number(live.port || 0);
+  if (on !== !!live.enabled || curPort !== savedPort) {
+    pl.textContent = t('prom.pendingSave');
+    if(copyBtn) copyBtn.hidden = true;
+    return;
+  }
   if(live.running&&live.port){ pl.textContent=t('prom.running',{p:live.port}); if(copyBtn){copyBtn.hidden=false;copyBtn.dataset.port=String(live.port);} }
   else { pl.textContent=live.enabled?t('prom.notRunning'):t('prom.pendingSave'); if(copyBtn)copyBtn.hidden=true; }
 }
 $('#prometheusEnabledInput')?.addEventListener('change',updatePromStatus);
+$('#prometheusPortInput')?.addEventListener('input',updatePromStatus);
 $('#promCopyUrl')?.addEventListener('click',()=>{const p=$('#promCopyUrl')?.dataset.port;if(!p)return;const url=`http://127.0.0.1:${p}/metrics`;try{navigator.clipboard.writeText(url);toast(t('prom.copied'));}catch{}});
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
 function markSettingsSaved(){settingsDirty=false;try{_settingsBaseline=JSON.stringify(getSettings())}catch{}updateApplyDirty()}
