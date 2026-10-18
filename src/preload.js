@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('observer', {
   getRemoteToken: () => ipcRenderer.invoke('remote:token'),
   // v2.0.0 multi-instance (Phase B backend)
   instancesList: () => ipcRenderer.invoke('instances:list'),
+  exportDocker: () => ipcRenderer.invoke('docker:export'),
   instancesStartAll: () => ipcRenderer.invoke('instances:start-all'),
   instancesStopAll: () => ipcRenderer.invoke('instances:stop-all'),
   instancesSetGroup: payload => ipcRenderer.invoke('instances:set-group', payload),

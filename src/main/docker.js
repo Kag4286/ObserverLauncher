@@ -145,4 +145,21 @@ The launcher runs headless inside the container; the server folder (\`./server\`
 `;
 }
 
-module.exports = { dockerfile, composeFile, dockerignore, readme, normalizeOpts, TYPE_TO_SOFTWARE };
+// Write the 4 generated files into outDir. Shared by the CLI (observer docker create) and the GUI
+// (docker:export IPC) so the two paths cannot drift in which files they emit (no-dup guard).
+// Returns the list of written file names. Throws on an I/O error.
+function writeDockerSetup(outDir, opts) {
+  const fs = require('fs');
+  const path = require('path');
+  const { writeFileAtomic } = require('./fs-utils.js');
+  fs.mkdirSync(outDir, { recursive: true });
+  const written = [];
+  const write = (name, content) => { const p = path.join(outDir, name); writeFileAtomic(p, content); written.push(name); };
+  write('Dockerfile', dockerfile(opts));
+  write('docker-compose.yml', composeFile(opts));
+  write('.dockerignore', dockerignore());
+  write('README.docker.md', readme(opts));
+  return written;
+}
+
+module.exports = { dockerfile, composeFile, dockerignore, readme, normalizeOpts, writeDockerSetup, TYPE_TO_SOFTWARE };

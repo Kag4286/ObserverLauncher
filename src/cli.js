@@ -153,13 +153,7 @@ async function run(argv, { print = true, foreground = false } = {}) {
     const opts = { type: flags.type, version: flags.version, ram: flags.ram, port: flags.port, javaVersion: flags.java, mods: flags.mods ? String(flags.mods).split(',') : [] };
     const norm = docker.normalizeOpts(opts);
     try {
-      fs.mkdirSync(outDir, { recursive: true });
-      const written = [];
-      const write = (name, content) => { const p = path.join(outDir, name); fs.writeFileSync(p, content); written.push(name); };
-      write('Dockerfile', docker.dockerfile(opts));
-      write('docker-compose.yml', docker.composeFile(opts));
-      write('.dockerignore', docker.dockerignore());
-      write('README.docker.md', docker.readme(opts));
+      const written = docker.writeDockerSetup(outDir, opts);
       if (flags.json) log(JSON.stringify({ ok: true, outDir, type: norm.type, version: norm.version, ram: norm.ram, port: norm.port, files: written }));
       else { log(`Generated Docker setup in ${outDir}/:`); for (const f of written) log('  ' + f); log(`\nNext: cd ${outDir} && docker compose up -d`); }
       return { ok: true, code: 0, result: { outDir, files: written } };

@@ -1028,6 +1028,14 @@ if(initial.settings?.remoteEnabled&&!initial.remote?.running||initial.settings?.
 try{const wco=navigator.windowControlsOverlay;if(wco){const sync=()=>document.documentElement.classList.toggle('wco-app',!!wco.visible);sync();wco.addEventListener('geometrychange',sync);}}catch{}
 bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
 
+// ===== DOCKER EXPORT =====
+$('#exportDockerBtn')?.addEventListener('click', () => withBusy($('#exportDockerBtn'), async () => {
+  let r; try { r = await window.observer.exportDocker(); } catch (e) { return toast(e?.message || t('dock.fail'), 'error'); }
+  if (!r || r.cancelled) return;
+  if (!r.ok) return toast(r.error || t('dock.fail'), 'error');
+  toast(t('dock.done', { p: r.outDir }), 'success');
+}));
+
 // ===== AUTO-UPDATE UI =====
 const updateBtn=$('#checkUpdateBtn');
 // BUGFIX: every update call is now awaited and its {ok:false} / thrown error is shown, and the

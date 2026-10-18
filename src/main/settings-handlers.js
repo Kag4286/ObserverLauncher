@@ -409,6 +409,26 @@ function registerSettings(ipcMain, ctx) {
     };
   });
 
+  // v6.0.0 I2: export a Docker setup (Dockerfile, compose, .dockerignore, README) to a chosen folder.
+  // Pure generation is handled by docker.js; this is the folder picker + file writer.
+  ipcMain.handle('docker:export', async () => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    const { dialog } = require('electron');
+    const r = await dialog.showOpenDialog(ctx.win, { title: 'Export Docker setup to folder', properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths.length) return { ok: false, cancelled: true };
+    const outDir = r.filePaths[0];
+    const docker = require('./docker.js');
+    const files = serverFiles(ctx.currentServerPath);
+    const settings = loadSettings();
+    const software = detectSoftware(files.jar) || 'paper';
+    const port = Number((files.properties || {})['server-port']) || 25565;
+    const opts = { type: software, version: 'latest', ram: settings.memoryMax || 4, port };
+    try {
+      const written = docker.writeDockerSetup(outDir, opts);
+      return { ok: true, outDir, written };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not write the Docker files.' }; }
+  });
+
   ipcMain.handle('instances:add', async (_, payload) => {
     const r = addInstance(payload || {});
     if (!r.ok) return r;

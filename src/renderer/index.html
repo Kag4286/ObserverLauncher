@@ -676,6 +676,12 @@
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="wh.format">Payload format</b><small data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</small></div><select class="ol-select" id="webhookFormatSelect" style="max-width:220px"><option value="discord" data-i18n="wh.formatDiscord">Discord</option><option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option></select></div>
             <div class="input-row"><span class="hint" data-i18n="wh.hint">Sent only on your machine; a bad URL is ignored silently.</span><button type="button" class="btn secondary sm" id="webhookTestBtn" style="margin-left:auto" data-i18n="wh.test">Send test</button></div>
           </section>
+          <!-- v6.0.0 I2: Docker export. Generates the Dockerfile/compose for the active server. -->
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/box.svg" alt=""><h3 data-i18n="dock.title">Export as Docker</h3><small data-i18n="dock.sub">Generate a Dockerfile + docker-compose.yml for this server.</small></div>
+            <p class="cell-sub" data-i18n="dock.desc">Runs the same headless backend in a container on any Linux VPS. Bakes a JRE, mounts ./server and ./data, and sets up a healthcheck. Perfect for moving a server to the cloud.</p>
+            <button type="button" class="btn secondary sm" id="exportDockerBtn" data-i18n="dock.btn">Export files…</button>
+          </section>
           <!-- v6.0.0 F4: Prometheus /metrics endpoint for a Grafana scrape. Loopback only. -->
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gauge.svg" alt=""><h3 data-i18n="prom.title">Prometheus metrics</h3><small data-i18n="prom.sub">Let Grafana scrape server metrics from a local endpoint.</small></div>
