@@ -312,9 +312,9 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .dp-order-summary:hover{color:var(--text)}
 .dp-order-summary .dp-order-ico{display:grid;place-items:center;width:30px;height:30px;border-radius:var(--r-sm);background:var(--brand-soft);color:var(--brand);font-size:15px}
 .dp-order[open] .ov-adv-chevron{transform:rotate(90deg)}
-.dp-order-body{padding:var(--space-4) var(--space-5) var(--space-5);border-top:1px solid var(--border)}
+.dp-order-body{padding:var(--space-4) var(--space-5) var(--space-5);border-top:1px solid var(--border);overflow-x:hidden}
 .dp-order-body .cell-sub{margin:0 0 var(--space-3);color:var(--text-muted);font:500 12.5px var(--font-ui);line-height:1.5}
-.dp-order-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.dp-order-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;overflow-x:hidden}
 /* v6.0.0 C5c: no per-row entrance animation. Reordering swaps the row order in place, so an
    entrance fade replays on every arrow press and looks like a flicker (memory gotcha 19: never
    animate a list that is rebuilt on every interaction). The disclosure itself still animates via
