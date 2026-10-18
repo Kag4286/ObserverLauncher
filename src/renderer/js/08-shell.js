@@ -1021,7 +1021,7 @@ if(!initial.java?.ok||!initial.files?.jar&&!initial.files?.launchScript){setTime
 // BUGFIX (remote/MCP show OFF right after launch though enabled): main.js starts those loopback
 // servers AFTER the window loads and does not await them, so the first snapshot can race the
 // listen() and report running:false. Re-sync once the backend has settled, like the Java fix above.
-if(initial.settings?.remoteEnabled&&!initial.remote?.running||initial.settings?.mcpEnabled&&!initial.mcp?.running){setTimeout(async()=>{try{const s3=await window.observer.getState();state={...state,mcp:s3.mcp??state.mcp,remote:s3.remote??state.remote};refreshUI()}catch{}},2500);}
+if(initial.settings?.remoteEnabled&&!initial.remote?.running||initial.settings?.mcpEnabled&&!initial.mcp?.running||initial.settings?.prometheusEnabled&&!initial.prometheus?.running){setTimeout(async()=>{try{const s3=await window.observer.getState();state={...state,mcp:s3.mcp??state.mcp,remote:s3.remote??state.remote,prometheus:s3.prometheus??state.prometheus};refreshUI()}catch{}},2500);}
 // BUGFIX: the native min/max/close caption buttons overlay the top-right of the page and used to
 // cover the server-path text in the command bar. Detect the Window Controls Overlay and flag it so
 // CSS can reserve its width (.wco-app rules in style.css).

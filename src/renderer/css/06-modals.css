@@ -179,8 +179,7 @@
 .set-field span{font:600 9.5px var(--font-mono);letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase}
 /* v6.0.0 F4: hide the native number-input spinner so a port field does not look like an OS default.
    The input is styled by .set-field already; the spinner is the one piece of UA chrome it keeps. */
-input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-input[type=number]{-moz-appearance:textfield}
+
 .set-field input{background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:10px 12px;color:var(--text);font:12px var(--font-mono)}
 .set-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .set-toggle{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:7px 0}

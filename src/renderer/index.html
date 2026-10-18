@@ -680,7 +680,7 @@
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gauge.svg" alt=""><h3 data-i18n="prom.title">Prometheus metrics</h3><small data-i18n="prom.sub">Let Grafana scrape server metrics from a local endpoint.</small></div>
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="prom.enable">Enable /metrics endpoint</b><small data-i18n="prom.enableSub">Loopback only. Scrape <code>http://127.0.0.1:&lt;port&gt;/metrics</code>.</small></div><label class="switch"><input type="checkbox" id="prometheusEnabledInput"><span class="switch-track"></span></label></div>
-            <label class="set-field"><span data-i18n="prom.port">Port (0 = random free port)</span><input id="prometheusPortInput" type="number" min="0" max="65535" placeholder="0"></label>
+            <label class="set-field"><span data-i18n="prom.port">Port (0 = random free port)</span><input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0"></label>
             <p class="hint" id="promStatusLine" hidden></p>
           </section>
           <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
