@@ -680,8 +680,8 @@
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gauge.svg" alt=""><h3 data-i18n="prom.title">Prometheus metrics</h3><small data-i18n="prom.sub">Let Grafana scrape server metrics from a local endpoint.</small></div>
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="prom.enable">Enable /metrics endpoint</b><small data-i18n="prom.enableSub">Loopback only. Scrape <code>http://127.0.0.1:&lt;port&gt;/metrics</code>.</small></div><label class="switch"><input type="checkbox" id="prometheusEnabledInput"><span class="switch-track"></span></label></div>
-            <label class="set-field"><span data-i18n="prom.port">Port (0 = random free port)</span><input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0"></label>
-            <p class="hint" id="promStatusLine" hidden></p>
+            <label class="set-field"><span data-i18n="prom.port">Port (0 = random free port)</span><input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" style="max-width:160px"></label>
+            <div class="input-row" style="margin-top:8px"><p class="hint" id="promStatusLine" hidden style="margin:0"></p><button type="button" class="btn secondary sm" id="promCopyUrl" hidden style="margin-left:auto" data-i18n="prom.copy">Copy URL</button></div>
           </section>
           <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
           <section class="flat-cell">

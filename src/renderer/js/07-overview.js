@@ -52,8 +52,11 @@ function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale
   // v6.0.0 F4: Prometheus toggle + port + live status line.
   if($('#prometheusEnabledInput'))$('#prometheusEnabledInput').checked=!!s.prometheusEnabled;
   if($('#prometheusPortInput'))$('#prometheusPortInput').value=s.prometheusPort||0;
-  // v6.0.0 F4: persist the status line across refreshUI (it used to appear only after Save).
-  {const pl=$('#promStatusLine');if(pl){const p=state.prometheus;if(p&&p.enabled){pl.hidden=false;pl.textContent=p.running?t('prom.running',{p:p.port}):t('prom.notRunning')}else pl.hidden=true}}
+  // v6.0.0 F4: status line reflects the toggle for immediate feedback, then the live backend
+  // state once it has one. Reading the toggle (not just state.prometheus) means the line shows the
+  // moment the user enables it, without waiting for an Apply, and it cannot vanish when a later
+  // refreshUI drops state.prometheus.
+  updatePromStatus();
   {const evs=Array.isArray(s.webhookEvents)?s.webhookEvents:['start','stop','crash'];$$('#webhookEvents input[data-wh-event]').forEach(x=>{x.checked=evs.includes(x.dataset.whEvent)})}if($('#autoTunnelQuick'))$('#autoTunnelQuick').checked=!!s.autoTunnel;$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;if($('#backupRetentionInput'))$('#backupRetentionInput').value=s.backupRetention??10;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);syncRemoteFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=t('ov.systemRam',{n:state.systemMemoryGB});
   // v6.0.0 G1: disable a RAM preset that exceeds the machine's RAM, and reflect the current max.
   {const sys=state.systemMemoryGB||0;$$('#ramPresets .ram-preset').forEach(b=>{const gb=Number(b.dataset.ram)||0;b.disabled=sys>0&&gb>sys;b.classList.toggle('active',Number($('#memoryMaxInput')?.value)===gb&&Number($('#memoryMinInput')?.value)===gb)})}$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():t('ov.defaultName');$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):t('ov.hintNone')))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
@@ -350,6 +353,25 @@ let settingsDirty=false;
 // A JSON snapshot of the LAST SAVED form state. An edit that returns every field to this snapshot
 // is not a real change, so the Apply dot must clear (was: dirty latched true until Apply).
 let _settingsBaseline=null;
+// v6.0.0 F4: paint #promStatusLine from BOTH the toggle (intent) and state.prometheus (live).
+//    toggle off                         -> hidden
+//    toggle on, not yet saved           -> 'Will start on Apply'
+//    toggle on, saved, backend running  -> 'Prometheus running on port X'
+//    toggle on, saved, backend not up   -> 'enabled but not running (check Console)'
+// Called from refreshUI and from the toggle's own change event.
+function updatePromStatus(){
+  const pl=$('#promStatusLine'); if(!pl) return;
+  const toggle=$('#prometheusEnabledInput');
+  const on=!!(toggle&&toggle.checked);
+  if(!on){ pl.hidden=true; return; }
+  const live=state.prometheus||{};
+  const copyBtn=$('#promCopyUrl');
+  pl.hidden=false;
+  if(live.running&&live.port){ pl.textContent=t('prom.running',{p:live.port}); if(copyBtn){copyBtn.hidden=false;copyBtn.dataset.port=String(live.port);} }
+  else { pl.textContent=live.enabled?t('prom.notRunning'):t('prom.pendingSave'); if(copyBtn)copyBtn.hidden=true; }
+}
+$('#prometheusEnabledInput')?.addEventListener('change',updatePromStatus);
+$('#promCopyUrl')?.addEventListener('click',()=>{const p=$('#promCopyUrl')?.dataset.port;if(!p)return;const url=`http://127.0.0.1:${p}/metrics`;try{navigator.clipboard.writeText(url);toast(t('prom.copied'));}catch{}});
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
 function markSettingsSaved(){settingsDirty=false;try{_settingsBaseline=JSON.stringify(getSettings())}catch{}updateApplyDirty()}
 // 2.2.0 (Java D): fill the 'Installed runtimes' pick-list from java:list. Hidden with 0-1 runtimes.
