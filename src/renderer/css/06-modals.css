@@ -297,23 +297,34 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 /* v6.0.0 E4: cross-instance dashboard table under the Overview hero. Collapsed by default; a
    details/summary to keep it out of the way of the single-server overview. Right-aligned numbers
    read faster than a wall of left-aligned counts. */
-/* v6.0.0 C5c: datapack load-order panel under the datapack list. Compact rows with an order
-   number and two arrow buttons; a note marks a builtin pack that is not a file in the server. */
-.dp-order{margin-top:10px}
-.dp-order-summary{cursor:pointer;padding:8px 0;font:600 12px var(--font-ui);color:var(--text-muted)}
+/* v6.0.0 C5c: datapack load-order panel. Follows the same card grammar as .modpack-tools and
+   .connect-advanced (DESIGN.md 2.1): a bordered surface, a brand-tinted gradient summary that
+   reads as clickable, a small icon box, and a rotating chevron. Rows live inside a body with a
+   top border so the disclosure reads as one unit, not a free-floating list. */
+.dp-order{margin-top:var(--space-4);border:1px solid var(--border);border-radius:var(--r);background:var(--surface);overflow:hidden;interpolate-size:allow-keywords}
+.dp-order::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
+.dp-order[open]::details-content{block-size:auto}
+.dp-order-summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--space-5);font:600 14px var(--font-ui);color:var(--text);background:linear-gradient(90deg,var(--brand-soft),transparent 60%)}
+.dp-order-summary::-webkit-details-marker{display:none}
 .dp-order-summary:hover{color:var(--text)}
-.dp-order-list{list-style:none;padding:0;margin:6px 0 0;display:flex;flex-direction:column;gap:4px}
-.dp-order-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);font:500 12px var(--font-mono);color:var(--text);transition:opacity var(--dur-fast),background var(--dur-fast);animation:dpFadeIn var(--dur-tab) var(--ease-out) both}
-@keyframes dpFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.dp-order-summary .dp-order-ico{display:grid;place-items:center;width:30px;height:30px;border-radius:var(--r-sm);background:var(--brand-soft);color:var(--brand);font-size:15px}
+.dp-order[open] .ov-adv-chevron{transform:rotate(90deg)}
+.dp-order-body{padding:var(--space-4) var(--space-5) var(--space-5);border-top:1px solid var(--border)}
+.dp-order-body .cell-sub{margin:0 0 var(--space-3);color:var(--text-muted);font:500 12.5px var(--font-ui);line-height:1.5}
+.dp-order-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.dp-order-row{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:var(--space-3);padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);font:500 12.5px var(--font-mono);color:var(--text);animation:dpFadeIn var(--dur-fast) var(--ease-out) both}
+@keyframes dpFadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 html.motion-lite .dp-order-row{animation:none}
-.dp-order-row .dp-order-idx{color:var(--text-dim);min-width:20px;text-align:right}
-.dp-order-row .dp-order-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dp-order-row .dp-order-tag{font:600 9px var(--font-ui);text-transform:uppercase;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:1px 4px}
-.dp-order-row button{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex-shrink:0;padding:0;box-sizing:border-box;vertical-align:middle;border:1px solid var(--border);border-radius:var(--r-xs);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1;transition:transform var(--dur-micro) var(--ease-out),color var(--dur-fast),border-color var(--dur-fast)}
-.dp-order-row button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong)}
-.dp-order-row button:active:not(:disabled){transform:scale(.9)}
-.dp-order-row button:disabled{opacity:.35;cursor:not-allowed}
-.dp-order-empty{font:500 12px var(--font-ui);color:var(--text-dim);padding:6px 2px}
+.dp-order-row .dp-order-idx{display:grid;place-items:center;width:22px;height:22px;border-radius:var(--r-xs);background:var(--surface-3);color:var(--text-muted);font:700 10px var(--font-mono)}
+.dp-order-row .dp-order-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.dp-order-row .dp-order-tag{font:700 9px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);border:1px solid var(--border);border-radius:999px;padding:2px 8px;justify-self:end}
+.dp-order-row .dp-order-arrows{display:inline-flex;gap:4px;justify-self:end}
+.dp-order-row button{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:1px solid var(--border);border-radius:var(--r-xs);background:transparent;color:var(--text-muted);cursor:pointer;transition:color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+.dp-order-row button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong);background:var(--surface-3)}
+.dp-order-row button:active:not(:disabled){background:var(--brand-soft)}
+.dp-order-row button:disabled{opacity:.3;cursor:not-allowed}
+.dp-order-row button svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dp-order-empty{font:500 12.5px var(--font-ui);color:var(--text-dim);padding:var(--space-3) 2px;text-align:center}
 .all-servers{margin-bottom:12px}
 .all-servers-summary{cursor:pointer;padding:8px 0;font:600 12px var(--font-ui);color:var(--text-muted)}
 .all-servers-summary:hover{color:var(--text)}

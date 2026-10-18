@@ -83,11 +83,19 @@ async function renderDatapackOrder(force){
   if(!force&&sig===lastDpOrderSig)return;
   lastDpOrderSig=sig;
   if(!enabled.length){ host.innerHTML='<li class="dp-order-empty">'+esc(t('dp.orderEmpty'))+'</li>'; return; }
+  // v6.0.0 C5c: SVG chevrons keep the two arrow buttons optically identical at 24x24. The two arrows
+  // live in a .dp-order-arrows wrapper so the grid's third column is one cell (arrows OR tag), and
+  // the row never reflows when the arrows disable at the ends of the list.
+  const svgUp='<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 8l3-3 3 3"/></svg>';
+  const svgDown='<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4l3 3 3-3"/></svg>';
   host.innerHTML=enabled.map((entry,i)=>{
     const parsed=parsePackEntry(entry)||{kind:'builtin',name:entry};
     const tag=parsed.kind==='vanilla'?esc(t('dp.tagVanilla')):parsed.kind==='builtin'?esc(t('dp.tagBuiltin')):'';
     const arrows=parsed.kind==='file'
-      ? '<button type="button" data-dp-move="up" data-dp-name="'+esc(entry)+'" '+(i===enabled.length-1?'disabled':'')+' aria-label="'+esc(t('dp.moveUp'))+'">↑</button>'+'<button type="button" data-dp-move="down" data-dp-name="'+esc(entry)+'" '+(i===0?'disabled':'')+' aria-label="'+esc(t('dp.moveDown'))+'">↓</button>'
+      ? '<span class="dp-order-arrows">'
+        +'<button type="button" data-dp-move="up" data-dp-name="'+esc(entry)+'" '+(i===enabled.length-1?'disabled':'')+' aria-label="'+esc(t('dp.moveUp'))+'" title="'+esc(t('dp.moveUp'))+'">'+svgUp+'</button>'
+        +'<button type="button" data-dp-move="down" data-dp-name="'+esc(entry)+'" '+(i===0?'disabled':'')+' aria-label="'+esc(t('dp.moveDown'))+'" title="'+esc(t('dp.moveDown'))+'">'+svgDown+'</button>'
+        +'</span>'
       : '<span class="dp-order-tag">'+tag+'</span>';
     return '<li class="dp-order-row"><span class="dp-order-idx">'+(i+1)+'</span><span class="dp-order-name">'+esc(parsed.name)+'</span>'+arrows+'</li>';
   }).join('');

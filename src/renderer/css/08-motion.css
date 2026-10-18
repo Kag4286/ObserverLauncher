@@ -48,17 +48,18 @@
 /* Content tab: the toolbar/list/tools are NESTED inside #contentBays (a .flat-wrap), so the
    direct-child rule above only animates the outer box. Cascade the inner blocks too, so the tab
    does not feel static. */
-.tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.modpack-tools){animation:panelIn var(--dur-modal) var(--ease-out) both}
+.tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.dp-order,.modpack-tools){animation:panelIn var(--dur-modal) var(--ease-out) both}
 .tab.active #contentBays > .content-toolbar{animation-delay:0ms}
 .tab.active #contentBays > .content-listwrap{animation-delay:calc(var(--stagger) * 1)}
 .tab.active #contentBays > .sec-note{animation-delay:calc(var(--stagger) * 2)}
-.tab.active #contentBays > .modpack-tools{animation-delay:calc(var(--stagger) * 3)}
+.tab.active #contentBays > .dp-order{animation-delay:calc(var(--stagger) * 3)}
+.tab.active #contentBays > .modpack-tools{animation-delay:calc(var(--stagger) * 4)}
 /* Marketplace: hero + toolbar are direct tab children not covered by the generic list above. */
 .tab.active > :is(.market-hero,.market-toolbar){animation:panelIn var(--dur-modal) var(--ease-out) both}
 .tab.active > .market-hero{animation-delay:0ms}
 .tab.active > .market-toolbar{animation-delay:calc(var(--stagger) * 1)}
-@media (prefers-reduced-motion:reduce){.tab.active > :is(.tab-head,.hero,.panel,.flat-wrap,.perf-stats,.perf-charts,.perf-details,.modpack-tools,.roster-toolbar,.player-manual,.proxy-notice,.wld-section,.content-toolbar),.tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.modpack-tools),.tab.active > :is(.market-hero,.market-toolbar){animation:none}}
-html.motion-lite .tab.active > :is(.tab-head,.hero,.panel,.flat-wrap,.perf-stats,.perf-charts,.perf-details,.modpack-tools,.roster-toolbar,.player-manual,.proxy-notice,.wld-section,.content-toolbar),html.motion-lite .tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.modpack-tools),html.motion-lite .tab.active > :is(.market-hero,.market-toolbar){animation:none}
+@media (prefers-reduced-motion:reduce){.tab.active > :is(.tab-head,.hero,.panel,.flat-wrap,.perf-stats,.perf-charts,.perf-details,.modpack-tools,.roster-toolbar,.player-manual,.proxy-notice,.wld-section,.content-toolbar),.tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.dp-order,.modpack-tools),.tab.active > :is(.market-hero,.market-toolbar){animation:none}}
+html.motion-lite .tab.active > :is(.tab-head,.hero,.panel,.flat-wrap,.perf-stats,.perf-charts,.perf-details,.modpack-tools,.roster-toolbar,.player-manual,.proxy-notice,.wld-section,.content-toolbar),html.motion-lite .tab.active #contentBays > :is(.content-toolbar,.content-listwrap,.sec-note,.dp-order,.modpack-tools),html.motion-lite .tab.active > :is(.market-hero,.market-toolbar){animation:none}
 /* Lite mode: kill the SIGNATURE tab slide + list stagger + fade-swap + modal rise too. These were
    the most VISIBLE motion (every tab switch / modal open) yet had NO lite guard — so Lite felt
    almost identical to Full. Now the only motion left in Lite is fast functional feedback
