@@ -240,9 +240,9 @@ function renderInstanceList(){
     // Stagger reveal: same cadence as tab-content rows (--stagger per index, capped so a long
     // list never waits). Re-runs on every render, so add/remove/switch animates.
     row.style.animationDelay=(idx*28)+'ms';
-    const groupBadge=inst.group?'<span class="inst-group-badge">'+esc(inst.group)+'</span>':'';
+    const groupBadge=inst.group?'<span class="inst-group-badge" title="'+esc(inst.group)+'">'+esc(inst.group)+'</span>':'';
     row.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,isMissing?'stopped':st)
-      +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+groupBadge+(isMissing?' <i class="inst-missing-tag">'+esc(t('inst.missing'))+'</i>':'')+'</span>'
+      +'<span class="inst-name"><span class="inst-name-text">'+esc(inst.name||inst.serverPath||'Server')+'</span>'+(isMissing?' <i class="inst-missing-tag">'+esc(t('inst.missing'))+'</i>':'')+groupBadge+'</span>'
       +'<span class="inst-acts">'
         +'<button type="button" class="inst-act" data-act="group" title="'+esc(t('inst.groupSet'))+'" aria-label="'+esc(t('inst.groupSet'))+'">⊞</button>'
         +(isMissing?'<button type="button" class="inst-act" data-act="relink" title="'+esc(t('inst.relink'))+'" aria-label="'+esc(t('inst.relink'))+'">↻</button>':'')
@@ -280,8 +280,8 @@ function renderInstanceGroupFilter(groups){
 }
 async function setInstanceGroupPrompt(inst){
   const current=inst.group||'';
-  const next=await promptDialog({title:t('inst.groupPrompt'),value:current,ok:t('cf.ok')});
-  if(next===null)return;
+  const next=await promptDialog({title:t('inst.groupPrompt'),value:current,ok:t('cf.ok'),allowEmpty:true});
+  if(next===null)return; // cancel; '' means clear the group
   let r; try{ r=await window.observer.instancesSetGroup({id:inst.id,group:String(next)}); }catch(e){ return toast(e?.message||'Set group failed.','error'); }
   if(!r||!r.ok)return toast((r&&r.error)||'Set group failed.','error');
   const updated=(state.instances||[]).map(i=>i.id===inst.id?{...i,group:r.group}:i);

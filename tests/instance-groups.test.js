@@ -71,5 +71,20 @@ ok('missing state -> stopped shape', N.buildSnapshots([{ id: 'z', name: 'Z' }], 
   ok('latest metric wins', rows[0].tps === 20 && rows[0].ram === 10);
 }
 
+// --- promptDialog allowEmpty (v6.0.0 E3 regression guard) ---
+// Clearing an instance group submits an EMPTY input. A normal promptDialog treats empty OK as
+// cancel (null), which is right for a rename but wrong for a set-or-clear field. Guard the fix
+// statically so a future refactor cannot silently re-break clearing a group.
+{
+  const fs2 = require('fs');
+  const path2 = require('path');
+  const core = fs2.readFileSync(path2.join(__dirname, '..', 'src', 'renderer', 'js', '00-core.js'), 'utf8');
+  ok('promptDialog has allowEmpty', /dataset\.allowEmpty = opts\.allowEmpty/.test(core));
+  ok('_pmSubmit honours allowEmpty (returns \"\")', /allowEmpty===\x271\x27\?\x27\x27:null/.test(core));
+  ok('pmOk handler uses _pmSubmit', /\$\('#pmOk'\)\?\.addEventListener\('click',_pmSubmit\)/.test(core));
+  const shell = fs2.readFileSync(path2.join(__dirname, '..', 'src', 'renderer', 'js', '08-shell.js'), 'utf8');
+  ok('setInstanceGroupPrompt passes allowEmpty:true', /promptDialog\(\{[^}]*allowEmpty:true/.test(shell));
+}
+
 fs.rmSync(userData, { recursive: true, force: true });
 console.log(`\n${passed} passed, 0 failed`);

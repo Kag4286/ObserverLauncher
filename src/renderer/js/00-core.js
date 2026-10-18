@@ -253,6 +253,10 @@ function promptDialog(opts){
   $('#pmTitle').textContent=opts.title||'Enter a value';
   const input=$('#pmInput');
   input.value=opts.value||'';
+  // v6.0.0 E3: some prompts need to accept an EMPTY submit as a real value (clearing an instance
+  // group). Default behaviour treats an empty OK as 'cancel' (null), which is right for a rename but
+  // wrong for a set-or-clear field. Opt into '' explicitly.
+  m.dataset.allowEmpty = opts.allowEmpty ? '1' : '';
   if(opts.placeholder) input.placeholder=opts.placeholder; else input.removeAttribute('placeholder');
   $('#pmOk').textContent=opts.ok||t('cf.ok');
   $('#pmCancel').textContent=opts.cancel||t('cf.cancel');
@@ -268,10 +272,17 @@ function closePrompt(result){
   releaseFocus();
   if(_pmResolve){const r=_pmResolve;_pmResolve=null;r(result===undefined?null:result)}
 }
-$('#pmOk')?.addEventListener('click',()=>{const v=($('#pmInput')?.value||'').trim();closePrompt(v||null)});
+function _pmSubmit(){
+  const m=$('#promptModal');
+  const v=($('#pmInput')?.value||'').trim();
+  if(v)return closePrompt(v);
+  // Empty input: a normal prompt -> cancel (null); an allowEmpty prompt -> '' (a real clear).
+  return closePrompt(m&&m.dataset.allowEmpty==='1'?'':null);
+}
+$('#pmOk')?.addEventListener('click',_pmSubmit);
 $('#pmCancel')?.addEventListener('click',()=>closePrompt(null));
 $('#promptModal')?.addEventListener('click',e=>{if(e.target.id==='promptModal')closePrompt(null)});
-$('#pmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const v=($('#pmInput')?.value||'').trim();closePrompt(v||null)}});
+$('#pmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_pmSubmit()}});
 document.addEventListener('keydown',e=>{const m=$('#promptModal');if(!m||m.hidden)return;if(e.key==='Escape')closePrompt(null)});
 // MOTION (1.3.0): tween a number element toward a new value instead of snapping. Restrained:
 // short duration, no spring, and totally skipped under prefers-reduced-motion. Keeps the last

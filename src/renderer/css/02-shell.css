@@ -67,7 +67,10 @@ html.motion-lite .beginner-share{animation:none}
 .inst-item .inst-dot.st-starting{background:var(--accent);animation:instPulse var(--dur-pulse) ease-in-out infinite}
 .inst-item .inst-dot.st-stopping{background:var(--warning,#d6a24a)}
 @keyframes instPulse{0%,100%{opacity:1}50%{opacity:.35}}
-.inst-item .inst-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inst-item .inst-name{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden}
+/* The name text truncates; the group badge keeps its full width (flex-shrink:0) so a long group
+   is never clipped mid-word by the row's own ellipsis. */
+.inst-item .inst-name-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
 /* 4.5.0 instance avatar: seed-art tile + initials + a corner status dot. Replaces the bare dot as the
    row's leading identity (DESIGN.md 13.3). Accent is per-row via --inst-accent (set inline by
    instAvatarHtml); the art layer fills with that accent, the tile stays neutral. No animation. */
@@ -124,7 +127,7 @@ html.motion-lite .tun-ov-row{animation:none}
    exist; the badge sits inline after the name and truncates before the row does. No animation. */
 .inst-group-filter{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .inst-group-filter .filter-chip{font-size:10px;padding:2px 7px}
-.inst-group-badge{font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:1px 4px;margin-left:6px;white-space:nowrap;flex-shrink:0}
+.inst-group-badge{font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:1px 4px;white-space:nowrap;flex-shrink:0;max-width:80px;overflow:hidden;text-overflow:ellipsis}
 .inst-bulk-btn{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);color:var(--text-muted);font:600 11px var(--font-ui);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast),background var(--dur-fast)}
 .inst-bulk-btn:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel)}
 .inst-bulk-btn[aria-busy="true"]{opacity:.6;cursor:progress}
