@@ -107,9 +107,21 @@ function buildCube(w, h, d, faces) {
   return { p: new Float32Array(p), t: new Float32Array(t) };
 }
 
-function createPlayerRenderer(canvas, skinUrl, isSlim) {
+function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const gl = canvas.getContext('webgl', { alpha: true, antialias: true });
   if (!gl) return null;
+
+  const getMaterial = (id) => {
+    if (!id) return null;
+    if (id.includes('leather')) return 'leather';
+    if (id.includes('chainmail')) return 'chainmail';
+    if (id.includes('iron')) return 'iron';
+    if (id.includes('golden')) return 'golden';
+    if (id.includes('diamond')) return 'diamond';
+    if (id.includes('netherite')) return 'netherite';
+    if (id.includes('turtle')) return 'turtle';
+    return null;
+  };
 
   const prog = gl.createProgram();
   const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, PLAYER_VS); gl.compileShader(vs);
@@ -130,16 +142,64 @@ function createPlayerRenderer(canvas, skinUrl, isSlim) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+  let armorTex1 = null, armorTex2 = null;
+  let mat1 = null, mat2 = null;
+  if (equipment) {
+    const helmetMat = getMaterial(equipment.helmet?.id);
+    const chestMat = getMaterial(equipment.chest?.id);
+    const bootsMat = getMaterial(equipment.boots?.id);
+    const legsMat = getMaterial(equipment.legs?.id);
+    mat1 = helmetMat || chestMat || bootsMat;
+    mat2 = legsMat;
+  }
+
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    
+    if (mat1) {
+      armorTex1 = gl.createTexture();
+      const imgA1 = new Image();
+      imgA1.crossOrigin = 'anonymous';
+      imgA1.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, armorTex1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgA1);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        draw();
+      };
+      imgA1.src = `tex://auto/armor/${mat1}_layer_1.png`;
+    }
+    if (mat2) {
+      armorTex2 = gl.createTexture();
+      const imgA2 = new Image();
+      imgA2.crossOrigin = 'anonymous';
+      imgA2.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, armorTex2);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgA2);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        draw();
+      };
+      imgA2.src = `tex://auto/armor/${mat2}_layer_2.png`;
+    }
     draw();
   };
   img.src = skinUrl;
 
   const armW = isSlim ? 3 : 4;
+  const cHelmet = buildCube(8.5, 8.5, 8.5, uvc(UV.head, 8, 8, 8));
+  const cChestplate = buildCube(8.5, 12.5, 4.5, uvc(UV.body, 8, 12, 4));
+  const cRightArmArmor = buildCube(armW+0.5, 12.5, 4.5, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, armW, 12, 4));
+  const cLeftArmArmor = buildCube(armW+0.5, 12.5, 4.5, uvc(isSlim ? UV.leftArmSlim : UV.leftArm, armW, 12, 4));
+  const cRightBoot = buildCube(4.5, 12.5, 4.5, uvc(UV.rightLeg, 4, 12, 4));
+  const cLeftBoot = buildCube(4.5, 12.5, 4.5, uvc(UV.leftLeg, 4, 12, 4));
+  const cLeggings = buildCube(8.5, 12.5, 4.5, uvc(UV.body, 8, 12, 4));
+  const cRightLeggings = buildCube(4.5, 12.5, 4.5, uvc(UV.rightLeg, 4, 12, 4));
+  const cLeftLeggings = buildCube(4.5, 12.5, 4.5, uvc(UV.leftLeg, 4, 12, 4));
+
   const cHead = buildCube(8, 8, 8, uvc(UV.head, 8, 8, 8));
   const cHat = buildCube(8.5, 8.5, 8.5, uvc(UV.hat, 8, 8, 8));
   const cBody = buildCube(8, 12, 4, uvc(UV.body, 8, 12, 4));
@@ -226,6 +286,28 @@ function createPlayerRenderer(canvas, skinUrl, isSlim) {
     drawPart(cRSleeve, -(4 + armW/2), 11, 0);
     drawPart(cLArm, (4 + armW/2), 11, 0);
     drawPart(cLSleeve, (4 + armW/2), 11, 0);
+
+    if (armorTex1) {
+      gl.bindTexture(gl.TEXTURE_2D, armorTex1);
+      if (equipment.helmet) drawPart(cHelmet, 0, 18, 0);
+      if (equipment.chest) {
+        drawPart(cChestplate, 0, 12, 0);
+        drawPart(cRightArmArmor, -(4 + armW/2), 11, 0);
+        drawPart(cLeftArmArmor, (4 + armW/2), 11, 0);
+      }
+      if (equipment.boots) {
+        drawPart(cRightBoot, -2, 6, 0);
+        drawPart(cLeftBoot, 2, 6, 0);
+      }
+    }
+    if (armorTex2) {
+      gl.bindTexture(gl.TEXTURE_2D, armorTex2);
+      if (equipment.legs) {
+        drawPart(cLeggings, 0, 12, 0);
+        drawPart(cRightLeggings, -2, 6, 0);
+        drawPart(cLeftLeggings, 2, 6, 0);
+      }
+    }
   }
 
   return { draw };

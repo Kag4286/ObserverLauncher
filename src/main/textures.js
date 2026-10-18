@@ -78,7 +78,7 @@ function handle(request) {
   const parts = decodeURIComponent(u.pathname).split('/').filter(Boolean);
   if (parts.length !== 2) return new Response('', { status: 400 });
   const [kind, rawFile] = parts;
-  if (kind !== 'item' && kind !== 'block') return new Response('', { status: 400 });
+  if (kind !== 'item' && kind !== 'block' && kind !== 'armor') return new Response('', { status: 400 });
   const file = String(rawFile).toLowerCase();
   if (!/^[a-z0-9_-]+\.png$/.test(file) || file.includes('..')) return new Response('', { status: 400 });
 
@@ -100,7 +100,7 @@ function queueRemote(version, kind, file) {
   if (inflight.has(key)) return;
   inflight.add(key);
   (async () => {
-    const folder = kind === 'item' ? 'items' : 'blocks'; // upstream uses plural names
+    const folder = kind === 'item' ? 'items' : kind === 'block' ? 'blocks' : 'models/armor';
     const url = `${RAW_BASE}/${encodeURIComponent(version)}/${folder}/${encodeURIComponent(file)}`;
     // GUI-only: net is an Electron module. Headless has no icon fetcher, so the request is skipped.
     const { net } = require('electron');

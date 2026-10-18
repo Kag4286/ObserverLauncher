@@ -203,29 +203,6 @@ async function openPlayerInspector(uuid,name){
   openPlayerInspectModal();
   pdSetTab('overview');
 
-  // v6.0.0 Track B: Render 3D Player
-  const canvas = $('#pd3dCanvas');
-  const status = $('#pd3dStatus');
-  if (canvas && status) {
-    status.hidden = false;
-    status.textContent = t('pd.loadingSkin');
-    canvas.style.opacity = '0';
-    const skinRes = await window.observer.playerSkin(uuid || name);
-    if (skinRes && skinRes.ok && skinRes.dataUri) {
-      status.hidden = true;
-      canvas.style.opacity = '1';
-      try {
-        const r = createPlayerRenderer(canvas, skinRes.dataUri, skinRes.model === 'slim');
-        if (!r) throw new Error('WebGL not supported');
-      } catch (e) {
-        status.hidden = false;
-        status.textContent = t('pd.renderFail');
-      }
-    } else {
-      status.textContent = skinRes?.error || t('pd.skinFail');
-    }
-  }
-
   const isOnline=pdIsOnline(name,uuid);
   const stEl=$('#inspectState');
   if(stEl){stEl.textContent=isOnline?t('pd.stateOnline'):t('pd.stateOffline');stEl.className='inspect-badge '+(isOnline?'online':'offline')}
@@ -242,6 +219,36 @@ async function openPlayerInspector(uuid,name){
   if(!r||!r.ok){$('#playerDataError').textContent=r?.error||t('ply.unknownReadError');return}
   const d=r.data;
   if(!d){$('#playerDataError').textContent=t('ply.corrupt');return}
+
+  // v6.0.0 Track B: Render 3D Player
+  const canvas = $('#pd3dCanvas');
+  const status = $('#pd3dStatus');
+  if (canvas && status) {
+    status.hidden = false;
+    status.textContent = t('pd.loadingSkin');
+    canvas.style.opacity = '0';
+    const skinRes = await window.observer.playerSkin(uuid || name);
+    if (skinRes && skinRes.ok && skinRes.dataUri) {
+      status.hidden = true;
+      canvas.style.opacity = '1';
+      try {
+        const equipment = {
+          helmet: d.armor?.find(x => x.slot === 'Helmet'),
+          chest: d.armor?.find(x => x.slot === 'Chestplate'),
+          legs: d.armor?.find(x => x.slot === 'Leggings'),
+          boots: d.armor?.find(x => x.slot === 'Boots'),
+        };
+        const rModel = createPlayerRenderer(canvas, skinRes.dataUri, skinRes.model === 'slim', equipment);
+        if (!rModel) throw new Error('WebGL not supported');
+      } catch (e) {
+        status.hidden = false;
+        status.textContent = t('pd.renderFail');
+      }
+    } else {
+      status.textContent = skinRes?.error || t('pd.skinFail');
+    }
+  }
+
   invSearchQuery='';ecSearchQuery='';invShowEmpty=false;ecShowEmpty=false;invSortBy='slot';ecSortBy='slot';
   const invS=$('#invSearch');if(invS)invS.value='';const ecS=$('#ecSearch');if(ecS)ecS.value='';
   const invCb=$('#invShowEmpty');if(invCb)invCb.checked=false;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=false;
