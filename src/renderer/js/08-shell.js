@@ -585,10 +585,8 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
-  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();
+  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
-  // v6.0.0 F4: show the live Prometheus status line after a save.
-  try{ const pl=$('#promStatusLine'); if(pl){ if(r.prometheus&&r.prometheus.enabled){ pl.hidden=false; pl.textContent=r.prometheus.running?t('prom.running',{p:r.prometheus.port}):t('prom.notRunning'); } else { pl.hidden=true; } } }catch{}
   toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });
 // v6.0.0 G1: RAM presets. A click sets min=max=preset and marks the buttons active; the user still

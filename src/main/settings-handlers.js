@@ -103,6 +103,9 @@ function registerSettings(ipcMain, ctx) {
       metricsLong: ctx.metricsLong,
       systemMemoryGB: Math.round(os.totalmem() / (1024 ** 3)),
       javaRequired,
+      // v6.0.0 F4: Prometheus live status so the UI status line is persistent across refreshUI,
+      // not only right after a settings save.
+      prometheus: { enabled: !!settings.prometheusEnabled, running: !!ctx.prometheusPort, port: ctx.prometheusPort || null },
       mcp: (() => {
         const running = !!ctx.mcpPort;
         // Client config: prefer the extracted launcher (userData/mcp/bridge.js + OBSERVER_MCP_USERDATA)
