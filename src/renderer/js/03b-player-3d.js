@@ -159,6 +159,14 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
     
+    if (img.height === 32) {
+      // Legacy skin: use right arm/leg UVs for the left side.
+      cLArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, armW, 12, 4));
+      cLSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.rightSleeveSlim : UV.rightSleeve, armW, 12, 4));
+      cLLeg = buildCube(4, 12, 4, uvc(UV.rightLeg, 4, 12, 4));
+      cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.rightPants, 4, 12, 4));
+    }
+    
     if (mat1) {
       armorTex1 = gl.createTexture();
       const imgA1 = new Image();
@@ -206,12 +214,15 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const cJacket = buildCube(8.25, 12.25, 4.25, uvc(UV.jacket, 8, 12, 4));
   const cRArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, armW, 12, 4));
   const cRSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.rightSleeveSlim : UV.rightSleeve, armW, 12, 4));
-  const cLArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.leftArmSlim : UV.leftArm, armW, 12, 4));
-  const cLSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.leftSleeveSlim : UV.leftSleeve, armW, 12, 4));
   const cRLeg = buildCube(4, 12, 4, uvc(UV.rightLeg, 4, 12, 4));
   const cRPants = buildCube(4.25, 12.25, 4.25, uvc(UV.rightPants, 4, 12, 4));
-  const cLLeg = buildCube(4, 12, 4, uvc(UV.leftLeg, 4, 12, 4));
-  const cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.leftPants, 4, 12, 4));
+
+  // v6.0.0 Track B: legacy skins (64x32) don't have left arm/leg UVs. They are mirrored.
+  // We define them as 'let' so we can swap them in img.onload if isLegacy.
+  let cLArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.leftArmSlim : UV.leftArm, armW, 12, 4));
+  let cLSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.leftSleeveSlim : UV.leftSleeve, armW, 12, 4));
+  let cLLeg = buildCube(4, 12, 4, uvc(UV.leftLeg, 4, 12, 4));
+  let cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.leftPants, 4, 12, 4));
 
   let rotX = 0, rotY = 0;
   let dragging = false, lastX = 0, lastY = 0;

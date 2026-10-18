@@ -72,6 +72,34 @@ function buildPlayerRows(){
 function badgeHtml(p){const b=[];if(p.op)b.push('<span class="player-badge op">OP</span>');if(p.whitelisted)b.push('<span class="player-badge whitelisted">WL</span>');if(p.banned)b.push(`<span class="player-badge banned">${t('ply.bannedBadge')}</span>`);return b.join('')}
 function rowActionBtn(action,label,active,cls='',extra=''){return `<button class="row-action ${cls} ${active?'active':''}" data-row-action="${action}" ${extra}>${label}</button>`}
 let lastPlayersSig='';
+// v6.0.0 Track B: local avatar cache to avoid CSP-blocked external images.
+const headAvatarCache = {};
+const pendingHeadFetches = new Set();
+function getHeadAvatarHtml(uuid) {
+  if (!uuid) return '<img class="player-avatar" src="assets/icons/ui/person.svg" alt="" style="padding:6px;opacity:0.6">';
+  if (headAvatarCache[uuid]) return `<img class="player-avatar" src="${headAvatarCache[uuid]}" alt="">`;
+  if (!pendingHeadFetches.has(uuid)) {
+    pendingHeadFetches.add(uuid);
+    window.observer.playerSkin(uuid).then(res => {
+      if (res && res.ok && res.dataUri) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 8; canvas.height = 8;
+          const ctx = canvas.getContext('2d');
+          // Draw face (8x8 at 8,8)
+          ctx.drawImage(img, 8, 8, 8, 8, 0, 0, 8, 8);
+          // Draw hat layer (8x8 at 40,8)
+          ctx.drawImage(img, 40, 8, 8, 8, 0, 0, 8, 8);
+          headAvatarCache[uuid] = canvas.toDataURL('image/png');
+          try { renderPlayers(); } catch {}
+        };
+        img.src = res.dataUri;
+      }
+    }).catch(() => {});
+  }
+  return '<img class="player-avatar" src="assets/icons/ui/person.svg" alt="" style="padding:6px;opacity:0.6">';
+}
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
   const all=buildPlayerRows();
@@ -92,10 +120,10 @@ function renderPlayers(){
   if(pager){pager.hidden=totalPages<=1;$('#playersPageLabel').textContent=`${t('ply.page')} ${playerPage+1} / ${totalPages}`;$('#playersPrevPage').disabled=playerPage<=0;$('#playersNextPage').disabled=playerPage>=totalPages-1}
   if(!page.length){n.innerHTML=`<div class="player-empty"><b>${t('ply.empty')}</b><span>${t('ply.emptySub')}</span></div>`}else{n.innerHTML=page.map(p=>{
     const attrs=`data-player="${esc(p.name)}" data-uuid="${esc(p.uuid||'')}"`;
-    const avatar=p.uuid?`https://mc-heads.net/avatar/${encodeURIComponent(p.uuid)}/36`:`https://mc-heads.net/avatar/MHF_Steve/36`;
+    const avatar = p.uuid ? getHeadAvatarHtml(p.uuid) : '<img class="player-avatar" src="assets/icons/ui/person.svg" alt="" style="padding:6px;opacity:0.6">';
     const meta=[p.online?`<span style="color:var(--success)">${t('ply.online')}</span>`:`<span>${t('ply.offline')}</span>`, p.hasData?t('ply.hasData'):t('ply.noData'), p.uuid?`UUID ${esc(p.uuid.slice(0,8))}…`:null].filter(Boolean).join(' • ');
     return `<div class="player-row ${p.online?'online':''}" tabindex="0" role="listitem">
-      <img class="player-avatar" src="${avatar}" alt="" onerror="this.src='https://mc-heads.net/avatar/MHF_Steve/36'">
+      ${avatar}
       <div class="player-main">
         <div class="player-name"><i class="player-row-dot"></i><b>${esc(p.name)}</b>${badgeHtml(p)}</div>
         <div class="player-meta">${meta}</div>
