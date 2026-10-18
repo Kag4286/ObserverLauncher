@@ -54,6 +54,17 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - Performance range chips `7d` and `30d`; the chart downsamples as before.
 - `tests/metrics-store.test.js` 25 checks (rollup averaging, tiered load, delete of all three files).
 
+### Added — integrations (F3, F4)
+
+**F3. Generic webhook.** Already delivered inside F1: `webhook.buildPayload` branches on `webhookFormat`, so `'generic'` posts a flat `{ event, instance, message, player, timestamp }` body. The `#webhookFormatSelect` dropdown, `getSettings`, and `refreshUI` were already wired. No code change in this pass; the item is marked DONE after verifying the existing path.
+
+**F4. Prometheus endpoint.**
+- **`src/main/prometheus.js`** exposes a loopback-only `/metrics` endpoint in the Prometheus text format. The body is built by pure `renderMetrics(rows, version)` from the SAME snapshot the cross-instance dashboard uses (`instances-snapshot.buildSnapshots`), so the two views cannot drift.
+- Metric families: `observerlauncher_info`, `observerlauncher_server_status` (0 stopped, 1 starting, 2 running, 3 stopping), `_tps`, `_mspt`, `_cpu_percent`, `_ram_percent`, `_players`, `_uptime_seconds`. A stopped server keeps `server_status` and `players` (real values) and omits the numeric series a stopped server has no number for, which is exactly what Prometheus expects.
+- **Security:** the endpoint binds `127.0.0.1` only, uses the same Origin/Host guard as `remote.js`, and refuses any non-loopback peer. The two guards moved into a new `src/main/http-guard.js` (`originOk`, `ipIsLoopback`) so the two servers cannot drift; `remote.js` was refactored to use them (no-dup enforced).
+- Settings gain `prometheusEnabled` (off) and `prometheusPort` (0 = random). Lifecycle hooks in `main.js` + `headless.js`, and `settings:save` toggles/restarts the server on a port change. A new card in Settings > Advanced has an on/off switch, a port field, and a live status line.
+- `tests/prometheus.test.js` 30 checks (format, escapeLabel, stopped-row omissions, server guards for Host/Origin/loopback). 7 `prom.*` keys x 7 locales (1215).
+
 ### Added — Datapack manager UI (C5)
 - **Enable/disable/delete** on a datapack were already part of the shared content list. C5 adds the three datapack-specific actions that were only reachable from an MCP client.
 - **Validate** reads `pack.mcmeta` from a folder or a `.zip` (via `jar-read.js`) and classifies the `pack_format` against the server's Minecraft version. The GUI toast colour mirrors the verdict (ok, warn, unknown). The pure logic already existed in `datapack.js`.

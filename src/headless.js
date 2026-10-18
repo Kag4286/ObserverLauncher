@@ -72,6 +72,10 @@ function createHeadless() {
   const remote = require('./main/remote.js');
   ctx.startRemoteServer = async () => { try { await remote.startRemote(ctx); } catch (e) { try { ctx.appendLog('Remote start failed: ' + (e?.message || e), 'error'); } catch {} } };
   ctx.stopRemoteServer = () => { try { remote.stopRemote(ctx); } catch {} };
+  // v6.0.0 F4: Prometheus endpoint lifecycle.
+  const prom = require('./main/prometheus.js');
+  ctx.startPrometheus = async () => { try { await prom.startPrometheus(ctx); } catch (e) { try { ctx.appendLog('Prometheus start failed: ' + (e?.message || e), 'error'); } catch {} } };
+  ctx.stopPrometheus = () => { try { prom.stopPrometheus(ctx); } catch {} };
 
   return { ctx, shim, ipcWrap };
 }
@@ -118,6 +122,9 @@ async function start() {
     const rOn = !!loadSettings().remoteEnabled;
     rt.ctx.currentRemoteEnabled = rOn;
     if (rOn) await rt.ctx.startRemoteServer();
+    const pOn = !!loadSettings().prometheusEnabled;
+    rt.ctx.currentPrometheusEnabled = pOn;
+    if (pOn) await rt.ctx.startPrometheus();
   } catch {}
   return rt;
 }

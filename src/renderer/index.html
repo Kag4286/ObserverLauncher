@@ -676,6 +676,13 @@
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="wh.format">Payload format</b><small data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</small></div><select class="ol-select" id="webhookFormatSelect" style="max-width:220px"><option value="discord" data-i18n="wh.formatDiscord">Discord</option><option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option></select></div>
             <div class="input-row"><span class="hint" data-i18n="wh.hint">Sent only on your machine; a bad URL is ignored silently.</span><button type="button" class="btn secondary sm" id="webhookTestBtn" style="margin-left:auto" data-i18n="wh.test">Send test</button></div>
           </section>
+          <!-- v6.0.0 F4: Prometheus /metrics endpoint for a Grafana scrape. Loopback only. -->
+          <section class="flat-cell">
+            <div class="sec-head"><img src="./assets/icons/ui/gauge.svg" alt=""><h3 data-i18n="prom.title">Prometheus metrics</h3><small data-i18n="prom.sub">Let Grafana scrape server metrics from a local endpoint.</small></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="prom.enable">Enable /metrics endpoint</b><small data-i18n="prom.enableSub">Loopback only. Scrape <code>http://127.0.0.1:&lt;port&gt;/metrics</code>.</small></div><label class="switch"><input type="checkbox" id="prometheusEnabledInput"><span class="switch-track"></span></label></div>
+            <label class="set-field"><span data-i18n="prom.port">Port (0 = random free port)</span><input id="prometheusPortInput" type="number" min="0" max="65535" placeholder="0"></label>
+            <p class="hint" id="promStatusLine" hidden></p>
+          </section>
           <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
           <section class="flat-cell">
             <div class="sec-head"><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>

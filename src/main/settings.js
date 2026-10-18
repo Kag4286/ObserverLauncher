@@ -64,6 +64,8 @@ function defaultGlobal() {
     // v6.0.0 F1: webhook notifications (Discord-compatible). Empty URL = off. webhookEvents is the
     // subscribed list; webhookFormat is 'discord' (default) or 'generic'.
     webhookUrl: '', webhookEvents: ['start', 'stop', 'crash'], webhookFormat: 'discord',
+    // v6.0.0 F4: Prometheus /metrics endpoint. Off by default; binds 127.0.0.1 only when on.
+    prometheusEnabled: false, prometheusPort: 0,
     // 4.0.0: auto-check for app updates on startup (global). v6.0.0 H4: replaced the boolean with a
     // 3-way policy read by setupAutoUpdater:
     //   'auto' = check on startup AND download automatically, then prompt to install

@@ -70,6 +70,7 @@ function remoteAddresses(port) {
 //   opts: { token, allow, readOnly, handlers:{ status, console, players, command }, version }
 // Returns { server, port, close() }. Binds 127.0.0.1 ONLY. Never serves write/destroy/install.
 const http = require('http');
+const { originOk, ipIsLoopback } = require('./http-guard.js');
 const fs = require('fs');
 const path = require('path');
 function createRemoteServer(opts) {
@@ -110,15 +111,10 @@ function createRemoteServer(opts) {
   const rateLimited = require('./rate-limit.js').makeRateLimiter(300, 60000);
   const server = http.createServer((req, res) => {
     // SECURITY: reject browser-shaped cross-origin requests up front (localhost CSRF /
-    // DNS-rebinding), same defense-in-depth as the MCP server. 4.4.0: the dashboard is served from
-    // THIS origin, so its fetch() calls carry an Origin header — allow a SAME-ORIGIN Origin (its
-    // host:port matches the Host header); any other Origin stays 403. No Origin = the CLI/curl client.
-    const origin = req.headers['origin'];
-    if (origin) {
-      let sameOrigin = false;
-      try { sameOrigin = new URL(origin).host === String(req.headers['host'] || ''); } catch {}
-      if (!sameOrigin) { res.writeHead(403); return res.end('forbidden'); }
-    }
+    // DNS-rebinding). Shared with prometheus.js via http-guard.originOk(). 4.4.0: the dashboard is
+    // served from THIS origin, so its fetch() calls carry an Origin header — allow a SAME-ORIGIN
+    // Origin (its host:port matches the Host header); any other Origin stays 403. No Origin = CLI/curl.
+    if (!originOk(req)) { res.writeHead(403); return res.end('forbidden'); }
     // BUGFIX: hostFromHeader handles an IPv6 Host ('[::1]:8080') that split(':')[0] would break.
     const hostHdr = require('./validate.js').hostFromHeader(req.headers['host']);
     // BUGFIX: when the user binds to 0.0.0.0 ("expose directly"), the real client still sends

@@ -237,6 +237,17 @@ function registerSettings(ipcMain, ctx) {
       try { if (typeof ctx.startRemoteServer === 'function') await ctx.startRemoteServer(); } catch {}
     }
     ctx.currentRemoteEnabled = nowRemote;
+    // v6.0.0 F4: Prometheus endpoint toggle (same shape as remote). Restart on a config change.
+    const wasProm = !!ctx.currentPrometheusEnabled;
+    const nowProm = !!merged.prometheusEnabled;
+    const promCfgChanged = Number(prev.prometheusPort || 0) !== Number(merged.prometheusPort || 0);
+    if (nowProm && !wasProm && typeof ctx.startPrometheus === 'function') { try { await ctx.startPrometheus(); } catch {} }
+    else if (!nowProm && wasProm && typeof ctx.stopPrometheus === 'function') { try { ctx.stopPrometheus(); } catch {} }
+    else if (nowProm && wasProm && promCfgChanged) {
+      try { if (typeof ctx.stopPrometheus === 'function') ctx.stopPrometheus(); } catch {}
+      try { if (typeof ctx.startPrometheus === 'function') await ctx.startPrometheus(); } catch {}
+    }
+    ctx.currentPrometheusEnabled = nowProm;
     // startMcpServer sets ctx.mcpPort from listen()'s async callback — wait briefly so the status
     // we return (and the UI shows) is accurate instead of a stale null "stopped".
     if (nowMcp) { for (let i = 0; i < 50 && !ctx.mcpPort; i++) await new Promise(r => setTimeout(r, 20)); }
@@ -254,6 +265,8 @@ function registerSettings(ipcMain, ctx) {
       // 4.3.0: mirror the live remote status so the UI refreshes right after Save (it already
       // consumes r.remote in 08-shell.js). Never includes the token.
       remote: (() => { try { const { remoteSnapshot } = require('./remote.js'); return { ...remoteSnapshot(merged), running: !!ctx.remotePort, port: ctx.remotePort || null }; } catch { return undefined; } })(),
+      // v6.0.0 F4: mirror the live Prometheus status so the UI refreshes after Save.
+      prometheus: { enabled: !!merged.prometheusEnabled, running: !!ctx.prometheusPort, port: ctx.prometheusPort || null },
     };
   });
 

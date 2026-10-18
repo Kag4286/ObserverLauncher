@@ -115,6 +115,11 @@ app.whenReady().then(async () => {
   ctx.startRemoteServer = async () => { try { await remote.startRemote(ctx); } catch (e) { try { ctx.appendLog('Remote start failed: ' + (e?.message || e), 'error'); } catch {} } };
   ctx.stopRemoteServer = () => { try { remote.stopRemote(ctx); } catch {} };
   try { const rOn = !!require('./main/settings.js').loadSettings().remoteEnabled; ctx.currentRemoteEnabled = rOn; if (rOn) ctx.startRemoteServer(); } catch {}
+  // v6.0.0 F4: Prometheus endpoint lifecycle.
+  const prom = require('./main/prometheus.js');
+  ctx.startPrometheus = async () => { try { await prom.startPrometheus(ctx); } catch (e) { try { ctx.appendLog('Prometheus start failed: ' + (e?.message || e), 'error'); } catch {} } };
+  ctx.stopPrometheus = () => { try { prom.stopPrometheus(ctx); } catch {} };
+  try { const pOn = !!require('./main/settings.js').loadSettings().prometheusEnabled; ctx.currentPrometheusEnabled = pOn; if (pOn) ctx.startPrometheus(); } catch {}
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

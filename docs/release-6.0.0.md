@@ -92,6 +92,10 @@ A datapack in the Content tab now has a Check button that reads its `pack.mcmeta
 
 Under the datapack list there is a Datapack load order panel. Minecraft applies datapacks in order, and a later pack overrides a function from an earlier one when both define the same thing. The panel shows the current order with arrows to move a pack up or down. Saving needs the server stopped. The world is backed up first.
 
+## Scrape your server metrics with Prometheus
+
+If you run Grafana, Settings > Advanced now has a Prometheus section. Turn it on and the app serves a `/metrics` endpoint on `127.0.0.1` in the standard Prometheus format: TPS, MSPT, CPU, RAM, player count and uptime for every server, labelled by instance. Point Prometheus at `http://127.0.0.1:<port>/metrics` and the numbers land in Grafana. The endpoint never leaves your machine.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.
