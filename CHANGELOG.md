@@ -12,6 +12,14 @@ All notable changes to ObserverLauncher are documented here. Format follows
 
 ## [6.0.0] — UNRELEASED
 
+### Added — Multi-server controls (Track E)
+
+**E2. Start all and stop all.**
+- **`src/main/bulk-instances.js`** holds the decision as two pure functions. `planStartAll(instances, statusOf)` returns the ids to start and the ids to skip with a reason (running, starting, stopping, missing, no-path). `planStopAll` does the same for stopping (skips stopped and stopping; a starting instance is still stoppable). A shared `eachInstance` walk drops null or id-less entries so a half-built list never crashes the loop.
+- **Sequential, not parallel.** `instances:start-all` and `instances:stop-all` run one server at a time inside `ctx.runInInstance(id, ...)` so each call writes only that instance's runtime state and N servers booting at once cannot spike the CPU or race for a port.
+- **Renderer:** a two-button `Start all` / `Stop all` bar under the instance rows, shown only when there are two or more instances. A single-instance rail stays unchanged. `withBusy` blocks a double-click while a long start-all is in flight; the toast summarises started/stopped, failures, and skipped.
+- 8 new `inst.*` i18n keys in 7 locales (1178 total). `tests/start-all.test.js` 16 checks. Arch channel count 94.
+
 **Bedrock crossplay that works end to end, a month of metrics history, and a hardening pass.** No settings migration.
 
 > Written before the release ships. This section lists what has landed so far. The date and the user-facing note are finalized when 6.0.0 is tagged.

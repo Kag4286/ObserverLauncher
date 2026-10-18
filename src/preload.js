@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('observer', {
   getRemoteToken: () => ipcRenderer.invoke('remote:token'),
   // v2.0.0 multi-instance (Phase B backend)
   instancesList: () => ipcRenderer.invoke('instances:list'),
+  instancesStartAll: () => ipcRenderer.invoke('instances:start-all'),
+  instancesStopAll: () => ipcRenderer.invoke('instances:stop-all'),
   instanceAdd: payload => ipcRenderer.invoke('instances:add', payload),
   instanceSwitch: id => ipcRenderer.invoke('instances:switch', id),
   instanceRename: payload => ipcRenderer.invoke('instances:rename', payload),

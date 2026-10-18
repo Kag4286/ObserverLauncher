@@ -248,6 +248,9 @@ function renderInstanceList(){
     row.querySelector('[data-act="remove"]').onclick=e=>{e.stopPropagation();removeInstancePrompt(inst)};
     host.appendChild(row);
   });
+  // v6.0.0 E2: show the bulk bar only when 2+ instances exist (one instance has nothing to bulk).
+  const bulk=$('#instBulk');
+  if(bulk) bulk.hidden = list.length < 2;
   renderInstanceDropdown(list, activeId);
 }
 // 4.5.0 instance appearance: render the accent swatches + avatar-art preview for the ACTIVE instance
@@ -608,6 +611,25 @@ $('#savePlayerData').onclick=async()=>{if(!selectedPlayer)return toast(t('toast.
 $('#startBtn').onclick=()=>withBusy($('#startBtn'),async()=>{let r;try{r=await window.observer.start(getSettings())}catch(e){toast(`Start failed: ${e?.message||e}`,'error');return}if(!r||!r.ok){toast((r&&r.error)||t('toast.startUnknown'),'error');if(r&&r.error&&r.error.includes('Java')){switchTab('overview');const jw=$('#javaWarnBanner');if(jw&&!jw.hidden)jw.scrollIntoView({behavior:'smooth',block:'center'})}}else toast(t('toast.startRequested'))});$('#stopBtn').onclick=()=>withBusy($('#stopBtn'),async()=>{let r;try{r=await window.observer.stop()}catch(e){toast(`Stop failed: ${e?.message||e}`,'error');return}if(!r.ok)toast(r.error)});
 $('#restartBtn').onclick=()=>withBusy($('#restartBtn'),async()=>{if(!await confirmDialog({title:t('top.restart'),body:t('top.restartConfirm'),ok:t('top.restart')}))return;let r;try{r=await window.observer.restart(getSettings())}catch(e){toast(`Restart failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||t('toast.restartFailed'),'error');else toast(t('toast.restarting'))});
 $('#forceStopBtn').onclick=()=>withBusy($('#forceStopBtn'),async()=>{if(!await confirmDialog({title:t('top.forceStop'),body:t('top.forceStopConfirm'),ok:t('top.forceStop'),danger:true}))return;let r;try{r=await window.observer.forceStop()}catch(e){toast(`Force stop failed: ${e?.message||e}`,'error');return}if(!r||!r.ok)toast((r&&r.error)||'Force stop failed.','error');else toast(t('toast.forceStopped'),'success')});
+// v6.0.0 E2: bulk Start all / Stop all. The backend is SEQUENTIAL and each instance runs in its
+// own ALS scope; the UI just shows a summary. withBusy prevents a double-click storm while a long
+// start-all is in flight (gotcha 18).
+$('#startAllBtn')?.addEventListener('click',()=>withBusy($('#startAllBtn'),async()=>{
+  let r; try{ r=await window.observer.instancesStartAll(); }catch(e){ return toast(e?.message||'Start all failed.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Start all failed.','error');
+  const n=r.started||0,f=(r.failed||[]).length,s=(r.skipped||[]).length;
+  if(f)toast(t('inst.startAllFailed',{n:f}),'error');
+  else if(n)toast(t('inst.startAllDone',{n}),'success');
+  else if(s)toast(t('inst.startAllNone'));
+}));
+$('#stopAllBtn')?.addEventListener('click',()=>withBusy($('#stopAllBtn'),async()=>{
+  let r; try{ r=await window.observer.instancesStopAll(); }catch(e){ return toast(e?.message||'Stop all failed.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Stop all failed.','error');
+  const n=r.stopped||0,f=(r.failed||[]).length,s=(r.skipped||[]).length;
+  if(f)toast(t('inst.stopAllFailed',{n:f}),'error');
+  else if(n)toast(t('inst.stopAllDone',{n}),'success');
+  else if(s)toast(t('inst.stopAllNone'));
+}));
 window.observer.onLog(addLog);window.observer.onState(v=>{
   // M5/B4: server:state is NOT gated (the rail needs a background instance's crash/stop). Record
   // it per instance, then let the ACTIVE view ignore a background instance or it would flip the

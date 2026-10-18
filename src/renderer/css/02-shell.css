@@ -116,6 +116,13 @@ html.motion-lite .tun-ov-row{animation:none}
 .inst-add{display:flex;align-items:center;gap:6px;margin-top:2px;padding:7px 8px;border:1px dashed var(--border);border-radius:var(--r-sm);background:transparent;color:var(--text-muted);font:600 12px var(--font-ui);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast)}
 .inst-add:hover{color:var(--text);border-color:var(--border-strong)}
 .inst-add span[aria-hidden]{font-size:15px;line-height:1}
+/* v6.0.0 E2: bulk Start all / Stop all for the rail. Explicit color (buttons do NOT inherit; gotcha 23),
+   a --dur-fast transition only (motion ratchet), and a soft secondary weight so it reads as a helper
+   action under the instance rows, not a primary CTA. */
+.inst-bulk{display:flex;gap:6px;margin-top:2px}
+.inst-bulk-btn{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);color:var(--text-muted);font:600 11px var(--font-ui);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast),background var(--dur-fast)}
+.inst-bulk-btn:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel)}
+.inst-bulk-btn[aria-busy="true"]{opacity:.6;cursor:progress}
 .rail-foot{padding:10px 12px;border-top:1.5px solid var(--border);font:500 10px var(--font-mono);color:var(--text-dim);display:flex;justify-content:flex-end}
 /* BUGFIX: with titleBarStyle:'hidden' (Windows) there was no -webkit-app-region drag strip anywhere,
 so the window could not be moved by dragging at all. The top command bar is now the drag handle. */

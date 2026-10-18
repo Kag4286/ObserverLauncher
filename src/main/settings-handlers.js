@@ -13,6 +13,7 @@ const { localIPv4s } = require('./network.js');
 const { download, marketplaceError, withTimeout } = require('./http.js');
 const { findFileRecursive } = require('./fs-utils.js');
 const platform = require('./platform');
+const { planStartAll, planStopAll } = require('./bulk-instances.js');
 
 let javaInstalling = false;
 
@@ -267,6 +268,44 @@ function registerSettings(ipcMain, ctx) {
   // Every mutation re-seeds ctx so activeInstanceId + the merged instance state stay in
   // sync. With a single instance nothing here is user-reachable, so behaviour is unchanged.
   ipcMain.handle('instances:list', async () => listInstances());
+
+  // v6.0.0 E2: start/stop every instance from the rail. The DECISION is pure (bulk-instances.js)
+  // so the skip rules are unit-tested; this handler is a thin SEQUENTIAL loop. Sequential, not
+  // parallel, because N servers booting at once spike CPU and race for the same port. Each call
+  // re-enters that instance's ALS scope (mirror scheduler.js) so a start/stop can never write
+  // another instance's runtime state.
+  function statusOf(id) {
+    const st = ctx.instances && ctx.instances.get(id);
+    return (st && st.serverStatus) || 'stopped';
+  }
+  ipcMain.handle('instances:start-all', async () => {
+    const { startServerInternal } = require('./server-lifecycle.js');
+    const plan = planStartAll(listInstances(), statusOf);
+    const failed = [];
+    let started = 0;
+    for (const id of plan.start) {
+      try {
+        const r = await ctx.runInInstance(id, () => startServerInternal(ctx, loadSettingsFor(id)));
+        if (r && r.ok === false) failed.push({ id, error: r.error || 'start failed' });
+        else started++;
+      } catch (e) { failed.push({ id, error: e?.message || String(e) }); }
+    }
+    return { ok: true, started, failed, skipped: plan.skip };
+  });
+  ipcMain.handle('instances:stop-all', async () => {
+    const { requestStop } = require('./server-lifecycle.js');
+    const plan = planStopAll(listInstances(), statusOf);
+    const failed = [];
+    let stopped = 0;
+    for (const id of plan.stop) {
+      try {
+        const r = await ctx.runInInstance(id, () => requestStop(ctx));
+        if (r && r.ok === false) failed.push({ id, error: r.error || 'stop failed' });
+        else stopped++;
+      } catch (e) { failed.push({ id, error: e?.message || String(e) }); }
+    }
+    return { ok: true, stopped, failed, skipped: plan.skip };
+  });
 
   // Q3: does a folder ALREADY contain a Minecraft server? Lets the Add-instance wizard offer
   // "import as-is" instead of downloading a fresh jar. Read-only probe, never throws.

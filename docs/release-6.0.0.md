@@ -72,6 +72,10 @@ If the server stops on its own (not because you pressed Stop), the app now finds
 
 Settings has a Notifications section that can post to a Discord webhook. Paste a webhook address from your Discord server, pick which events you care about (start, stop, crash, player joins), and press Send test to check it works. It only sends from your own computer, and a bad address is ignored quietly instead of breaking anything.
 
+## Start or stop all your servers at once
+
+When you have more than one server in the rail, two buttons appear under the list: Start all and Stop all. The app skips a server that is already running, already booting, or whose folder is missing, so you are never starting a server twice. Booting them one at a time keeps your machine responsive.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.

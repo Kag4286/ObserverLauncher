@@ -22,6 +22,10 @@
     <div class="instance-list" id="instanceList" hidden>
       <p class="instance-list-label" data-i18n="nav.instances">Instances</p>
       <div class="instance-items" id="instanceItems" role="list"></div>
+      <div class="inst-bulk" id="instBulk" hidden>
+        <button type="button" class="inst-bulk-btn" id="startAllBtn" data-i18n="inst.startAll">Start all</button>
+        <button type="button" class="inst-bulk-btn" id="stopAllBtn" data-i18n="inst.stopAll">Stop all</button>
+      </div>
       <button type="button" class="inst-add" id="addServerBtn"><span aria-hidden="true">+</span> <span data-i18n="nav.addInstance">Add server</span></button>
     </div>
     <nav id="nav" class="rail-nav" role="navigation" aria-label="Main">
@@ -643,6 +647,7 @@
             <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="wh.title">Notifications</h3><small data-i18n="wh.sub">Post a message to a Discord webhook when something happens.</small></div>
             <label class="set-field"><span data-i18n="wh.url">Webhook URL</span><input id="webhookUrlInput" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off"><small class="field-hint" data-i18n="wh.urlSub">Paste a Discord webhook URL (Server Settings > Integrations > Webhooks). Leave empty to disable.</small></label>
             <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="wh.events">Events</b><small data-i18n="wh.eventsSub">Which events send a message.</small></div><div class="wh-events" id="webhookEvents"><label class="filter-chip"><input type="checkbox" data-wh-event="start"> <span data-i18n="wh.ev.start">Start</span></label><label class="filter-chip"><input type="checkbox" data-wh-event="stop"> <span data-i18n="wh.ev.stop">Stop</span></label><label class="filter-chip"><input type="checkbox" data-wh-event="crash"> <span data-i18n="wh.ev.crash">Crash</span></label><label class="filter-chip"><input type="checkbox" data-wh-event="player_join"> <span data-i18n="wh.ev.join">Player joins</span></label></div></div>
+            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="wh.format">Payload format</b><small data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</small></div><select class="ol-select" id="webhookFormatSelect" style="max-width:220px"><option value="discord" data-i18n="wh.formatDiscord">Discord</option><option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option></select></div>
             <div class="input-row"><span class="hint" data-i18n="wh.hint">Sent only on your machine; a bad URL is ignored silently.</span><button type="button" class="btn secondary sm" id="webhookTestBtn" style="margin-left:auto" data-i18n="wh.test">Send test</button></div>
           </section>
           <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
