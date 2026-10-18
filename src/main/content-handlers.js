@@ -95,6 +95,11 @@ function registerContent(ipcMain, ctx) {
     if (!r.ok) return r;
     return { ok: true, mod, text: r.text };
   };
+  ipcMain.handle('player:skin', async (_, { input } = {}) => {
+    try { return await require('./skins.js').getSkin(String(input || '')); }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
   ipcMain.handle('proxy:servers:get', async () => {
     const R = loadProxyConfig();
     if (!R.ok) return R;

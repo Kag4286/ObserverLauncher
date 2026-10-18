@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('observer', {
   metricsLong: range => ipcRenderer.invoke('metrics:long', range),
   // v6.0.0 F1: webhook notifications.
   webhookTest: () => ipcRenderer.invoke('webhook:test'),
+  playerSkin: input => ipcRenderer.invoke('player:skin', { input }),
   proxyServerGet: () => ipcRenderer.invoke('proxy:servers:get'),
   proxyServerAdd: payload => ipcRenderer.invoke('proxy:servers:add', payload),
   proxyServerRemove: payload => ipcRenderer.invoke('proxy:servers:remove', payload),

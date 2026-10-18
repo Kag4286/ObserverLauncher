@@ -202,6 +202,30 @@ async function openPlayerInspector(uuid,name){
   selectedPlayer={uuid:uuid||null,name};
   openPlayerInspectModal();
   pdSetTab('overview');
+
+  // v6.0.0 Track B: Render 3D Player
+  const canvas = $('#pd3dCanvas');
+  const status = $('#pd3dStatus');
+  if (canvas && status) {
+    status.hidden = false;
+    status.textContent = t('pd.loadingSkin');
+    canvas.style.opacity = '0';
+    const skinRes = await window.observer.playerSkin(uuid || name);
+    if (skinRes && skinRes.ok && skinRes.dataUri) {
+      status.hidden = true;
+      canvas.style.opacity = '1';
+      try {
+        const r = createPlayerRenderer(canvas, skinRes.dataUri, skinRes.model === 'slim');
+        if (!r) throw new Error('WebGL not supported');
+      } catch (e) {
+        status.hidden = false;
+        status.textContent = t('pd.renderFail');
+      }
+    } else {
+      status.textContent = skinRes?.error || t('pd.skinFail');
+    }
+  }
+
   const isOnline=pdIsOnline(name,uuid);
   const stEl=$('#inspectState');
   if(stEl){stEl.textContent=isOnline?t('pd.stateOnline'):t('pd.stateOffline');stEl.className='inspect-badge '+(isOnline?'online':'offline')}

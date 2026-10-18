@@ -68,6 +68,13 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - **Status line reflects intent:** the Settings line reads the toggle as well as the backend state, so turning the switch on shows 'Prometheus will start on Apply' immediately and the saved line shows 'running on port X' after a successful Apply. A **Copy URL** button appears next to a running server so the correct port is one click away (the most common cause of a 404 is curling a stale port).
 - **Port field:** switched from `type=number` (which kept the OS spinner) to `type=text inputmode=numeric`, width-capped. `tests/prometheus-headless.test.js` boots a real headless ctx, enables Prometheus, and curls `/metrics` end to end (11 checks).
 
+### Added — Player Inspector: 3D Skin Render (Track B - B1a)
+- **New `src/main/skins.js`** resolves a player's UUID via the Mojang session server, decodes the Base64 texture property, and downloads the `64x64` PNG. The PNG is cached in `userData/textures/skins/<uuid>.png` and returned as a `dataUri` so the renderer can load it without CSP issues.
+- **New `src/renderer/js/03b-player-3d.js`** renders the Minecraft humanoid model using raw WebGL (no Three.js, no bundler). It builds 6 body parts (head, body, arms, legs) plus their outer overlay layers (hat, jacket, sleeves, pants), maps the skin UVs precisely, and supports both classic (Steve, 4px arm) and slim (Alex, 3px arm) models.
+- The Player Inspector modal now has a 3D canvas at the top of the Overview tab. Drag to rotate. If a player has no custom skin or is offline without a Mojang profile, it shows a clear fallback message.
+- New IPC `player:skin`. 4 new keys (`pd.loadingSkin`, `pd.renderFail`, `pd.skinFail`).
+- Spike notes: `docs/v6.0.0-sp2.md`, `sp3`, `sp4`.
+
 ### Added — Velocity backend manager (E1)
 - A Velocity proxy uses `velocity.toml` to list its backend servers. Editing that file by hand is easy to break (TOML syntax, quotes, priority list), so the Properties tab now shows a **Backend servers** card when the active server is a proxy (a `.jar` with "velocity" in its name).
 - `src/main/proxy-config.js` parses, adds and removes servers at the **line level**, so the user's own comments and the rest of the file are never re-serialized or lost (the same rule the Geyser config fixer follows).

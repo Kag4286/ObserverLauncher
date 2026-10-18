@@ -728,6 +728,11 @@
           <button type="button" class="inspect-tab" data-pd-tab="edit" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
         </div>
         <div class="inspect-panel active" id="pdPanelOverview">
+        <!-- v6.0.0 Track B: 3D Player Model -->
+        <div class="pd-3d-container" id="pd3dContainer">
+          <canvas id="pd3dCanvas"></canvas>
+          <div id="pd3dStatus" class="pd-3d-status" hidden></div>
+        </div>
         <div class="inspect-readout" id="pdReadout"></div>
         <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="text-list"></div></div>
         <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
@@ -1015,4 +1020,5 @@
     <div class="nsw-actions"><span class="im-note" id="imNote"></span><span class="nsw-actions-spacer"></span><button class="btn secondary" id="imCancel" data-i18n="im.cancel">Cancel</button><button class="btn primary" id="imInstall" data-i18n="im.install">Install</button></div>
   </div>
 </div>
-<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00b-instance-art.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/02b-gamerules.js"></script><script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>
+<script src="locales/meta.js"></script><script src="locales/en.js"></script><script src="locales/vi.js"></script><script src="locales/es.js"></script><script src="locales/pt-BR.js"></script><script src="locales/de.js"></script><script src="locales/ru.js"></script><script src="locales/zh-CN.js"></script><script src="js/00-core.js"></script><script src="js/00b-instance-art.js"></script><script src="js/00-dropdown.js"></script><script src="js/01-content.js"></script><script src="js/01b-editor.js"></script><script src="js/02-worldmap.js"></script><script src="js/02b-gamerules.js"></script><script src="js/03b-player-3d.js"></script>
+<script src="js/03-players.js"></script><script src="js/04-worlds.js"></script><script src="js/05-marketplace.js"></script><script src="js/06-properties.js"></script><script src="js/07-overview.js"></script><script src="js/08-shell.js"></script><script src="js/10-properties.js"></script><script src="js/11-market.js"></script><script src="js/12-wizard.js"></script><script src="js/13-bootcheck.js"></script></body></html>
