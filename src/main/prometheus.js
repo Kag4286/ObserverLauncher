@@ -132,6 +132,12 @@ async function startPrometheus(ctx) {
     },
   });
   const actualPort = await srv.listen();
+  // If the port we bound differs from the saved value (0 -> random, or a <1024 rewrite), persist
+  // the real port so the next Apply reuses the same one. Without this, a random port would change
+  // on every save and confuse a Grafana scrape that hard-codes the URL.
+  if (actualPort !== Number(s.prometheusPort || 0)) {
+    try { const cur = loadSettings(); cur.prometheusPort = actualPort; require('./settings.js').saveSettings(cur); } catch {}
+  }
   ctx.prometheusServer = srv; ctx.prometheusPort = actualPort;
   return { port: actualPort };
 }

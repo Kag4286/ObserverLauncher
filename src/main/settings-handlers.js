@@ -260,6 +260,9 @@ function registerSettings(ipcMain, ctx) {
     const mcpStatus = { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!merged.mcpAutoAllowWrite };
     return {
       ok: true,
+      // v6.0.0 F4: the backend may have rewritten prometheusPort (0 -> real port, or <1024 -> 0)
+      // during startPrometheus, so hand back the SAVED settings so the renderer reflects reality.
+      settings: loadSettings(),
       java: ctx.javaInfo,
       files: serverFiles(ctx.currentServerPath),
       eulaAccepted: readEula(ctx.currentServerPath),

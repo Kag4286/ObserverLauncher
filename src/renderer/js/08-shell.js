@@ -519,7 +519,7 @@ async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
 function renderRecentCommands(){const wrap=$('#recentCommands'),group=$('#recentCommandsGroup');if(!wrap||!group)return;if(!cmdHistory.length){group.hidden=true;return}group.hidden=false;wrap.innerHTML='';cmdHistory.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.title=c;b.onclick=()=>command(c);wrap.append(b)})}
-async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
+async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
 $$('.nav-item').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $('#nav')?.addEventListener('keydown', e=>{
   const items=[...$$('.nav-item')]; const idx=items.indexOf(document.activeElement);
@@ -585,7 +585,7 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
-  state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();
+  state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });
@@ -606,7 +606,7 @@ $('#webhookTestBtn')?.addEventListener('click',()=>withBusy($('#webhookTestBtn')
   if(!next.webhookUrl)return toast(t('wh.noUrl'),'error');
   const saved=await window.observer.saveSettings(next);
   if(!saved||!saved.ok)return toast((saved&&saved.error)||t('wh.saveFail'),'error');
-  state={...state,settings:next,java:saved.java};markSettingsSaved();refreshUI();
+  state={...state,settings:saved.settings||next,java:saved.java};markSettingsSaved();refreshUI();
   const r=await window.observer.webhookTest();
   if(!r||!r.ok)return toast((r&&r.error)||t('wh.testFail'),'error');
   toast(t('wh.testOk'),'success');
@@ -614,7 +614,7 @@ $('#webhookTestBtn')?.addEventListener('click',()=>withBusy($('#webhookTestBtn')
 $('#saveRamOverview').onclick=()=>withBusy($('#saveRamOverview'),async()=>{
   const next=getSettings();
   if(next.memoryMax<next.memoryMin)return toast(t('set.errMemOrder'),'error');
-  const r=await window.observer.saveSettings(next);state={...state,settings:next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
+  const r=await window.observer.saveSettings(next);state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired};markSettingsSaved();refreshUI();toast(t('toast.ramSaved'),'success');
 });
 // v5.3.1: the language dropdown now follows the SAME edit->Apply flow as the other settings.
 // It used to live-apply on change, which was inconsistent (motion level + beginner mode need Apply).
