@@ -88,7 +88,11 @@ function createPrometheusServer(opts) {
     const hostOk = !h || h === '127.0.0.1' || h === 'localhost' || h === '::1' || h === '[::1]';
     if (!hostOk) { res.writeHead(403); return res.end('forbidden'); }
     if (!ipIsLoopback(req)) { res.writeHead(403); return res.end('forbidden'); }
-    if (req.method !== 'GET' || req.url !== '/metrics') { res.writeHead(404); return res.end('not found'); }
+    // BUGFIX: Invoke-WebRequest (PowerShell's curl alias) and some browsers append a trailing
+    // slash or query string. Parse the pathname instead of exact-matching the raw req.url.
+    let pathname = (() => { try { return new URL(req.url, 'http://127.0.0.1').pathname; } catch { return ''; } })();
+    if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+    if (req.method !== 'GET' || pathname !== '/metrics') { res.writeHead(404); return res.end('not found'); }
     let body;
     try { body = renderMetrics(o.snapshot && o.snapshot(), o.version); }
     catch { res.writeHead(500); return res.end('scrape failed'); }

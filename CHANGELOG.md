@@ -63,7 +63,8 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - Metric families: `observerlauncher_info`, `observerlauncher_server_status` (0 stopped, 1 starting, 2 running, 3 stopping), `_tps`, `_mspt`, `_cpu_percent`, `_ram_percent`, `_players`, `_uptime_seconds`. A stopped server keeps `server_status` and `players` (real values) and omits the numeric series a stopped server has no number for, which is exactly what Prometheus expects.
 - **Security:** the endpoint binds `127.0.0.1` only, uses the same Origin/Host guard as `remote.js`, and refuses any non-loopback peer. The two guards moved into a new `src/main/http-guard.js` (`originOk`, `ipIsLoopback`) so the two servers cannot drift; `remote.js` was refactored to use them (no-dup enforced).
 - Settings gain `prometheusEnabled` (off) and `prometheusPort` (0 = random). Lifecycle hooks in `main.js` + `headless.js`, and `settings:save` toggles/restarts the server on a port change. A new card in Settings > Advanced has an on/off switch, a port field, and a live status line.
-- `tests/prometheus.test.js` 30 checks (format, escapeLabel, stopped-row omissions, server guards for Host/Origin/loopback). 7 `prom.*` keys x 7 locales (1215).
+- `tests/prometheus.test.js` 32 checks (format, escapeLabel, stopped-row omissions, server guards for Host/Origin/loopback, trailing-slash + query-string tolerance). 7 `prom.*` keys x 7 locales (1215).
+- **Trailing-slash fix:** PowerShell's `Invoke-WebRequest` (alias of `curl`) appends a trailing slash on `/metrics`, which the exact-string router returned 404 for. The route now parses the pathname and strips a trailing slash, so `http://127.0.0.1:<port>/metrics`, `/metrics/` and `/metrics?x=1` all return the same body.
 
 ### Added — Datapack manager UI (C5)
 - **Enable/disable/delete** on a datapack were already part of the shared content list. C5 adds the three datapack-specific actions that were only reachable from an MCP client.

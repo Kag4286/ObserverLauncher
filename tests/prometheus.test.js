@@ -68,6 +68,11 @@ ok('empty rows -> info only', P.renderMetrics([], '6.0.0').includes('observerlau
 
   const r2 = await get('/other');
   ok('/other 404', r2.code === 404);
+  // Regression: Invoke-WebRequest (PowerShell curl alias) and some browsers send a trailing slash.
+  const r1b = await get('/metrics/');
+  ok('/metrics/ 200', r1b.code === 200);
+  const r1c = await get('/metrics?x=1');
+  ok('/metrics?x=1 200', r1c.code === 200);
 
   // Wrong Host header -> 403 (DNS-rebinding guard).
   const bad = await new Promise((resolve, reject) => {
