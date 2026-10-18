@@ -98,6 +98,10 @@ If you run Grafana, Settings > Advanced now has a Prometheus section. Turn it on
 
 The section tells you what it is doing as you touch it. Flip the switch and it says the endpoint will start when you press Apply. After Apply it names the port it is listening on and shows a Copy URL button, so you never have to copy a port by hand.
 
+## Export a server as a Docker setup
+
+If you want to move a server to a Linux VPS, Settings > Advanced now has an Export as Docker button. Pick a folder, and the app writes a Dockerfile, a docker-compose.yml, a .dockerignore and a short README that run the same headless backend in a container. The image bundles Java, mounts your server folder and the launcher's data folder as volumes, and includes a healthcheck. Nothing leaves your machine until you copy the folder to the VPS yourself.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.

@@ -23,6 +23,7 @@ const pkg = require('../package.json');
 const COMMANDS = {
   status: { tool: 'get_status', desc: 'Show server status, folder, jar and Java info.' },
   players: { tool: 'list_players', desc: 'List online/whitelisted/banned/op players.' },
+  metrics: { tool: 'get_metrics_history', desc: 'Show recent metrics (TPS, RAM, CPU, players).', build: (f) => ({ minutes: f.minutes ? Number(f.minutes) : 30 }) },
   logs: { tool: 'read_console', desc: 'Show recent console lines.', build: (f) => ({ lines: f.lines ? Number(f.lines) : 200 }) },
   start: { tool: 'start_server', desc: 'Start the server.' },
   stop: { tool: 'stop_server', desc: 'Gracefully stop the server.' },
@@ -90,7 +91,7 @@ async function run(argv, { print = true, foreground = false } = {}) {
   const errlog = (...a) => { if (print) console.error(...a); };
 
   if (flags.version) { log(pkg.version); return { ok: true, code: 0 }; }
-  const cmdName = flags._[0];
+  let cmdName = flags._[0];
   if (flags.help || !cmdName) { log(USAGE); return { ok: !cmdName || !!flags.help, code: cmdName || flags.help ? 0 : 2 }; }
 
   // Local (non-tool) commands: templates + init. They need no backend boot.
@@ -165,6 +166,21 @@ async function run(argv, { print = true, foreground = false } = {}) {
   // loader/MC gate + conflict check see real metadata; `--offline` (or `--resolved <file>`) skips
   // that. CI runs this on every PR so a bad loader/MC combo or a same-file collision is caught BEFORE
   // anything is downloaded.
+  // I1 aliases: `mod install`, `world backup`, `player list`.
+  if (cmdName === 'mod' && flags._[1] === 'install') {
+    flags._.splice(0, 2, 'install');
+    flags.kind = 'mod';
+    cmdName = 'install';
+  }
+  if (cmdName === 'world' && flags._[1] === 'backup') {
+    flags._.splice(0, 2, 'backup');
+    cmdName = 'backup';
+  }
+  if (cmdName === 'player' && flags._[1] === 'list') {
+    flags._.splice(0, 2, 'players');
+    cmdName = 'players';
+  }
+
   if (cmdName === 'modpack') {
     const sub = flags._[1];
     if (sub !== 'verify' && sub !== 'build') { errlog('Usage: observer modpack verify|build <modpack.json> [--resolved <file>] [--offline] [--server <mc/loader>] [--out <dir>] [--strict] [--json]'); return { ok: false, code: 2, error: 'unknown modpack subcommand' }; }
@@ -320,6 +336,7 @@ function printHuman(cmdName, result, log, errlog) {
   if (cmdName === 'stop') { log(`server ${d.status || 'stopping'}`); return; }
   if (cmdName === 'players') { const n = (d.online || d.players || []).length; log(`${n} online`); return; }
   if (cmdName === 'doctor') { log(d.summary || 'health report ready (use --json for full output)'); return; }
+  if (cmdName === 'metrics') { log(`${d.count || 0} samples over the last ${d.spanMinutes || 0} minutes`); return; }
   log('ok');
 }
 

@@ -68,6 +68,14 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - **Status line reflects intent:** the Settings line reads the toggle as well as the backend state, so turning the switch on shows 'Prometheus will start on Apply' immediately and the saved line shows 'running on port X' after a successful Apply. A **Copy URL** button appears next to a running server so the correct port is one click away (the most common cause of a 404 is curling a stale port).
 - **Port field:** switched from `type=number` (which kept the OS spinner) to `type=text inputmode=numeric`, width-capped. `tests/prometheus-headless.test.js` boots a real headless ctx, enables Prometheus, and curls `/metrics` end to end (11 checks).
 
+### Added — Docker compose export from the GUI (I2)
+- The pure generator in `docker.js` (Dockerfile, docker-compose.yml, .dockerignore, README.docker.md) already existed for `observer docker create`. A new **Export as Docker** card in Settings > Advanced calls it from the GUI: pick an output folder, and the four files are written based on the ACTIVE instance's software, port and memory.
+- New `writeDockerSetup(outDir, opts)` in `docker.js` owns the file list; the CLI was refactored to call it, so the two callers cannot drift on which files they emit. The helper uses `writeFileAtomic` so the arch guard stays green in `src/main`.
+- New IPC `docker:export`. 6 `dock.*` keys x 7 locales (1224). Arch channel count 101.
+
+### Added — layout-shift reservation on numeric readouts (H6)
+- Every numeric reading (Overview hero + KPI, Performance 4-stat strip, Rail instance status, Content segment counts, per-player stats, cross-instance dashboard, datapack order index) now uses `tabular-nums` and a small `min-width` reservation (5ch for TPS/MSPT/CPU/RAM, 3ch for players and uptime, 2.5ch for the instance count). A metric that flips from `—` (one glyph) to `19.80` (five) no longer pushes the label after it. The startup splash itself was already shipped in 1.3.0.
+
 ### Added — Datapack manager UI (C5)
 - **Enable/disable/delete** on a datapack were already part of the shared content list. C5 adds the three datapack-specific actions that were only reachable from an MCP client.
 - **Validate** reads `pack.mcmeta` from a folder or a `.zip` (via `jar-read.js`) and classifies the `pack_format` against the server's Minecraft version. The GUI toast colour mirrors the verdict (ok, warn, unknown). The pure logic already existed in `datapack.js`.

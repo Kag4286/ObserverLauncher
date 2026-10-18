@@ -129,6 +129,25 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
     check('modpack build: no --out -> usage exit 2', buildNoOut.code === 2);
   }
 
+  // 4) I1: new CLI commands and aliases.
+  {
+    const r = await cli.run(['metrics'], { print: false });
+    check('metrics exits (0/1)', r.code === 0 || r.code === 1);
+    check('metrics produces a result object', r.result && typeof r.result === 'object');
+  }
+  {
+    const r = await cli.run(['mod', 'install', 'sodium', '--json'], { print: false });
+    check('mod install alias routes to install (fails gracefully without real id)', r.code === 1 || r.code === 0);
+  }
+  {
+    const r = await cli.run(['world', 'backup', '--json'], { print: false });
+    check('world backup alias routes to backup', r.code === 1 || r.code === 0);
+  }
+  {
+    const r = await cli.run(['player', 'list', '--json'], { print: false });
+    check('player list alias routes to players', r.code === 1 || r.code === 0);
+  }
+
   try { fs.rmSync(tmpData, { recursive: true, force: true }); } catch {}
   console.log(fail ? `\n${fail} check(s) failed.` : `\nAll cli checks passed (${pass}).`);
   process.exit(fail ? 1 : 0);
