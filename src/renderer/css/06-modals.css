@@ -312,9 +312,11 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .dp-order-body{padding:var(--space-4) var(--space-5) var(--space-5);border-top:1px solid var(--border)}
 .dp-order-body .cell-sub{margin:0 0 var(--space-3);color:var(--text-muted);font:500 12.5px var(--font-ui);line-height:1.5}
 .dp-order-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
-.dp-order-row{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:var(--space-3);padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);font:500 12.5px var(--font-mono);color:var(--text);animation:dpFadeIn var(--dur-fast) var(--ease-out) both}
-@keyframes dpFadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
-html.motion-lite .dp-order-row{animation:none}
+/* v6.0.0 C5c: no per-row entrance animation. Reordering swaps the row order in place, so an
+   entrance fade replays on every arrow press and looks like a flicker (memory gotcha 19: never
+   animate a list that is rebuilt on every interaction). The disclosure itself still animates via
+   ::details-content, which is the only motion this card needs. */
+.dp-order-row{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:var(--space-3);padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);font:500 12.5px var(--font-mono);color:var(--text)}
 .dp-order-row .dp-order-idx{display:grid;place-items:center;width:22px;height:22px;border-radius:var(--r-xs);background:var(--surface-3);color:var(--text-muted);font:700 10px var(--font-mono)}
 .dp-order-row .dp-order-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .dp-order-row .dp-order-tag{font:700 9px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);border:1px solid var(--border);border-radius:999px;padding:2px 8px;justify-self:end}
