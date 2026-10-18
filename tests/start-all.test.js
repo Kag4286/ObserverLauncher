@@ -78,4 +78,18 @@ const mk = (m) => (id) => m[id];
   ok('stop mixed -> stop only running', r.stop.length === 1 && r.stop[0] === 'a');
 }
 
+// --- integration shape guard ---
+// listInstances() returns { instances, activeInstanceId }, NOT a bare array. The IPC handler must
+// pass .instances; passing the object makes planStartAll/planStopAll silently see an empty list
+// (Array.isArray(object) === false) and report 'nothing to do'. Assert the handler unwraps it.
+{
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'settings-handlers.js'), 'utf8');
+  ok('start-all unwraps listInstances().instances', /planStartAll\(listInstances\(\)\.instances\b/.test(src));
+  ok('stop-all unwraps listInstances().instances', /planStopAll\(listInstances\(\)\.instances\b/.test(src));
+  ok('start-all does NOT pass the wrapper object', !/planStartAll\(listInstances\(\)\s*,/.test(src));
+  ok('stop-all does NOT pass the wrapper object', !/planStopAll\(listInstances\(\)\s*,/.test(src));
+}
+
 console.log(`\n${passed} passed, 0 failed`);

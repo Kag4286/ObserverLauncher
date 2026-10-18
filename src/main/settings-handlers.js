@@ -280,12 +280,23 @@ function registerSettings(ipcMain, ctx) {
   }
   ipcMain.handle('instances:start-all', async () => {
     const { startServerInternal } = require('./server-lifecycle.js');
-    const plan = planStartAll(listInstances(), statusOf);
+    const { detectJava } = require('./java.js');
+    const plan = planStartAll(listInstances().instances, statusOf);
     const failed = [];
     let started = 0;
     for (const id of plan.start) {
       try {
-        const r = await ctx.runInInstance(id, () => startServerInternal(ctx, loadSettingsFor(id)));
+        // A background instance that was never ACTIVE this session still has javaInfo = null, and
+        // startServerInternal's validateStart() would reject with 'Java was not detected'. Prime
+        // this instance's folder + detected Java (per-instance javaPath) inside its own ALS scope,
+        // exactly what instances:switch does for the active one.
+        const r = await ctx.runInInstance(id, async () => {
+          let s; try { s = loadSettingsFor(id); } catch { s = null; }
+          if (!s) return { ok: false, error: 'Could not read this instance\u2019s settings.' };
+          try { ctx.currentServerPath = s.serverPath || ''; } catch {}
+          try { ctx.javaInfo = await detectJava(s.javaPath || 'java'); } catch { ctx.javaInfo = { ok: false }; }
+          return startServerInternal(ctx, s);
+        });
         if (r && r.ok === false) failed.push({ id, error: r.error || 'start failed' });
         else started++;
       } catch (e) { failed.push({ id, error: e?.message || String(e) }); }
@@ -294,7 +305,7 @@ function registerSettings(ipcMain, ctx) {
   });
   ipcMain.handle('instances:stop-all', async () => {
     const { requestStop } = require('./server-lifecycle.js');
-    const plan = planStopAll(listInstances(), statusOf);
+    const plan = planStopAll(listInstances().instances, statusOf);
     const failed = [];
     let stopped = 0;
     for (const id of plan.stop) {
