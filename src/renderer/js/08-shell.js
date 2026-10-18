@@ -205,7 +205,12 @@ function renderInstanceList(){
   wrap.hidden=list.length===0;
   if(list.length===0)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
-  const sig=JSON.stringify([currentLocale,activeId,list.map(i=>[i.id,i.name||i.serverPath||'',i.accent||'',i.artSeed||0,!!i.missing])]);
+  // v6.0.0 E3: the group filter is a rail-scoped display toggle. `instGroupFilterValue` holds the
+  // active chip's group ('' = All). Filtering only hides rows; bulk actions still touch every
+  // instance on purpose, so a filtered view can never start a server the user cannot see.
+  const groups=[...new Set(list.map(i=>i.group||''))].filter(Boolean).sort();
+  if(instGroupFilterValue && !groups.includes(instGroupFilterValue)) instGroupFilterValue='';
+  const sig=JSON.stringify([currentLocale,activeId,instGroupFilterValue,list.map(i=>[i.id,i.name||i.serverPath||'',i.accent||'',i.artSeed||0,!!i.missing,i.group||''])]);
   if(sig===lastInstSig){
     // Same list/active/names -> just refresh the dots (status can change without a rebuild).
     host.querySelectorAll('.inst-item').forEach(row=>{
@@ -220,6 +225,7 @@ function renderInstanceList(){
   list.forEach((inst,idx)=>{
     const isActive=inst.id===activeId;
     const st=instanceDotStatus(inst.id,activeId);
+    const inGroup=!instGroupFilterValue || (inst.group||'')===instGroupFilterValue;
     // A div (not a button) so the rename/remove icon buttons can live INSIDE it without nesting
     // <button> elements (invalid HTML). Click anywhere on the row switches; the icons stopPropagation.
     // 5.4.0: a missing folder (deleted, or a drive that is not mounted) greys the row, shows a
@@ -234,16 +240,22 @@ function renderInstanceList(){
     // Stagger reveal: same cadence as tab-content rows (--stagger per index, capped so a long
     // list never waits). Re-runs on every render, so add/remove/switch animates.
     row.style.animationDelay=(idx*28)+'ms';
+    const groupBadge=inst.group?'<span class="inst-group-badge">'+esc(inst.group)+'</span>':'';
     row.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,isMissing?'stopped':st)
-      +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+(isMissing?' <i class="inst-missing-tag">'+esc(t('inst.missing'))+'</i>':'')+'</span>'
+      +'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+groupBadge+(isMissing?' <i class="inst-missing-tag">'+esc(t('inst.missing'))+'</i>':'')+'</span>'
       +'<span class="inst-acts">'
+        +'<button type="button" class="inst-act" data-act="group" title="'+esc(t('inst.groupSet'))+'" aria-label="'+esc(t('inst.groupSet'))+'">⊞</button>'
         +(isMissing?'<button type="button" class="inst-act" data-act="relink" title="'+esc(t('inst.relink'))+'" aria-label="'+esc(t('inst.relink'))+'">↻</button>':'')
         +'<button type="button" class="inst-act" data-act="rename" title="'+esc(t('inst.rename'))+'" aria-label="'+esc(t('inst.rename'))+'">✎</button>'
         +'<button type="button" class="inst-act" data-act="remove" title="'+esc(t('inst.remove'))+'" aria-label="'+esc(t('inst.remove'))+'">✕</button>'
       +'</span>';
+    // v6.0.0 E3: hide a row that is not in the active group chip. Display-only; the underlying
+    // bulk actions and instance list stay complete (never silently act on a filtered subset).
+    if(!inGroup) row.hidden=true;
     row.onclick=e=>{ if(e.target.closest('.inst-act'))return; switchInstance(inst.id); };
     row.onkeydown=e=>{ if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.inst-act')){e.preventDefault();switchInstance(inst.id);} };
     row.querySelector('[data-act="relink"]')?.addEventListener('click',e=>{e.stopPropagation();relinkInstancePrompt(inst)});
+    row.querySelector('[data-act="group"]').onclick=e=>{e.stopPropagation();setInstanceGroupPrompt(inst)};
     row.querySelector('[data-act="rename"]').onclick=e=>{e.stopPropagation();renameInstancePrompt(inst)};
     row.querySelector('[data-act="remove"]').onclick=e=>{e.stopPropagation();removeInstancePrompt(inst)};
     host.appendChild(row);
@@ -251,7 +263,29 @@ function renderInstanceList(){
   // v6.0.0 E2: show the bulk bar only when 2+ instances exist (one instance has nothing to bulk).
   const bulk=$('#instBulk');
   if(bulk) bulk.hidden = list.length < 2;
+  renderInstanceGroupFilter(groups);
   renderInstanceDropdown(list, activeId);
+}
+// v6.0.0 E3: rail group filter. A row of chips under the instance list when 2+ distinct groups
+// exist. Value '' means All. Filtering only hides rows: the tooltip says bulk actions still apply
+// to every server, so a narrow view can never start a server the user cannot see.
+let instGroupFilterValue='';
+function renderInstanceGroupFilter(groups){
+  const host=$('#instGroupFilter'); if(!host)return;
+  if(!Array.isArray(groups)||groups.length<2){host.hidden=true;host.innerHTML='';return}
+  host.hidden=false;
+  const chips=[{v:'',label:t('inst.groupAll')},...groups.map(g=>({v:g,label:g}))];
+  host.innerHTML=chips.map(c=>'<button type="button" class="filter-chip'+(instGroupFilterValue===c.v?' active':'')+'" data-group="'+esc(c.v)+'" title="'+esc(t('inst.groupBulkNote'))+'">'+esc(c.label)+'</button>').join('');
+  host.querySelectorAll('[data-group]').forEach(b=>b.onclick=()=>{instGroupFilterValue=b.dataset.group;renderInstanceList()});
+}
+async function setInstanceGroupPrompt(inst){
+  const current=inst.group||'';
+  const next=await promptDialog({title:t('inst.groupPrompt'),value:current,ok:t('cf.ok')});
+  if(next===null)return;
+  let r; try{ r=await window.observer.instancesSetGroup({id:inst.id,group:String(next)}); }catch(e){ return toast(e?.message||'Set group failed.','error'); }
+  if(!r||!r.ok)return toast((r&&r.error)||'Set group failed.','error');
+  const updated=(state.instances||[]).map(i=>i.id===inst.id?{...i,group:r.group}:i);
+  state={...state,instances:updated};refreshUI();
 }
 // 4.5.0 instance appearance: render the accent swatches + avatar-art preview for the ACTIVE instance
 // into the Settings 'Instance appearance' section. accent/artSeed live in the nested instances[]

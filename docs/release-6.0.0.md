@@ -80,6 +80,12 @@ When you have more than one server in the rail, two buttons appear under the lis
 
 The Performance tab now shows a banner when the server's tick rate drops sharply or when the memory it uses keeps climbing. The tick banner suggests a likely cause from the numbers it already has (a slow tick, a jump in players, or memory pressure). The memory banner reports the growth rate so you can decide whether to restart before the server stalls. Both banners disappear on their own when the numbers recover.
 
+## Manage several servers at once
+
+The rail now lets you tag a server with a short group name (for example, one group for a friends server and one for a build server). With two or more groups, a row of chips appears so you can show only one group at a time. This is only a view: the Start all and Stop all buttons still act on every server, so a filtered rail cannot start a server you cannot see.
+
+The Overview tab gets an All servers table when you have more than one server. One row per server with its status, TPS, memory, player count and uptime. Click a row to switch to that server.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.

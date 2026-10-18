@@ -120,6 +120,11 @@ html.motion-lite .tun-ov-row{animation:none}
    a --dur-fast transition only (motion ratchet), and a soft secondary weight so it reads as a helper
    action under the instance rows, not a primary CTA. */
 .inst-bulk{display:flex;gap:6px;margin-top:2px}
+/* v6.0.0 E3: rail group filter chips + per-row group badge. A chip row only shows when 2+ groups
+   exist; the badge sits inline after the name and truncates before the row does. No animation. */
+.inst-group-filter{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.inst-group-filter .filter-chip{font-size:10px;padding:2px 7px}
+.inst-group-badge{font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:1px 4px;margin-left:6px;white-space:nowrap;flex-shrink:0}
 .inst-bulk-btn{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);color:var(--text-muted);font:600 11px var(--font-ui);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast),background var(--dur-fast)}
 .inst-bulk-btn:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel)}
 .inst-bulk-btn[aria-busy="true"]{opacity:.6;cursor:progress}

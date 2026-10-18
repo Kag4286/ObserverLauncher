@@ -43,6 +43,8 @@ function defaultInstanceFields() {
     // 4.5.0 appearance: accent palette key ('' = --brand default) + avatar art seed (0 = derive
     // from the name hash in the renderer). Both are per-instance, persisted in the nested store.
     accent: '', artSeed: 0,
+    // v6.0.0 E3: rail group label ('' = ungrouped). Free-form, sanitised by sanitizeGroup.
+    group: '',
   };
 }
 
@@ -211,14 +213,23 @@ function newInstanceId() {
 // basename, or a name from the MCP create_instance tool) and renameInstance agree. Control chars
 // are collapsed to spaces: a `name` coming from an AI client could carry a newline that would break
 // the rail/toast layout. Kept short enough to stay readable in the rail and the narrow dropdown.
-const INSTANCE_NAME_MAX = 60;
-function sanitizeInstanceName(raw) {
+// Shared sanitiser: drop control chars, collapse whitespace, trim, cap. Both the instance name and
+// the group label use exactly these rules, so they go through the same helper (no-dup guard).
+function trimCollapse(raw, max) {
   return String(raw == null ? '' : raw)
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, INSTANCE_NAME_MAX);
+    .slice(0, max);
 }
+const INSTANCE_NAME_MAX = 60;
+function sanitizeInstanceName(raw) { return trimCollapse(raw, INSTANCE_NAME_MAX); }
+
+// v6.0.0 E3: sanitise a free-form instance group. Same rules as the name, capped shorter because
+// it also has to fit inside the rail as a badge. '' means ungrouped. Free-form (not an enum)
+// because the user's own naming is more useful than a fixed list here.
+const INSTANCE_GROUP_MAX = 32;
+function sanitizeGroup(raw) { return trimCollapse(raw, INSTANCE_GROUP_MAX); }
 
 // Lightweight list for the rail + Q2 tunnel overview: id/name/serverPath + the two
 // per-instance tunnel fields the overview table needs. No secrets, no big fields
@@ -234,7 +245,7 @@ function listInstances() {
       let missing = false;
       if (!serverPath) missing = true;
       else { try { missing = !fs.existsSync(serverPath); } catch { missing = true; } }
-      return { id: i.id, name: i.name || '', serverPath, missing, tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0 };
+      return { id: i.id, name: i.name || '', serverPath, missing, tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0, group: typeof i.group === 'string' ? i.group : '' };
     });
   return { instances, activeInstanceId: store.activeInstanceId || (instances[0] && instances[0].id) || null };
 }
@@ -313,6 +324,16 @@ function setInstanceStyle(id, { accent, artSeed } = {}) {
   return { ok: true, id, accent: inst.accent || '', artSeed: inst.artSeed || 0 };
 }
 
+// v6.0.0 E3: set (or clear) an instance's rail group label. Free-form; sanitised here so the
+// renderer can pass anything. Returns { ok, group }.
+function setInstanceGroup(id, group) {
+  const { store, instances, inst } = findInstanceForEdit(id);
+  if (!inst) return { ok: false, error: 'No such instance.' };
+  inst.group = sanitizeGroup(group);
+  saveSettings({ ...store, instances });
+  return { ok: true, id, group: inst.group };
+}
+
 // Remove an instance from the list ONLY — never touches the folder on disk. If it was active,
 // falls back to the first remaining instance (or null -> first-run UI).
 function removeInstance(id) {
@@ -323,7 +344,7 @@ function removeInstance(id) {
   let activeInstanceId = store.activeInstanceId;
   if (activeInstanceId === id) activeInstanceId = (instances[0] && instances[0].id) || null;
   saveSettings({ ...store, instances, activeInstanceId });
-  return { ok: true, instances: instances.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0 })), activeInstanceId };
+  return { ok: true, instances: instances.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0, group: typeof i.group === 'string' ? i.group : '' })), activeInstanceId };
 }
 
 // 5.4.0: point an instance at a NEW folder (after its old one was deleted or moved). Refuses a
@@ -339,7 +360,7 @@ function relinkInstance(id, serverPath) {
   if (instances.some(i => i.id !== id && i.serverPath === sp)) return { ok: false, error: 'That folder is already used by another instance.' };
   const next = instances.map(i => i.id === id ? { ...i, serverPath: sp } : i);
   saveSettings({ ...store, instances: next });
-  return { ok: true, instances: next.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0 })) };
+  return { ok: true, instances: next.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0, group: typeof i.group === 'string' ? i.group : '' })) };
 }
 
 function saveSettings(settings) {
@@ -373,4 +394,4 @@ function saveSettingsFor(instanceId, flat) {
   writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
-module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, INSTANCE_ACCENTS, removeInstance, relinkInstance, sanitizeInstanceName, INSTANCE_NAME_MAX };
+module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, setInstanceGroup, INSTANCE_ACCENTS, removeInstance, relinkInstance, sanitizeInstanceName, sanitizeGroup, INSTANCE_NAME_MAX, INSTANCE_GROUP_MAX };

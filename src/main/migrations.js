@@ -17,6 +17,9 @@ const PER_INSTANCE_KEYS = [
   'rconPort', 'rconPassword',
   // 4.5.0: per-instance appearance — accent palette key ('' = brand default) + avatar art seed.
   'accent', 'artSeed',
+  // v6.0.0 E3: per-instance group label ('' = ungrouped). Free-form; sanitised to [A-Za-z0-9 _-]{0,32}
+  // by settings.sanitizeGroup before it ever reaches the store.
+  'group',
 ];
 
 const migrations = [
@@ -65,6 +68,15 @@ const migrations = [
         accent: typeof i.accent === 'string' ? i.accent : '',
         artSeed: Number.isFinite(Number(i.artSeed)) ? Number(i.artSeed) : 0,
       }));
+    }
+    return out;
+  },
+  // v5 -> v6 (v6.0.0 E3): per-instance `group` string for the rail filter. DEFENSIVE + idempotent:
+  // an existing instance with a real string keeps it; anything else gets ''.
+  (s) => {
+    const out = { ...s, version: 6 };
+    if (Array.isArray(out.instances)) {
+      out.instances = out.instances.map(i => ({ ...i, group: typeof i.group === 'string' ? i.group : '' }));
     }
     return out;
   },

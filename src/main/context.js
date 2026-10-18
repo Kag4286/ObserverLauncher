@@ -92,6 +92,7 @@ function createContext() {
       // SPECIFIC local port, so each instance owns its own process and state.
       pinggyProcess: null,     // ssh child process, or null
       pinggyProto: null,       // 'tcp' | 'udp' for the current tunnel, or null
+      startedAt: 0,            // v6.0.0 E4: Date.now() when the server reached 'running', else 0
       pinggyAddress: '',       // resolved public address, e.g. 'udp://abc.run.pinggy-free.link:41140'
       pinggyStatus: 'stopped', // 'stopped' | 'starting' | 'running' | 'error'
       pinggyRestartTimer: null,// 55-minute auto-restart (a free Pinggy tunnel expires at 60 min)
@@ -131,6 +132,7 @@ function createContext() {
     'wizardAbort', 'contentWatcher', 'contentWatchers', 'contentWatchDebounce',
     'edWatcher', 'edWatchMtime', 'edWatchDebounce',
     'pinggyProcess', 'pinggyProto', 'pinggyAddress', 'pinggyStatus', 'pinggyRestartTimer',
+    'startedAt',
   ];
   for (const f of INST_FIELDS) defInst(f);
 
@@ -163,6 +165,12 @@ function createContext() {
 
   // The ONLY place that pushes 'server:state' — keeps the 4-state machine consistent.
   function setServerStatus(status) {
+    // v6.0.0 E4: remember when this instance first reached 'running' so the cross-instance
+    // dashboard can show an uptime without keeping a second clock. Cleared on stopped/error.
+    try {
+      if (status === 'running' && !ctx.startedAt) ctx.startedAt = Date.now();
+      else if (status === 'stopped') ctx.startedAt = 0;
+    } catch {}
     ctx.serverStatus = status;
     // M8: reflect the status on the persisted runtime record (if any) so orphan cleanup can pick
     // a tier after a crash. Lazy require + guard so context.js keeps working in bare unit tests.

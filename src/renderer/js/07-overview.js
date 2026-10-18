@@ -154,6 +154,7 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   const perfSec=$('#performance'); if(perfSec) perfSec.classList.toggle('is-live', state.status==='running');
   const perfStatus=$('#perfStatus'); if(perfStatus) perfStatus.hidden = state.status!=='stopped';
   if(typeof renderInstanceList==='function')renderInstanceList();
+  if(typeof renderAllServers==='function')renderAllServers();
   if(typeof renderInstanceAppearance==='function')renderInstanceAppearance();
   if(typeof renderTunnelOverview==='function')renderTunnelOverview();
   // v5.7.0 GEYSER: surface the Bedrock-crossplay panel only when a Geyser/Floodgate jar is present,

@@ -22,6 +22,7 @@
     <div class="instance-list" id="instanceList" hidden>
       <p class="instance-list-label" data-i18n="nav.instances">Instances</p>
       <div class="instance-items" id="instanceItems" role="list"></div>
+      <div class="inst-group-filter" id="instGroupFilter" hidden></div>
       <div class="inst-bulk" id="instBulk" hidden>
         <button type="button" class="inst-bulk-btn" id="startAllBtn" data-i18n="inst.startAll">Start all</button>
         <button type="button" class="inst-bulk-btn" id="stopAllBtn" data-i18n="inst.stopAll">Stop all</button>
@@ -92,6 +93,18 @@
         </div>
         <ul class="hero-steps" id="setupSteps" aria-label="Setup checklist" hidden></ul>
       </div>
+      <!-- v6.0.0 E4: cross-instance dashboard. A read-only live table of every instance (one row
+           per server) so a user with several servers sees them at a glance. Hidden with a single
+           instance, so the one-server screen is unchanged. -->
+      <details class="panel glass all-servers" id="allServersCard" hidden>
+        <summary class="all-servers-summary"><span data-i18n="ov.allServers">All servers</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
+        <div class="all-servers-body">
+          <table class="all-servers-table" aria-label="Server summary">
+            <thead><tr><th data-i18n="ov.col.server">Server</th><th data-i18n="ov.col.status">Status</th><th>TPS</th><th>RAM</th><th data-i18n="ov.col.players">Players</th><th data-i18n="ov.col.uptime">Uptime</th></tr></thead>
+            <tbody id="allServersBody"></tbody>
+          </table>
+        </div>
+      </details>
       <!-- 5.2.0 Beginner mode: a big, unmissable "share this address" card shown ONLY when the
            server is running and beginner-mode is on. Turns the hardest beginner step (inviting
            friends) into one visible action. Hidden for everyone else. -->

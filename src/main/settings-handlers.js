@@ -318,6 +318,25 @@ function registerSettings(ipcMain, ctx) {
     return { ok: true, stopped, failed, skipped: plan.skip };
   });
 
+  // v6.0.0 E3: set (or clear) an instance's rail group label. Returns the sanitised value so the
+  // renderer can reflect it without a full reload.
+  ipcMain.handle('instances:set-group', async (_, { id, group } = {}) => {
+    const r = require('./settings.js').setInstanceGroup(String(id || ''), group);
+    if (!r.ok) return r;
+    try { ctx.seedInstances(); } catch {}
+    return r;
+  });
+
+  // v6.0.0 E4: a live, read-only snapshot of every instance for the cross-instance dashboard. No
+  // disk I/O: reads the in-memory metricsHistory tail and live players per instance.
+  ipcMain.handle('instances:snapshots', async () => {
+    try {
+      const { buildSnapshots } = require('./instances-snapshot.js');
+      const list = listInstances().instances;
+      return { ok: true, rows: buildSnapshots(list, (id) => (ctx.instances ? ctx.instances.get(id) : null)) };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
   // Q3: does a folder ALREADY contain a Minecraft server? Lets the Add-instance wizard offer
   // "import as-is" instead of downloading a fresh jar. Read-only probe, never throws.
   ipcMain.handle('instances:probe', async (_, folder) => {

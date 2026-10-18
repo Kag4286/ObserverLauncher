@@ -41,7 +41,7 @@ const readRaw = () => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
   });
   const s = loadSettings();
   const raw = readRaw();
-  ok('migrated file version = 5', raw.version === 5);
+  ok('migrated file version is latest', raw.version === require('../src/main/migrations.js').latestVersion);
   ok('backup written before migration', fs.existsSync(backupPathV3()));
   ok('backup is the original v3', JSON.parse(fs.readFileSync(backupPathV3(), 'utf8')).version === 3);
   ok('one instance created', Array.isArray(raw.instances) && raw.instances.length === 1);
@@ -121,7 +121,7 @@ const readRaw = () => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
   ok('round-trip: instance memoryMax updated', raw.instances[0].memoryMax === 10);
   ok('round-trip: still one instance', raw.instances.length === 1);
   ok('round-trip: no flat serverPath leaked to top level', raw.serverPath === undefined);
-  ok('round-trip: version still 5', raw.version === 5);
+  ok('round-trip: version is latest', raw.version === require('../src/main/migrations.js').latestVersion);
   // A second load still sees the change through the flat view.
   ok('round-trip: reload sees memoryMax', loadSettings().memoryMax === 10);
 }

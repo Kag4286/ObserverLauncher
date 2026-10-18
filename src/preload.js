@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('observer', {
   instancesList: () => ipcRenderer.invoke('instances:list'),
   instancesStartAll: () => ipcRenderer.invoke('instances:start-all'),
   instancesStopAll: () => ipcRenderer.invoke('instances:stop-all'),
+  instancesSetGroup: payload => ipcRenderer.invoke('instances:set-group', payload),
+  instancesSnapshots: () => ipcRenderer.invoke('instances:snapshots'),
   instanceAdd: payload => ipcRenderer.invoke('instances:add', payload),
   instanceSwitch: id => ipcRenderer.invoke('instances:switch', id),
   instanceRename: payload => ipcRenderer.invoke('instances:rename', payload),

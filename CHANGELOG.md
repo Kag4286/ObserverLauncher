@@ -54,6 +54,19 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - Performance range chips `7d` and `30d`; the chart downsamples as before.
 - `tests/metrics-store.test.js` 25 checks (rollup averaging, tiered load, delete of all three files).
 
+### Added — Multi-server controls, part 2 (E3, E4)
+
+**E3. Instance groups.**
+- A new per-instance `group` string (free-form, up to 32 chars). `sanitizeGroup` shares a small `trimCollapse` helper with `sanitizeInstanceName` so the two rules cannot drift; the no-dup test enforces it.
+- **Schema v5 to v6.** A new migration adds `group: ''` to every existing instance. `latestVersion` is now 6. The migration is defensive and idempotent, and `migration-v4.test.js` now reads `latestVersion` instead of hard-coding 5.
+- The rail shows a small group badge on each row with a group, and adds a Set group action (a `⊞` button on hover). With two or more groups the rail grows a chip filter row. **Filtering only hides rows.** Start all and Stop all still touch every instance, and the tooltip says so, so a filtered view can never silently start a server the user cannot see.
+
+**E4. Cross-instance dashboard.**
+- New `src/main/instances-snapshot.js` `buildSnapshots(list, getState, now)` is a pure read of the live ctx map: TPS, RAM, CPU, player count, uptime. A stopped instance reports nulls (never zeros), so the table shows a dash. Reads the LAST entry of `metricsHistory`, not the first.
+- New IPC `instances:snapshots` (loopback-only, no disk I/O). The Overview tab gets a collapsible **All servers** table under the hero, hidden with a single instance; clicking a row switches to that instance. Signature-guarded so a metric tick does not rebuild it when nothing moved.
+- New per-instance ctx field `startedAt` (set inside `setServerStatus` when the server reaches running, cleared on stopped). Added in all three places plus the arch MIGRATED list.
+- 15 new keys (`inst.group*`, `ov.allServers`, `ov.col.*`) x 7 locales (1196 total). `tests/instance-groups.test.js` 21 checks. Arch channel count 96.
+
 ### Added — Performance tab alerts (D3, D4)
 - **`detectTpsAnomaly(samples)`** in `00-core.js` compares the latest TPS to the median of the previous 30 samples and returns null unless the drop is at least 20% AND the current TPS is below 17. A small heuristic labels the likely cause: `tick` when MSPT is over 45, `players` when the online count rose by 3 or more, `memory` when RAM is over 85%, else `unknown`.
 - **`detectMemoryLeak(samples)`** splits the window into three equal time slices, takes the median RAM in each, and only reports when every slice rose strictly AND the median-to-median growth rate exceeds 2% per hour over at least 2 hours. A GC sawtooth averages out and does not trigger it.

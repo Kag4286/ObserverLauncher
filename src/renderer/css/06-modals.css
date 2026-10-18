@@ -294,6 +294,23 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 /* v6.0.0 D3/D4: inline alert banners on the Performance tab (TPS anomaly, memory leak). No
    animation: the content changes once per metric tick, not on reveal, so a transition would only
    add motion for a status that lingers. A soft warning border reads as advisory, not an error. */
+/* v6.0.0 E4: cross-instance dashboard table under the Overview hero. Collapsed by default; a
+   details/summary to keep it out of the way of the single-server overview. Right-aligned numbers
+   read faster than a wall of left-aligned counts. */
+.all-servers{margin-bottom:12px}
+.all-servers-summary{cursor:pointer;padding:8px 0;font:600 12px var(--font-ui);color:var(--text-muted)}
+.all-servers-summary:hover{color:var(--text)}
+.all-servers-body{padding-top:4px;overflow-x:auto}
+.all-servers-table{width:100%;border-collapse:collapse;font:500 12px var(--font-ui)}
+.all-servers-table th{text-align:left;font:600 10px var(--font-ui);text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);padding:4px 8px;border-bottom:1px solid var(--border)}
+.all-servers-table th:nth-child(n+3){text-align:right}
+.all-servers-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text)}
+.all-servers-table td:nth-child(n+3){text-align:right;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.all-servers-table tr.all-servers-row{cursor:pointer;transition:background var(--dur-fast)}
+.all-servers-table tr.all-servers-row:hover{background:var(--surface-2)}
+.all-servers-table tr.active td{color:var(--text)}
+.all-servers-table .as-name{font-weight:600}
+.all-servers-table .as-status{display:inline-flex;align-items:center;gap:6px}
 .perf-alert{margin:8px 0;padding:8px 12px;border:1px solid var(--warning,#d6a24a);border-left-width:3px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--text);font:500 12px var(--font-ui);line-height:1.45}
 .perf-alert b{display:block;font:700 12px var(--font-ui);color:var(--warning,#d6a24a);margin-bottom:2px}
 .jvm-preset-help{position:absolute;right:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:700 12px var(--font-ui);cursor:pointer;display:grid;place-items:center;transition:all var(--dur-micro)}
