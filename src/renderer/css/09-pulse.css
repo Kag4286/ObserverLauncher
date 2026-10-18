@@ -270,6 +270,25 @@ input[type="checkbox"]:hover,input[type="radio"]:hover{filter:brightness(1.15)}
 /* Numeric readouts: ease the colour change so a state flip (ok→warn→bad) is not a hard cut. */
 .srv-stats dd,.perf-kpi strong,.status-pill strong,.metric-hero-value,.srv-uptime b{transition:color var(--dur-fast) var(--ease-out)}
 
+/* v6.0.0 H6: layout-shift reservation. A metric that flips between '—' (1 glyph) and '19.80' (5)
+   pushes everything after it sideways on the first real sample. tabular-nums makes digits the same
+   width so the box only resizes between dash and digits, and a small min-width on the value cells
+   reserves the dash-to-digits jump so the label after it never moves.
+   Applies to Overview (hero + kpi), Performance (4-stat strip + per-chart readouts), Rail instance
+   status pill, Content tab segment counts, and the per-player stats list. Additive, no reflow risk. */
+.metric-hero-value,#tps,#perfTps,#perfMspt,#perfServerRam,#perfCpu,#overviewCpu,#serverRam,
+#playerCount,.srv-stats dd,.perf-kpi strong,.srv-uptime b,.seg-count,.inst-badge,
+.all-servers-table td:nth-child(n+3),.dp-order-idx{
+  font-variant-numeric:tabular-nums;
+  min-width:2ch;
+}
+/* Wider reservation for the readings that can hit '19.80' or '1024 MB' */
+#tps,#perfTps,#perfMspt,#perfCpu,#overviewCpu,#perfServerRam,#serverRam{min-width:5ch;display:inline-block;text-align:right}
+/* Player count and uptime are integers that only grow, so a 3-char reservation is enough */
+#playerCount,.srv-uptime b{min-width:3ch;display:inline-block;text-align:right}
+/* Instance count badge on the rail: 1-3 digits */
+.inst-badge{display:inline-block;text-align:center;min-width:2.5ch}
+
 /* Section-head icons (settings cards): tint follows the header on hover. */
 .sec-head img{transition:filter var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),opacity var(--dur-micro) var(--ease-out)}
 .sec-head img:hover{opacity:1}
