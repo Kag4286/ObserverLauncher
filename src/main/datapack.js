@@ -25,6 +25,11 @@ const FORMAT_RANGES = [
   { fmt: 22, mc: '1.20.5–1.20.6' },
   { fmt: 32, mc: '1.21' },
   { fmt: 41, mc: '1.21.1' },
+  // v6.0.0 C5 fix: 1.21.9+ (26.x) uses min_format / max_format. These are the DATA PACK formats,
+  // which differ from resource pack formats. 26.1 = 101.1, 26.2 = 107.1, 26.3 = 121.0.
+  { fmt: 101.1, mc: '26.1' },
+  { fmt: 107.1, mc: '26.2' },
+  { fmt: 121.0, mc: '26.3' },
 ];
 // MC version -> the pack_format a datapack must declare. Best-effort; only the versions above.
 const MC_TO_FORMAT = {
@@ -32,20 +37,34 @@ const MC_TO_FORMAT = {
   '1.17': 7, '1.17.1': 7, '1.18': 8, '1.18.2': 8, '1.19': 9, '1.19.3': 9, '1.19.4': 10,
   '1.20': 12, '1.20.1': 12, '1.20.2': 15, '1.20.3': 18, '1.20.4': 18, '1.20.5': 22, '1.20.6': 22,
   '1.21': 32, '1.21.1': 41,
+  '26.1': 101.1, '26.2': 107.1, '26.3': 121.0,
 };
 
-// PURE: parse a pack.mcmeta JSON text. Returns { format, supported, error? }. `pack.pack_format` is
-// the declared format; `pack.supported_formats` (1.20.2+) may be a number or [min,max].
+// Normalise a format value (number or [major, minor] array) to a float. 1.21.9+ splits the format
+// into major.minor, e.g. [101, 1] or 101.1.
+function normalizeFormat(v) {
+  if (Array.isArray(v)) return v.length ? Number(v[0]) + (Number(v[1]) || 0) / 10 : null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// PURE: parse a pack.mcmeta JSON text. Returns { format, supported, error? }.
+// 1.21.9+ (26.x) uses min_format / max_format; older packs use pack_format / supported_formats.
 function parsePackMeta(text) {
   let obj;
   try { obj = JSON.parse(text); } catch { return { format: null, supported: null, error: 'pack.mcmeta is not valid JSON.' }; }
   const pack = obj && obj.pack;
   if (!pack || typeof pack !== 'object') return { format: null, supported: null, error: 'pack.mcmeta has no "pack" object.' };
-  const fmt = Number(pack.pack_format);
+  // 1.21.9+ (26.x) shape.
+  const minFmt = normalizeFormat(pack.min_format);
+  const maxFmt = normalizeFormat(pack.max_format);
+  if (minFmt != null && maxFmt != null) return { format: minFmt, supported: [minFmt, maxFmt], error: null };
+  // Legacy shape.
+  const fmt = normalizeFormat(pack.pack_format);
   let supported = null;
-  if (Array.isArray(pack.supported_formats)) supported = pack.supported_formats.map(Number);
+  if (Array.isArray(pack.supported_formats)) supported = pack.supported_formats.map(normalizeFormat).filter(n => n != null);
   else if (Number.isFinite(Number(pack.supported_formats))) supported = [Number(pack.supported_formats), Number(pack.supported_formats)];
-  return { format: Number.isFinite(fmt) ? fmt : null, supported, error: null };
+  return { format: fmt, supported, error: null };
 }
 
 // PURE: the MC range a pack_format belongs to, or null when unknown.

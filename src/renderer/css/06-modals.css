@@ -306,12 +306,12 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .dp-order-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);font:500 12px var(--font-mono);color:var(--text);transition:opacity var(--dur-fast),background var(--dur-fast);animation:dpFadeIn var(--dur-tab) var(--ease-out) both}
 @keyframes dpFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 html.motion-lite .dp-order-row{animation:none}
-.dp-order-row button:active{transform:scale(0.95)}
 .dp-order-row .dp-order-idx{color:var(--text-dim);min-width:20px;text-align:right}
 .dp-order-row .dp-order-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dp-order-row .dp-order-tag{font:600 9px var(--font-ui);text-transform:uppercase;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:1px 4px}
-.dp-order-row button{width:22px;height:22px;border:1px solid var(--border);border-radius:3px;background:transparent;color:var(--text-muted);cursor:pointer}
+.dp-order-row button{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex-shrink:0;padding:0;box-sizing:border-box;vertical-align:middle;border:1px solid var(--border);border-radius:var(--r-xs);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1;transition:transform var(--dur-micro) var(--ease-out),color var(--dur-fast),border-color var(--dur-fast)}
 .dp-order-row button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong)}
+.dp-order-row button:active:not(:disabled){transform:scale(.9)}
 .dp-order-row button:disabled{opacity:.35;cursor:not-allowed}
 .dp-order-empty{font:500 12px var(--font-ui);color:var(--text-dim);padding:6px 2px}
 .all-servers{margin-bottom:12px}
