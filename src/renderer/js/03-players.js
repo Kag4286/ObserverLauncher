@@ -1,7 +1,36 @@
 // js/03-players.js — split from app.js (lines 539-703); classic script, load in numeric order.
 // Players tab: roster, badges, inspector, OP/whitelist/ban.
 // TEXT-ONLY item display — no textures, just readable labels. Keeps the same IDs so save logic is untouched.
-function itemLabel(id){return String(id||'').replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||t('ply.unknownItem')}
+function itemLabel(id){
+  const raw=String(id||'');
+  // Keep the namespace when it's a MOD's: "create:wrench" must not render as the vanilla
+  // "Wrench" -- different items, and the player would be looking at the wrong thing.
+  const i=raw.indexOf(':');
+  if(i>0)return (raw.slice(0,i)+' '+raw.slice(i+1)).replace(/[_.]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  return raw.replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||t('ply.unknownItem')
+}
+// Durability bar colour follows the game's own convention: green -> yellow -> red.
+function durColor(d){const r=d.remaining/d.max;return r>0.5?'var(--success)':r>0.25?'#e2b93b':'#e05a4a'}
+const ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+const romanNum=n=>ROMAN[n]||String(n);
+// Hover text: real item name (or the anvil name), enchantments in roman numerals, remaining
+// durability, and the raw id so a mod item can be looked up.
+function itemTooltip(x,label){
+  const lines=[label];
+  if(x.customName&&x.customName!==label)lines.push(itemLabel(x.id));
+  for(const e of x.enchantments||[])lines.push(`${itemLabel(e.id)} ${romanNum(e.level)}`);
+  for(const e of x.storedEnchantments||[])lines.push(`${itemLabel(e.id)} ${romanNum(e.level)}`);
+  if(x.durability)lines.push(`${x.durability.remaining} / ${x.durability.max}`);
+  lines.push(`×${x.count}`,x.id);
+  return esc(lines.join('\n'));
+}
+// tex:// answers a cache miss with a 1x1 transparent PNG and HTTP 200, so onerror never fires.
+// Detect that placeholder in onload and swap in the readable label instead of a blank cell.
+function itemCellInner(iconUrl,label){
+  if(!iconUrl)return esc(label);
+  const fb=esc(label).replace(/"/g,'&quot;');
+  return `<img src="${iconUrl}" alt="" data-fb="${fb}" onload="if(this.naturalWidth<=1)this.outerHTML=document.createTextNode(this.dataset.fb)">`;
+}
 // v4.0.0: config-driven grid so hotbar (0-8) / main inventory (9-35) / ender chest (0-26)
 // share one renderer. base = first slot index, slots = how many.
 const GRID_CFG={
@@ -34,9 +63,16 @@ function renderItemGrid(id,items){
   if(!list.length){n.innerHTML=`<div style="grid-column:1/-1" class="inv-empty"><b>${esc(t('pd.noMatch'))}</b><span>${esc(t('pd.noMatchSub'))}</span></div>`;return}
   n.innerHTML=list.map((x,i)=>{
     if(x.empty) return `<div class="inv-cell empty" title="Slot ${x.slot}"></div>`;
-    const label=itemLabel(x.id);
-    const idNoPrefix=x.id.replace('minecraft:','').replace(/[^a-z0-9_]/g, '');
-    return `<div class="inv-cell" title="${esc(label)} ×${x.count}"><img src="tex://auto/item/${idNoPrefix}.png" alt=""><span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    const label=x.customName||itemLabel(x.id);
+    // Only vanilla ids have a texture on the mirror. A mod item (namespace != minecraft) is
+    // rendered as its label rather than requesting a URL that can never resolve.
+    const vanilla=!x.id.includes(':')||x.id.startsWith('minecraft:');
+    const idNoPrefix=x.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
+    const iconUrl=vanilla?`tex://auto/item/${idNoPrefix}.png`:null;
+    const tip=itemTooltip(x,label);
+    const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
+    const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
+    return `<div class="inv-cell${iconUrl?'':' no-tex'}" title="${tip}">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
@@ -247,6 +283,41 @@ async function pdLiveAction(action){
 $$('.inspect-tab').forEach(b=>b.onclick=()=>pdSetTab(b.dataset.pdTab));
 $('#pdPanelLive')?.addEventListener('click',e=>{const b=e.target.closest('[data-live-cmd]');if(b&&!b.disabled)pdLiveAction(b.dataset.liveCmd)});
 
+// Build (or rebuild) the 3D model in the inspector. Extracted from openPlayerInspector so the
+// icons:update handler can call it again: tex:// serves a 1x1 placeholder on a cache miss, and
+// that <img> has already fired onload by the time the real armor texture is fetched, so without
+// a rebuild the armor would stay invisible for the rest of the session.
+async function renderPlayer3D(canvas,status,uuid,name,armor){
+  if(!canvas||!status)return;
+  status.hidden=false;
+  status.textContent=t('pd.loadingSkin');
+  canvas.style.opacity='0';
+  let skinRes;
+  try{ skinRes=await window.observer.playerSkin(uuid||name); }catch{ skinRes=null; }
+  if(skinRes&&skinRes.ok&&skinRes.dataUri){
+    status.hidden=true;
+    canvas.style.opacity='1';
+    // Only pass equipment if there is actually armor to render. Passing an empty
+    // object causes the renderer to try loading texture files for 'undefined' materials.
+    let equipment=null;
+    if(armor&&armor.length>0){
+      equipment={
+        helmet:armor.find(x=>x.slot==='Helmet'),
+        chest:armor.find(x=>x.slot==='Chestplate'),
+        legs:armor.find(x=>x.slot==='Leggings'),
+        boots:armor.find(x=>x.slot==='Boots'),
+      };
+    }
+    try{
+      const rModel=createPlayerRenderer(canvas,skinRes.dataUri,skinRes.model==='slim',equipment);
+      if(!rModel)throw new Error('WebGL not supported');
+      return skinRes.dataUri;
+    }catch(e){ status.hidden=false; status.textContent=t('pd.renderFail'); }
+  }else{
+    status.innerHTML=`<div style="padding:20px;text-align:center;color:var(--text-muted)"><b>${esc(t('pd.no3dTitle'))}</b><br><span style="font-size:11px;opacity:0.8">${esc(t('pd.no3dSub'))}</span></div>`;
+  }
+  return null;
+}
 async function openPlayerInspector(uuid,name){
   selectedPlayer={uuid:uuid||null,name};
   openPlayerInspectModal();
@@ -271,39 +342,7 @@ async function openPlayerInspector(uuid,name){
 
   // v6.0.0 Track B: Render 3D Player
   let _skinDataUri = null;
-  const canvas = $('#pd3dCanvas');
-  const status = $('#pd3dStatus');
-  if (canvas && status) {
-    status.hidden = false;
-    status.textContent = t('pd.loadingSkin');
-    canvas.style.opacity = '0';
-    const skinRes = await window.observer.playerSkin(uuid || name);
-    if (skinRes && skinRes.ok && skinRes.dataUri) _skinDataUri = skinRes.dataUri;
-    if (skinRes && skinRes.ok && skinRes.dataUri) {
-      status.hidden = true;
-      canvas.style.opacity = '1';
-      try {
-        // Only pass equipment if there is actually armor to render. Passing an empty
-        // object causes the renderer to try loading texture files for 'undefined' materials.
-        let equipment = null;
-        if (d.armor && d.armor.length > 0) {
-          equipment = {
-            helmet: d.armor.find(x => x.slot === 'Helmet'),
-            chest: d.armor.find(x => x.slot === 'Chestplate'),
-            legs: d.armor.find(x => x.slot === 'Leggings'),
-            boots: d.armor.find(x => x.slot === 'Boots'),
-          };
-        }
-        const rModel = createPlayerRenderer(canvas, skinRes.dataUri, skinRes.model === 'slim', equipment);
-        if (!rModel) throw new Error('WebGL not supported');
-      } catch (e) {
-        status.hidden = false;
-        status.textContent = t('pd.renderFail');
-      }
-    } else {
-      status.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted)"><b>${esc(t('pd.no3dTitle'))}</b><br><span style="font-size:11px;opacity:0.8">${esc(t('pd.no3dSub'))}</span></div>`;
-    }
-  }
+  _skinDataUri=await renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),uuid,name,d.armor);
 
   invSearchQuery='';ecSearchQuery='';invShowEmpty=false;ecShowEmpty=false;invSortBy='slot';ecSortBy='slot';
   const invS=$('#invSearch');if(invS)invS.value='';const ecS=$('#ecSearch');if(ecS)ecS.value='';
@@ -420,9 +459,14 @@ $('#refreshPlayersBtn').onclick=async()=>{
 // icons:update — a placeholder icon just got its real pixels; re-render the open player
 // inspector grid. Lives with the inspector that owns lastInspectData (was misplaced in 02-worldmap.js).
 window.observer.onIconsUpdate(()=>{
-  if(!$('#playerInspectModal').hidden&&lastInspectData){
-    renderEquipment(lastInspectData.armor,lastInspectData.offhand);
-    renderItemGrid('#inventoryList',lastInspectData.inventory);
-    renderItemGrid('#enderChestList',lastInspectData.enderChest);
+  if($('#playerInspectModal').hidden||!lastInspectData)return;
+  renderEquipment(lastInspectData.armor,lastInspectData.offhand);
+  renderItemGrid('#inventoryList',lastInspectData.inventory);
+  renderItemGrid('#enderChestList',lastInspectData.enderChest);
+  renderItemGrid('#hotbarList',lastInspectData.inventory);
+  // Worn-armor textures are fetched through the same protocol, and the first request may well
+  // have been served the 1x1 placeholder. Rebuild the model so the armor actually appears.
+  if(selectedPlayer&&selectedPlayer.uuid&&lastInspectData.armor?.length){
+    renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),selectedPlayer.uuid,selectedPlayer.name,lastInspectData.armor);
   }
 });

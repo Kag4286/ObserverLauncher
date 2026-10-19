@@ -36,13 +36,33 @@ function checkPlayerInput({ name, reason, uuid }) {
 
 // ---- Pure player actions (shared by the IPC handlers AND the MCP tools) ----
 // Extracted so src/mcp/tools.js reuses the exact same validated logic.
+
+// A running server only flushes player .dat files on autosave or logout, so reading one right
+// after the player picked something up shows stale data (the inventory misses what they just
+// picked up). `save-all` forces the write. Throttled: the inspector polls, and save-all on a big
+// world is not free, so at most one per 5s and never more than one in flight.
+let _lastSaveAll = 0, _saveAllBusy = false;
+async function ensurePlayerDataFresh(ctx) {
+  if (_saveAllBusy || !ctx.serverProcess) return;
+  if (Date.now() - _lastSaveAll < 5000) return;
+  _lastSaveAll = Date.now();
+  _saveAllBusy = true;
+  try {
+    writeCmd(ctx, 'save-all flush');
+    await new Promise(r => setTimeout(r, 1500));
+  } finally { _saveAllBusy = false; }
+}
+
 async function readPlayer(ctx, uuid, name) {
   // Accept a UUID, or a name (resolved to the offline UUID on disk). Need at least one.
   const hasUuid = isSafeUuid(uuid);
   const hasName = typeof name === 'string' && name.length >= 1 && name.length <= 16;
   if (!hasUuid && !hasName) return { ok: false, error: 'Provide a valid player UUID or a name.' };
   if (uuid && !hasUuid) return { ok: false, error: 'Invalid player UUID.' };
-  try { return { ok: true, ...(await readPlayerData(ctx.currentServerPath, hasUuid ? uuid : null, hasName ? name : undefined)) }; }
+  try {
+    await ensurePlayerDataFresh(ctx);
+    return { ok: true, ...(await readPlayerData(ctx.currentServerPath, hasUuid ? uuid : null, hasName ? name : undefined)) };
+  }
   catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data.` }; }
 }
 async function whitelistToggle(ctx, { uuid, name, add }) {

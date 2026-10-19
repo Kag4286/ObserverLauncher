@@ -141,7 +141,85 @@ function buildPropertiesContent(root, props) {
 }
 // BUGFIX (item count showing as undefined): 1.21.5+ / 26.x item stacks use
 // lowercase `count`; pre-1.20.5 files used `Count`. Normalize both here.
-function stackOf(item) { return { id: item.id, count: item.count ?? item.Count ?? 1 }; }
+//
+// 1.20.5 moved item NBT into a `components` compound; older files keep it under `tag`. Both are
+// read so durability / enchantments / the anvil name show up on every server version.
+// Vanilla max durability. Only OVERRIDDEN values are stored in the item itself, so a plain
+// undamaged sword has no `damage` field and the bar must be derived from the id.
+// Armor and tools are deliberately SEPARATE tables: one shared `diamond` key collides (528 for a
+// chestplate vs 1561 for a sword) and the later literal would silently win, showing every
+// diamond chestplate as a 1561-durability bar.
+const ARMOR_MAX = {
+  // index order: helmet, chestplate, leggings, boots
+  leather: [55, 80, 75, 65], chainmail: [165, 240, 225, 195], iron: [165, 240, 225, 195],
+  golden: [77, 112, 105, 91], diamond: [363, 528, 495, 429], netherite: [407, 592, 555, 481],
+  copper: [121, 176, 165, 143],
+};
+const TOOL_MAX = {
+  // every sword / pickaxe / axe / shovel / hoe of a material shares one value
+  wooden: 59, stone: 131, copper: 190, iron: 250, golden: 32, diamond: 1561, netherite: 2031,
+};
+const MISC_MAX = {
+  bow: 384, crossbow: 465, trident: 250, elytra: 432, shield: 336, fishing_rod: 64, shears: 238,
+  flint_and_steel: 64, mace: 500, carrot_on_a_stick: 25, warped_fungus_on_a_stick: 100,
+  brush: 64, wolf_armor: 64, turtle_helmet: 275,
+};
+const ARMOR_ORDER = ['helmet', 'chestplate', 'leggings', 'boots'];
+const TOOL_ORDER = ['sword', 'pickaxe', 'axe', 'shovel', 'hoe'];
+function maxDamageFor(id) {
+  const path = String(id || '').split(':').pop();
+  if (MISC_MAX[path] !== undefined) return MISC_MAX[path];
+  const [mat, kind] = path.split('_');
+  if (!kind) return undefined;
+  if (TOOL_ORDER.includes(kind) && TOOL_MAX[mat] !== undefined) return TOOL_MAX[mat];
+  if (ARMOR_ORDER.includes(kind) && ARMOR_MAX[mat]) return ARMOR_MAX[mat][ARMOR_ORDER.indexOf(kind)];
+  return undefined;
+}
+// A text component is either a plain string or a {text, extra[], translate} tree. Some writers
+// serialize the whole component as a JSON string, so parse that first. The inspector shows the
+// rendered name, so walk the tree rather than dumping raw JSON at the user.
+function textOf(value) {
+  if (value == null) return undefined;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (s.startsWith('{') || s.startsWith('[')) { try { return textOf(JSON.parse(s)); } catch { /* plain text */ } }
+    return s || undefined;
+  }
+  if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join('') || undefined;
+  if (typeof value !== 'object') return String(value);
+  let out = typeof value.text === 'string' ? value.text : (typeof value.translate === 'string' ? value.translate : '');
+  if (Array.isArray(value.extra)) out += value.extra.map(textOf).filter(Boolean).join('');
+  return out || undefined;
+}
+function enchantmentsOf(components, tag, newKey, oldKey) {
+  const out = [];
+  const push = (id, lvl) => { if (id) out.push({ id: String(id).includes(':') ? String(id) : `minecraft:${id}`, level: Number(lvl) || 1 }); };
+  const modern = components && components[newKey];
+  if (modern && typeof modern === 'object') {
+    const levels = modern.levels && typeof modern.levels === 'object' ? modern.levels : modern;
+    for (const [id, lvl] of Object.entries(levels)) if (typeof lvl === 'number') push(id, lvl);
+  }
+  for (const e of (tag && tag[oldKey]) || []) if (e && e.id) push(e.id, e.lvl ?? 1);
+  return out;
+}
+function stackOf(item) {
+  const out = { id: item.id, count: item.count ?? item.Count ?? 1 };
+  if (!item || typeof item !== 'object') return out;
+  const components = item.components || {};
+  const tag = item.tag || {};
+  const max = components['minecraft:max_damage'] ?? maxDamageFor(item.id);
+  const damage = components['minecraft:damage'] ?? tag.Damage;
+  if (typeof damage === 'number' && damage > 0 && typeof max === 'number' && max > 0) {
+    out.durability = { remaining: Math.max(0, max - damage), max };
+  }
+  const enchants = enchantmentsOf(components, tag, 'minecraft:enchantments', 'Enchantments');
+  if (enchants.length) out.enchantments = enchants;
+  const stored = enchantmentsOf(components, tag, 'minecraft:stored_enchantments', 'StoredEnchantments');
+  if (stored.length) out.storedEnchantments = stored;
+  const custom = textOf(components['minecraft:custom_name']) ?? textOf(tag.display && tag.display.Name);
+  if (custom) out.customName = custom;
+  return out;
+}
 async function readPlayerData(root, uuid, name) {
   if (!root) throw new Error('No server folder is selected.');
   const files = serverFiles(root);
@@ -288,4 +366,4 @@ function parseServerLine(text, live, send) {
   }
   if (changed && typeof send === 'function') send('server:live', live);
 }
-module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine };
+module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine, stackOf, maxDamageFor };

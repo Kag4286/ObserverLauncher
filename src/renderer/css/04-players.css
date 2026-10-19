@@ -46,6 +46,9 @@
 .inv-cell img{width:32px;height:32px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
 .inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:#fff;text-shadow:1px 1px 0 #000;pointer-events:none}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
+/* No icon on the mirror (mod items): show the label instead of an empty square. */
+.inv-cell.no-tex{font:500 9px/1.15 var(--font-ui);color:var(--text-dim);text-align:center;padding:2px;word-break:break-word;overflow:hidden}
+.inv-cell.no-tex .inv-count{font-size:9px}
 /* v6.0.0 Track B - B2: Leaderboard */
 .leaderboard-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto}
 .leaderboard-table{width:100%;border-collapse:collapse;font:500 13px var(--font-ui)}
