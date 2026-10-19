@@ -289,14 +289,25 @@
 /* Technical values inside the facts row stay mono; the labels stay UI font, so a value is
    distinguishable from its label by typeface, not only by weight. */
 .pd-support b{color:var(--text-2);font-weight:600;font-family:var(--font-mono);font-size:12px}
-/* Secondary detail lives behind a disclosure, not a wall of equal-weight tiles (DESIGN.md 2.4). */
-.pd-more{border-top:1px solid var(--border);padding-top:var(--space-3)}
-.pd-more>summary{cursor:pointer;list-style:none;font:600 12px var(--font-ui);color:var(--text-3);display:flex;align-items:center;gap:var(--space-2)}
+/* Secondary detail lives behind a disclosure, not a wall of equal-weight tiles (DESIGN.md 2.4).
+   A disclosure is an interactive control, so it EARNS a container: surface-2 + --r per 12.3, with
+   the same open/close motion the "Manage by name" disclosure already uses (.player-manual).
+   Without that the element read as a bare HTML <details>: a tiny caret, no background, and the
+   panel snapped open with no transition, which is what looked foreign next to the rest of the
+   card. */
+.pd-more{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);interpolate-size:allow-keywords}
+.pd-more::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
+.pd-more[open]::details-content{block-size:auto}
+.pd-more>summary{cursor:pointer;list-style:none;font:600 12.5px var(--font-ui);color:var(--text-3);display:flex;align-items:center;gap:var(--space-2);padding:11px 14px;border-radius:var(--r);transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
 .pd-more>summary::-webkit-details-marker{display:none}
 .pd-more>summary::before{content:'▸';color:var(--brand);font-family:var(--font-mono);transition:transform var(--dur-fast) var(--ease-out)}
 .pd-more[open]>summary::before{transform:rotate(90deg)}
-.pd-more>summary:hover{color:var(--text-2)}
-.pd-more[open]>summary{margin-bottom:var(--space-3)}
+.pd-more[open]>summary{border-radius:var(--r) var(--r) 0 0;border-bottom:1px solid var(--border)}
+.pd-more>summary:hover{color:var(--text-2);background:var(--surface-3)}
+.pd-more[open]>summary:hover{background:var(--surface-2)}
+.pd-more .pd-vitals{padding:var(--space-3) var(--space-4) var(--space-4)}
+@media (prefers-reduced-motion:reduce){.pd-more::details-content{transition:none}.pd-more>summary::before{transition:none}}
+html.motion-lite .pd-more::details-content{transition:none}
 
 /* Equipment tiles: real icons, one row, fixed slot order. Reuses .inv-cell so the icon sizing and
    the durability bar are shared with the inventory grid instead of a second implementation. */
