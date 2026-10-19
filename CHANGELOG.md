@@ -10,7 +10,7 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
-## [6.0.0] — UNRELEASED
+## [6.0.0] — 2026-10-19
 
 **Bedrock crossplay that works end to end, a month of metrics history, a player inspector with a real
 3D model, and a hardening pass.** No settings migration.

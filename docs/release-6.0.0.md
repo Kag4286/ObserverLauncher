@@ -2,7 +2,7 @@
 
 Bedrock players can join a Java server without editing config files by hand, and your metrics history now reaches back a month instead of a day.
 
-> This is the plain-English release note. Developers: see the full technical changelog in [CHANGELOG.md](https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md#600--unreleased).
+> This is the plain-English release note. Developers: see the full technical changelog in [CHANGELOG.md](https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md#600--2026-10-19).
 
 ---
 

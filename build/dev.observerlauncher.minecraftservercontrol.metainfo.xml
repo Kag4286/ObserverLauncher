@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="6.0.0" date="2026-10-19">
+      <description>
+        <p>Bedrock players can join a Java server without editing config files by hand: the app repairs a Geyser config in one click and opens a second tunnel for the Bedrock side. Metrics history now reaches back a month. The player inspector draws a rotatable 3D model with the player's armor and reads item icons from the server's own mod jars, and skins come from SkinsRestorer on offline-mode servers. Also adds Discord notifications, a Prometheus endpoint, multi-server controls and a hardening pass.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-6.0.0.md</url>
+    </release>
     <release version="5.7.0" date="2026-10-15">
       <description>
         <p>The Playit tunnel address is now detected automatically from the agent log instead of being copied by hand, and the app surfaces a Bedrock crossplay panel when GeyserMC is installed.</p>
