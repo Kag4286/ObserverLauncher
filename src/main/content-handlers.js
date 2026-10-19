@@ -106,7 +106,14 @@ function registerContent(ipcMain, ctx) {
   });
 
   ipcMain.handle('player:skin', async (_, { input } = {}) => {
-    try { return await require('./skins.js').getSkin(String(input || '')); }
+    try {
+      // Try SkinsRestorer first: on an offline-mode server it holds the skin the players actually
+      // see, while the Mojang lookup for an offline UUID always 404s. Falls through to the normal
+      // chain (Mojang -> client jar -> mirror) when the plugin is absent or has no record.
+      const sr = await require('./skinsrestorer.js').getSkinFromSkinsRestorer(ctx.currentServerPath, String(input || ''));
+      if (sr && sr.ok) return sr;
+      return await require('./skins.js').getSkin(String(input || ''));
+    }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
