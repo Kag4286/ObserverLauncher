@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { dataDir } = require('./data-dir.js');
 const { writeFileAtomic } = require('./fs-utils.js');
+const { loadDefaultPlayerTextures } = require('./client-skins.js');
 
 // PURE: parse the Base64 textures property from a Mojang session profile.
 // Returns the raw skin URL, or null.
@@ -21,10 +22,20 @@ function parseSkinUrl(profileJson) {
   } catch { return null; }
 }
 
+// PURE: detect a version-3 UUID (offline-mode, name-derived). These never exist on Mojang.
+// The 13th hex digit is the version; a 3 means name-based MD5, which is how an offline server
+// derives a UUID from the player name.
+function isOfflineUuid(input) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-3[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(input || ''));
+}
+
 // Resolve a username or UUID to a Mojang profile.
 // If given a 32-char hex string (with or without dashes), treat it as a UUID.
 // Otherwise, fetch the UUID from the username first.
 async function fetchMojangProfile(input) {
+  if (isOfflineUuid(input)) {
+    throw new Error('Offline-mode UUID (version 3): no Mojang skin.');
+  }
   const isUuid = /^[0-9a-f]{32}$/i.test(String(input).replace(/-/g, ''));
   let uuid = input;
   
@@ -38,8 +49,13 @@ async function fetchMojangProfile(input) {
 
   const cleanUuid = String(uuid).replace(/-/g, '');
   const profRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${cleanUuid}`);
+  if (profRes.status === 204 || profRes.status === 404) {
+    throw new Error('Player has no Mojang skin (likely an offline-mode server).');
+  }
   if (!profRes.ok) throw new Error(`Session server error: ${profRes.status}`);
-  return profRes.json();
+  const text = await profRes.text();
+  if (!text) throw new Error('Player has no Mojang skin (empty response).');
+  return JSON.parse(text);
 }
 
 // Main entry: get the local path to a player's skin PNG.
@@ -79,8 +95,25 @@ async function getSkin(input) {
     const dataUri = `data:image/png;base64,${buf.toString('base64')}`;
     return { ok: true, file: cacheFile, dataUri, uuid, model };
   } catch (e) {
+    // Legal-safe fallback: read Steve/Alex from the user's OWN client jar (never bundled). Offline
+    // UUIDs and transient fetch failures both land here, so the renderer can still show a real
+    // Minecraft face instead of a flat placeholder. When no client is installed, the original
+    // error is returned and the renderer falls back to its initials avatar.
+    try {
+      const defaults = loadDefaultPlayerTextures();
+      if (defaults && (defaults.wide || defaults.slim)) {
+        const useSlim = !defaults.wide && defaults.slim;
+        return {
+          ok: true,
+          dataUri: useSlim ? defaults.slim : defaults.wide,
+          model: useSlim ? 'slim' : 'classic',
+          fallback: true,
+          error: e.message,
+        };
+      }
+    } catch { /* fall through to the original error */ }
     return { ok: false, error: e.message };
   }
 }
 
-module.exports = { parseSkinUrl, getSkin };
+module.exports = { parseSkinUrl, getSkin, isOfflineUuid };

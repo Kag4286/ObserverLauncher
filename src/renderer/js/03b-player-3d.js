@@ -73,15 +73,19 @@ UV.leftSleeveSlim = { top:[52,48,3,4], bottom:[55,48,3,4], right:[48,52,4,12], f
 
 function uvc(uv, w, h, d) {
   const px = 1/64, py = 1/64;
-  const u = (x,y) => [x*px, 1 - (y+1)*py];
-  const map = (box, pw, ph) => {
-    const [x,y,pw_,ph_] = box;
-    return [ u(x,y), u(x+pw_,y), u(x+pw_,y+ph_), u(x,y+ph_) ];
+  const map = (box) => {
+    const [x, y, pw, ph] = box;
+    const u0 = x * px;
+    const u1 = (x + pw) * px;
+    const v0 = 1 - (y + ph) * py; // bottom
+    const v1 = 1 - y * py;        // top
+    // Order: Bottom-Left, Bottom-Right, Top-Right, Top-Left
+    return [ [u0, v0], [u1, v0], [u1, v1], [u0, v1] ];
   };
   return {
-    top: map(uv.top, w, d), bottom: map(uv.bottom, w, d),
-    right: map(uv.right, d, h), front: map(uv.front, w, h),
-    left: map(uv.left, d, h), back: map(uv.back, w, h)
+    top: map(uv.top), bottom: map(uv.bottom),
+    right: map(uv.right), front: map(uv.front),
+    left: map(uv.left), back: map(uv.back)
   };
 }
 
@@ -92,7 +96,7 @@ function buildCube(w, h, d, faces) {
     p.push(...verts[0], ...verts[1], ...verts[2], ...verts[0], ...verts[2], ...verts[3]);
     t.push(...uvs[0], ...uvs[1], ...uvs[2], ...uvs[0], ...uvs[2], ...uvs[3]);
   };
-  // Front
+  // Front (Bottom-Left, Bottom-Right, Top-Right, Top-Left)
   addFace([[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]], faces.front);
   // Back
   addFace([[x,-y,-z],[-x,-y,-z],[-x,y,-z],[x,y,-z]], faces.back);
@@ -110,6 +114,13 @@ function buildCube(w, h, d, faces) {
 function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const gl = canvas.getContext('webgl', { alpha: true, antialias: true });
   if (!gl) return null;
+
+  // Standard Minecraft skin UVs assume the origin at the image BOTTOM (OpenGL convention).
+  // WebGL defaults UNPACK_FLIP_Y_WEBGL to false (v=0 = image TOP), so without this every
+  // face samples a vertically-mirrored region: on a 64x64 skin that lands on the overlay /
+  // armor rows (mostly transparent) and is discarded by the alpha test, which looks like
+  // "only the head renders". This is persistent state, so it covers skin AND armor textures.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   const getMaterial = (id) => {
     if (!id) return null;
@@ -159,7 +170,22 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
     
-    if (img.height === 32) {
+    // Detect legacy skin: either 64x32, or Mojang padded it to 64x64 with a transparent bottom half.
+    const isLegacy = img.height === 32 || (() => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 32, img.width, img.height - 32).data;
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] > 0) return false;
+        }
+        return true;
+      } catch { return false; }
+    })();
+
+    if (isLegacy) {
       // Legacy skin: use right arm/leg UVs for the left side.
       cLArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, armW, 12, 4));
       cLSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.rightSleeveSlim : UV.rightSleeve, armW, 12, 4));

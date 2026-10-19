@@ -75,9 +75,23 @@ let lastPlayersSig='';
 // v6.0.0 Track B: local avatar cache to avoid CSP-blocked external images.
 const headAvatarCache = {};
 const pendingHeadFetches = new Set();
-function getHeadAvatarHtml(uuid) {
-  if (!uuid) return '<img class="player-avatar" src="assets/icons/ui/person.svg" alt="" style="padding:6px;opacity:0.6">';
+// A colored square with the player's initial, used whenever no Mojang skin is available
+// (offline UUID, failed fetch). This replaces the faint generic person icon so the roster
+// and inspector header always show a stable, visible face.
+function playerInitialsAvatar(name) {
+  const initial = String(name || '?').trim().charAt(0).toUpperCase() || '?';
+  let hash = 0;
+  for (const c of String(name || '?')) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
+  const hue = Math.abs(hash) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="6" fill="hsl(${hue},32%,24%)"/><text x="32" y="34" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="hsl(${hue},60%,75%)">${initial}</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+function getHeadAvatarHtml(uuid, name) {
+  const fallback = `<img class="player-avatar" src="${playerInitialsAvatar(name)}" alt="">`;
+  if (!uuid) return fallback;
   if (headAvatarCache[uuid]) return `<img class="player-avatar" src="${headAvatarCache[uuid]}" alt="">`;
+  // Offline UUIDs are no longer short-circuited: the backend now falls back to the user's own
+  // Steve/Alex texture, and the face crop below turns that into a real default avatar.
   if (!pendingHeadFetches.has(uuid)) {
     pendingHeadFetches.add(uuid);
     window.observer.playerSkin(uuid).then(res => {
@@ -95,10 +109,13 @@ function getHeadAvatarHtml(uuid) {
           try { renderPlayers(); } catch {}
         };
         img.src = res.dataUri;
+      } else {
+        // Transient failure (network, timeout): allow the next render to retry.
+        pendingHeadFetches.delete(uuid);
       }
-    }).catch(() => {});
+    }).catch(() => { pendingHeadFetches.delete(uuid); });
   }
-  return '<img class="player-avatar" src="assets/icons/ui/person.svg" alt="" style="padding:6px;opacity:0.6">';
+  return fallback;
 }
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
@@ -112,7 +129,10 @@ function renderPlayers(){
   // Signature guard: refreshUI() (server:files / server:state / live) can call this many times a
   // second. Rebuilding innerHTML each time restarts the row stagger animation -> visible flicker.
   // If the page content is unchanged, leave the DOM alone.
-  const sig=JSON.stringify([currentLocale,playerPage,playerFilter,q,totalPages,list.length,page.map(p=>[p.name,p.uuid,p.online,p.hasData,p.op,p.whitelisted,p.banned])]);
+  // BUGFIX: include the avatar cache size in the signature. getHeadAvatarHtml() fetches the skin
+  // asynchronously and then calls renderPlayers() to swap the placeholder for the real face, but the
+  // signature did not change, so the early-return below left every row on person.svg forever.
+  const sig=JSON.stringify([currentLocale,playerPage,playerFilter,q,totalPages,list.length,Object.keys(headAvatarCache).length,page.map(p=>[p.name,p.uuid,p.online,p.hasData,p.op,p.whitelisted,p.banned])]);
   if(sig===lastPlayersSig)return;
   lastPlayersSig=sig;
   const pager=$('#playersPager');
@@ -120,7 +140,7 @@ function renderPlayers(){
   if(pager){pager.hidden=totalPages<=1;$('#playersPageLabel').textContent=`${t('ply.page')} ${playerPage+1} / ${totalPages}`;$('#playersPrevPage').disabled=playerPage<=0;$('#playersNextPage').disabled=playerPage>=totalPages-1}
   if(!page.length){n.innerHTML=`<div class="player-empty"><b>${t('ply.empty')}</b><span>${t('ply.emptySub')}</span></div>`}else{n.innerHTML=page.map(p=>{
     const attrs=`data-player="${esc(p.name)}" data-uuid="${esc(p.uuid||'')}"`;
-    const avatar = p.uuid ? getHeadAvatarHtml(p.uuid) : '<img class="player-avatar" src="assets/icons/ui/person.svg" alt="" style="padding:6px;opacity:0.6">';
+    const avatar = getHeadAvatarHtml(p.uuid, p.name);
     const meta=[p.online?`<span style="color:var(--success)">${t('ply.online')}</span>`:`<span>${t('ply.offline')}</span>`, p.hasData?t('ply.hasData'):t('ply.noData'), p.uuid?`UUID ${esc(p.uuid.slice(0,8))}…`:null].filter(Boolean).join(' • ');
     return `<div class="player-row ${p.online?'online':''}" tabindex="0" role="listitem">
       ${avatar}
@@ -250,6 +270,7 @@ async function openPlayerInspector(uuid,name){
   if(!d){$('#playerDataError').textContent=t('ply.corrupt');return}
 
   // v6.0.0 Track B: Render 3D Player
+  let _skinDataUri = null;
   const canvas = $('#pd3dCanvas');
   const status = $('#pd3dStatus');
   if (canvas && status) {
@@ -257,16 +278,22 @@ async function openPlayerInspector(uuid,name){
     status.textContent = t('pd.loadingSkin');
     canvas.style.opacity = '0';
     const skinRes = await window.observer.playerSkin(uuid || name);
+    if (skinRes && skinRes.ok && skinRes.dataUri) _skinDataUri = skinRes.dataUri;
     if (skinRes && skinRes.ok && skinRes.dataUri) {
       status.hidden = true;
       canvas.style.opacity = '1';
       try {
-        const equipment = {
-          helmet: d.armor?.find(x => x.slot === 'Helmet'),
-          chest: d.armor?.find(x => x.slot === 'Chestplate'),
-          legs: d.armor?.find(x => x.slot === 'Leggings'),
-          boots: d.armor?.find(x => x.slot === 'Boots'),
-        };
+        // Only pass equipment if there is actually armor to render. Passing an empty
+        // object causes the renderer to try loading texture files for 'undefined' materials.
+        let equipment = null;
+        if (d.armor && d.armor.length > 0) {
+          equipment = {
+            helmet: d.armor.find(x => x.slot === 'Helmet'),
+            chest: d.armor.find(x => x.slot === 'Chestplate'),
+            legs: d.armor.find(x => x.slot === 'Leggings'),
+            boots: d.armor.find(x => x.slot === 'Boots'),
+          };
+        }
         const rModel = createPlayerRenderer(canvas, skinRes.dataUri, skinRes.model === 'slim', equipment);
         if (!rModel) throw new Error('WebGL not supported');
       } catch (e) {
@@ -274,7 +301,7 @@ async function openPlayerInspector(uuid,name){
         status.textContent = t('pd.renderFail');
       }
     } else {
-      status.textContent = skinRes?.error || t('pd.skinFail');
+      status.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted)"><b>${esc(t('pd.no3dTitle'))}</b><br><span style="font-size:11px;opacity:0.8">${esc(t('pd.no3dSub'))}</span></div>`;
     }
   }
 
@@ -283,7 +310,10 @@ async function openPlayerInspector(uuid,name){
   const invCb=$('#invShowEmpty');if(invCb)invCb.checked=false;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=false;
   const invSel=$('#invSort');if(invSel)invSel.value='slot';const ecSel=$('#ecSort');if(ecSel)ecSel.value='slot';
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
-  $('#inspectAvatar').src=`https://mc-heads.net/avatar/${encodeURIComponent(uuid)}/44`;
+  // BUGFIX: the header avatar used an external mc-heads.net URL, which shows a broken image when
+  // offline or when that request is slow. Reuse the 8x8 face we already cached for the roster, then
+  // the full skin data URI, then the local placeholder, so the header never shows a broken image.
+  $('#inspectAvatar').src = headAvatarCache[uuid] || _skinDataUri || playerInitialsAvatar(name);
   $('#inspectName').textContent=name;$('#inspectDim').textContent=d.dimension||t('ply.unknownDim');
   renderPdBadges(name);
   const posEl=$('#inspectPos');
