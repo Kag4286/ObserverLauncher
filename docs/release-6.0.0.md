@@ -108,7 +108,7 @@ If you run a Velocity proxy, the Properties tab now lists the backend servers it
 
 ## A player card that shows the player
 
-Open a player from the Players tab and the Overview now leads with a rotatable 3D model of that player, wearing whatever armor they have on. Drag to turn it. The four numbers you actually look at (online or offline, gamemode, health, food) sit beside the model at a readable size, and the rest of the saved values wait behind an **All stats** line you can open.
+Open a player from the Players tab and the Overview now leads with a rotatable 3D model of that player, wearing whatever armor they have on. Drag to turn it. The four numbers you actually look at (online or offline, gamemode, health, food) sit beside the model at a readable size, and the rest of the saved values wait behind an **All stats** section you can open. It opens the same way the other collapsible rows in the app do, with the same background and the same motion.
 
 Equipment is a row of item icons rather than a list of names, so you can see a diamond helmet at a glance. Enchanted items show their enchantments and level when you hover. Damaged tools and armor show a durability bar under the icon.
 
