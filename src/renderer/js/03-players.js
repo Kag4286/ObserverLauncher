@@ -64,11 +64,22 @@ function renderItemGrid(id,items){
   n.innerHTML=list.map((x,i)=>{
     if(x.empty) return `<div class="inv-cell empty" title="Slot ${x.slot}"></div>`;
     const label=x.customName||itemLabel(x.id);
-    // Only vanilla ids have a texture on the mirror. A mod item (namespace != minecraft) is
-    // rendered as its label rather than requesting a URL that can never resolve.
+    // Vanilla ids resolve on the PrismarineJS mirror. A mod id (namespace != minecraft) does not,
+    // but the mods/*.jar on the server ships the PNG, and the tex:// itemmod kind reads it from
+    // there (falling back to the readable label when the jar has no such texture).
     const vanilla=!x.id.includes(':')||x.id.startsWith('minecraft:');
-    const idNoPrefix=x.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
-    const iconUrl=vanilla?`tex://auto/item/${idNoPrefix}.png`:null;
+    let iconUrl=null;
+    if(vanilla){
+      const idNoPrefix=x.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
+      iconUrl=`tex://auto/item/${idNoPrefix}.png`;
+    } else {
+      // tex:// path segments cannot hold a slash, so pack `<namespace>~<name>` and split it in
+      // main. The tilde is not valid in a resource location, so it can never collide with an
+      // underscore that lives inside either the namespace or the item name (cofh_core_wrench).
+      const [ns, ...rest]=x.id.split(':');
+      const nm=rest.join(':').replace(/\.png$/,'');
+      if(ns&&nm) iconUrl=`tex://auto/itemmod/${encodeURIComponent(ns)}~${encodeURIComponent(nm)}.png`;
+    }
     const tip=itemTooltip(x,label);
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';

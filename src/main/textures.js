@@ -20,10 +20,13 @@
 const fs = require('fs');
 const path = require('path');
 const { dataDir } = require('./data-dir.js');
+const { singleton: modsIndex } = require('./mods-index.js');
 
 const RAW_BASE = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data';
-// item/block icons; armor layer 1 (helmet/chest/boots) and layer 2 (leggings)
-const KINDS = ['item', 'block', 'armor', 'armorlegs'];
+// item/block icons; armor layer 1 (helmet/chest/boots) and layer 2 (leggings); itemmod reads a
+// texture from the server's own mods/*.jar (the mirror is vanilla-only, so a modded server's
+// inventory was all text labels before this).
+const KINDS = ['item', 'block', 'armor', 'armorlegs', 'itemmod'];
 
 // The mirror lags the game: 26.3 shipped but PrismarineJS had only extracted up to 26.1, so a
 // request for data/26.3/items/diamond_sword.png 404s and EVERY icon renders blank. Item textures
@@ -60,6 +63,7 @@ function parseVersion(v) {
 
 let serverNames = () => [];
 let notifyIcon = null;
+let modsDirOf = () => null;
 const inflight = new Set();
 
 // 1×1 TRANSPARENT PNG — served on a cache miss instead of a 404 so the DevTools console isn't
@@ -82,9 +86,12 @@ function broadcast(channel, payload) {
     for (const w of BrowserWindow.getAllWindows()) { try { w.webContents.send(channel, payload); } catch {} }
   } catch { /* headless: no windows to notify */ }
 }
-function init({ serverNames: getNames, notify }) {
+function init({ serverNames: getNames, notify, modsDir }) {
   if (typeof getNames === 'function') serverNames = getNames;
   if (typeof notify === 'function') notifyIcon = notify;
+  // A getter, not a path: the active instance can change while the app runs, so the mods folder
+  // must be re-read per request. Returning null disables the itemmod kind gracefully.
+  if (typeof modsDir === 'function') modsDirOf = modsDir;
 }
 
 // "paper-26.3.jar" → "26.3", "minecraft_server.1.21.4.jar" → "1.21.4", else null.
@@ -114,12 +121,19 @@ function pngResponse(file) {
 function handle(request) {
   let u;
   try { u = new URL(request.url); } catch { return new Response('', { status: 400 }); }
-  const parts = decodeURIComponent(u.pathname).split('/').filter(Boolean);
+  // Split BEFORE decoding: an itemmod name may contain an encoded slash (%2F), and decoding the
+  // whole pathname first would turn it into a path separator and break the two-part shape.
+  const parts = u.pathname.split('/').filter(Boolean).map(s => { try { return decodeURIComponent(s); } catch { return s; } });
   if (parts.length !== 2) return new Response('', { status: 400 });
   const [kind, rawFile] = parts;
   if (!KINDS.includes(kind)) return new Response('', { status: 400 });
+  // itemmod files are written as <namespace>_<name>.png because a tex:// path segment cannot
+  // contain a slash. Every other kind keeps the strict lower-case name-only pattern.
   const file = String(rawFile).toLowerCase();
-  if (!/^[a-z0-9_-]+\.png$/.test(file) || file.includes('..')) return new Response('', { status: 400 });
+  const fileOk = kind === 'itemmod'
+    ? /^[a-z0-9_.-]+~[a-z0-9_./-]+\.png$/.test(file) && !file.includes('..')
+    : /^[a-z0-9_-]+\.png$/.test(file) && !file.includes('..');
+  if (!fileOk) return new Response('', { status: 400 });
 
   const version = u.hostname === 'auto'
     ? (detectMcVersion(serverNames()) || DEFAULT_VERSION)
@@ -127,6 +141,19 @@ function handle(request) {
 
   const local = resolveLocal(version, kind, file);
   if (local) return pngResponse(local);
+
+  // Mod textures come from a jar on disk, not the network. Try it synchronously: the index is
+  // session-cached and a hit is instant, so the first paint of an inventory renders correctly
+  // without the placeholder flash the remote path needs.
+  if (kind === 'itemmod') {
+    const buf = readModTexture(file);
+    if (buf && buf.length) {
+      const dest = path.join(cacheRoot(), version, kind, file);
+      try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, buf); } catch {}
+      return new Response(buf, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
+    }
+    return new Response(PLACEHOLDER_PNG, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
+  }
 
   queueRemote(version, kind, file); // fire-and-forget: next render hits the cache
   // Transparent 1×1 instead of 404: no console error spam, no broken-image flash. The renderer
@@ -207,4 +234,27 @@ async function fetchInto(url, kind, file, version) {
   return true;
 }
 
-module.exports = { init, handle, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS };
+// Split an itemmod filename `<namespace>~<name>.png` back into its parts. The tilde is the
+// separator because it is not valid in a resource location, so it cannot appear inside the
+// namespace or the item name (both allow underscores: cofh_core, diamond_sword). Returns null on
+// a malformed name.
+function splitModFile(file) {
+  const base = String(file || '').replace(/\.png$/, '');
+  const i = base.indexOf('~');
+  if (i <= 0 || i === base.length - 1) return null;
+  return { namespace: base.slice(0, i), name: base.slice(i + 1) };
+}
+
+// Read a mod texture through the singleton index. The dir comes from the getter because the active
+// instance can change; readTexture caches per session and drops the cache on a folder signature
+// change, so a mod update is picked up on the next request.
+function readModTexture(file) {
+  const parts = splitModFile(file);
+  if (!parts) return null;
+  let dir = null;
+  try { dir = modsDirOf(); } catch { dir = null; }
+  modsIndex.setModsDir(dir);
+  return modsIndex.readTexture(parts.namespace, parts.name);
+}
+
+module.exports = { init, handle, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile };

@@ -163,6 +163,12 @@ async function initApp(ctx, ipcMain) {
     serverNames: () => {
       try { const i = serverFiles(ctx.currentServerPath); return [i.jar, i.launchScript].filter(Boolean); }
       catch { return []; }
+    },
+    // FEATURE (v6.0.0): mod item icons read their PNG straight from the server's mods/*.jar,
+    // because the PrismarineJS mirror is vanilla-only. A getter so the active instance can change.
+    modsDir: () => {
+      const root = ctx.currentServerPath;
+      return root ? path.join(root, 'mods') : null;
     }
   });
   protocol.handle('tex', textures.handle);
