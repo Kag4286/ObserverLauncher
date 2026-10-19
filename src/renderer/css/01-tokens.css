@@ -82,3 +82,10 @@ h1,h2,h3{margin:0} h1{font-size:22px;font-weight:700;letter-spacing:-.02em} h2{f
 .eyebrow{font:700 10px var(--font-mono);letter-spacing:.14em;color:var(--text-dim);text-transform:uppercase}
 .text-muted{color:var(--text-muted)} code{color:var(--brand);font-family:var(--font-mono)}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+/* BUGFIX: native number spinners are drawn by the OS, not the design system. In the Saved data and
+   Live actions forms they were the only control that broke the visual language (DESIGN.md 12.2:
+   inputs are .field / .launcher-select, never an OS widget). Hiding the spinner keeps typing and
+   keyboard arrows working; only the visual affordance goes away. */
+input[type="number"]{-moz-appearance:textfield;appearance:textfield}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}

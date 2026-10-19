@@ -77,8 +77,11 @@ let chartSamples = samples;
 const PERF_LONG_MS = 10000, PERF_LONG_CAP = 8640;
 let selectedPlayer = null; let marketSort = 'downloads';
 let lastInspectData=null; // kept so icons:update can re-render the open inspector (now text-only, but keep for compat)
-let invSearchQuery='', invShowEmpty=false, invSortBy='slot';
-let ecSearchQuery='', ecShowEmpty=false, ecSortBy='slot';
+// Default ON: an inventory grid that hides every empty slot looks like a short list rather than a
+// 27-slot grid, and the user cannot tell a full slot from a missing one. Showing the whole grid
+// up front matches the in-game inventory.
+let invSearchQuery='', invShowEmpty=true, invSortBy='slot';
+let ecSearchQuery='', ecShowEmpty=true, ecSortBy='slot';
 const titles={overview:'Overview',console:'Console',players:'Players',performance:'Performance',content:'Content library',marketplace:'Marketplace',worlds:'Worlds & backups',properties:'Server properties',settings:'Launcher settings'};
 const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 // SECURITY (mirror of src/main/validate.js — renderer has no require()).

@@ -108,14 +108,21 @@ function renderEquipment(armor,offhand){
   const order=['Helmet','Chestplate','Leggings','Boots','Offhand'];
   n.innerHTML=order.map(label=>{
     const it=slots.find(x=>x.slot===label);
-    let cell=t('ply.emptySlot');
+    // A short dash, not the long "— Empty —" label: inside a fixed-height square cell the long
+    // string wrapped onto three lines and stretched that one tile taller than the icon tiles
+    // beside it (the uneven row the user saw). The slot name under the tile already says which
+    // piece is empty.
+    let cell='–';
     if(it&&it.id){
       const vanilla=!it.id.includes(':')||it.id.startsWith('minecraft:');
       const idNoPrefix=it.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
       const iconUrl=vanilla?`tex://auto/item/${idNoPrefix}.png`:null;
       cell=itemCellInner(iconUrl,itemLabel(it.id));
     }
-    return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" title="${esc(it&&it.id?it.id:label)}">${cell}</div><span>${esc(label)}</span></div>`;
+    // The long "— Empty —" label stays available as the hover title instead of being rendered
+    // inside the tile, where it wrapped and stretched the row.
+    const tip = it && it.id ? it.id : t('ply.emptySlot');
+    return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" title="${esc(tip)}">${cell}</div><span>${esc(label)}</span></div>`;
   }).join('');
 }
 let playerFilter='online';
@@ -230,7 +237,11 @@ function renderPlayers(){
 async function togglePlayerOp(p,on){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerOpToggle({uuid:p.uuid,name:p.name,op:on});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(on?'toast.nowOp':'toast.noLongerOp',{n:p.name}))}
 async function togglePlayerWhitelist(p,add){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerWhitelistToggle({uuid:p.uuid,name:p.name,add});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(add?'toast.addedWl':'toast.removedWl',{n:p.name}))}
 async function togglePlayerBan(p,ban){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerBanToggle({uuid:p.uuid,name:p.name,ban});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(ban?'toast.banned':'toast.unbanned',{n:p.name}))}
-function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; trapFocus(m); }
+function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; trapFocus(m);
+  // BUGFIX: the Live actions and Saved data selects were plain <select> elements, so the OS drew
+  // their popup and it looked foreign next to the animated dropdowns elsewhere. They now carry
+  // .ol-select; this call covers a case where the modal was rebuilt after enhanceAll() ran at load.
+  if(window.enhanceAllSelects)try{window.enhanceAllSelects(m)}catch{} }
 // Fade-out is handled by the universal .modal-overlay [hidden] transition (08-motion.css) — just
 // flip the attribute and drop the transient class after the fade finishes.
 function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; releaseFocus(); m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
@@ -397,9 +408,9 @@ async function openPlayerInspector(uuid,name){
   let _skinDataUri = null;
   _skinDataUri=await renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),uuid,name,d.armor);
 
-  invSearchQuery='';ecSearchQuery='';invShowEmpty=false;ecShowEmpty=false;invSortBy='slot';ecSortBy='slot';
+  invSearchQuery='';ecSearchQuery='';invShowEmpty=true;ecShowEmpty=true;invSortBy='slot';ecSortBy='slot';
   const invS=$('#invSearch');if(invS)invS.value='';const ecS=$('#ecSearch');if(ecS)ecS.value='';
-  const invCb=$('#invShowEmpty');if(invCb)invCb.checked=false;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=false;
+  const invCb=$('#invShowEmpty');if(invCb)invCb.checked=true;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=true;
   const invSel=$('#invSort');if(invSel)invSel.value='slot';const ecSel=$('#ecSort');if(ecSel)ecSel.value='slot';
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
   // BUGFIX: the header avatar used an external mc-heads.net URL, which shows a broken image when

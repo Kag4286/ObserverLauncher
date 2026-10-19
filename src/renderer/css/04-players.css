@@ -40,9 +40,13 @@
 .pd-3d-container{width:100%;aspect-ratio:1;background:radial-gradient(circle, var(--surface-3) 0%, var(--surface) 100%);border-radius:var(--r-sm);border:1px solid var(--border);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
 #pd3dCanvas{width:100%;height:100%;object-fit:contain;cursor:grab}
 #pd3dCanvas:active{cursor:grabbing}
-.pd-3d-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface-2);color:var(--text-muted);font:500 12px var(--font-ui);text-align:center;padding:20px;z-index:2}
+.pd-3d-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface-2);color:var(--text-3);font:500 12px var(--font-ui);line-height:1.5;text-align:center;padding:20px;z-index:2}
 /* v6.0.0 Track B: Inventory Grid */
 .inv-grid{display:grid;grid-template-columns:repeat(9, 1fr);gap:4px;margin-top:10px;max-width:450px}
+/* BUGFIX: the empty-state message is injected INTO the 9-column grid as one child, so it was
+   squeezed into a single 32px cell ("Inventory is empty" wrapped over four lines). Span every
+   column so it reads as a full-width notice. */
+.inv-grid>.inv-empty{grid-column:1/-1}
 .inv-cell{aspect-ratio:1;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;position:relative;cursor:default}
 .inv-cell:hover{background:var(--surface-3);border-color:var(--border-strong)}
 .inv-cell.empty{background:transparent;border-style:dashed;opacity:0.5}
@@ -50,7 +54,7 @@
 .inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:var(--text);text-shadow:1px 1px 0 var(--bg);pointer-events:none}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
 /* No icon on the mirror (mod items): show the label instead of an empty square. */
-.inv-cell.no-tex{font:500 9px/1.15 var(--font-ui);color:var(--text-dim);text-align:center;padding:2px;word-break:break-word;overflow:hidden}
+.inv-cell.no-tex{font:500 9px/1.15 var(--font-ui);color:var(--text-3);text-align:center;padding:2px;word-break:break-word;overflow:hidden}
 .inv-cell.no-tex .inv-count{font-size:9px}
 /* v6.0.0 Track B - B2: Leaderboard */
 .leaderboard-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto}
@@ -69,7 +73,7 @@
 .inspect-uuid:hover{border-color:var(--brand);color:var(--brand)}
 .inspect-uuid.copied{border-color:var(--success);color:var(--success);background:var(--success-weak)}
 .inspect-note code{color:var(--brand)}
-.inspect-check{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--warning-weak);border:1px solid rgba(255,200,87,.18);border-radius:var(--r-sm);font:500 11px var(--font-ui);color:var(--text);margin-bottom:12px}
+.inspect-check{display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--danger-weak);border:1px solid rgba(255,102,125,.22);border-radius:var(--r-sm);font:500 11.5px var(--font-ui);color:var(--text);margin-bottom:12px}
 .inspect-check input{accent-color:var(--brand)}
 .workspace-empty{padding:32px 20px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:var(--r);background:rgba(255,255,255,.01)}
 .workspace-empty h3{color:var(--text);margin:8px 0 4px}

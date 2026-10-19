@@ -23,6 +23,20 @@ const { dataDir } = require('./data-dir.js');
 const { singleton: modsIndex } = require('./mods-index.js');
 
 const RAW_BASE = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data';
+// BUGFIX: some vanilla items have no texture file of their own. The enchanted golden apple is
+// drawn by the game from golden_apple.png plus a glint; the mirror only ships the base file, so
+// `enchanted_golden_apple.png` 404s and the slot rendered as an empty label. Aliases map an id to
+// the texture that actually exists. Kept tiny and explicit so a wrong guess cannot hide a real
+// missing icon behind the wrong picture.
+const ITEM_ALIASES = {
+  enchanted_golden_apple: 'golden_apple',
+  enchanted_book: 'book',
+};
+function itemAliasOf(file) {
+  const base = String(file || '').replace(/\.png$/, '');
+  const target = ITEM_ALIASES[base];
+  return target ? `${target}.png` : null;
+}
 // item/block icons; armor layer 1 (helmet/chest/boots) and layer 2 (leggings); itemmod reads a
 // texture from the server's own mods/*.jar (the mirror is vanilla-only, so a modded server's
 // inventory was all text labels before this).
@@ -145,6 +159,12 @@ function handle(request) {
 
   const local = resolveLocal(version, kind, file);
   if (local) return pngResponse(local);
+  // An aliased item serves the base texture's cached copy immediately, so the second open of the
+  // inspector does not flash the placeholder first.
+  if (kind === 'item') {
+    const alias = itemAliasOf(file);
+    if (alias) { const a = resolveLocal(version, kind, alias); if (a) return pngResponse(a); }
+  }
 
   // Mod textures come from a jar on disk, not the network. Try it synchronously: the index is
   // session-cached and a hit is instant, so the first paint of an inventory renders correctly
@@ -210,6 +230,9 @@ function queueRemote(version, kind, file) {
         const folder = kind === 'item' ? 'items' : kind === 'block' ? 'blocks' : null;
         if (!folder) return;
         urls.push([`${RAW_BASE}/${encodeURIComponent(v)}/${folder}/${file}`, v]);
+        // Alias after the real name, so a mirror that DOES publish the specific texture wins.
+        const alias = kind === 'item' ? itemAliasOf(file) : null;
+        if (alias) urls.push([`${RAW_BASE}/${encodeURIComponent(v)}/${folder}/${alias}`, v]);
       }
     }
     // Cache under the version the renderer asked for, so the next request hits resolveLocal
@@ -261,4 +284,4 @@ function readModTexture(file) {
   return modsIndex.readTexture(parts.namespace, parts.name);
 }
 
-module.exports = { init, handle, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile };
+module.exports = { init, handle, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf };
