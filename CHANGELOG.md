@@ -75,6 +75,54 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - New IPC `player:skin`. 4 new keys (`pd.loadingSkin`, `pd.renderFail`, `pd.skinFail`).
 - Spike notes: `docs/v6.0.0-sp2.md`, `sp3`, `sp4`.
 
+### Added — Player Inspector: geometry, armor, items and skins (Track B follow-up)
+
+The first B1a pass shipped a working canvas but the model, the armor and the item icons were wrong
+in ways only a screenshot exposed. This pass fixes each defect at its root and fills in the rest of
+the inspector.
+
+**Model geometry and orientation.**
+- Every body part was placed at an invented Y offset with no relation to the vanilla skeleton, so the head sank ten units into the torso and the torso overlapped the legs by six. Parts now sit on the vanilla values (hip 12, shoulder 24, head 24..32) and the camera distance is solved from the field of view so the 32-unit model fills 78% of the frame without clipping (`tests/player-model-geometry.test.js` asserts zero interpenetration and the projection).
+- `buildCube` put its `right` face at +X, but the model faces +Z, so +X is the character's LEFT. Every side face sampled the opposite skin region. The faces are now named `east`/`west` so the ambiguity cannot return.
+
+**Worn armor.**
+- Armor textures are 64x32, not 64x64, so a v computed against a 64-row grid sampled the helmet rows onto the torso. `uvc()` now takes the texture height and armor cubes pass 32.
+- Mojang moved the humanoid armor textures in 1.21.2 from `models/armor/<mat>_layer_N.png` to `entity/equipment/humanoid[_leggings]/<mat>.png`. `textures.js` gained `armor`/`armorlegs` kinds, a NUMERIC version compare at the 1.21.2 boundary (a string compare sorts 1.9.4 above 1.21.2), and a two-layout candidate list so a misdetected jar still resolves on the next reload. `golden` armor maps to the `gold` texture file.
+- The armor atlas and the skin share texture unit 0. `loadArmor`'s upload bound the armor texture there and `draw()` never rebound the skin, so every skin cube after the first armor upload sampled the armor atlas at skin UVs (transparent rows) and the alpha test deleted the torso. `draw()` now binds the skin every frame; the armor blocks rebind their own texture.
+- `upload()` refuses a 1x1 image so the placeholder never binds as a real texture.
+
+**Texture protocol.**
+- `tex://` was a privileged scheme WITHOUT `corsEnabled`, so a WebGL `texImage2D` from the `file://` page was a cross-origin pixel read and Chromium refused it. The scheme is now `corsEnabled`, every `tex://` response carries `Access-Control-Allow-Origin`, and the `<img>` keeps `crossOrigin='anonymous'` (a texture upload does need the handshake). `upload()` also catches a tainted-image `SecurityError` so one bad texture cannot break the draw loop.
+- The placeholder PNG decoded to a solid BLUE pixel, so every unresolved icon rendered as a blue square. Replaced with a genuinely transparent 1x1; a test inflates the IDAT and asserts alpha 0.
+- The mirror lags the game: a 26.3 request 404s. `mirrorVersion()` picks the nearest extracted version on the same major.minor line, and the requested version stays the cache key so the next load is local.
+
+**Item icons and metadata.**
+- Mod items are read from the server's own `mods/*.jar` (new `src/main/mods-index.js` over the existing `jar-reader.js`), because the mirror is vanilla-only. The `tex://` path is `<namespace>~<name>`: a tilde cannot appear in a resource location, so it can never collide with an underscore inside either part. The index is cached by a folder signature (name + size + mtime) and rebuilt when a mod changes.
+- A few vanilla items have no texture file of their own. `enchanted_golden_apple` is drawn by the game from `golden_apple.png` plus a glint; the mirror 404s the specific name. A small `ITEM_ALIASES` table maps those ids, tried AFTER the real name so a mirror that does publish it still wins.
+- `stackOf()` now returns durability, enchantments and custom names, reading both the 1.20.5+ `components` compound and the older `tag`. Armor and tool durability tables are separate (a single `diamond` key collides at 528 versus 1561). A custom name serialized as a JSON string is parsed.
+- `readPlayer()` runs `save-all flush` before reading, throttled to once per 5 seconds, so a running server no longer shows data up to 15 minutes stale.
+
+**Skin resolution.**
+- The fallback chain is now: SkinsRestorer on disk -> Mojang session server -> the user's own client jar (new `client-skins.js` + `jar-reader.js`, a ~90 line zlib ZIP reader, no new dependency) -> the PrismarineJS mirror (the same model `tex://` uses) -> the renderer's initials avatar. Nothing Mojang-owned is bundled; every texture is fetched to the user's machine at runtime.
+- `UNPACK_FLIP_Y_WEBGL` defaults to false, so every face sampled a vertically mirrored region and only the head happened to hit opaque pixels. Set to true.
+- Version-3 UUIDs (offline-mode, name-derived) are detected and the doomed Mojang request is skipped.
+- The roster's signature guard did not include the avatar cache, so a late skin fetch called `renderPlayers()` and returned early, leaving every row on the placeholder. The cache size is part of the signature now.
+
+**SkinsRestorer.**
+- New `src/main/skinsrestorer.js` reads the plugin's FILE backend on disk. Format verified by a read-only spike on a real 15.x install: `players/<uuid>.player` holds `skinIdentifier.identifier` (the assigned skin uuid, no texture), `skins/<skin-uuid>.playerskin` holds the base64 `value` whose decoded textures property points at `textures.minecraft.net` (the same host the Mojang path downloads from). MySQL/Postgres storage needs a driver this project does not ship, so the reader returns a clear error and the chain falls back.
+- The `player:skin` IPC handler tries SkinsRestorer FIRST, because on an offline-mode server it holds the skin the players actually see. Verified end to end on the real folder.
+
+**Layout.**
+- The Overview tab was the only screen still in the pre-v4 visual language: eight equal-weight bordered tiles, every section a bordered card, and a 3D box with no background because it referenced `--surface-1`, a token that does not exist. The base `.inspect-*` rules were ALSO duplicated between `04-players.css` and `07-polish.css`, and the 04 copy's border + radius was never overridden.
+- The 3D model is now the dominant element, four headline facts sit beside it at display weight, one supporting line carries the rest, and the full readout lives behind an `All stats` disclosure. Equipment is a row of real icon tiles that reuses the inventory cell.
+- `.inspect-title>span` matched every direct span child of the title, so the brand-coloured coordinates and the mono dimension were both rewritten to one muted size. Scoped to `#inspectDim`.
+- Inventories now show every slot by default (a 27-slot grid read as a short list when empties were hidden), the empty-state message spans the whole grid instead of one 32px cell, and the enchanted glint no longer leaves an empty tile.
+- Native number spinners and two plain `<select>` elements in Live actions and Saved data were the only OS-drawn widgets in the modal; the spinners are hidden globally and the selects carry `.ol-select`.
+- Two informational rows used `--warning-weak`, which renders as a muddy olive bar that reads as an error. A note is neutral; the destructive clear option is danger-tinged.
+- The CSP forbids inline handlers, so the placeholder-to-label swap moved to one delegated capture `load` listener keyed on `data-fb` and `naturalWidth<=1`.
+
+**Tests:** `player-model-geometry` 55, `item-metadata` 36, `armor-textures` 50, `jar-reader` 6, `client-skins` 6, `mods-index` 16, `skinsrestorer` 11, `item-alias` 5, `console-player-links` 10, `motd-preview` 12, `jvm-presets` 15, `properties-history` 15, `template-store` 14, `gamerules` 17, `webhook` 18. Unit 135 files, e2e 13, i18n 7 locales x 1240 keys, motion ratchet 102 (was 104).
+
 ### Added — Velocity backend manager (E1)
 - A Velocity proxy uses `velocity.toml` to list its backend servers. Editing that file by hand is easy to break (TOML syntax, quotes, priority list), so the Properties tab now shows a **Backend servers** card when the active server is a proxy (a `.jar` with "velocity" in its name).
 - `src/main/proxy-config.js` parses, adds and removes servers at the **line level**, so the user's own comments and the rest of the file are never re-serialized or lost (the same rule the Geyser config fixer follows).
@@ -155,7 +203,7 @@ SP1 spike notes live in `docs/v6.0.0-sp1.md`: the free tier is anonymous, the ad
 - `tests/orphan.test.js` +3 checks.
 
 ### Tests
-- `npm test` 120 files, `npm run test:e2e` 13, i18n 7 locales x 1166 keys, arch 92 IPC channels.
+- `npm test` 135 files, `npm run test:e2e` 13, i18n 7 locales x 1240 keys, arch 106 IPC channels, motion ratchet 102 literal durations (baseline 124), no-dup clean.
 
 ## [5.7.0] — 2026-10-15
 

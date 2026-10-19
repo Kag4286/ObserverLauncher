@@ -106,11 +106,35 @@ If you want to move a server to a Linux VPS, Settings > Advanced now has an Expo
 
 If you run a Velocity proxy, the Properties tab now lists the backend servers it forwards to. Add one by name and address, or remove an old one. The file is edited at the line level, so any comments and spacing you put in `velocity.toml` yourself are kept exactly as they were.
 
+## A player card that shows the player
+
+Open a player from the Players tab and the Overview now leads with a rotatable 3D model of that player, wearing whatever armor they have on. Drag to turn it. The four numbers you actually look at (online or offline, gamemode, health, food) sit beside the model at a readable size, and the rest of the saved values wait behind an **All stats** line you can open.
+
+Equipment is a row of item icons rather than a list of names, so you can see a diamond helmet at a glance. Enchanted items show their enchantments and level when you hover. Damaged tools and armor show a durability bar under the icon.
+
+This works for players who are offline. The app reads their save file, so nothing needs the server to be running. If the server is running, it asks the server to write the file first, so you are not looking at data from fifteen minutes ago.
+
+## Skins work on offline servers now
+
+An offline-mode server has no Mojang account behind its player names, so the app used to show a default Steve for everyone. If you run SkinsRestorer, the app now reads the skins the plugin stores on disk and shows the skin your players actually see. It looks in the plugin folder itself, so there is nothing to configure.
+
+If SkinsRestorer is not installed, the app still finds a skin when it can. It checks Mojang, then your own Minecraft client's files, then a public texture mirror, and finally falls back to a colored tile with the player's first letter. A player never shows a broken image.
+
+## Item icons, including modded ones
+
+Inventory and ender chest show every slot, the way the game does. Empty slots are outlined, so you can tell a full inventory from a short one. A stack of more than one item shows the count.
+
+Items added by mods used to show only a text label. The app now reads the icon straight out of the mod's own jar file on your server, so a Create wrench or an AE2 cable has a picture like anything else. Vanilla items come from the same public mirror the launcher already uses for block and item icons.
+
+A few items have no texture file of their own, because the game draws them from another texture plus a glow. The enchanted golden apple is one of these. Those items now show the right picture instead of a blank square.
+
 ## Smaller additions
 
 - Player names in the console are now clickable and open that player's card.
 - A new server created from the wizard shows a short note about Bedrock crossplay when the software you picked supports it.
 - The update policy in Settings (Automatic, Ask me first, Off) uses the app's own dropdown, not the system one.
+- The two dropdowns inside the player card (gamemode) now use the app's own dropdown, and the up and down arrows on number fields are gone. Both were the last places the operating system drew a control instead of the app.
+- Several small typography problems inside the player card are fixed: coordinates, the dimension line and the name no longer share three different text sizes and colors on one row, and the equipment row keeps every tile the same height when a slot is empty.
 
 ## Upgrading
 
