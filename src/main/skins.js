@@ -11,6 +11,12 @@ const { dataDir } = require('./data-dir.js');
 const { writeFileAtomic } = require('./fs-utils.js');
 const { loadDefaultPlayerTextures } = require('./client-skins.js');
 
+// Fallback default skin from the same public PrismarineJS mirror the tex:// protocol already uses
+// for item and armor icons. Nothing Mojang-owned is bundled in this repository; the PNG is fetched
+// to the user's machine at runtime and cached there, exactly like the item icons.
+const MIRROR_BASE = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data';
+const MIRROR_VERSION = '1.21.4'; // a stable version whose player textures are known present
+
 // PURE: parse the Base64 textures property from a Mojang session profile.
 // Returns the raw skin URL, or null.
 function parseSkinUrl(profileJson) {
@@ -56,6 +62,26 @@ async function fetchMojangProfile(input) {
   const text = await profRes.text();
   if (!text) throw new Error('Player has no Mojang skin (empty response).');
   return JSON.parse(text);
+}
+
+// Fetch the default Steve texture from the PrismarineJS mirror, cache it under dataDir, and
+// return a data URI. Returns null on any failure (offline, mirror down) so the caller can fall
+// through to its last resort.
+async function fetchDefaultFromMirror() {
+  const cacheDir = path.join(dataDir(), 'textures', 'skins', 'defaults');
+  const cacheFile = path.join(cacheDir, 'steve.png');
+  if (fs.existsSync(cacheFile)) {
+    const buf = fs.readFileSync(cacheFile);
+    if (buf.length > 100) return 'data:image/png;base64,' + buf.toString('base64');
+  }
+  const url = `${MIRROR_BASE}/${MIRROR_VERSION}/entity/player/wide/steve.png`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.length < 100) return null;
+  fs.mkdirSync(cacheDir, { recursive: true });
+  writeFileAtomic(cacheFile, buf);
+  return 'data:image/png;base64,' + buf.toString('base64');
 }
 
 // Main entry: get the local path to a player's skin PNG.
@@ -111,6 +137,12 @@ async function getSkin(input) {
           error: e.message,
         };
       }
+    } catch { /* fall through to the mirror */ }
+    // Second fallback: fetch the default Steve texture from the public PrismarineJS mirror and
+    // cache it on disk. Still no Mojang asset is redistributed by this project.
+    try {
+      const mirror = await fetchDefaultFromMirror();
+      if (mirror) return { ok: true, dataUri: mirror, model: 'classic', fallback: true, error: e.message };
     } catch { /* fall through to the original error */ }
     return { ok: false, error: e.message };
   }
