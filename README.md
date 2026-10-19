@@ -18,8 +18,6 @@ No terminal, no account, no cloud. Pick a folder, choose a server type, press St
 
 </div>
 
-v6.0.0 will be released on October 24, 2026, at 13:00 ICT
-
 ## What this is
 
 ObserverLauncher is a **server hosting** app. It is not a client launcher for joining servers. If you want to play on someone else's server, use Prism Launcher or the official launcher. This app is for running the server itself, for you and your friends, from your own machine.
