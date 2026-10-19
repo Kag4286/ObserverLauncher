@@ -735,13 +735,24 @@
           <button type="button" class="inspect-tab" data-pd-tab="edit" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
         </div>
         <div class="inspect-panel active" id="pdPanelOverview">
-        <!-- v6.0.0 Track B: 3D Player Model -->
-        <div class="pd-3d-container" id="pd3dContainer">
-          <canvas id="pd3dCanvas"></canvas>
-          <div id="pd3dStatus" class="pd-3d-status" hidden></div>
+        <!-- v6.0.0 redesign: 3D model is the dominant element (DESIGN.md 2.2). Facts sit beside it
+             at display weight; secondary numbers collapse into a disclosure (2.4); equipment is a
+             row of real icon tiles, not text rows. -->
+        <div class="pd-hero">
+          <div class="pd-3d-container" id="pd3dContainer">
+            <canvas id="pd3dCanvas"></canvas>
+            <div id="pd3dStatus" class="pd-3d-status" hidden></div>
+          </div>
+          <div class="pd-facts">
+            <div class="pd-vitals" id="pdVitals"></div>
+            <div class="pd-support" id="pdSupport"></div>
+            <details class="pd-more" id="pdMore">
+              <summary data-i18n="pd.allStats">All stats</summary>
+              <div class="pd-vitals" id="pdReadout"></div>
+            </details>
+          </div>
         </div>
-        <div class="inspect-readout" id="pdReadout"></div>
-        <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="text-list"></div></div>
+        <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="pd-equipment"></div></div>
         <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
         </div>
         <div class="inspect-panel" id="pdPanelInventory">

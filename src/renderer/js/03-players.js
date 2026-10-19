@@ -100,13 +100,22 @@ function renderItemGrid(id,items){
   }).join('');
 }
 function renderEquipment(armor,offhand){
+  // v6.0.0 redesign: equipment is a row of real icon tiles that reuses the inventory cell, so the
+  // icon sizing, the durability bar and the missing-texture fallback are shared instead of a
+  // second implementation (the old version was a text row with a dashed border).
   const n=$('#equipmentGrid');if(!n)return;
   const slots=[...(armor||[]),...(offhand?[{slot:'Offhand',id:offhand.id,count:offhand.count}]:[])];
   const order=['Helmet','Chestplate','Leggings','Boots','Offhand'];
-  n.innerHTML=order.map((label,i)=>{
+  n.innerHTML=order.map(label=>{
     const it=slots.find(x=>x.slot===label);
-    const has=!!it;
-    return `<div class="inv-row equip ${has?'':'empty'}" style="animation-delay:${i*22}ms"${has?` title="${esc(it.id)}"`:''}><span class="slot">${esc(label)}</span><span class="item-name ${has?'':'muted'}">${has?esc(itemLabel(it.id)):t('ply.emptySlot')}</span></div>`;
+    let cell=t('ply.emptySlot');
+    if(it&&it.id){
+      const vanilla=!it.id.includes(':')||it.id.startsWith('minecraft:');
+      const idNoPrefix=it.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
+      const iconUrl=vanilla?`tex://auto/item/${idNoPrefix}.png`:null;
+      cell=itemCellInner(iconUrl,itemLabel(it.id));
+    }
+    return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" title="${esc(it&&it.id?it.id:label)}">${cell}</div><span>${esc(label)}</span></div>`;
   }).join('');
 }
 let playerFilter='online';
@@ -242,8 +251,28 @@ function pdIsOnline(name,uuid){
   return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid===uuid));
 }
 function renderPdReadout(d,isOnline){
-  const el=$('#pdReadout');if(!el)return;
+  // v6.0.0 redesign: hierarchy before decoration (DESIGN.md 2.2). Four headline facts at display
+  // weight, one supporting line, and the full detail behind a disclosure (2.4). The old version
+  // rendered all eight numbers as equal-weight bordered tiles, which is the wall of boxes the
+  // user objected to.
   const gm=['Survival','Creative','Adventure','Spectator'][d.gameType??0]||'—';
+  const vital=(k,v,c)=>`<div class="pd-vital"><span>${esc(k)}</span><b class="${c||''}">${esc(String(v))}</b></div>`;
+  const vitals=$('#pdVitals');
+  if(vitals) vitals.innerHTML=[
+    vital(t('pd.stateLabel'), isOnline?t('pd.stateOnline'):t('pd.stateOffline'), isOnline?'ok':'dim'),
+    vital(t('pd.gamemode'), gm, ''),
+    vital(t('pd.health'), d.health??'—', ''),
+    vital(t('pd.food'), d.food??'—', ''),
+  ].join('');
+  const support=$('#pdSupport');
+  if(support) support.innerHTML=[
+    `<span>${esc(t('pd.dimension'))} <b>${esc(d.dimension||t('ply.unknownDim'))}</b></span>`,
+    `<span>${esc(t('pd.saturation'))} <b>${esc(String(d.saturation??'—'))}</b></span>`,
+    `<span>${esc(t('pd.xp'))} <b>${esc(String(d.xpLevel??0))}</b></span>`,
+    `<span>${esc(t('pd.totalXp'))} <b>${esc(String(d.xpTotal??0))}</b></span>`,
+  ].join('');
+  // The disclosure keeps every value the old readout had, so nothing is lost (DESIGN.md 2.4).
+  const el=$('#pdReadout');if(!el)return;
   const rows=[
     [t('pd.stateLabel'),isOnline?t('pd.stateOnline'):t('pd.stateOffline'),isOnline?'ok':'dim'],
     [t('pd.dimension'),d.dimension||t('ply.unknownDim'),'dim'],
@@ -254,7 +283,7 @@ function renderPdReadout(d,isOnline){
     [t('pd.totalXp'),d.xpTotal??0,''],
     [t('pd.gamemode'),gm,''],
   ];
-  el.innerHTML=rows.map(([k,v,c])=>`<div class="pd-ro"><span>${esc(k)}</span><b class="${c}">${esc(String(v))}</b></div>`).join('');
+  el.innerHTML=rows.map(([k,v,c])=>vital(k,v,c)).join('');
 }
 // v4.0.0: header badges (OP / WL / banned) from the roster model, so the inspector shows role at a glance.
 function renderPdBadges(name){

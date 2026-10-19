@@ -34,7 +34,10 @@
 .player-modal{width:min(760px,100%);max-height:88vh;display:flex;flex-direction:column}
 .player-modal #playerInspector{flex:1;min-height:0;overflow:auto;padding-right:4px}
 /* v6.0.0 Track B: 3D Player Model */
-.pd-3d-container{width:100%;max-width:280px;aspect-ratio:1;background:radial-gradient(circle, var(--surface-3) 0%, var(--surface-1) 100%);border-radius:var(--r-sm);border:1px solid var(--border);margin:0 auto var(--space-4);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+/* BUGFIX: --surface-1 does not exist (only --surface, --surface-2, --surface-3), so the gradient
+   was invalid and the box fell back to no background. Fixed the token; the column width is now
+   controlled by the .pd-hero grid, so max-width/margin auto are gone. */
+.pd-3d-container{width:100%;aspect-ratio:1;background:radial-gradient(circle, var(--surface-3) 0%, var(--surface) 100%);border-radius:var(--r-sm);border:1px solid var(--border);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
 #pd3dCanvas{width:100%;height:100%;object-fit:contain;cursor:grab}
 #pd3dCanvas:active{cursor:grabbing}
 .pd-3d-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface-2);color:var(--text-muted);font:500 12px var(--font-ui);text-align:center;padding:20px;z-index:2}
@@ -44,7 +47,7 @@
 .inv-cell:hover{background:var(--surface-3);border-color:var(--border-strong)}
 .inv-cell.empty{background:transparent;border-style:dashed;opacity:0.5}
 .inv-cell img{width:32px;height:32px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
-.inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:#fff;text-shadow:1px 1px 0 #000;pointer-events:none}
+.inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:var(--text);text-shadow:1px 1px 0 var(--bg);pointer-events:none}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
 /* No icon on the mirror (mod items): show the label instead of an empty square. */
 .inv-cell.no-tex{font:500 9px/1.15 var(--font-ui);color:var(--text-dim);text-align:center;padding:2px;word-break:break-word;overflow:hidden}
@@ -58,47 +61,26 @@
 .leaderboard-table tr:hover td{background:var(--surface-3)}
 .leaderboard-table td:first-child{color:var(--text-muted);font-family:var(--font-mono)}
 .leaderboard-table td:nth-child(2){font-weight:600}
-.inspect-header{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px;background:var(--panel-raised);border:1px solid var(--border);border-radius:4px;margin-top:6px}
-.inspect-head-left{display:flex;gap:12px;align-items:center;min-width:0}
-.inspect-avatar{width:44px;height:44px;border-radius:4px;border:1px solid var(--border);background:var(--field);flex-shrink:0}
-.inspect-title{display:flex;flex-direction:column;gap:2px;min-width:0}
-.inspect-title b{font:700 16px var(--font-ui);line-height:1} .inspect-title span{font:500 11px var(--font-mono);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.inspect-badge{font:700 10px var(--font-mono);letter-spacing:.06em;color:var(--text-dim);border:1px solid var(--border);padding:4px 8px;border-radius:999px;background:var(--field);white-space:nowrap;flex-shrink:0}
-.inspect-uuid{font:500 10px var(--font-mono);color:var(--text-dim);background:var(--field);border:1px solid var(--border);border-radius:4px;padding:3px 6px;cursor:copy;user-select:all;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;margin-top:2px}
-.inspect-uuid:hover{border-color:var(--accent);color:var(--accent)}
+/* v6.0.0 inspector consolidation: the base `.inspect-*` styles live in 07-polish.css (single source
+   of truth). Only the interaction states and the warning row stay here. This block previously
+   duplicated 07 and defined `border:1px solid; border-radius:4px; background:panel-raised` on
+   .inspect-section, which 07 never overrode -- that is why every inspector section rendered as a
+   boxed card despite the design contract saying "spatial, not boxed" (DESIGN.md 2.1). */
+.inspect-uuid:hover{border-color:var(--brand);color:var(--brand)}
 .inspect-uuid.copied{border-color:var(--success);color:var(--success);background:var(--success-weak)}
-.inspect-note{margin:10px 0 12px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:var(--field);color:var(--text-muted);font:500 11px var(--font-ui);line-height:1.5}
-.inspect-note code{color:var(--accent)}
-.inspect-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
-.inspect-stats label{display:flex;flex-direction:column;gap:6px;font:600 11px var(--font-ui);color:var(--text-muted);background:var(--panel-raised);border:1px solid var(--border);border-radius:4px;padding:10px}
-.inspect-stats label span{font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--text-dim)}
-.inspect-stats input,.inspect-stats select{width:100%;background:var(--field);border:1px solid var(--field-border);border-radius:4px;padding:8px 10px;color:var(--text);font:500 13px var(--font-mono);outline:0}
-.inspect-stats input:focus,.inspect-stats select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.inspect-check{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--warning-weak);border:1px solid rgba(255,210,63,.18);border-radius:4px;font:500 11px var(--font-ui);color:var(--text);margin-bottom:12px}
-.inspect-check input{accent-color:var(--accent)}
-.inspect-section{margin-bottom:14px;padding:12px;background:var(--panel-raised);border:1px solid var(--border);border-radius:4px}
-.inspect-section-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.inspect-section-head h3{font:700 13px var(--font-ui);margin:0} .inspect-section-head span{font:500 10px var(--font-mono);color:var(--text-dim)}
+.inspect-note code{color:var(--brand)}
+.inspect-check{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--warning-weak);border:1px solid rgba(255,200,87,.18);border-radius:var(--r-sm);font:500 11px var(--font-ui);color:var(--text);margin-bottom:12px}
+.inspect-check input{accent-color:var(--brand)}
 .workspace-empty{padding:32px 20px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:4px;background:rgba(255,255,255,.01)}
 .workspace-empty h3{color:var(--text);margin:8px 0 4px}
 .row-action.muted{border-style:dashed;color:var(--text-dim)}
 .player-empty{padding:28px 18px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:4px;background:rgba(255,255,255,.01)}
 .player-empty b{color:var(--text);display:block;margin-bottom:4px}
 .player-pager{margin-top:14px}
-.item-grid{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0} .item-cell{width:64px;background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;transition:transform .14s var(--ease), border-color .14s, box-shadow .14s}
-.item-cell:hover{transform:translateY(-2px);border-color:var(--border-hover);box-shadow:0 6px 16px rgba(0,0,0,.25)}
-.item-cell .item-icon{width:32px;height:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))} .item-cell em{position:absolute;right:4px;bottom:4px;font:700 10px var(--font-mono);background:rgba(0,0,0,.7);color:#fff;padding:1px 4px;border-radius:999px;min-width:14px;text-align:center}
-.item-cell small{font:600 10px var(--font-mono);color:var(--text-muted);text-align:center;line-height:1.2;max-width:100%;white-space:normal;word-break:break-word;display:block;min-height:1.2em}
-/* equipment — larger, balanced */
-.inspect-section .item-grid{gap:12px}
-.inspect-section .item-grid.equipment .item-cell{width:92px;padding:12px 6px;gap:8px;background:linear-gradient(180deg, var(--panel), var(--panel-raised));border:1px solid var(--border)}
-.inspect-section .item-grid.equipment .item-cell .item-icon{width:38px;height:38px}
-.inspect-section .item-grid.equipment .item-cell small{font:700 10px var(--font-mono);letter-spacing:.04em;color:var(--text);white-space:normal}
-.inspect-section .item-cell{animation:itemIn .18s var(--ease) backwards}
-.inspect-section .item-cell:nth-child(1){animation-delay:0ms} .inspect-section .item-cell:nth-child(2){animation-delay:25ms} .inspect-section .item-cell:nth-child(3){animation-delay:50ms} .inspect-section .item-cell:nth-child(4){animation-delay:75ms} .inspect-section .item-cell:nth-child(5){animation-delay:100ms}
-@keyframes itemIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
-.inspect-section .item-cell:hover .item-icon{animation:itemFloat .9s ease-in-out infinite alternate}
-@keyframes itemFloat{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+/* v6.0.0 cleanup: `.item-cell` was the pre-track-B equipment renderer; nothing writes it any more
+   (search confirmed no JS or HTML produces .item-cell). Deleting the block also removes two
+   literal durations (.14s, .9s) that violated the motion ratchet, plus a raw #fff and a hover
+   bounce (DESIGN.md 2.3 / 10.4). */
 
 /* ============ PLAYERS TAB (v4.0.0) ============ */
 /* The roster sits directly on the canvas (no card wrapper). Toolbar, list and the collapsed

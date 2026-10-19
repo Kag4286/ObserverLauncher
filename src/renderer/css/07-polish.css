@@ -255,7 +255,39 @@
 
 /* v4.0.0 FIX: sections animated ONCE at page load (panel hidden but present), so switching tabs
    showed them static. Bind the animation to .inspect-panel.active so it REPLAYS on every switch. */
+/* v6.0.0 inspector redesign: spatial, not boxed (DESIGN.md 2.1/2.2). A section is a heading plus
+   content with whitespace, not a bordered card. Only the interactive blocks (stats form, live
+   actions) earn a border. */
 .inspect-section{display:flex;flex-direction:column;gap:10px}
+
+/* Hero: the 3D model is the dominant element (DESIGN.md 2.2). The right column carries the four
+   headline facts at display weight, then a supporting line, then a collapsed All-stats block. */
+.pd-hero{display:grid;grid-template-columns:minmax(180px,260px) minmax(0,1fr);gap:var(--space-5);align-items:start}
+@media(max-width:720px){.pd-hero{grid-template-columns:1fr}}
+.pd-facts{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
+.pd-vitals{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--space-4)}
+.pd-vital{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pd-vital>span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-4)}
+.pd-vital>b{font:700 22px var(--font-ui);color:var(--text);line-height:1.1;overflow-wrap:anywhere}
+.pd-vital>b.ok{color:var(--success)}
+.pd-vital>b.dim{color:var(--text-3)}
+.pd-support{font:500 12.5px var(--font-ui);color:var(--text-3);display:flex;gap:var(--space-3);flex-wrap:wrap}
+.pd-support b{color:var(--text-2);font-weight:600}
+/* Secondary detail lives behind a disclosure, not a wall of equal-weight tiles (DESIGN.md 2.4). */
+.pd-more{border-top:1px solid var(--border);padding-top:var(--space-3)}
+.pd-more>summary{cursor:pointer;list-style:none;font:600 12px var(--font-ui);color:var(--text-3);display:flex;align-items:center;gap:var(--space-2)}
+.pd-more>summary::-webkit-details-marker{display:none}
+.pd-more>summary::before{content:'▸';color:var(--brand);font-family:var(--font-mono);transition:transform var(--dur-fast) var(--ease-out)}
+.pd-more[open]>summary::before{transform:rotate(90deg)}
+.pd-more>summary:hover{color:var(--text-2)}
+.pd-more[open]>summary{margin-bottom:var(--space-3)}
+
+/* Equipment tiles: real icons, one row, fixed slot order. Reuses .inv-cell so the icon sizing and
+   the durability bar are shared with the inventory grid instead of a second implementation. */
+.pd-equipment{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--space-2);max-width:400px}
+.pd-equip{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pd-equip .inv-cell{cursor:default}
+.pd-equip>span{font:600 9px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inspect-panel.active .inspect-section{animation:sectionIn .35s var(--ease) both}
 .inspect-panel.active .inspect-section:nth-of-type(3){animation-delay:.10s}
 .inspect-panel.active .inspect-section:nth-of-type(4){animation-delay:.14s}
