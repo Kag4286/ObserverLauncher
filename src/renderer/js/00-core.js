@@ -12,9 +12,15 @@ const javaMajorOf=s=>{const m=String(s||'').match(/(?:1\.)?(\d+)/);return m?Numb
 // 2.2.0 (C): min Java a server jar needs. Mirrors src/main/java.js requiredJavaForJar so the UI can
 // show 'needs Java X' without an IPC round-trip. Calendar scheme 26.x -> 25; 1.x by minor/patch.
 const requiredJavaOf=jar=>{const s=String(jar||'');let m=s.match(/\b1\.(\d{1,2})(?:\.(\d{1,2}))?\b/);if(m){const minor=Number(m[1]),patch=Number(m[2]||0);if(minor>=21)return 21;if(minor===20&&patch>=5)return 21;if(minor>=18)return 17;if(minor>=17)return 16;return 8}if(/\b26\.\d{1,2}\b/.test(s))return 25;return null};
+// Key families built by concatenation have a deliberate fallback at the call site (the world map
+// prettifies a biome name, the crash panel shows the raw category, and so on). A missing entry is
+// expected there, so warning on every one of them only fills the console with noise the user
+// cannot act on. Real one-off missing keys still warn.
+const _DYNAMIC_KEY_PREFIXES = ['wm.lg.', 'mkt.', 'prop.group.', 'crash.cat.', 'set.preset.'];
+function _isDynamicKey(key){ for (const p of _DYNAMIC_KEY_PREFIXES) { if (key.startsWith(p) && key.length > p.length) return true; } return false; }
 function t(key,repl){
   const val=(window.LOCALES?.[currentLocale]?.[key]) ?? (window.LOCALES?.en?.[key]);
-  if(val==null){ if(!_missingI18nLogged.has(key)){ _missingI18nLogged.add(key); console.warn(`[i18n] missing key: ${key} (locale: ${currentLocale})`);} return key; }
+  if(val==null){ if(!_isDynamicKey(key)&&!_missingI18nLogged.has(key)){ _missingI18nLogged.add(key); console.warn(`[i18n] missing key: ${key} (locale: ${currentLocale})`);} return key; }
   return repl?String(val).replace(/\{(\w+)\}/g,(m,k)=>repl[k]??m):val;
 }
 function applyLocale(){

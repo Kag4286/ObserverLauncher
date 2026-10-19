@@ -113,8 +113,12 @@ function resolveLocal(version, kind, file) {
   return null;
 }
 
+// Every tex:// response carries ACAO because the scheme is registered corsEnabled (see main.js).
+// Without it a WebGL texImage2D from a file:// page is a cross-origin pixel read and Chromium
+// refuses to upload the texture, which is what made armor silently vanish.
+const PNG_HEADERS = { 'content-type': 'image/png', 'access-control-allow-origin': '*' };
 function pngResponse(file) {
-  try { return new Response(fs.readFileSync(file), { headers: { 'content-type': 'image/png' } }); }
+  try { return new Response(fs.readFileSync(file), { headers: PNG_HEADERS }); }
   catch { return new Response('', { status: 404 }); }
 }
 
@@ -150,15 +154,15 @@ function handle(request) {
     if (buf && buf.length) {
       const dest = path.join(cacheRoot(), version, kind, file);
       try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, buf); } catch {}
-      return new Response(buf, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
+      return new Response(buf, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
     }
-    return new Response(PLACEHOLDER_PNG, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
+    return new Response(PLACEHOLDER_PNG, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
   }
 
   queueRemote(version, kind, file); // fire-and-forget: next render hits the cache
   // Transparent 1×1 instead of 404: no console error spam, no broken-image flash. The renderer
   // re-renders icon grids when the real icon lands (icons:update event + ?e= cache-buster).
-  return new Response(PLACEHOLDER_PNG, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
+  return new Response(PLACEHOLDER_PNG, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
 }
 
 // Mojang moved the humanoid armor textures in 1.21.2:

@@ -57,7 +57,13 @@ const { registerOrphanPrompt } = require('./main/orphan-prompt.js');
 
 // Custom tex:// icon scheme — MUST be registered as privileged before the
 // app is ready, or Chromium treats it as non-standard and <img> loads fail.
-protocol.registerSchemesAsPrivileged([{ scheme: 'tex', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+// BUGFIX: corsEnabled is required for WebGL. The renderer's origin is file:// while tex:// is a
+// different origin, so texImage2D from a tex:// image is a cross-origin pixel read. Without CORS
+// on the scheme Chromium refuses it (and an explicit crossOrigin='anonymous' on the <img> is
+// rejected outright: 'Cross origin requests are only supported for protocol schemes: chrome,
+// chrome-extension, chrome-untrusted, data, http, https'). corsEnabled + the ACAO header that
+// textures.js returns makes the upload legal without needing inline script or a looser CSP.
+protocol.registerSchemesAsPrivileged([{ scheme: 'tex', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 const ctx = createContext();
 

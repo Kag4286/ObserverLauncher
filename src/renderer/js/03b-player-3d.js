@@ -213,11 +213,17 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // fragment shader would discard every fragment -- the armor would silently vanish.
   const upload = (texture, image) => {
     if (!image || image.naturalWidth <= 1) return false;
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    return true;
+    try {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      return true;
+    } catch (e) {
+      // A tainted image throws SecurityError from texImage2D. Swallow it so one bad texture
+      // cannot break the whole draw loop; the part simply renders untextured.
+      return false;
+    }
   };
 
   // The armor layer number: 1 covers helmet + chestplate + boots, 2 covers leggings. Both live in
@@ -227,6 +233,10 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const loadArmor = (kind, material, onReady) => {
     const texture = gl.createTexture();
     const image = new Image();
+    // crossOrigin IS required: WebGL texImage2D refuses a cross-origin image that is not
+    // CORS-clean (it would throw SecurityError). The original failure was NOT this attribute but
+    // the tex:// scheme itself missing CORS support; that is now fixed in main.js (corsEnabled)
+    // and textures.js (Access-Control-Allow-Origin). Both halves are needed.
     image.crossOrigin = 'anonymous';
     image.onload = () => { if (upload(texture, image)) onReady(texture); };
     image.onerror = () => {};
@@ -234,6 +244,8 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   };
 
   const img = new Image();
+  // Same reasoning as loadArmor above: the CORS handshake is required for a WebGL texture upload
+  // from a cross-origin image, and now works because tex:// is a corsEnabled scheme.
   img.crossOrigin = 'anonymous';
   img.onload = () => {
     upload(tex, img);
@@ -352,6 +364,12 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   }
 
   function draw() {
+    // BUGFIX: useProgram must run on EVERY draw, not only at setup. The inspector rebuilds the
+    // renderer whenever a late armor texture arrives, and the OLD closure keeps firing draw() from
+    // its pointermove listener. Without this, uniformMatrix4fv below is called with a location
+    // that belongs to the previous program while the new one is active, and Chromium throws
+    // 'INVALID_OPERATION: uniformMatrix4fv: location is not from the associated program'.
+    gl.useProgram(prog);
     const rect = canvas.getBoundingClientRect();
     if (canvas.width !== rect.width) canvas.width = rect.width;
     if (canvas.height !== rect.height) canvas.height = rect.height;

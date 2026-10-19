@@ -29,8 +29,21 @@ function itemTooltip(x,label){
 function itemCellInner(iconUrl,label){
   if(!iconUrl)return esc(label);
   const fb=esc(label).replace(/"/g,'&quot;');
-  return `<img src="${iconUrl}" alt="" data-fb="${fb}" onload="if(this.naturalWidth<=1)this.outerHTML=document.createTextNode(this.dataset.fb)">`;
+  // BUGFIX: no inline onload here. The renderer's CSP is script-src 'self' with no 'unsafe-inline',
+  // so Chromium refuses every inline event handler ('Executing inline event handler violates...').
+  // The placeholder swap now runs in a delegated capture listener (iconPlaceholderSweep below).
+  return `<img src="${iconUrl}" alt="" data-fb="${fb}">`;
 }
+// A single capture listener handles every tex:// image on the page. `load` does not bubble, so
+// capture is the only way to hear it from a delegated position. The check is deliberately narrow:
+// only an <img> that carries data-fb AND resolved to the 1x1 placeholder (naturalWidth<=1) is
+// swapped for its stored label. A real icon keeps its pixels.
+document.addEventListener('load', (e) => {
+  const img = e.target;
+  if (!img || img.tagName !== 'IMG' || !img.dataset || img.dataset.fb === undefined) return;
+  if (img.naturalWidth > 1) return;
+  try { const span = document.createElement('span'); span.textContent = img.dataset.fb; img.replaceWith(span); } catch {}
+}, true);
 // v4.0.0: config-driven grid so hotbar (0-8) / main inventory (9-35) / ender chest (0-26)
 // share one renderer. base = first slot index, slots = how many.
 const GRID_CFG={
