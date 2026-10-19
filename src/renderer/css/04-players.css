@@ -4,13 +4,13 @@
 .roster-count{font:700 11px var(--font-mono);letter-spacing:.06em;color:var(--text-muted);border:1px solid var(--border);padding:7px 10px;border-radius:999px;background:var(--field);white-space:nowrap}
 .roster-toolbar{display:flex;justify-content:space-between;gap:var(--space-3);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-2)}
 .roster-search{position:relative;display:flex;align-items:center}
-.roster-search input{width:200px;background:var(--field);border:1px solid var(--field-border);border-radius:4px;padding:8px 28px 8px 10px;color:var(--text);font:12px var(--font-ui);outline:0}
+.roster-search input{width:200px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 28px 8px 10px;color:var(--text);font:12px var(--font-ui);outline:0}
 .roster-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
 .roster-search span{position:absolute;right:8px;color:var(--text-dim);font-size:12px;pointer-events:none}
 .player-filters{display:flex;gap:6px;flex-wrap:wrap}
-.player-manual-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:12px;background:var(--field);border:1px solid var(--border);border-radius:4px}
+.player-manual-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:12px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm)}
 .manual-kicker{font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-dim);flex-shrink:0}
-.player-manual-row input{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--field-border);padding:8px 10px;border-radius:4px;color:var(--text);font:12px var(--font-ui)}
+.player-manual-row input{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--field-border);padding:8px 10px;border-radius:var(--r-sm);color:var(--text);font:12px var(--font-ui)}
 .manual-btns{display:flex;gap:6px;flex-wrap:wrap}
 .players-table{margin-top:var(--space-3);display:grid;gap:var(--space-2)}
 /* Entity card (DESIGN.md 16.3): a player is a card, not a table row. */
@@ -71,10 +71,10 @@
 .inspect-note code{color:var(--brand)}
 .inspect-check{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--warning-weak);border:1px solid rgba(255,200,87,.18);border-radius:var(--r-sm);font:500 11px var(--font-ui);color:var(--text);margin-bottom:12px}
 .inspect-check input{accent-color:var(--brand)}
-.workspace-empty{padding:32px 20px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:4px;background:rgba(255,255,255,.01)}
+.workspace-empty{padding:32px 20px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:var(--r);background:rgba(255,255,255,.01)}
 .workspace-empty h3{color:var(--text);margin:8px 0 4px}
 .row-action.muted{border-style:dashed;color:var(--text-dim)}
-.player-empty{padding:28px 18px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:4px;background:rgba(255,255,255,.01)}
+.player-empty{padding:28px 18px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:var(--r);background:rgba(255,255,255,.01)}
 .player-empty b{color:var(--text);display:block;margin-bottom:4px}
 .player-pager{margin-top:14px}
 /* v6.0.0 cleanup: `.item-cell` was the pre-track-B equipment renderer; nothing writes it any more

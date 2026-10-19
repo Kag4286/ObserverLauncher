@@ -210,7 +210,7 @@
 .pd-live-cell.actions .btn{flex:0 0 auto}
 .pd-offline-actions{display:flex;align-items:center;gap:12px;margin-top:6px}
 .inspect-badge.online{color:var(--success);background:var(--success-weak,rgba(0,229,160,.12));border-color:rgba(0,229,160,.3)}
-.inspect-badge.offline{color:var(--warning);background:var(--warning-weak);border-color:rgba(255,210,63,.25)}
+.inspect-badge.offline{color:var(--warning);background:var(--warning-weak);border-color:rgba(255,200,87,.25)}
 .inspect-header{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:var(--panel-raised);border:1px solid var(--border);border-radius:var(--r);animation:sectionIn .3s var(--ease) .05s both}
 .inspect-avatar{width:48px;height:48px;border-radius:var(--r);border:1px solid var(--border);background:var(--field);image-rendering:pixelated;flex-shrink:0}
 .inspect-title{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
@@ -221,9 +221,12 @@
 .inspect-title>span{font:500 11px var(--font-mono);color:var(--text-muted);overflow-wrap:anywhere;line-height:1.35}
 .inspect-uuid{font:500 10px var(--font-mono);color:var(--accent-dim);cursor:pointer;word-break:break-word;overflow-wrap:anywhere;line-height:1.35}
 .inspect-uuid.copied{color:var(--success)}
-.inspect-badge{font:600 9.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--warning);background:var(--warning-weak);border:1px solid rgba(255,210,63,.25);padding:3px 7px;border-radius:999px;white-space:nowrap;flex-shrink:0}
+/* BUGFIX: rgba(255,210,63,...) is the PRE-v4 warning tone; the token is #FFC857 = rgb(255,200,87).
+   Mixing the two made this badge a visibly different yellow from every other warning pill in the
+   app, which is the "off-tone" the user noticed. */
+.inspect-badge{font:600 9.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--warning);background:var(--warning-weak);border:1px solid rgba(255,200,87,.25);padding:3px 7px;border-radius:999px;white-space:nowrap;flex-shrink:0}
 .inspect-header .btn{flex-shrink:0;align-self:center}
-.inspect-note{font:500 11px var(--font-ui);color:var(--text-dim);background:var(--warning-weak);border:1px solid rgba(255,210,63,.2);padding:8px 12px;border-radius:var(--r)}
+.inspect-note{font:500 11px var(--font-ui);color:var(--text-3);background:var(--warning-weak);border:1px solid rgba(255,200,87,.2);padding:8px 12px;border-radius:var(--r)}
 .inspect-panel.active>.inspect-note{animation:sectionIn .3s var(--ease) .06s both}
 /* v4.0.0 inspector: header badges + coords + stats grid. */
 .inspect-badges{display:inline-flex;gap:5px;flex-wrap:wrap}
