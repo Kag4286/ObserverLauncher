@@ -399,6 +399,13 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
       gl.drawArrays(gl.TRIANGLES, 0, 36);
     };
 
+    // BUGFIX: bind the skin texture on EVERY draw. loadArmor's upload() binds the armor texture to
+    // TEXTURE0, and both skin and armor share that one texture unit (the sampler defaults to 0), so
+    // without this rebind every skin cube after the first armor upload sampled the armor atlas at
+    // skin UVs -- the body sampled transparent rows and disappeared, which the user saw as a model
+    // with no armor and a missing torso.
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
     const p = name => partPos(name);
     drawPart(cBody, p('body').x, p('body').y, 0);
     drawPart(cJacket, p('body').x, p('body').y, 0);
