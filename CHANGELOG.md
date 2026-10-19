@@ -203,6 +203,46 @@ the inspector.
 - `runtime-state.js` records `javaPid` and `javaPidStartedAt` when the metrics sampler resolves the real java; orphan cleanup classifies against that java pid when the recorded pid is gone (ask while it looks running, kill on stop).
 - `tests/orphan.test.js` +3 checks.
 
+### Deferred — moved out of 6.0.0
+
+Nothing below was started and abandoned mid-way; each was scoped out before code, so 6.0.0
+ships no half-built feature.
+
+**To 6.1.0**
+- **C2. Bulk content update with rollback.** Updating many mods at once and rolling back on a failed
+  start. The single-item update plus the existing stability record covers the common case for now.
+- **C3. Conflict detector GUI.** Duplicate mods, loader mismatch and missing dependencies are already
+  answered by the MCP `check_mod_compat` and `doctor_report` tools; a GUI panel is a later pass.
+- **D5. Spark integration.** The Performance panel's Spark button currently jumps to the Marketplace
+  so you can install Spark; it does not run a profiler or show the result. Doing that needs a live
+  server with Spark installed to verify the profiler output against.
+- **I3. Headless REST extension** and **I4. Event hooks.** More loopback endpoints and a local hook so
+  an external script can observe start/stop/crash/player-join.
+- **C1 known limit.** A jar dropped into `mods`/`plugins` by hand has no `projectId` in the manifest,
+  so `checkUpdates()` reports it as `unknown` rather than guessing a marketplace match. Matching a jar
+  through its metadata is approximate (a mod id does not map one-to-one to a marketplace project), so
+  it stays a reported limitation.
+
+**To 6.2.0**
+- **B1d. Resource pack selector.** Reading a user-chosen resource pack at runtime to override item
+  icons needs its own test round.
+- **B3. World map extension.** Cave mode, Nether/End dimensions, entity markers, region PNG export.
+- **B4. World operations.** Rename a world, edit the display seed, delete one dimension, import or
+  export a world between instances.
+- **B5. Waypoint sync.** Share waypoints between instances and import the Xaero / JourneyMap formats.
+
+**Still gated on a spike**
+- **C4. LuckPerms permissions editor** (SP5). The storage format differs by plugin version, so the
+  real format has to be inspected on an install before any reader is written.
+- **F2. Cloud backup** to S3 / Google Drive / WebDAV (SP6). Whether this needs a heavy SDK is undecided;
+  adding a runtime dependency is a user decision, not an implementation detail.
+
+**Satisfied by what already shipped (not deferred, not new)**
+- **I1. CLI extension.** The plan listed `observer mod install`, `observer player list`,
+  `observer world backup` and `observer metrics`. The `observer` command already exposes `install`,
+  `players`, `backup` and `metrics` over the same MCP handlers, so the four extra names would have
+  been aliases of commands that work today. No new command was added; the plan item is met.
+
 ### Tests
 - `npm test` 135 files, `npm run test:e2e` 13, i18n 7 locales x 1240 keys, arch 106 IPC channels, motion ratchet 102 literal durations (baseline 124), no-dup clean.
 
