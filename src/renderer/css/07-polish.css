@@ -91,6 +91,13 @@
 /* KPI "?" click bubble */
 .kpi-help{cursor:pointer}
 .kpi-tip{position:fixed;z-index:1200;max-width:280px;background:var(--panel-raised);border:1px solid var(--accent);border-radius:var(--r);padding:10px 13px;font:500 11.5px var(--font-ui);line-height:1.55;color:var(--text);box-shadow:0 12px 30px rgba(0,0,0,.45);animation:imIn .16s var(--ease) both;pointer-events:none}
+/* v6.0.0: in-app tooltip that replaces native title= (drawn by the OS, ignores design tokens).
+   textContent keeps the body safe; white-space:pre-line preserves the newlines the item tooltip
+   already joins lines with (name, enchantments, durability, count, raw id). */
+.ol-tip{position:fixed;top:0;left:0;z-index:1200;max-width:min(320px,80vw);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:9px 13px;font:500 12px/1.55 var(--font-ui);color:var(--text);box-shadow:var(--shadow-lg);white-space:pre-line;overflow-wrap:anywhere;pointer-events:none;animation:olTipIn var(--dur-fast) var(--ease-out) both}
+@keyframes olTipIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ol-tip{animation:none}}
+html.motion-lite .ol-tip{animation:none}
 /* Hard-synced Java requirement line (step 2) */
 .nsw-java{margin-top:10px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font:600 11.5px var(--font-mono);background:var(--field)}
 .nsw-java.ok{border-color:rgba(0,229,160,.35);color:var(--success);background:var(--success-weak)}

@@ -47,15 +47,22 @@
    squeezed into a single 32px cell ("Inventory is empty" wrapped over four lines). Span every
    column so it reads as a full-width notice. */
 .inv-grid>.inv-empty{grid-column:1/-1}
-.inv-cell{aspect-ratio:1;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;position:relative;cursor:default}
+/* min-width:0 keeps the cell square (aspect-ratio:1) when its content is wider than the column.
+   Grid items default to min-width:auto, so a long fallback label used to stretch its own column
+   AND every neighbour with it. */
+.inv-cell{aspect-ratio:1;min-width:0;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;position:relative;cursor:default}
 .inv-cell:hover{background:var(--surface-3);border-color:var(--border-strong)}
 .inv-cell.empty{background:transparent;border-style:dashed;opacity:0.5}
 .inv-cell img{width:32px;height:32px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
 .inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:var(--text);text-shadow:1px 1px 0 var(--bg);pointer-events:none}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
-/* No icon on the mirror (mod items): show the label instead of an empty square. */
-.inv-cell.no-tex{font:500 9px/1.15 var(--font-ui);color:var(--text-3);text-align:center;padding:2px;word-break:break-word;overflow:hidden}
-.inv-cell.no-tex .inv-count{font-size:9px}
+/* Items with no texture on the mirror or in the mod jar. The full name used to overflow the
+   square cell; a two-letter badge stays inside it and reads as a compact tag. */
+.inv-cell .inv-initial{font:700 11px var(--font-mono);color:var(--text-4);letter-spacing:.04em}
+/* The load listener marks the cell when an image resolves to the 1x1 placeholder, so the broken
+   img is hidden and the initials badge takes its place without inserting text into the grid. */
+.inv-cell.icon-missing img{display:none}
+.inv-cell.icon-missing::before{content:attr(data-initial);font:700 11px var(--font-mono);color:var(--text-4);letter-spacing:.04em}
 /* v6.0.0 Track B - B2: Leaderboard */
 .leaderboard-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto}
 .leaderboard-table{width:100%;border-collapse:collapse;font:500 13px var(--font-ui)}

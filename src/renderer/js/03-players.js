@@ -27,22 +27,26 @@ function itemTooltip(x,label){
 // tex:// answers a cache miss with a 1x1 transparent PNG and HTTP 200, so onerror never fires.
 // Detect that placeholder in onload and swap in the readable label instead of a blank cell.
 function itemCellInner(iconUrl,label){
-  if(!iconUrl)return esc(label);
-  const fb=esc(label).replace(/"/g,'&quot;');
-  // BUGFIX: no inline onload here. The renderer's CSP is script-src 'self' with no 'unsafe-inline',
-  // so Chromium refuses every inline event handler ('Executing inline event handler violates...').
-  // The placeholder swap now runs in a delegated capture listener (iconPlaceholderSweep below).
-  return `<img src="${iconUrl}" alt="" data-fb="${fb}">`;
+  // Fallback: two-letter initials inside the square cell. The full label used to be written as
+  // text, which overflowed neighbouring cells (a grid item's min-width was auto) and could never
+  // be replaced when the real icon finally arrived. Initials stay short enough to keep the cell
+  // square.
+  const initials=(String(label||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2)||'?').toUpperCase();
+  if(!iconUrl)return `<span class="inv-initial">${esc(initials)}</span>`;
+  return `<img src="${iconUrl}" alt="" data-fb="${esc(initials)}">`;
 }
-// A single capture listener handles every tex:// image on the page. `load` does not bubble, so
-// capture is the only way to hear it from a delegated position. The check is deliberately narrow:
-// only an <img> that carries data-fb AND resolved to the 1x1 placeholder (naturalWidth<=1) is
-// swapped for its stored label. A real icon keeps its pixels.
+// A load event that resolves to the 1x1 placeholder means the texture is not on the mirror (or not
+// in the mod jar). Mark the parent cell so CSS shows the initials badge, and clear the mark when a
+// real texture arrives on a re-render. Do NOT swap the img for text: that change is what made a
+// long label stretch the whole row.
 document.addEventListener('load', (e) => {
   const img = e.target;
   if (!img || img.tagName !== 'IMG' || !img.dataset || img.dataset.fb === undefined) return;
-  if (img.naturalWidth > 1) return;
-  try { const span = document.createElement('span'); span.textContent = img.dataset.fb; img.replaceWith(span); } catch {}
+  const cell = img.closest && img.closest('.inv-cell');
+  if (!cell) return;
+  if (img.naturalWidth > 1) { cell.classList.remove('icon-missing'); return; }
+  cell.classList.add('icon-missing');
+  cell.setAttribute('data-initial', img.dataset.fb);
 }, true);
 // v4.0.0: config-driven grid so hotbar (0-8) / main inventory (9-35) / ender chest (0-26)
 // share one renderer. base = first slot index, slots = how many.
@@ -75,7 +79,7 @@ function renderItemGrid(id,items){
   else list.sort((a,b)=>a.slot-b.slot);
   if(!list.length){n.innerHTML=`<div style="grid-column:1/-1" class="inv-empty"><b>${esc(t('pd.noMatch'))}</b><span>${esc(t('pd.noMatchSub'))}</span></div>`;return}
   n.innerHTML=list.map((x,i)=>{
-    if(x.empty) return `<div class="inv-cell empty" title="Slot ${x.slot}"></div>`;
+    if(x.empty) return `<div class="inv-cell empty" data-tip="Slot ${x.slot}"></div>`;
     const label=x.customName||itemLabel(x.id);
     // Vanilla ids resolve on the PrismarineJS mirror. A mod id (namespace != minecraft) does not,
     // but the mods/*.jar on the server ships the PNG, and the tex:// itemmod kind reads it from
@@ -96,7 +100,7 @@ function renderItemGrid(id,items){
     const tip=itemTooltip(x,label);
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
-    return `<div class="inv-cell${iconUrl?'':' no-tex'}" title="${tip}">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    return `<div class="inv-cell${iconUrl?'':' no-tex'}" data-tip="${tip}">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
@@ -122,7 +126,7 @@ function renderEquipment(armor,offhand){
     // The long "— Empty —" label stays available as the hover title instead of being rendered
     // inside the tile, where it wrapped and stretched the row.
     const tip = it && it.id ? it.id : t('ply.emptySlot');
-    return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" title="${esc(tip)}">${cell}</div><span>${esc(label)}</span></div>`;
+    return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" data-tip="${esc(tip)}">${cell}</div><span>${esc(label)}</span></div>`;
   }).join('');
 }
 let playerFilter='online';
@@ -228,8 +232,8 @@ function renderPlayers(){
         ${rowActionBtn('op',p.op?t('ply.removeOp'):t('ply.makeOp'),p.op,'',`${attrs} data-value="${p.op?'off':'on'}"`)}
         ${rowActionBtn('whitelist',p.whitelisted?t('ply.unwhitelist'):t('ply.whitelist'),p.whitelisted,'',`${attrs} data-value="${p.whitelisted?'off':'on'}"`)}
         ${rowActionBtn('ban',p.banned?t('ply.unban'):t('ply.ban'),p.banned,'danger',`${attrs} data-value="${p.banned?'off':'on'}"`)}
-        <button class="row-action danger" data-row-action="kick" ${attrs} ${p.online?'':`disabled title="${t('ply.kickHint')}"`}>${t('ply.kick')}</button>
-        <button class="row-action ${p.hasData?'':'muted'}" data-row-action="inspect" ${attrs} title="${p.hasData?t('ply.inspectHint'):t('ply.noDataHint')}">${t('ply.inspect')}</button>
+        <button class="row-action danger" data-row-action="kick" ${attrs} ${p.online?'':`disabled data-tip="${t('ply.kickHint')}"`}>${t('ply.kick')}</button>
+        <button class="row-action ${p.hasData?'':'muted'}" data-row-action="inspect" ${attrs} data-tip="${p.hasData?t('ply.inspectHint'):t('ply.noDataHint')}">${t('ply.inspect')}</button>
       </div>
     </div>`;
   }).join('')}
@@ -394,10 +398,10 @@ async function openPlayerInspector(uuid,name){
   $$('#pdPanelLive [data-live-cmd]').forEach(b=>b.disabled=!state.running);
   const saveBtn=$('#savePlayerData');
   const offHint=$('#pdOfflineHint');
-  if(saveBtn){saveBtn.disabled=state.running;saveBtn.title=state.running?t('ply.stopBeforeEdit'):''}
+  if(saveBtn){saveBtn.disabled=state.running;if(state.running)saveBtn.setAttribute('data-tip',t('ply.stopBeforeEdit'));else saveBtn.removeAttribute('data-tip')}
   if(offHint)offHint.textContent=state.running?t('pd.stopToEdit'):'';
   $('#playerDataForm').hidden=true;$('#playerDataEmpty').hidden=false;$('#playerDataError').textContent=t('ply.loadingData');
-  if(!uuid){ const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.textContent=t('ply.uuidUnknown'); uuidEl.hidden=false; uuidEl.title=t('ply.uuidNone'); uuidEl.onclick=null; } $('#playerDataError').textContent=t('ply.noUuidLong',{n:name});return}
+  if(!uuid){ const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.textContent=t('ply.uuidUnknown'); uuidEl.hidden=false; uuidEl.setAttribute('data-tip', t('ply.uuidNone')); uuidEl.onclick=null; } $('#playerDataError').textContent=t('ply.noUuidLong',{n:name});return}
   let r;
   try{r=await window.observer.playerRead(uuid)}catch(e){$('#playerDataError').textContent=t('ply.readError',{m:e?.message||e});return}
   if(!r||!r.ok){$('#playerDataError').textContent=r?.error||t('ply.unknownReadError');return}
@@ -422,7 +426,7 @@ async function openPlayerInspector(uuid,name){
   const posEl=$('#inspectPos');
   if(posEl){const p=d.pos||[];if(p.length>=3){posEl.hidden=false;posEl.textContent=`X ${Math.round(p[0])}  Y ${Math.round(p[1])}  Z ${Math.round(p[2])}`}else{posEl.hidden=true}}
   renderPdReadout(d,isOnline);
-  const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.title=`${uuid} — ${t('ply.copyUuidHint')}`; uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
+  const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
   $('#pdHealth').value=d.health??'';$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation??'';$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
   renderEquipment(d.armor,d.offhand);
