@@ -27,21 +27,30 @@ plus a window-less entry point that reuses the exact same backend:
   - Feature modules (stateful, take `ipcMain` + `ctx`): `context.js`, `server-lifecycle.js`,
     `backups.js`, `players.js`, `marketplace.js`, `modpacks.js`, `wizard.js`, `settings-handlers.js`,
     `content-handlers.js`, `app-lifecycle.js`, `scheduler.js`, `tunnel.js`, `orphan.js`,
-    `orphan-prompt.js`, `rcon.js`, `runtime-state.js`, `tunnel-manager.js`, `remote.js`.
+    `orphan-prompt.js`, `rcon.js`, `runtime-state.js`, `tunnel-manager.js`, `remote.js`,
+    `pinggy-tunnel.js` (per-instance ssh child for the Bedrock UDP tunnel), `bulk-instances.js`
+    (pure start-all/stop-all planners), `prometheus.js` (the loopback `/metrics` endpoint).
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
     `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
     `validate.js`, `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
     (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key),
     `server-compat.js`, `server-java.js`, `version-compare.js` (natural digit-aware version compare),
     `forge-versions.js`, `jar-read.js`, `mod-metadata.js`, `content-ops.js` / `content-updates.js`
-    (content toggle/update logic), `datapack.js`,
+    (content toggle/update logic), `datapack.js`, `datapack-order.js` (load order in `level.dat`),
     `secrets.js`, `data-dir.js` (the ONE data-folder resolver), `ipc-shim.js` (a fake `ipcMain` so the
     feature modules register without Electron), `templates.js` (server templates), `docker.js` (a pure
     Dockerfile/compose generator), `modpack-manifest.js` (modpack.json schema + static verifier),
     `modpack-resolve.js` (manifest -> resolved items via the marketplace resolver), `modpack-build.js`
     (resolved items -> a real server folder; pure `planBuild` + injectable `buildPack`),
-    `rate-limit.js` (a shared token-bucket used by the MCP and remote servers), and
-    `stability.js` (persistent per-instance run records + the auto-rollback decision).
+    `rate-limit.js` (a shared token-bucket used by the MCP and remote servers),
+    `stability.js` (persistent per-instance run records + the auto-rollback decision),
+    `metrics-store.js` (raw + 1m + 1h metric tiers), `instances-snapshot.js` (cross-instance table),
+    `properties-history.js` (snapshot/diff/restore), `template-store.js` (user templates),
+    `gamerules.js` (level.dat game rules), `geyser.js` (Geyser config inspect + line-level repair),
+    `proxy-config.js` (velocity.toml line-level edit), `pinggy.js` (the Pinggy ssh adapter),
+    `webhook.js` (Discord/generic POST), `http-guard.js` (shared Origin/Host/loopback guards),
+    `player-analytics.js` (playtime leaderboard), `skins.js` + `skinsrestorer.js` + `client-skins.js`
+    + `jar-reader.js` (the player skin chain), and `mods-index.js` (item icons read from mod jars).
   - `remote-ui/` — the Remote-access WEB dashboard (index.html / style.css / app.js), served by
     `remote.js` from a fixed in-memory asset map. Plain scripts, self-contained i18n (7 locales).
   - `mcp/` — optional MCP/AI integration (see below).
@@ -90,7 +99,7 @@ plus a window-less entry point that reuses the exact same backend:
 The app manages several servers at once. The design is what keeps that from becoming a tangle of
 globals, so read this before touching backend state.
 
-- **Settings are nested (schema v5).** The store is `{ global..., instances: [], activeInstanceId }`.
+- **Settings are nested (schema v6).** The store is `{ global..., instances: [], activeInstanceId }`.
   The per-instance keys are listed once in `PER_INSTANCE_KEYS` (`src/main/migrations.js`); the v3→v4
   migration moves them into `instances[0]` (v4→v5 adds the per-instance `accent`/`artSeed` appearance
   keys). `loadSettings()` returns a FLAT view of the ACTIVE
@@ -136,6 +145,37 @@ Known changes the code already handles (keep them working):
 - **Biomes (1.18+):** stored per chunk section as a paletted container
   (`{ palette, data? }`, 64 cells per section, bit-packed longs). See
   `readBiomes()` in `src/main/worldmap.js`.
+- **Worn armor textures (1.21.2+):** `models/armor/<mat>_layer_N.png` moved to
+  `entity/equipment/humanoid/<mat>.png` and `humanoid_leggings/`. `textures.js`
+  `newArmorLayout()` picks the layout with a NUMERIC version compare (a string compare
+  sorts `1.9.4` above `1.21.2`), and `armorCandidates()` returns both so a misdetected
+  jar still resolves on the next reload.
+- **Skin textures the game draws without a file of its own:** `enchanted_golden_apple`
+  is rendered from `golden_apple.png` plus a glint, so the mirror 404s the specific
+  name. `textures.js` `ITEM_ALIASES` maps those ids, tried AFTER the real name.
+
+## The `tex://` protocol and player skins
+
+Textures do not go through the normal IPC path. A custom `tex://` scheme serves them so
+`<img>` and WebGL can load them; read `src/main/textures.js` and `src/renderer/js/03b-player-3d.js`
+before touching either. Four rules that each cost a debugging session:
+
+1. **A WebGL texture upload needs all three CORS pieces.** The scheme is registered with
+   `corsEnabled` in `main.js`, every `tex://` response carries `Access-Control-Allow-Origin`, AND
+   the `<img>` sets `crossOrigin='anonymous'`. Remove any one and `texImage2D` either throws a
+   `SecurityError` or Chromium refuses the request outright.
+2. **The skin and the armor share texture unit 0.** `draw()` must rebind the skin texture on every
+   frame; otherwise the skin cubes sample the armor atlas at skin UVs and the alpha test deletes the
+   torso.
+3. **The CSP forbids inline handlers.** A texture that resolves to the 1x1 placeholder is detected in
+   a delegated capture `load` listener, never with `onload="..."`.
+4. **Nothing Mojang-owned is bundled.** The chain is SkinsRestorer on disk, then the Mojang session
+   server, then the user's own client jar, then the public PrismarineJS mirror, then a generated
+   initials avatar. Read files on the user's machine at runtime; never copy a texture into the repo.
+
+The Player Inspector's item cells, equipment tiles and tooltips use `data-tip` / `data-tip-html`
+(`src/renderer/js/00b-tooltip.js`), not the native `title=` attribute, which is drawn by the OS and
+ignores the design tokens.
 
 When you add a reader, prefer the new format first with a legacy fallback, and
 add a regression test with a synthesized NBT fixture (see

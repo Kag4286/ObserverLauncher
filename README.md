@@ -51,13 +51,13 @@ Live output with timestamps, level filters, search, command history and log expo
 <td width="50%" valign="top">
 
 **Performance**
-TPS, MSPT, CPU and RAM graphs with 15m / 1h / 6h / 24h ranges. History persists to disk, so it survives a restart.
+TPS, MSPT, CPU and RAM graphs with 15m / 1h / 6h / 24h / 7d / 30d ranges. History persists to disk, so it survives a restart. A banner appears when the tick rate drops sharply or memory keeps climbing, and names the likely cause.
 
 </td>
 <td width="50%" valign="top">
 
 **Players**
-One roster for online, whitelisted, banned and OP players. The inspector reads equipment, inventory and ender chest, runs live actions, and edits saved data while the server is stopped.
+One roster for online, whitelisted, banned and OP players. The inspector draws a rotatable 3D model of the player wearing their armor, reads equipment, inventory and ender chest with real item icons, runs live actions, and edits saved data while the server is stopped. Skins come from SkinsRestorer when the plugin is installed, so offline-mode servers show the skin players actually wear.
 
 </td>
 </tr>
@@ -112,6 +112,10 @@ The app can act as an MCP server so an AI client reads and controls the server. 
 <td align="center" width="50%"><b>World map</b><br><img src="docs/screenshot-worldmap.png" width="420" alt="World map"></td>
 <td align="center" width="50%"><b>MCP / AI integration</b><br><img src="docs/screenshot-MCP.png" width="420" alt="MCP / AI integration"></td>
 </tr>
+<tr>
+<td align="center" width="50%"><b>Player inspector, 3D skin preview</b><br><img src="docs/screenshot-player-inspector.png" width="420" alt="Player inspector with a 3D skin preview"></td>
+<td align="center" width="50%"><b>Player inventory</b><br><img src="docs/screenshot-inventory.png" width="420" alt="Player inventory with item icons"></td>
+</tr>
 </table>
 
 ## Install
@@ -120,10 +124,10 @@ Download the latest release:
 
 | Platform | File |
 |---|---|
-| Windows 10/11 (64-bit) | `ObserverLauncher-5.7.0-setup.exe` |
-| Linux (AppImage) | `ObserverLauncher-5.7.0.AppImage` |
+| Windows 10/11 (64-bit) | `ObserverLauncher-6.0.0-setup.exe` |
+| Linux (AppImage) | `ObserverLauncher-6.0.0.AppImage` |
 
-Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-5.7.0.AppImage` and run it. No root needed.
+Windows: run the installer, which sets up auto-update. Linux: `chmod +x ObserverLauncher-6.0.0.AppImage` and run it. No root needed.
 
 > **Windows SmartScreen note.** The installer is not code-signed, so Windows may show a "Windows protected your PC" or "Unknown publisher" warning on first run. Click **More info**, then **Run anyway**. The Linux AppImage is unaffected. To be sure a download is intact, compare it against the SHA-256 in the release notes.
 
@@ -194,7 +198,9 @@ No admin rights are needed. Java installs into your user folder; elevation is re
 
 ## Data and privacy
 
-ObserverLauncher is a local tool with no account, no telemetry and no analytics. Downloads happen only when you ask, and only from official sources: server jars from Mojang, PaperMC, Purpur, Leaf, Fabric and Forge; plugins and mods from Modrinth, Hangar and SpigotMC; item and block icons from the public PrismarineJS mirror (no Mojang assets are bundled or redistributed); Java runtimes when you use auto-install; and update metadata from GitHub Releases. Nothing is uploaded, and the app runs no background service once closed.
+ObserverLauncher is a local tool with no account, no telemetry and no analytics. Downloads happen only when you ask, and only from official sources: server jars from Mojang, PaperMC, Purpur, Leaf, Fabric and Forge; plugins and mods from Modrinth, Hangar and SpigotMC; item and block icons and default player skins from the public PrismarineJS mirror; player skins from Mojang when a server is in online mode; Java runtimes when you use auto-install; and update metadata from GitHub Releases. Nothing is uploaded, and the app runs no background service once closed.
+
+The player inspector reads files that already exist on your machine: the player `.dat` files in your world folder, the mod jars in your server's `mods` folder for item icons, your own Minecraft client jar for a default skin, and SkinsRestorer's data folder when that plugin is installed. No Mojang texture or model is bundled with the app; everything is read on your machine or downloaded to it at runtime.
 
 Launcher data lives outside the server folder, in Electron's `userData` directory (`%APPDATA%\ObserverLauncher` on Windows, `~/.config/ObserverLauncher` on Linux). Set `OBSERVER_DATA_DIR` to move it.
 
@@ -202,6 +208,8 @@ Launcher data lives outside the server folder, in Electron's `userData` director
 
 - Windows and Linux only. No macOS build.
 - TPS/MSPT need a supported server. Vanilla and Fabric report player count only.
+- The longer performance ranges (7d, 30d) fill up over time. Right after an update they hold only what has been recorded since then.
+- SkinsRestorer skins are read from its default file storage. A server that stores them in MySQL or PostgreSQL falls back to the default skin.
 - Spigot needs Git and a full JDK, and compiles slowly.
 - Velocity proxies do not tick a world, so their TPS/MSPT panel shows N/A.
 - Auto-update requires the packaged installer or AppImage.
