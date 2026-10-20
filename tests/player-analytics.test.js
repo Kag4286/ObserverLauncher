@@ -53,15 +53,41 @@ try { ck('no folder: empty array', getPlayerAnalytics(r3, 'world', known).length
 catch { threw = true; }
 ck('no folder: does not throw', !threw);
 
-// --- Modern wins when both exist (a migrated world may briefly have both) ---
+// --- Both layouts present (a migrated world may briefly have both) ---
+// The reader scans BOTH: a half-finished migration must not hide players who only have a record
+// in the other folder yet. A player present in both keeps the larger numbers.
 const r4 = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-stats-both-'));
 fs.mkdirSync(path.join(r4, 'world', 'players', 'stats'), { recursive: true });
 fs.mkdirSync(path.join(r4, 'world', 'stats'), { recursive: true });
 fs.writeFileSync(path.join(r4, 'world', 'players', 'stats', UUID_A + '.json'), stats(20 * 60, 1, 1, 1));
-fs.writeFileSync(path.join(r4, 'world', 'stats', UUID_B + '.json'), stats(20 * 60, 1, 1, 1));
+fs.writeFileSync(path.join(r4, 'world', 'stats', UUID_B + '.json'), stats(20 * 60, 2, 2, 2));
 const r4rows = getPlayerAnalytics(r4, 'world', known);
-ck('both: only the modern folder is read', r4rows.length === 1);
-ck('both: the modern player is the one returned', r4rows[0] && r4rows[0].name === 'Alice');
+ck('both: every player from either folder is listed', r4rows.length === 2);
+ck('both: the modern-only player is present', r4rows.some(r => r.name === 'Alice'));
+ck('both: the legacy-only player is present', r4rows.some(r => r.name === 'Bob'));
+
+// --- A player in both folders keeps the larger numbers ---
+const r4b = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-stats-dup-'));
+fs.mkdirSync(path.join(r4b, 'world', 'players', 'stats'), { recursive: true });
+fs.mkdirSync(path.join(r4b, 'world', 'stats'), { recursive: true });
+fs.writeFileSync(path.join(r4b, 'world', 'players', 'stats', UUID_A + '.json'), stats(20 * 3600, 9, 9, 9)); // 1 hour
+fs.writeFileSync(path.join(r4b, 'world', 'stats', UUID_A + '.json'), stats(20 * 600, 2, 2, 2));            // 10 min
+const r4brows = getPlayerAnalytics(r4b, 'world', known);
+ck('dup: one row per player', r4brows.length === 1);
+ck('dup: keeps the larger playtime', r4brows[0] && r4brows[0].playTimeSec === 3600);
+ck('dup: keeps the larger death count', r4brows[0] && r4brows[0].deaths === 9);
+
+// --- A second world folder is read too ---
+// A server can hold more than one world (a creative test world next to the survival one); the
+// leaderboard is about players across the server, so both are scanned.
+const r6 = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-stats-multi-'));
+fs.mkdirSync(path.join(r6, 'world', 'players', 'stats'), { recursive: true });
+fs.mkdirSync(path.join(r6, 'creative', 'players', 'stats'), { recursive: true });
+fs.writeFileSync(path.join(r6, 'world', 'players', 'stats', UUID_A + '.json'), stats(20 * 60, 1, 1, 1));
+fs.writeFileSync(path.join(r6, 'creative', 'players', 'stats', UUID_B + '.json'), stats(20 * 60, 1, 1, 1));
+const r6rows = getPlayerAnalytics(r6, 'world', known);
+ck('multi-world: both worlds are read', r6rows.length === 2);
+ck('multi-world: the second world player is present', r6rows.some(r => r.name === 'Bob'));
 
 // --- Custom level-name honoured ---
 const r5 = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-stats-level-'));

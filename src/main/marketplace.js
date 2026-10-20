@@ -341,6 +341,26 @@ function registerMarketplace(ipcMain, ctx) {
         if (!id) return emptyDetail(item);
         let res = {};
         try { res = await json(`https://api.spiget.org/v2/resources/${encodeURIComponent(id)}`); } catch { res = {}; }
+        // BUGFIX (v6.0.0 follow-up): search results only carry the author's NUMERIC id, so
+        // item.author is always null for Spigot and the modal showed "Unknown author" for every
+        // project. The search card fills it in lazily, but the item object handed to the modal is
+        // the raw search row, so that fix never reached this path. Resolve the name here.
+        // Same lazy gap for the icon: Spiget search returns no icon, the grid fills it in after the
+        // fact, and the modal is opened from the raw row, so it showed an empty frame. The resource
+        // fetch above carries the icon, so use it.
+        let iconUrl = item.icon || '';
+        if (!iconUrl && res.icon) {
+          const raw = res.icon.url || (typeof res.icon === 'string' ? res.icon : null);
+          if (raw) { const s = String(raw); iconUrl = s.startsWith('http') ? s : 'https://www.spigotmc.org/' + s.replace(/^\/+/, ''); }
+          else if (res.icon.data) iconUrl = 'data:image/png;base64,' + String(res.icon.data);
+        }
+        let authorName = item.author || '';
+        if (!authorName && res.author && res.author.id != null) {
+          try {
+            const a = await json(`https://api.spiget.org/v2/authors/${encodeURIComponent(String(res.author.id))}`);
+            authorName = (a && a.name) || '';
+          } catch { /* leave blank; the UI falls back to its own unknown-author label */ }
+        }
         const tested = Array.isArray(res.testedVersions) ? res.testedVersions : [];
         const projectUrl = `https://www.spigotmc.org/resources/${encodeURIComponent(id)}/`;
         let versions = [];
@@ -359,7 +379,7 @@ function registerMarketplace(ipcMain, ctx) {
             dependencies: [],
           }));
         } catch { versions = []; }
-        return buildDetail({ item, title: res.name, description: res.tag, loaders: ['paper', 'spigot', 'bukkit'], versions, sourceUrl: res.sourceCodeLink || null, projectUrl });
+        return buildDetail({ item, title: res.name, description: res.tag, icon: iconUrl, author: authorName, loaders: ['paper', 'spigot', 'bukkit'], versions, sourceUrl: res.sourceCodeLink || null, projectUrl });
       }
       if (!item || item.source !== 'modrinth') {
         // Anything else (an unknown source) keeps just the fields the search already returned.
