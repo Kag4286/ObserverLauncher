@@ -166,8 +166,14 @@ async function resolveMarketDownload(item) {
     return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0, hashes: hangarHashes, projectId: item.id, versionId: target?.id || null, gameVersion: item.version || null, versionNumber: target?.name || null };
   }
   if (item.source === 'spigot') {
+    // v6.0.0: honour an explicit version pick. Spigot's download endpoint accepts a version id, so a
+    // row chosen in the picker installs THAT build instead of whatever the site serves as latest.
     const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
-    return { url: `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`, filename: `${title}.jar`, source: 'spigot', projectId: item.id, versionId: null, gameVersion: item.version || null };
+    const vId = item.versionId ? String(item.versionId).replace(/[^0-9]/g, '') : '';
+    const url = vId
+      ? `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/versions/${encodeURIComponent(vId)}/download`
+      : `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`;
+    return { url, filename: `${title}${vId ? '-' + vId : ''}.jar`, source: 'spigot', projectId: item.id, versionId: vId || null, gameVersion: item.version || null };
   }
   if (item.source === 'curseforge') {
     const headers = cfHeaders();
@@ -191,6 +197,27 @@ async function resolveMarketDownload(item) {
     return { url: inst.url, filename: file.fileName, source: 'curseforge', size: file.fileLength || 0, hashes: cfHashes, projectId: item.id, versionId: file.id != null ? String(file.id) : null, gameVersion: item.version || (file.gameVersions && file.gameVersions[0]) || null, versionNumber: file.displayName || null, gameVersions: file.gameVersions || [], loaders: [], dependencies: cf.cfDependencies(file) };
   }
   throw new Error('Unsupported marketplace source.');
+}
+
+// Shared detail-response shape for a source whose version API is a flat list. Hangar and Spigot each
+// need the same four closing lines around their own fetch, and the no-dup guard flags a copy.
+// `fetchVersions()` returns the raw array; `mapOne(v)` turns one entry into the modal's shape.
+function emptyDetail(item) {
+  return { ok: true, title: (item && item.title) || '', description: (item && item.description) || '', icon: (item && item.icon) || '', author: (item && item.author) || '', env: null, loaders: null, versions: null, projectUrl: (item && item.projectUrl) || null };
+}
+function buildDetail({ title, description, icon, author, loaders, versions, sourceUrl, projectUrl, item }) {
+  return {
+    ok: true,
+    title: title || (item && item.title) || '',
+    description: description || (item && item.description) || '',
+    icon: icon || (item && item.icon) || '',
+    author: author || (item && item.author) || '',
+    env: null,
+    loaders: loaders || null,
+    versions,
+    sourceUrl: sourceUrl || null,
+    projectUrl: projectUrl || (item && item.projectUrl) || null,
+  };
 }
 
 function registerMarketplace(ipcMain, ctx) {
@@ -269,9 +296,74 @@ function registerMarketplace(ipcMain, ctx) {
         versions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
         return { ok: true, title: item.title || '', description: item.description || '', icon: item.icon || '', author: item.author || '', env: null, loaders: null, versions, projectUrl: item.projectUrl || null };
       }
+      if (item && item.source === 'hangar') {
+        // v6.0.0: Hangar has a real project + version endpoint, so the install modal gets the same
+        // treatment Modrinth already had: a source link, the project page, a version list, and the
+        // game versions that build declares. The shape was verified against the live API (a project
+        // exposes settings.links[] -> links[], and each version carries platformDependencies.PAPER
+        // as the game-version array plus downloads.PAPER.fileInfo).
+        const [owner, slug] = String(item.id).split('/');
+        if (!owner || !slug) return emptyDetail(item);
+        let proj = {};
+        try { proj = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}`); } catch { proj = {}; }
+        // Flatten the nested links groups and pick the first Source / Issues URL as the source link.
+        const allLinks = [];
+        for (const grp of (proj.settings && proj.settings.links) || []) for (const l of grp.links || []) allLinks.push({ name: String(l.name || ''), url: String(l.url || '') });
+        const sourceLink = allLinks.find(l => /^(source|issues|github|gitlab|code)$/i.test(l.name)) || allLinks.find(l => /github\.com|gitlab\.com/i.test(l.url)) || null;
+        const projectUrl = `https://hangar.papermc.io/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}`;
+        let versions = [];
+        try {
+          const vres = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=25`);
+          versions = (vres.result || [])
+            .filter(v => v.downloads && v.downloads.PAPER && v.downloads.PAPER.downloadUrl)
+            .map(v => ({
+              id: v.name,
+              number: v.name,
+              // platformDependencies.PAPER is the list of Minecraft versions this build supports.
+              gameVersions: (v.platformDependencies && v.platformDependencies.PAPER) || [],
+              loaders: ['paper'],
+              date: v.createdAt || null,
+              size: (v.downloads.PAPER.fileInfo && v.downloads.PAPER.fileInfo.sizeBytes) || 0,
+              // Hangar publishes no per-version dependencies in this shape; leave the list empty so
+              // the UI shows no deps section rather than a false 'none required'.
+              dependencies: [],
+            }));
+        } catch { versions = []; }
+        return buildDetail({ item, title: proj.name, description: proj.description, icon: proj.avatarUrl, author: (proj.memberNames && proj.memberNames[0]), loaders: ['paper'], versions, sourceUrl: sourceLink ? sourceLink.url : null, projectUrl });
+      }
+      if (item && item.source === 'spigot') {
+        // v6.0.0: SpigotMC's API DOES expose a resource's versions, its tested Minecraft versions,
+        // and a sourceCodeLink. The old code assumed it had none, so a Spigot install showed no
+        // version picker and no source link. Shape verified against the live API: the resource
+        // carries { testedVersions: [], sourceCodeLink }, and /resources/{id}/versions returns
+        // [{ id, name, releaseDate, downloads }].
+        const id = String(item.id || '');
+        if (!id) return emptyDetail(item);
+        let res = {};
+        try { res = await json(`https://api.spiget.org/v2/resources/${encodeURIComponent(id)}`); } catch { res = {}; }
+        const tested = Array.isArray(res.testedVersions) ? res.testedVersions : [];
+        const projectUrl = `https://www.spigotmc.org/resources/${encodeURIComponent(id)}/`;
+        let versions = [];
+        try {
+          const list = await json(`https://api.spiget.org/v2/resources/${encodeURIComponent(id)}/versions?size=25&sort=-releaseDate`);
+          versions = (Array.isArray(list) ? list : []).map(v => ({
+            id: String(v.id),
+            number: String(v.name || v.id),
+            // A Spigot version's own MC list is not exposed; the resource-level testedVersions is the
+            // best available signal, so every row shares it. That is honest: the picker still lets
+            // the user choose a build, it just cannot claim per-build MC support.
+            gameVersions: tested,
+            loaders: ['paper', 'spigot', 'bukkit'],
+            date: v.releaseDate ? new Date(v.releaseDate * 1000).toISOString() : null,
+            size: 0,
+            dependencies: [],
+          }));
+        } catch { versions = []; }
+        return buildDetail({ item, title: res.name, description: res.tag, loaders: ['paper', 'spigot', 'bukkit'], versions, sourceUrl: res.sourceCodeLink || null, projectUrl });
+      }
       if (!item || item.source !== 'modrinth') {
-        // Other sources (Hangar/Spigot) have no rich detail endpoint here; return the fields we have.
-        return { ok: true, title: item?.title || '', description: item?.description || '', icon: item?.icon || '', author: item?.author || '', env: item?.env || null, loaders: item?.loaders || null, versions: null, projectUrl: item?.projectUrl || null };
+        // Anything else (an unknown source) keeps just the fields the search already returned.
+        return emptyDetail(item);
       }
       const proj = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}`);
       const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
