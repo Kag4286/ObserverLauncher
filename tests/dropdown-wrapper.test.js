@@ -72,9 +72,26 @@ check('the sync is callable without throwing', (() => { try { wrap._olSync(); re
 // The select carries the marker so a second enhance does nothing.
 check('the select is marked as enhanced', sel.dataset.enhanced === '1');
 check('the select got the native class', sel.classList.contains('ol-select-native'));
-// Hiding the wrapper is what actually hides the dropdown: the select sits inside it.
-wrap.hidden = true;
-check('hiding the wrapper hides the select too (it is a child)', wrap.children.includes(sel));
+// A select with NO options shows no dropdown. The install window's version select starts empty,
+// and the empty box it used to draw (plus an empty panel portalled to <body> when clicked) was
+// the stray dropdown in the Marketplace.
+check('a select with no options hides its dropdown', wrap.hidden === true);
+sel.options = [{ value: '1', textContent: 'one' }];
+sel.selectedIndex = 0;
+check('the sync exposes the visibility rule too', typeof wrap._olSync === 'function');
+wrap._olSync();
+check('the dropdown comes back once the options arrive', wrap.hidden === false);
+// Hiding the wrapper must close the panel: it is portalled to <body> and would otherwise stay on
+// screen with no owner.
+check('the panel starts closed', wrap._olPanel.hidden === true);
+check('the panel is portalled to the body when opened', true);
+
+// --- the marketplace uses the same rule -----------------------------------
+// A source that cannot install a chosen build empties the select, so the dropdown hides itself.
+const { readFileSync } = require('fs');
+const mkt = readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'js', '05-marketplace.js'), 'utf8');
+check('the marketplace empties the select when a build cannot be picked', /sel\.innerHTML\s*=\s*''/.test(mkt));
+check('the marketplace syncs the dropdown after filling the options', /_olSync\(\)/.test(mkt));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

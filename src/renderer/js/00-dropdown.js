@@ -41,7 +41,16 @@
     wrap._olPanel = panel; wrap._olBtn = btn;
 
     const syncLabel = () => { const l = btn.querySelector('.ol-dd-label'); if (l) l.textContent = labelOf(sel); };
-    syncLabel();
+    // A select with nothing to choose shows no dropdown at all. The install window's version
+    // select starts EMPTY and is filled when the window opens, so before that it was an empty
+    // box on screen, and clicking it portalled an empty panel to <body> where it outlived the
+    // modal it belonged to.
+    const syncVisible = () => { wrap.hidden = sel.options.length === 0; };
+    const sync = () => { syncLabel(); syncVisible(); };
+    sync();
+    // The panel is portalled to <body>, so hiding the wrapper must close it too, or it stays on
+    // screen with no owner.
+    try { new MutationObserver(() => { if (wrap.hidden && !panel.hidden) close(); }).observe(wrap, { attributes: true, attributeFilter: ['hidden'] }); } catch {}
 
     function buildPanel() {
       panel.innerHTML = Array.from(sel.options).map(o => {
@@ -85,9 +94,9 @@
     btn.onkeydown = e => { if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     // Keep the label in sync when the value/options change elsewhere (JS sets .value, or options are
     // rebuilt) — cheap: only re-reads the selected option's text.
-    try { new MutationObserver(syncLabel).observe(sel, { childList: true, subtree: true }); } catch {}
-    sel.addEventListener('change', syncLabel);
-    wrap._olSync = syncLabel;
+    try { new MutationObserver(sync).observe(sel, { childList: true, subtree: true }); } catch {}
+    sel.addEventListener('change', sync);
+    wrap._olSync = sync;
   }
 
   function closeAll(except) {

@@ -213,7 +213,10 @@ function imRenderVersionPicker(){
   // ?version= parameter is ignored (every version returns the same file). The list is still
   // shown, read-only, because it carries the Minecraft versions the resource declares.
   if(installState.detail.versionPickable===false){
-    if(dd)dd.hidden=true;else sel.hidden=true;
+    // Nothing to choose: the select is emptied, and the dropdown hides itself (a select with no
+    // options has no dropdown to show). The list below carries the information instead.
+    sel.innerHTML='';
+    if(dd&&dd._olSync)dd._olSync();else sel.hidden=true;
     if(list){
       list.hidden=false;
       // A Spigot resource can have 25+ builds. Listing them all pushed the Install button off
@@ -228,8 +231,7 @@ function imRenderVersionPicker(){
   }
   if(dd)dd.hidden=false;else sel.hidden=false;
   if(list)list.hidden=true;
-  if(note)note.hidden=true;
-  // BUGFIX (v6.0.0 follow-up): the option label packed version, date, size and a Minecraft version
+  if(note)note.hidden=true;  // BUGFIX (v6.0.0 follow-up): the option label packed version, date, size and a Minecraft version
   // onto one line. In the narrow modal the dot in "1.16" was lost at that font size, so it read
   // "116". Split it: the version number is the label, the rest is the title tooltip.
   sel.innerHTML=vs.map(v=>{
