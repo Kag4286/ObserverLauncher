@@ -147,40 +147,69 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
     const { FileTransaction } = require('./fs-utils.js');
     const tx = new FileTransaction();
     try {
-      for (let i = 0; i < installable.length; i++) {
-        const f = installable[i];
-        onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.name, received: 0, fileTotal: f.size });
-        fs.mkdirSync(path.dirname(f.dest), { recursive: true });
-        tx.touch(f.dest);
-        // Individual files inside a modpack (mods/configs): 512 MB each is plenty.
-        await download(f.url, f.dest, (received, total) => onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.name, received, fileTotal: total || f.size }), null, { maxBytes: 512 * 1024 * 1024 });
-        // SECURITY (supply-chain): the .mrpack index carries {sha1,sha512} per file — verify it before
-        // keeping the downloaded content (a tampered pack/CDN must not silently install a bad jar).
-        const { verifyFileHash } = require('./fs-utils.js');
-        const vh = verifyFileHash(f.dest, f.hashes);
-        if (!vh.ok) throw new Error(`Modpack file "${f.name}" ${vh.error} Import stopped.`);
-        installed++;
-      }
+      // SECURITY (supply-chain): the .mrpack index carries {sha1,sha512} per file - verify it before
+      // keeping the downloaded content (a tampered pack/CDN must not silently install a bad jar).
+      const { verifyFileHash } = require('./fs-utils.js');
+      const done = await installFilesTransactional(tx, installable, {
+        onInfo,
+        verify: (it) => verifyFileHash(it.dest, it.hashes),
+      });
+      installed = done.length;
+      const overridesDir = path.join(extractDir, 'overrides');
+      // DRY (v3.1.0): use the SHARED overrides copy (same logic the CurseForge path uses) instead of a
+      // second inline copy. It lists every file that would be clobbered and confirms with the user.
+      // The transaction stays open across the copy so a failed copy rolls the whole import back.
+      await copyOverridesWithConfirm(ctx, overridesDir, tx);
     } catch (e) {
       // Roll back every file this import wrote, then report the failure.
-      try { tx.rollback(); } catch {}
-      throw e;
+      const rolledBack = tx.rollback();
+      const err = marketplaceError(e);
+      return { ...err, rolledBack };
     }
     tx.commit();
-    const overridesDir = path.join(extractDir, 'overrides');
-    // DRY (v3.1.0): use the SHARED overrides copy (same logic the CurseForge path uses) instead of a
-    // second inline copy. It lists every file that would be clobbered and confirms with the user.
-    await copyOverridesWithConfirm(ctx, overridesDir);
     return { ok: true, installed, skipped, name: index.name || 'Modpack', files: serverFiles(ctx.currentServerPath) };
   } catch (error) { return marketplaceError(error); }
   finally { try { if (tempZip) fs.rmSync(tempZip, { force: true }); if (extractDir) fs.rmSync(extractDir, { recursive: true, force: true }); } catch {} }
 }
 
+// Install a list of resolved files into the server folder as ONE transaction.
+//
+// Every destination is journalled BEFORE it is written, so a failure part-way through restores
+// the bytes that were there before and removes what was newly created. A pack import that dies
+// on file 20 of 25 must not leave the first 19 in mods/ with no way back.
+//
+// Shared by the .mrpack and the CurseForge path so the two cannot drift; the no-dup guard
+// rejects a copied loop.
+async function installFilesTransactional(tx, items, opts = {}) {
+  const { onInfo, phase = 'modpack', verify, download: dl } = opts;
+  const downloadFn = dl || download;
+  const installed = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const report = (received, total) => onInfo?.({ phase, index: i + 1, total: items.length, name: it.name, received, fileTotal: total || it.size || 0 });
+    onInfo?.({ phase, index: i + 1, total: items.length, name: it.name, received: 0, fileTotal: it.size || 0 });
+    fs.mkdirSync(path.dirname(it.dest), { recursive: true });
+    tx.touch(it.dest);
+    // Individual files inside a modpack (mods/configs): 512 MB each is plenty.
+    await downloadFn(it.url, it.dest, report, null, { maxBytes: 512 * 1024 * 1024 });
+    if (verify) {
+      const vh = verify(it);
+      if (!vh.ok) throw new Error(`Modpack file "${it.name}" ${vh.error} Import stopped.`);
+    }
+    installed.push(it);
+  }
+  return installed;
+}
+
 // Shared overrides copy (used by BOTH the .mrpack and CurseForge import paths). Lists every file
 // that would be clobbered before copying, and confirms with the user.
-async function copyOverridesWithConfirm(ctx, overridesDir) {
+//
+// `tx` is the caller's FileTransaction. Every destination the copy would write is journalled
+// first, so a copy that dies half-way leaves the original files in place instead of a mixture of
+// old and new configs.
+async function copyOverridesWithConfirm(ctx, overridesDir, tx) {
   const { dialog } = require('electron'); // GUI-only: the overwrite prompt below
-  if (!fs.existsSync(overridesDir)) return;
+  if (!fs.existsSync(overridesDir)) return { cancelled: false };
   const sensitiveSet = new Set(['server.properties', 'eula.txt']);
   const clobbered = [];
   const walkRel = (rel) => {
@@ -188,7 +217,10 @@ async function copyOverridesWithConfirm(ctx, overridesDir) {
     for (const e of entries) {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) { walkRel(r); continue; }
-      if (fs.existsSync(path.join(ctx.currentServerPath, r))) clobbered.push(r);
+      const dest = safeTarget(ctx.currentServerPath, r);
+      if (!dest) continue; // unsafe path: the copy must not write outside the server folder
+      if (tx) tx.touch(dest);
+      if (fs.existsSync(dest)) clobbered.push(r);
     }
   };
   walkRel('');
@@ -206,7 +238,9 @@ async function copyOverridesWithConfirm(ctx, overridesDir) {
     });
     proceed = choice.response === 1;
   }
-  if (proceed) fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });
+  if (!proceed) return { cancelled: true };
+  fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });
+  return { cancelled: false };
 }
 
 // CurseForge modpack import: resolves each {projectID,fileID} through the CF API (needs the user's
@@ -237,19 +271,35 @@ async function importCfModpack(ctx, extractDir, index, onInfo) {
   const { installable, blocked } = cf.partitionCfFiles(resolved);
   const modsFolder = (lf.loader === 'forge' || lf.loader === 'neoforge' || lf.loader === 'fabric' || lf.loader === 'quilt') ? 'mods' : 'plugins';
   const { isSafeDownloadUrl } = require('./validate.js');
-  let installed = 0;
-  for (let i = 0; i < installable.length; i++) {
-    const f = installable[i];
+  // v6.0.0 H1: the CurseForge path was still best-effort - a download that failed on file 20 of
+  // 25 left the first 19 jars in mods/ with no manifest and no way back. It now runs in the same
+  // FileTransaction as the .mrpack path, so any failure rolls the whole import back.
+  const { FileTransaction, recordManifestEntry } = require('./fs-utils.js');
+  const tx = new FileTransaction();
+  const files = [];
+  for (const f of installable) {
     if (!isSafeDownloadUrl(f.url)) { blocked.push(f); continue; }
     const dest = safeTarget(ctx.currentServerPath, path.join(modsFolder, path.basename(f.fileName || `cf-${f.fileID}.jar`)));
     if (!dest) { blocked.push(f); continue; }
-    onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.fileName, received: 0, fileTotal: 0 });
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    await download(f.url, dest, (received, total) => onInfo?.({ phase: 'modpack', index: i + 1, total: installable.length, name: f.fileName, received, fileTotal: total }), null, { maxBytes: 512 * 1024 * 1024 });
-    try { recordManifestEntry(ctx.currentServerPath, { kind: modsFolder === 'mods' ? 'mod' : 'plugin', fileName: path.basename(dest), sourceUrl: f.url, source: 'curseforge', installedAt: new Date().toISOString() }); } catch {}
-    installed++;
+    files.push({ url: f.url, dest, name: path.basename(dest), size: f.fileSize || 0, fileName: path.basename(dest) });
   }
-  await copyOverridesWithConfirm(ctx, path.join(extractDir, index.overrides || 'overrides'));
+  let installed = 0;
+  let done = [];
+  try {
+    done = await installFilesTransactional(tx, files, { onInfo });
+    installed = done.length;
+    // The overrides copy runs INSIDE the transaction, so a failed copy rolls the jars back too.
+    await copyOverridesWithConfirm(ctx, path.join(extractDir, index.overrides || 'overrides'), tx);
+  } catch (e) {
+    const rolledBack = tx.rollback();
+    return { ok: false, error: e?.message || 'The CurseForge modpack import failed.', rolledBack };
+  }
+  tx.commit();
+  // The manifest is written only AFTER the transaction commits. Writing it during the loop left
+  // entries pointing at files a rollback had already deleted.
+  for (const f of done) {
+    try { recordManifestEntry(ctx.currentServerPath, { kind: modsFolder === 'mods' ? 'mod' : 'plugin', fileName: f.fileName, sourceUrl: f.url, source: 'curseforge', installedAt: new Date().toISOString() }); } catch {}
+  }
   return { ok: true, installed, blocked, name, destFolder: modsFolder, files: serverFiles(ctx.currentServerPath) };
 }
 
@@ -365,4 +415,4 @@ function registerModpacks(ipcMain, ctx) {
   });
 }
 
-module.exports = { importMrpackFromPath, importModpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor };
+module.exports = { importMrpackFromPath, importCfModpack, importModpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor };
