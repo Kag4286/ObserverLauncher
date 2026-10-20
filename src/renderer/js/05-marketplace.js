@@ -216,7 +216,12 @@ function imRenderVersionPicker(){
     if(dd)dd.hidden=true;else sel.hidden=true;
     if(list){
       list.hidden=false;
-      list.innerHTML=vs.map(v=>`<li class="im-version"><b>${esc(v.number)}</b><span>${esc(imVersionBits(v).join(' · '))}</span></li>`).join('');
+      // A Spigot resource can have 25+ builds. Listing them all pushed the Install button off
+      // the bottom of the window, so only the newest few are shown; the note below says how many
+      // the resource has in total.
+      const shown=vs.slice(0,5);
+      list.innerHTML=shown.map(v=>`<li class="im-version"><b>${esc(v.number)}</b><span>${esc(imVersionBits(v).join(' · '))}</span></li>`).join('')
+        + (vs.length>shown.length?`<li class="im-version more"><span>${t('mkt.moreBuilds',{n:vs.length-shown.length})}</span></li>`:'');
     }
     if(note){note.hidden=false;note.textContent=t('mkt.latestOnly')}
     return;

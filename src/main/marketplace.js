@@ -78,7 +78,11 @@ async function searchMarket(opts) {
     return { ok: true, relaxed, total: lastTotal, items: hits.map(x => ({ source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: normalizeEnv({ client: x.client_side, server: x.server_side }), loaders: x.loaders || [], date: x.date_created || null })) };
   }
   if (source === 'hangar') {
-    const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updatedAt' : '-stars';
+    // BUGFIX (6.0.1): the sort field was "updatedAt", which Hangar does not accept. Its search
+    // takes stars, downloads, views, newest, updated, recent_views, recent_downloads and slug.
+    // An unknown field is answered with a 400, so sorting by "latest" always failed. The field
+    // is "updated" (the one Hangar's own UI calls "Recently Updated").
+    const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updated' : '-stars';
     const data = await json(`https://hangar.papermc.io/api/v1/projects?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&sort=${encodeURIComponent(order)}`);
     const rows = data.result || data.projects || [];
     // BUGFIX (v4.0.0): Hangar hits carry an avatarUrl (often root-relative) — without mapping it to

@@ -3,7 +3,11 @@ const { execFile } = require('child_process');
 
 function withTimeout(ms) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), ms); return { signal: controller.signal, cancel: () => clearTimeout(timer) }; }
 async function jsonAttempt(url, extraHeaders, method, body, timeoutMs) {
-  const { signal, cancel } = withTimeout(Number(timeoutMs) > 0 ? Number(timeoutMs) : 25000);
+  // 6.0.1: the default was 25 s. A registry that stopped answering turned the Marketplace into
+  // an endless spinner: the timeout fired, the GET was retried, and the user waited 25 s three
+  // times over before seeing an error. 15 s is still generous for a JSON call, and a timeout is
+  // no longer retried (see json()), so a hung registry now reports itself in one wait.
+  const { signal, cancel } = withTimeout(Number(timeoutMs) > 0 ? Number(timeoutMs) : 15000);
   try {
     const headers = { 'User-Agent': 'ObserverLauncher/0.2 (local Minecraft server launcher)', 'Accept': 'application/json', ...(extraHeaders || {}) };
     const opts = { signal, headers };
@@ -29,7 +33,11 @@ async function json(url, extraHeaders, method, body, timeoutMs) {
       // A 4xx is a real answer (not found / bad request) - never retry it. Only retry network/
       // timeout/5xx style failures.
       const msg = String(error && error.message || '');
-      const retryable = !/^\s*4\d\d\b/.test(msg);
+      // A TIMEOUT is not retried: the server did not answer at all, so trying again just
+      // multiplies the wait the user is already sitting through (25 s x 3 was over a minute of
+      // "Searching..." before the error appeared).
+      const timedOut = /timed out/i.test(msg);
+      const retryable = !timedOut && !/^\s*4\d\d\b/.test(msg);
       if (!isGet || !retryable || i === attempts - 1) throw error;
       await new Promise(r => setTimeout(r, backoff[i] || 1200));
     }

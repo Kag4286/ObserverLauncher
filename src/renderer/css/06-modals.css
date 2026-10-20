@@ -410,7 +410,7 @@ html.motion-lite #saveSettings.dirty,html.motion-lite #saveProperties.dirty{anim
 .jvm-preview::before{content:'EFFECTIVE LAUNCH COMMAND';display:block;margin-bottom:4px;font:700 9px var(--font-mono);letter-spacing:.12em;color:var(--text-dim)}
 
 /* ---------- MARKETPLACE INSTALL CONFIRM MODAL ---------- */
-.im .modal.wide{width:min(720px,94vw)}
+.im .modal.wide{width:min(720px,94vw);max-height:92vh;overflow:auto}
 .im-head{display:flex;gap:14px;align-items:center;padding-right:30px}
 .im-head img{width:52px;height:52px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--field);flex-shrink:0;object-fit:cover}
 .im-head-main{flex:1;min-width:0}
