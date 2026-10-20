@@ -22,6 +22,7 @@ Thumbs.db
 
 # Agent / internal docs (do not publish)
 .agent/
+handoff-*.md
 
 # Website (built separately, deployed on its own; not committed to this repo)
 website/
