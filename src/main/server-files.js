@@ -40,6 +40,56 @@ function findPlayerDataFile(root, properties, uuid, name) {
 function emptyServerFiles() {
   return { jar: null, launchScript: null, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {}, geyser: false };
 }
+// server.properties is read by Java's java.util.Properties, which decodes a backslash escape
+// before the game ever sees the value. The most common one by far is \uXXXX, used for the
+// section sign that carries the MOTD's colour codes: the file holds the six ASCII characters
+// "\u00a7" and the server shows a coloured "§".
+//
+// The launcher used to read the file line by line, so it showed the raw escape text in the
+// properties grid and the MOTD preview rendered the literal "\u00a7" instead of the colours the
+// player actually sees. These two helpers are the exact inverse of each other and follow Java's
+// rules, so a value read, edited and written back keeps its meaning.
+//
+// PURE (no I/O) so they are unit-tested directly.
+const PROPS_ESCAPES = { n: '\n', r: '\r', t: '\t', f: '\f' };
+function decodePropertiesValue(raw) {
+  const s = String(raw == null ? '' : raw);
+  if (s.indexOf('\\') < 0) return s;
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c !== '\\') { out += c; continue; }
+    const n = s[++i];
+    if (n === undefined) break;               // a trailing backslash: Java drops it
+    if (n === 'u') {
+      // \uXXXX, exactly four hex digits. Java reads a malformed one as a literal 'u'.
+      const hex = s.slice(i + 1, i + 5);
+      if (/^[0-9a-fA-F]{4}$/.test(hex)) { out += String.fromCharCode(parseInt(hex, 16)); i += 4; continue; }
+      out += 'u';
+      continue;
+    }
+    if (n in PROPS_ESCAPES) { out += PROPS_ESCAPES[n]; continue; }
+    out += n;                                  // \\ \= \: \# \! and \x -> x
+  }
+  return out;
+}
+function encodePropertiesValue(value) {
+  const s = String(value == null ? '' : value);
+  let out = '';
+  for (const c of s) {
+    if (c === '\\') { out += '\\\\'; continue; }
+    if (c === '\n') { out += '\\n'; continue; }
+    if (c === '\r') { out += '\\r'; continue; }
+    if (c === '\t') { out += '\\t'; continue; }
+    if (c === '\f') { out += '\\f'; continue; }
+    // Anything above printable ASCII goes out as \uXXXX. server.properties is read as
+    // ISO-8859-1, so a raw UTF-8 byte would be read as two garbage characters.
+    if (c.charCodeAt(0) > 0x7e) { out += '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'); continue; }
+    out += c;
+  }
+  return out;
+}
+
 function serverFiles(root) {
   if (!root || !fs.existsSync(root)) return emptyServerFiles();
   const list = p => fs.existsSync(p) ? fs.readdirSync(p, { withFileTypes: true }) : [];
@@ -49,7 +99,9 @@ function serverFiles(root) {
   const fileNames = folder => list(path.join(root, folder)).filter(x => x.isFile()).map(x => x.name);
   const dirNames = folder => list(path.join(root, folder)).filter(x => x.isDirectory()).map(x => x.name);
   let properties = {};
-  try { for (const line of fs.readFileSync(path.join(root, 'server.properties'), 'utf8').split(/\r?\n/)) { const i = line.indexOf('='); if (i > 0 && !line.startsWith('#')) properties[line.slice(0, i)] = line.slice(i + 1); } } catch {}
+  // The values are decoded the way Java's Properties would, so the grid and the MOTD preview
+  // show what the server actually gets (a colour-coded MOTD, not the escape text).
+  try { for (const line of fs.readFileSync(path.join(root, 'server.properties'), 'utf8').split(/\r?\n/)) { const i = line.indexOf('='); if (i > 0 && !line.startsWith('#')) properties[line.slice(0, i)] = decodePropertiesValue(line.slice(i + 1)); } } catch {}
   let knownPlayers = [];
   try { const cache = JSON.parse(fs.readFileSync(path.join(root, 'usercache.json'), 'utf8')); knownPlayers = cache.map(x => ({ name: x.name, uuid: x.uuid, hasData: !!findPlayerDataFile(root, properties, x.uuid, x.name) })).filter(x => x.name); } catch {}
   const hasSpigotConfig = fs.existsSync(path.join(root, 'spigot.yml')) || fs.existsSync(path.join(root, 'bukkit.yml'));
@@ -131,12 +183,15 @@ function buildPropertiesContent(root, props) {
     const i = line.indexOf('=');
     if (i > 0 && !line.startsWith('#') && remaining.has(line.slice(0, i))) {
       const key = line.slice(0, i), value = remaining.get(key); remaining.delete(key);
-      return `${key}=${value}`;
+      // The value arrives DECODED (the grid showed the real character), so it has to be encoded
+      // back on the way out. Otherwise a MOTD the user edited with a real "§" would be written
+      // as UTF-8 and read back as two garbage characters by the server.
+      return `${key}=${encodePropertiesValue(value)}`;
     }
     return line;
   });
   if (outLines.length && outLines[outLines.length - 1] === '') outLines.pop(); // avoid a growing blank tail from the trailing-newline split
-  for (const [key, value] of remaining) outLines.push(`${key}=${value}`);
+  for (const [key, value] of remaining) outLines.push(`${key}=${encodePropertiesValue(value)}`);
   return outLines.join(eol) + eol;
 }
 // BUGFIX (item count showing as undefined): 1.21.5+ / 26.x item stacks use
@@ -366,4 +421,4 @@ function parseServerLine(text, live, send) {
   }
   if (changed && typeof send === 'function') send('server:live', live);
 }
-module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine, stackOf, maxDamageFor };
+module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine, stackOf, maxDamageFor, decodePropertiesValue, encodePropertiesValue };

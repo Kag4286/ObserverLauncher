@@ -9,6 +9,20 @@ const { json, download, marketplaceError } = require('./http.js');
 const cf = require('./curseforge.js');
 const { normalizeEnv } = require('./mod-metadata.js');
 
+// Is this file a ZIP (and therefore a jar)? A jar starts with the local-file-header signature
+// "PK\x03\x04". Reading four bytes is enough and never loads the whole file into memory.
+function isZipFile(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const head = Buffer.alloc(4);
+    const read = fs.readSync(fd, head, 0, 4, 0);
+    if (read < 4) return false;
+    return head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04;
+  } catch { return false; }
+  finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} }
+}
+
 // CurseForge needs the user's own API key (ToS forbids sharing one). Returns the header object, or
 // null when no key is set — callers then treat CurseForge as unavailable rather than erroring.
 function cfHeaders() {
@@ -166,14 +180,20 @@ async function resolveMarketDownload(item) {
     return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0, hashes: hangarHashes, projectId: item.id, versionId: target?.id || null, gameVersion: item.version || null, versionNumber: target?.name || null };
   }
   if (item.source === 'spigot') {
-    // v6.0.0: honour an explicit version pick. Spigot's download endpoint accepts a version id, so a
-    // row chosen in the picker installs THAT build instead of whatever the site serves as latest.
+    // Spiget only serves ONE download endpoint: /v2/resources/{id}/download, and it always
+    // returns the resource's latest build. The version-specific endpoint
+    // (/v2/resources/{id}/versions/{versionId}/download) answers 403 for every version of every
+    // resource, with any user agent, so asking for a chosen build could never work. Verified
+    // against the live API for resource 94387:
+    //   /v2/resources/94387/download                    -> 200, 201871 bytes, a real jar
+    //   /v2/resources/94387/versions/409737/download    -> 403
+    //   /v2/resources/94387/versions/<uuid>/download    -> 404
+    // The version picker therefore stays a READ-ONLY hint for Spigot: it shows which builds
+    // exist and which Minecraft versions the resource declares, and the install always fetches
+    // the latest build. The version id is kept out of the URL on purpose.
     const title = String(item.title || item.id || 'plugin').replace(/[^\w.-]+/g, '_');
-    const vId = item.versionId ? String(item.versionId).replace(/[^0-9]/g, '') : '';
-    const url = vId
-      ? `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/versions/${encodeURIComponent(vId)}/download`
-      : `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`;
-    return { url, filename: `${title}${vId ? '-' + vId : ''}.jar`, source: 'spigot', projectId: item.id, versionId: vId || null, gameVersion: item.version || null };
+    const url = `https://api.spiget.org/v2/resources/${encodeURIComponent(item.id)}/download`;
+    return { url, filename: `${title}.jar`, source: 'spigot', projectId: item.id, versionId: null, gameVersion: item.version || null, latestBuild: true };
   }
   if (item.source === 'curseforge') {
     const headers = cfHeaders();
@@ -205,7 +225,7 @@ async function resolveMarketDownload(item) {
 function emptyDetail(item) {
   return { ok: true, title: (item && item.title) || '', description: (item && item.description) || '', icon: (item && item.icon) || '', author: (item && item.author) || '', env: null, loaders: null, versions: null, projectUrl: (item && item.projectUrl) || null };
 }
-function buildDetail({ title, description, icon, author, loaders, versions, sourceUrl, projectUrl, item }) {
+function buildDetail({ title, description, icon, author, loaders, versions, sourceUrl, projectUrl, item, versionPickable }) {
   return {
     ok: true,
     title: title || (item && item.title) || '',
@@ -215,6 +235,9 @@ function buildDetail({ title, description, icon, author, loaders, versions, sour
     env: null,
     loaders: loaders || null,
     versions,
+    // FALSE for a source whose registry cannot install a chosen build: the picker would promise
+    // something the download cannot deliver. The renderer hides it and explains instead.
+    versionPickable: versionPickable !== false,
     sourceUrl: sourceUrl || null,
     projectUrl: projectUrl || (item && item.projectUrl) || null,
   };
@@ -379,7 +402,7 @@ function registerMarketplace(ipcMain, ctx) {
             dependencies: [],
           }));
         } catch { versions = []; }
-        return buildDetail({ item, title: res.name, description: res.tag, icon: iconUrl, author: authorName, loaders: ['paper', 'spigot', 'bukkit'], versions, sourceUrl: res.sourceCodeLink || null, projectUrl });
+        return buildDetail({ item, title: res.name, description: res.tag, icon: iconUrl, author: authorName, loaders: ['paper', 'spigot', 'bukkit'], versions, sourceUrl: res.sourceCodeLink || null, projectUrl, versionPickable: false });
       }
       if (!item || item.source !== 'modrinth') {
         // Anything else (an unknown source) keeps just the fields the search already returned.
@@ -435,6 +458,16 @@ function registerMarketplace(ipcMain, ctx) {
       const { verifyFileHash } = require('./fs-utils.js');
       const vh = verifyFileHash(dest, hashes);
       if (!vh.ok) { try { fs.rmSync(dest, { force: true }); } catch {} return { ok: false, error: `${vh.error} The file was deleted — retry, or install manually from the project page.` }; }
+      // A jar is a ZIP, so it starts with the "PK" signature. Without this check a registry that
+      // answers 200 with an HTML error page (or a captcha wall) is saved as "<name>.jar" and
+      // reported as a SUCCESSFUL install. The server then cannot load it and the user has to
+      // work out why the plugin is not working. A file that is not a zip is deleted and reported
+      // as the failure it is. The check runs BEFORE the manifest entry, so a rejected file is
+      // never recorded as installed.
+      if (!isZipFile(dest)) {
+        try { fs.rmSync(dest, { force: true }); } catch {}
+        return { ok: false, error: 'The registry did not return a plugin file (the download was not a jar). Nothing was installed - try again or download it from the project page.' };
+      }
       recordManifestEntry(ctx.currentServerPath, { kind, fileName: path.basename(filename), sourceUrl: url, source: item.source, title: item.title, env: item.env || undefined, projectId: projectId || item.id, versionId: versionId || undefined, gameVersion: gameVersion || undefined, version: versionNumber || undefined, installedAt: new Date().toISOString() });
       return { ok: true, files: serverFiles(ctx.currentServerPath), name: filename };
     } catch (error) {
@@ -530,4 +563,4 @@ async function findMarketProject(query, opts) {
   return { ok: false, candidates: pick.candidates.map(c => ({ id: c.id, title: c.title })), error: `No mod found matching "${query}".` };
 }
 
-module.exports = { registerMarketplace, searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject };
+module.exports = { registerMarketplace, searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject, isZipFile };

@@ -420,6 +420,9 @@ html.motion-lite #saveSettings.dirty,html.motion-lite #saveProperties.dirty{anim
 .im-desc{font-size:12px;line-height:1.5;margin:10px 0 2px;max-height:52px;overflow:hidden}
 .im-section{margin-top:14px}
 .im-section>.eyebrow{margin-bottom:8px}
+/* A one-line note under a section, used when the version picker is hidden because the
+   registry cannot install a chosen build. */
+.im-hint{font:500 11.5px var(--font-ui);color:var(--text-muted);line-height:1.5;margin:6px 0 0}
 .im-compat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
 .im-compat-cell{background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 11px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
 .im-compat-cell small{display:block;font:600 8.5px var(--font-mono);letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase}

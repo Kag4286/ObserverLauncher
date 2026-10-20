@@ -10,6 +10,96 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.0.1] — 2026-10-20
+
+**The MOTD preview shows real colours, Spigot plugins name their author, and a CurseForge pack
+install no longer leaves half a pack behind.** No settings migration, no new dependency.
+
+### Fixed — the server message preview showed the escape text, not the colours
+
+- **Root cause.** `server.properties` is read by Java's `java.util.Properties`, which decodes a
+  backslash escape before the game sees the value. The common one is `\uXXXX`, used for the
+  section sign that carries the MOTD's colour codes: the file holds the six ASCII characters
+  `\u00a7` and the server shows a coloured `§`. The launcher read the file line by line, so the
+  properties grid showed `\u00a71Just click...` and the MOTD preview rendered that literal text
+  instead of the colours. The file was never wrong; the app was showing the wrong thing.
+- **`decodePropertiesValue()`** and **`encodePropertiesValue()`** in `src/main/server-files.js` are
+  the exact inverse of each other and follow Java's rules: `\uXXXX`, `\n`, `\r`, `\t`, `\f`, `\\`,
+  and an unknown escape drops the backslash the way Java does. Both are pure, so they are unit
+  tested directly.
+- The properties parser decodes on read, so the grid and the preview show what the player will
+  see. The writer encodes on the way out, so a MOTD edited with a real `§` is written as
+  `\u00a7` and the server still reads it. `server.properties` is ISO-8859-1 as far as the game is
+  concerned, so a raw UTF-8 byte would be read as two garbage characters.
+- A line the user never touched keeps its original bytes, so the file does not churn on save.
+- `tests/properties-escape.test.js` 32 checks: every escape, the byte round trip for the common
+  case, the meaning round trip for the awkward ones, and the file writer.
+
+### Fixed — a Spigot plugin showed "Unknown author" in the install window
+
+- **Root cause.** A Spigot search result carries only the author's numeric id, so the card in the
+  list had no name either. The list filled the name in later, in the background, and the card
+  showed it. But that enrichment patched the DOM only, so the model kept the empty author, and
+  the install window was opened from the raw row. The window's meta line was written once, from
+  the row, before the detail had loaded, so it said "Unknown author" for every Spigot project
+  even though the name was already on screen two inches away.
+- The enrichment now writes the name and the icon back into the model as well as the DOM, and the
+  install window refreshes its meta line with the author from the detail response, which the
+  backend resolves through Spiget's author endpoint.
+
+### Fixed — a CurseForge modpack install could leave half the pack behind
+
+- The `.mrpack` import had been transactional since 6.0.0. The CurseForge path had not: its
+  download loop had no transaction and no error handling, so a download that failed on file 20 of
+  25 left the first 19 jars in `mods/` with no way back, and the overrides copy could
+  half-overwrite a server folder.
+- Both paths now share `installFilesTransactional()`, which journals every destination before it
+  is written, and `copyOverridesWithConfirm(ctx, dir, tx)` journals every file the overrides copy
+  would write. A failure rolls the whole import back: new files are removed, overwritten ones are
+  restored, and the result reports how many paths were undone.
+- The manifest is written after the transaction commits rather than inside the download loop, so a
+  rollback cannot leave entries pointing at files that were deleted.
+- **This also fixed a bug the old code hid.** `recordManifestEntry` was never imported in
+  `modpacks.js`, so the call inside a `try {} catch {}` threw a `ReferenceError` that the catch
+  swallowed. Every CurseForge import had been leaving the server folder with no manifest entry,
+  which is why those files reported no update information.
+- `tests/modpack-import-transaction.test.js` 18 checks: the rollback, the restore of an
+  overwritten file, and the manifest entries, with the network, the CurseForge API and the
+  Electron dialog all mocked.
+
+### Fixed — a Spigot build could not be installed at all
+
+- **Root cause.** Spiget serves exactly one download endpoint, `/v2/resources/{id}/download`, and
+  it always returns the resource's latest build. The launcher built the version-specific URL
+  instead, and that endpoint answers `403` for every version of every resource. Verified against
+  the live API for resource 94387:
+  ```
+  /v2/resources/94387/download                  -> 200, 201871 bytes, a real jar
+  /v2/resources/94387/versions/409737/download  -> 403
+  /v2/resources/94387/versions/<uuid>/download  -> 404
+  ```
+  Picking a build in the version picker therefore could never install anything.
+- The install now uses the endpoint that works. The version picker stays as a read-only hint for
+  Spigot, and the window says so instead of promising a build the download cannot deliver
+  (`mkt.latestOnly`, 7 locales).
+- `tests/marketplace-spigot.test.js` 16 checks.
+
+### Fixed — a failed download could be reported as a successful install
+
+- A jar is a ZIP, so it starts with the `PK\x03\x04` signature. Nothing checked for it, so a
+  registry that answered `200` with an HTML error page or a captcha wall was saved as
+  `<name>.jar` and reported as a successful install. The server then could not load it.
+- `isZipFile()` reads the first four bytes and nothing else, and the check runs before the
+  manifest entry, so a file that is not a jar is deleted and reported as the failure it is.
+
+### Added — the SSH path setting and an honest Spark button
+
+- The Pinggy tunnel could report "set pinggyPath in Settings" while Settings had no such field.
+  There is now an input next to the Playit path, with a Browse button, and the IPC
+  `dialog:ssh-file`.
+- The Overview button labelled "Get Spark" only jumped to the Marketplace tab. It now reads
+  "Install Spark", which is what it does. The real Spark integration is still deferred.
+
 ## [6.0.0] — 2026-10-19
 
 **Bedrock crossplay that works end to end, a month of metrics history, a player inspector with a real

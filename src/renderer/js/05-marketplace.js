@@ -25,6 +25,10 @@ function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.in
         if(d.icon){const box=card.querySelector('.market-icon');if(box&&!box.querySelector('img')){const im=document.createElement('img');im.loading='lazy';im.alt='';im.onerror=()=>{box.innerHTML=PH};im.src=d.icon;box.innerHTML='';box.appendChild(im)}}
         if(d.author){const a=card.querySelector('.mi-author');if(a)a.textContent=d.author}
       });
+      // BUGFIX: the enrichment only patched the DOM, so the MODEL kept the empty author. Clicking
+      // Install handed that raw row to the modal, which then showed "Unknown author" for a
+      // project whose name was already on screen in the list. Write it back into the model too.
+      for(const x of items){const d=map[String(x.id)];if(!d)continue;if(d.author)x.author=d.author;if(d.icon)x.icon=d.icon}
     }).catch(()=>{});
   }
 }
@@ -186,7 +190,11 @@ function imRenderVersionPicker(){
   const sec=$('#imVersionSection'),sel=$('#imVersion');
   const vs=installState.detail?.versions;
   if(!vs||!vs.length){sec.hidden=true;return}
-  sec.hidden=false;
+  // A source that cannot install a chosen build must not offer the choice. Spiget only serves
+  // the resource's latest build (its version-specific download endpoint answers 403), so a
+  // picker there would promise something the install cannot deliver.
+  if(installState.detail.versionPickable===false){sec.hidden=false;sel.innerHTML='';sel.hidden=true;const note=$('#imVersionNote');if(note){note.hidden=false;note.textContent=t('mkt.latestOnly')}return}
+  sec.hidden=false;sel.hidden=false;const note=$('#imVersionNote');if(note)note.hidden=true;
   // BUGFIX (v6.0.0 follow-up): the option label packed version, date, size and a Minecraft version
   // onto one line. In the narrow modal the dot in "1.16" was lost at that font size, so it read
   // "116". Split it: the version number is the label, the rest is the title tooltip. A Spigot
@@ -296,6 +304,14 @@ function openInstallModal(item){
     if(installState.item!==item)return; // modal was reopened for another item meanwhile
     if(!d||!d.ok){$('#imCompat').innerHTML=`<span class="im-badge bad">${t('mkt.couldNotLoad',{m:esc(d?.error||'unknown')})}</span>`;const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.installAnyway');return}
     installState.detail=d;
+    // BUGFIX: the meta line was written once, from the search row, before the detail was loaded.
+    // A Spigot search row carries only the author's numeric id, so the modal said "Unknown
+    // author" for every Spigot project even though the list card had resolved the name in the
+    // background. The detail response has the real name, so refresh the line with it.
+    if(d.author||d.icon){
+      $('#imMeta').textContent=`${d.author||item.author||t('mkt.unknownAuthor')} · ${item.source} · ${t('mkt.downloads',{n:Number(item.downloads||0).toLocaleString()})}`;
+      if(d.icon){$('#imIcon').src=d.icon;$('#imIcon').style.visibility='visible'}
+    }
     imRenderVersionPicker();
     installState.versionId=installState.detail.versions?.[0]?.id||null;
     imRenderCompat();imRenderWarns();imRenderDeps();imRenderLinks();
