@@ -48,6 +48,33 @@ The Bedrock tunnel could ask you to set an SSH path that had no field to set it 
 
 The button on Overview that read "Get Spark" only took you to the Marketplace tab. It now reads "Install Spark", which is what it does. Actually installing and running Spark is still on the list for a later release.
 
+## What comes next
+
+6.0.1 is a polish release, and 6.0.0 still carries some planned work that did not fit. Here is what is not in this version, and why.
+
+**Version 6.1.0**
+
+- Bulk content updates with rollback. Updating many mods at once, with a rollback if the server does not come back up, is not in this release. Today you update one item at a time, and the launcher already records whether a start succeeded.
+- A conflict panel in the Content tab. Finding duplicate mods, loader mismatches and missing dependencies is already available to an AI client through the app's MCP tools, but there is no screen for it yet.
+- Spark profiling from the Performance tab. The button still takes you to the Marketplace so you can install it. Running the profiler from inside the app and showing the result needs a real server to check the output against, and that check did not happen before this release.
+- More headless endpoints and local event hooks, so an external script can watch start, stop, crash and player join events.
+- A fix for one known limit in update checking: a jar you dropped into `mods` or `plugins` by hand has no marketplace id recorded, so it is reported as unknown instead of being matched by guesswork.
+- The Pinggy tunnel's SSH path now has a field in Settings. A path that is not on the default list, and no way to point at one, is a problem the app used to report without offering a way to solve it.
+
+**Version 6.2.0**
+
+- Resource pack support in the player inspector. Reading a resource pack at runtime to override item icons is planned, and it needs its own round of testing before it ships.
+- World map extensions: cave mode, Nether and End dimensions, entity markers, and PNG export of a region.
+- World operations: rename a world, edit the display seed, delete one dimension, and import or export a world between servers.
+- Waypoint sharing between servers, including import from the Xaero and JourneyMap formats.
+
+**Still waiting on a first look**
+
+- A LuckPerms permissions editor. The plugin stores data differently by version, so the format has to be inspected on a real install before any code is written.
+- Cloud backup to S3, Google Drive or WebDAV. Whether this needs a heavy third-party library has not been decided, and adding one is a decision for you, not the app.
+
+Smaller bug fixes and polish will keep landing between these releases.
+
 ---
 
 ## Upgrading

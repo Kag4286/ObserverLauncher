@@ -186,29 +186,55 @@ function imSetBusy(busy,phase,label){
   prog.hidden=!busy&&!installState.done;
   if(busy){btn.textContent=t('im.installing');$('#imPhase').textContent=phase||t('im.downloading');if(label)$('#imBarLabel').textContent=label}
 }
+// The information line for one version: date, size and the Minecraft versions it supports.
+// A Spigot version has no per-build MC list, so the RESOURCE's declared range is shown.
+// Shared by the picker options and the read-only list (the no-dup guard rejects a copy).
+function imVersionBits(v){
+  const mcList=(v.gameVersions||[]).filter(Boolean);
+  const mc=mcList.length?(mcList.length>2?`${mcList[0]} – ${mcList[mcList.length-1]}`:mcList.join(', ')):'—';
+  const bits=[new Date(v.date).toLocaleDateString()];
+  if(v.size)bits.push(imFmtBytes(v.size));
+  bits.push(`Minecraft ${mc}`);
+  if(v.blocked)bits.push(t('mkt.cfBlocked'));
+  return bits;
+}
 function imRenderVersionPicker(){
   const sec=$('#imVersionSection'),sel=$('#imVersion');
   const vs=installState.detail?.versions;
-  if(!vs||!vs.length){sec.hidden=true;return}
-  // A source that cannot install a chosen build must not offer the choice. Spiget only serves
-  // the resource's latest build (its version-specific download endpoint answers 403), so a
-  // picker there would promise something the install cannot deliver.
-  if(installState.detail.versionPickable===false){sec.hidden=false;sel.innerHTML='';sel.hidden=true;const note=$('#imVersionNote');if(note){note.hidden=false;note.textContent=t('mkt.latestOnly')}return}
-  sec.hidden=false;sel.hidden=false;const note=$('#imVersionNote');if(note)note.hidden=true;
+  const list=$('#imVersionList'),note=$('#imVersionNote');
+  // The <select> is a custom dropdown: enhanceSelect() wraps it in a div.ol-dd and moves the
+  // native select inside. Hiding the select alone leaves the WRAPPER on screen, which is how an
+  // empty dropdown box ended up under the VERSION heading. Hide the wrapper.
+  const dd=sel.closest('.ol-dd');
+  if(!vs||!vs.length){sec.hidden=true;if(list)list.hidden=true;return}
+  sec.hidden=false;
+  // A source that cannot install a chosen build must not offer the choice. Spiget serves only
+  // the resource's latest build: the version-specific download endpoint answers 403 and the
+  // ?version= parameter is ignored (every version returns the same file). The list is still
+  // shown, read-only, because it carries the Minecraft versions the resource declares.
+  if(installState.detail.versionPickable===false){
+    if(dd)dd.hidden=true;else sel.hidden=true;
+    if(list){
+      list.hidden=false;
+      list.innerHTML=vs.map(v=>`<li class="im-version"><b>${esc(v.number)}</b><span>${esc(imVersionBits(v).join(' · '))}</span></li>`).join('');
+    }
+    if(note){note.hidden=false;note.textContent=t('mkt.latestOnly')}
+    return;
+  }
+  if(dd)dd.hidden=false;else sel.hidden=false;
+  if(list)list.hidden=true;
+  if(note)note.hidden=true;
   // BUGFIX (v6.0.0 follow-up): the option label packed version, date, size and a Minecraft version
   // onto one line. In the narrow modal the dot in "1.16" was lost at that font size, so it read
-  // "116". Split it: the version number is the label, the rest is the title tooltip. A Spigot
-  // version also has no per-build MC list, so show the range the RESOURCE declares, not a single
-  // element that looks like the build's own.
+  // "116". Split it: the version number is the label, the rest is the title tooltip.
   sel.innerHTML=vs.map(v=>{
-    const mcList=(v.gameVersions||[]).filter(Boolean);
-    const mc=mcList.length?(mcList.length>2?`${mcList[0]} – ${mcList[mcList.length-1]}`:mcList.join(', ')):'—';
-    const bits=[new Date(v.date).toLocaleDateString()];
-    if(v.size)bits.push(imFmtBytes(v.size));
-    bits.push(`Minecraft ${mc}`);
-    if(v.blocked)bits.push(t('mkt.cfBlocked'));
-    return `<option value="${esc(v.id)}" title="${esc(bits.join(' · '))}">${esc(v.number)} — ${esc(bits.join(' · '))}</option>`;
+    const info=imVersionBits(v).join(' · ');
+    return `<option value="${esc(v.id)}" title="${esc(info)}">${esc(v.number)} — ${esc(info)}</option>`;
   }).join('');
+  // The custom dropdown caches the button label from the moment it was enhanced, and this
+  // select was empty then. Without this the button shows no text at all, which reads as an
+  // empty version list.
+  if(dd&&dd._olSync)dd._olSync();
   sel.onchange=()=>{installState.versionId=sel.value;imRenderCompat();imRenderWarns();imRenderDeps()};
 }
 function imSetDone(r){
