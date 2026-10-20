@@ -60,11 +60,18 @@ function readSkinFile(srDir, skinUuid) {
 }
 
 // Download and cache the texture under dataDir/textures/skins/sr/<player>.png. Returns a data URI
-// or null. Cached on disk because the same player is opened repeatedly and the URL never changes.
+// or null.
+//
+// BUGFIX (v6.0.0 follow-up): the cache was keyed on the player UUID only and never invalidated, so
+// changing a skin in SkinsRestorer kept showing the old face forever, with no UI to clear it. The
+// cache file name now includes a hash of the texture URL: a new URL (the plugin assigns a new skin
+// uuid when the skin changes) is a new file, so the change is picked up on the next open. The old
+// file is left in place, so switching back and forth does not re-download.
 async function downloadAndCache(url, playerUuid) {
   const safeUuid = String(playerUuid || '').replace(/[^a-zA-Z0-9-]/g, '') || 'unknown';
+  const urlHash = require('crypto').createHash('sha1').update(String(url)).digest('hex').slice(0, 12);
   const dir = path.join(dataDir(), 'textures', 'skins', 'sr');
-  const file = path.join(dir, `${safeUuid}.png`);
+  const file = path.join(dir, `${safeUuid}-${urlHash}.png`);
   if (fs.existsSync(file)) {
     const buf = fs.readFileSync(file);
     if (buf.length > 100) return 'data:image/png;base64,' + buf.toString('base64');

@@ -47,9 +47,14 @@ function makeZip(files) {
 }
 
 // --- pure helpers ---
-t('candidateEntries uses item then items', () => {
+t('candidateEntries tries item, items, then block spellings', () => {
   const e = candidateEntries('create', 'wrench');
-  assert.deepStrictEqual(e, ['assets/create/textures/item/wrench.png', 'assets/create/textures/items/wrench.png']);
+  assert.deepStrictEqual(e, [
+    'assets/create/textures/item/wrench.png',
+    'assets/create/textures/items/wrench.png',
+    'assets/create/textures/block/wrench.png',
+    'assets/create/textures/blocks/wrench.png',
+  ]);
 });
 
 t('candidateEntries rejects path tricks', () => {
@@ -78,6 +83,12 @@ try {
     ['assets/ae2/textures/items/cable.png', Buffer.from('CABLE')],
   ]);
   fs.writeFileSync(path.join(dir, 'ae2-2.0.jar'), jarB);
+  // A BlockItem: the mod registers a block and exposes it as an item, so the texture lives under
+  // textures/block/, not textures/item/. This is the shape the block fallback exists for.
+  const jarC = makeZip([
+    ['assets/create/textures/block/cogwheel.png', Buffer.from('COGWHEEL')],
+  ]);
+  fs.writeFileSync(path.join(dir, 'create-blockitem-1.0.jar'), jarC);
 
   const idx = new ModsIndex();
   idx.setModsDir(dir);
@@ -93,6 +104,16 @@ try {
 
   t('readTexture finds items/ spelling (ae2)', () => {
     assert.strictEqual(idx.readTexture('ae2', 'cable').toString(), 'CABLE');
+  });
+
+  t('readTexture finds a BlockItem under textures/block/ (create cogwheel)', () => {
+    assert.strictEqual(idx.readTexture('create', 'cogwheel').toString(), 'COGWHEEL');
+  });
+
+  t('an item/ texture still wins over a block/ texture of the same name', () => {
+    // Both spellings exist for namespace create after the fixture above, but only cogwheel has a
+    // block texture; wrench has an item texture. Reading wrench must not be shadowed.
+    assert.strictEqual(idx.readTexture('create', 'wrench').toString(), 'WRENCH');
   });
 
   t('readTexture miss returns null', () => {

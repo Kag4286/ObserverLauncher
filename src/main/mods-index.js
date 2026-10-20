@@ -14,6 +14,11 @@ const fs = require('fs');
 const path = require('path');
 const { openJar } = require('./jar-reader.js');
 
+// NOTE (v6.0.0 memory fix): a JarHandle now holds only the parsed central directory (a few KB per
+// jar), not the whole jar body. Caching the handle is therefore cheap and saves re-parsing the
+// index on every icon lookup. readTexture still opens/closes the file per entry, so no file
+// descriptor is held open between calls.
+
 // PURE: a Minecraft mod jar packs items as assets/<ns>/textures/item[s]/<name>.png. Return the
 // list of candidate entry paths for a namespace/name pair; some packs nest under `item/`, others
 // under `items/`, so try both spellings.
@@ -24,9 +29,15 @@ function candidateEntries(namespace, name) {
   // Defense in depth: a jar entry name is compared verbatim, so a `..` segment cannot escape the
   // zip, but rejecting it here keeps a caller from ever building a path with it downstream.
   if (ns.includes('..') || nm.split('/').includes('..')) return [];
+  // BUGFIX: a mod often registers an item as a BlockItem (Create's cogwheel, AE2's cable, a
+  // Botania flower). Its texture lives under textures/block/, not textures/item/, so the old two
+  // candidates missed it and the cell fell back to an initials badge. Item spellings come first
+  // because a plain item of the same name should win over a block of that name.
   return [
     `assets/${ns}/textures/item/${nm}.png`,
     `assets/${ns}/textures/items/${nm}.png`,
+    `assets/${ns}/textures/block/${nm}.png`,
+    `assets/${ns}/textures/blocks/${nm}.png`,
   ];
 }
 

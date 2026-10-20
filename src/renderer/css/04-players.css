@@ -56,6 +56,17 @@
 .inv-cell img{width:32px;height:32px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
 .inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:var(--text);text-shadow:1px 1px 0 var(--bg);pointer-events:none}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
+/* v6.0.0: an enchanted item gets a slow violet sheen so it is distinguishable from a plain one
+   at a glance. A pseudo-element overlay keeps it off the icon pixels and works for both a real
+   image and the initials badge. Pure decoration: reduced-motion and Lite both flatten it. */
+.inv-cell.enchanted{position:relative}
+.inv-cell.enchanted::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(135deg, rgba(155,140,255,.22), rgba(155,140,255,0) 55%, rgba(155,140,255,.18));
+  box-shadow:inset 0 0 0 1px rgba(155,140,255,.35);
+  animation:enchPulse var(--dur-pulse) var(--ease-out) infinite alternate}
+@keyframes enchPulse{from{opacity:.55}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.inv-cell.enchanted::after{animation:none;opacity:.8}}
+html.motion-lite .inv-cell.enchanted::after{animation:none;opacity:.8}
 /* Items with no texture on the mirror or in the mod jar. The full name used to overflow the
    square cell; a two-letter badge stays inside it and reads as a compact tag. */
 .inv-cell .inv-initial{font:700 11px var(--font-mono);color:var(--text-4);letter-spacing:.04em}

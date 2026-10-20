@@ -24,6 +24,24 @@ function itemTooltip(x,label){
   lines.push(`×${x.count}`,x.id);
   return esc(lines.join('\n'));
 }
+// ONE place decides which tex:// URL an item id maps to. The inventory grid used to carry this
+// logic inline while the equipment row did not, so a mod item worn as armor fell through to the
+// initials badge even though the mod jar had the texture. Both call this now.
+function itemIconUrl(id){
+  const s=String(id||'');
+  if(!s) return null;
+  const vanilla=!s.includes(':')||s.startsWith('minecraft:');
+  if(vanilla){
+    const idNoPrefix=s.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
+    return `tex://auto/item/${idNoPrefix}.png`;
+  }
+  // tex:// path segments cannot hold a slash, so pack `<namespace>~<name>` and split it in main.
+  // The tilde is not valid in a resource location, so it can never collide with an underscore
+  // that lives inside either the namespace or the item name (cofh_core_wrench).
+  const [ns, ...rest]=s.split(':');
+  const nm=rest.join(':').replace(/\.png$/,'');
+  return (ns&&nm)?`tex://auto/itemmod/${encodeURIComponent(ns)}~${encodeURIComponent(nm)}.png`:null;
+}
 // tex:// answers a cache miss with a 1x1 transparent PNG and HTTP 200, so onerror never fires.
 // Detect that placeholder in onload and swap in the readable label instead of a blank cell.
 function itemCellInner(iconUrl,label){
@@ -81,26 +99,17 @@ function renderItemGrid(id,items){
   n.innerHTML=list.map((x,i)=>{
     if(x.empty) return `<div class="inv-cell empty" data-tip="Slot ${x.slot}"></div>`;
     const label=x.customName||itemLabel(x.id);
-    // Vanilla ids resolve on the PrismarineJS mirror. A mod id (namespace != minecraft) does not,
-    // but the mods/*.jar on the server ships the PNG, and the tex:// itemmod kind reads it from
-    // there (falling back to the readable label when the jar has no such texture).
-    const vanilla=!x.id.includes(':')||x.id.startsWith('minecraft:');
-    let iconUrl=null;
-    if(vanilla){
-      const idNoPrefix=x.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
-      iconUrl=`tex://auto/item/${idNoPrefix}.png`;
-    } else {
-      // tex:// path segments cannot hold a slash, so pack `<namespace>~<name>` and split it in
-      // main. The tilde is not valid in a resource location, so it can never collide with an
-      // underscore that lives inside either the namespace or the item name (cofh_core_wrench).
-      const [ns, ...rest]=x.id.split(':');
-      const nm=rest.join(':').replace(/\.png$/,'');
-      if(ns&&nm) iconUrl=`tex://auto/itemmod/${encodeURIComponent(ns)}~${encodeURIComponent(nm)}.png`;
-    }
+    // Vanilla ids resolve on the PrismarineJS mirror; a mod id is read from the server's own
+    // mods/*.jar through the tex:// itemmod kind (see itemIconUrl).
+    const iconUrl=itemIconUrl(x.id);
     const tip=itemTooltip(x,label);
+    // BUGFIX: `ench` was computed and then never applied, and no .enchanted rule existed, so an
+    // enchanted item looked identical to a plain one. The flag is applied now and the CSS draws a
+    // subtle glint overlay. The old `no-tex` class is gone too: the initials badge replaced it
+    // during the redesign and nothing styles it any more.
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
-    return `<div class="inv-cell${iconUrl?'':' no-tex'}" data-tip="${tip}">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    return `<div class="inv-cell${ench}" data-tip="${tip}">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
@@ -118,14 +127,15 @@ function renderEquipment(armor,offhand){
     // piece is empty.
     let cell='–';
     if(it&&it.id){
-      const vanilla=!it.id.includes(':')||it.id.startsWith('minecraft:');
-      const idNoPrefix=it.id.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
-      const iconUrl=vanilla?`tex://auto/item/${idNoPrefix}.png`:null;
-      cell=itemCellInner(iconUrl,itemLabel(it.id));
+      // BUGFIX: this used to build a vanilla-only URL and pass null for a mod item, so worn mod
+      // armor always showed the initials badge. itemIconUrl routes a mod id to the jar texture.
+      cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id));
     }
     // The long "— Empty —" label stays available as the hover title instead of being rendered
     // inside the tile, where it wrapped and stretched the row.
-    const tip = it && it.id ? it.id : t('ply.emptySlot');
+    // Use the same rich tooltip as the inventory grid (enchantments, durability, count), not the
+    // bare id, so a worn enchanted chestplate says so on hover.
+    const tip = it && it.id ? itemTooltip(it, itemLabel(it.id)) : t('ply.emptySlot');
     return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" data-tip="${esc(tip)}">${cell}</div><span>${esc(label)}</span></div>`;
   }).join('');
 }
