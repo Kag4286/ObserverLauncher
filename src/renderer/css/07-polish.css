@@ -291,6 +291,33 @@ html.motion-lite .ol-tip{animation:none}
 .pd-vital>b{font:700 22px var(--font-ui);color:var(--text);line-height:1.1;overflow-wrap:anywhere}
 .pd-vital>b.ok{color:var(--success)}
 .pd-vital>b.dim{color:var(--text-3)}
+/* FOLLOW-UP: three signals so the four headline facts stop reading as one block of text.
+   1. Gamemode carries its in-game colour, so Creative is recognisable without reading the word. */
+.pd-vital>b.gm-survival{color:var(--success)}
+.pd-vital>b.gm-creative{color:var(--violet)}
+.pd-vital>b.gm-adventure{color:var(--orange)}
+.pd-vital>b.gm-spectator{color:var(--text-3)}
+/* 2. Health and food are 10-segment meters, the same count as hearts and drumsticks in game. The
+   digit stays for precision; the meter is what the eye reads first. */
+.pd-vital-meter{gap:var(--space-1)}
+.pd-meter{display:flex;gap:2px;margin-top:2px}
+.pd-meter i{flex:1;height:5px;border-radius:1px;background:var(--surface-3);transition:background var(--dur-micro) var(--ease-out)}
+.pd-meter i.hp{background:var(--danger)}
+.pd-meter i.food{background:var(--orange)}
+/* 3. The dimension is a chip tinted by the vanilla world it belongs to. */
+.pd-dim-chip{display:inline-block;padding:1px 7px;border-radius:999px;font:600 10px var(--font-mono);letter-spacing:.02em;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2)}
+.pd-dim-overworld{color:#9fd8a0;border-color:rgba(159,216,160,.35);background:rgba(159,216,160,.10)}
+.pd-dim-nether{color:#ff8a7a;border-color:rgba(255,138,122,.35);background:rgba(255,138,122,.10)}
+.pd-dim-end{color:#b8a7ff;border-color:rgba(184,167,255,.35);background:rgba(184,167,255,.10)}
+.pd-dim-other{color:var(--text-3)}
+/* 4. The 3D backdrop takes the same tint as the dimension chip, so the model visibly sits IN a
+   world instead of floating on a neutral gradient. The tint is a low-opacity overlay on top of
+   the existing radial gradient, never a full repaint of the canvas. */
+.pd-3d-container{transition:box-shadow var(--dur-modal) var(--ease-out)}
+.pd-3d-container[data-dim="overworld"]{box-shadow:inset 0 0 0 1px rgba(159,216,160,.22), inset 0 -40px 80px -40px rgba(159,216,160,.18)}
+.pd-3d-container[data-dim="nether"]{box-shadow:inset 0 0 0 1px rgba(255,138,122,.22), inset 0 -40px 80px -40px rgba(255,138,122,.18)}
+.pd-3d-container[data-dim="end"]{box-shadow:inset 0 0 0 1px rgba(184,167,255,.22), inset 0 -40px 80px -40px rgba(184,167,255,.18)}
+@media (prefers-reduced-motion:reduce){.pd-3d-container{transition:none}}
 .pd-support{font:500 12.5px var(--font-ui);color:var(--text-3);display:flex;gap:var(--space-2) var(--space-4);flex-wrap:wrap;line-height:1.6}
 .pd-support>span{display:inline-flex;gap:var(--space-1);white-space:nowrap}
 /* Technical values inside the facts row stay mono; the labels stay UI font, so a value is

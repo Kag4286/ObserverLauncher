@@ -5,7 +5,13 @@
 .modal{width:min(560px,100%);background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;position:relative;box-shadow:0 18px 40px rgba(0,0,0,.5)}
 .modal.wide{width:min(720px,100%)}
 #newServerModal .modal.wide{width:min(1020px,96%);max-height:94vh;overflow:auto}
-.modal-close{position:absolute;top:10px;right:10px;border:0;background:transparent;color:var(--text-muted);font-size:20px;cursor:pointer}
+/* v6.0.0: was a bare × character with no container, no hover, no focus ring. It read as raw
+   HTML next to the rest of the modal. A close button IS interactive, so per DESIGN.md 12.1 it
+   earns the same shape as every other small button: --r-sm radius, a hover fill, a focus ring. */
+.modal-close{position:absolute;top:12px;right:12px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:var(--r-sm);background:transparent;color:var(--text-3);font:400 22px/1 var(--font-ui);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),transform var(--dur-micro) var(--ease-out)}
+.modal-close:hover{background:var(--surface-3);color:var(--text);border-color:var(--border)}
+.modal-close:active{transform:scale(.92)}
+.modal-close:focus-visible{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
 .onboarding-choices{display:grid;gap:10px;margin-top:14px} .onboarding-choice{border:1px solid var(--border);background:var(--panel-raised);border-radius:var(--r);padding:12px;text-align:left;cursor:pointer;display:grid;gap:4px}
 .onboarding-choice:hover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset} .onboarding-choice b{display:flex;gap:8px;align-items:center}
 .nsw-step{display:none} .nsw-step.active{display:block;animation:fadeIn .14s var(--ease)}
@@ -348,12 +354,22 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .perf-alert b{display:block;font:700 12px var(--font-ui);color:var(--warning,#d6a24a);margin-bottom:2px}
 .jvm-preset-help{position:absolute;right:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:700 12px var(--font-ui);cursor:pointer;display:grid;place-items:center;transition:all var(--dur-micro)}
 .jvm-preset-help:hover{color:var(--text);border-color:var(--border-strong);background:var(--panel-raised)}
-/* v6.0.0 G4: game-rule editor grid (World Map tab). */
-.gr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px;margin:10px 0}
-.gr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel)}
-.gr-name{font:600 12px var(--font-mono);color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis}
-.gr-row input,.gr-row select{max-width:130px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 8px;color:var(--text);font:12px var(--font-mono)}
-.gr-actions{display:flex;justify-content:flex-end;margin-top:4px}
+/* v6.0.0 G4: game-rule editor grid (World Map tab).
+   FOLLOW-UP: the first version squeezed a 20-character rule name and a select into a 240px
+   flex row, so the label was ellipsised to "doDaylightCyc..." and the select lost its right
+   padding to the custom dropdown. Now a rule is a card: the name on its own line (mono, no
+   ellipsis, wraps if needed), the control on the second line at full width. Two columns when the
+   panel is wide enough, one below. */
+.gr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--space-2);margin:var(--space-3) 0}
+.gr-row{display:flex;flex-direction:column;align-items:stretch;gap:var(--space-1);padding:var(--space-3) var(--space-3) var(--space-2);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);transition:border-color var(--dur-micro) var(--ease-out)}
+.gr-row:focus-within{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+.gr-name{font:600 11.5px var(--font-mono);color:var(--text-2);overflow-wrap:anywhere;line-height:1.35;white-space:normal;user-select:text}
+.gr-row .ol-dd,.gr-row input{width:100%;min-width:0}
+.gr-row .ol-dd .ol-dd-btn{width:100%;justify-content:space-between;padding:7px 10px;font-size:12.5px}
+.gr-row input{background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px;color:var(--text);font:500 12.5px var(--font-ui);outline:0}
+.gr-row input:focus{border-color:var(--brand)}
+.gr-actions{display:flex;justify-content:flex-end;align-items:center;gap:var(--space-2);margin-top:var(--space-3)}
+@media (max-width:560px){.gr-grid{grid-template-columns:1fr}}
 /* v6.0.0 D2: crash analysis panel (top of the Console tab). */
 .crash-panel{margin:0 0 14px;padding:14px 16px;border:1px solid var(--danger);border-radius:var(--r);background:var(--danger-weak)}
 .crash-head{display:flex;align-items:flex-start;gap:10px}

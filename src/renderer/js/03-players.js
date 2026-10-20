@@ -277,25 +277,48 @@ function pdIsOnline(name,uuid){
 }
 function renderPdReadout(d,isOnline){
   // v6.0.0 redesign: hierarchy before decoration (DESIGN.md 2.2). Four headline facts at display
-  // weight, one supporting line, and the full detail behind a disclosure (2.4). The old version
-  // rendered all eight numbers as equal-weight bordered tiles, which is the wall of boxes the
-  // user objected to.
+  // weight, one supporting line, and the full detail behind a disclosure (2.4).
+  //
+  // FOLLOW-UP: the four numbers read as one block of identical text, which is what the user meant
+  // by "all text". Three signals now carry information the numbers alone could not:
+  //   - health and food render as 10-segment meters, the same count as the in-game hearts and
+  //     drumsticks, so a player at 18 HP shows nine lit segments without reading the digit;
+  //   - gamemode carries its in-game colour (survival green, creative violet, adventure orange);
+  //   - the dimension is a chip tinted by the vanilla world it belongs to, and the 3D backdrop
+  //     takes the same tint (see data-dim on #pd3dContainer), so the model visibly sits IN a world.
+  // Every value still appears in All stats below, nothing is lost.
   const gm=['Survival','Creative','Adventure','Spectator'][d.gameType??0]||'—';
+  const gmClass=['gm-survival','gm-creative','gm-adventure','gm-spectator'][d.gameType??0]||'';
   const vital=(k,v,c)=>`<div class="pd-vital"><span>${esc(k)}</span><b class="${c||''}">${esc(String(v))}</b></div>`;
+  const meter=(k,value,cls)=>{
+    const max=20, segments=10;
+    const hasValue = value !== null && value !== undefined;
+    const n = hasValue ? Math.max(0, Math.min(max, Number(value) || 0)) : 0;
+    const filled = hasValue ? Math.round(n / max * segments) : 0;
+    const segs = Array.from({length: segments}, (_, i) => `<i class="${i < filled ? cls : ''}"></i>`).join('');
+    return `<div class="pd-vital pd-vital-meter"><span>${esc(k)}</span><b>${hasValue ? esc(String(n)) : '—'}</b>` +
+      `<div class="pd-meter" role="meter" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${n}"${hasValue ? '' : ' aria-disabled="true"'}>${segs}</div></div>`;
+  };
   const vitals=$('#pdVitals');
   if(vitals) vitals.innerHTML=[
     vital(t('pd.stateLabel'), isOnline?t('pd.stateOnline'):t('pd.stateOffline'), isOnline?'ok':'dim'),
-    vital(t('pd.gamemode'), gm, ''),
-    vital(t('pd.health'), d.health??'—', ''),
-    vital(t('pd.food'), d.food??'—', ''),
+    vital(t('pd.gamemode'), gm, gmClass),
+    meter(t('pd.health'), d.health, 'hp'),
+    meter(t('pd.food'), d.food, 'food'),
   ].join('');
+  // Dimension -> tint key. Only the three vanilla worlds have an in-game colour; a mod dimension
+  // falls back to the neutral tone so it does not claim to be the Overworld.
+  const dim=String(d.dimension||'');
+  const dimKey = dim.includes('nether') ? 'nether' : (dim.includes('the_end') || /(^|:)end$/.test(dim)) ? 'end' : dim.includes('overworld') ? 'overworld' : 'other';
   const support=$('#pdSupport');
   if(support) support.innerHTML=[
-    `<span>${esc(t('pd.dimension'))} <b>${esc(d.dimension||t('ply.unknownDim'))}</b></span>`,
+    `<span>${esc(t('pd.dimension'))} <span class="pd-dim-chip pd-dim-${dimKey}">${esc(dim||t('ply.unknownDim'))}</span></span>`,
     `<span>${esc(t('pd.saturation'))} <b>${esc(String(d.saturation??'—'))}</b></span>`,
     `<span>${esc(t('pd.xp'))} <b>${esc(String(d.xpLevel??0))}</b></span>`,
     `<span>${esc(t('pd.totalXp'))} <b>${esc(String(d.xpTotal??0))}</b></span>`,
   ].join('');
+  // Tint the 3D backdrop by dimension so the model sits in its world.
+  const cont=$('#pd3dContainer'); if(cont) cont.dataset.dim=dimKey;
   // The disclosure keeps every value the old readout had, so nothing is lost (DESIGN.md 2.4).
   const el=$('#pdReadout');if(!el)return;
   const rows=[

@@ -26,7 +26,9 @@ async function loadGameRules() {
     grid.innerHTML = `<p class="text-muted">${esc(t('gr.emptyWorld'))}</p>`;
     // Still offer a Save path: render the common defaults so the user can set them.
     const defaults = { doDaylightCycle: 'true', keepInventory: 'false', mobGriefing: 'true', naturalRegeneration: 'true', randomTickSpeed: '3', doMobSpawning: 'true' };
-    grid.innerHTML += Object.keys(defaults).map(n => `<label class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span><select class="ol-select" data-gr="${esc(n)}"><option value="true" ${defaults[n] === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${defaults[n] === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select></label>`).join('');
+    // A <div>, not a <label>: the row now wraps an enhanced dropdown, and a label pointing at the
+    // hidden native select fired a second, empty picker on every click on the row.
+    grid.innerHTML += Object.keys(defaults).map(n => `<div class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span><select class="ol-select" data-gr="${esc(n)}"><option value="true" ${defaults[n] === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${defaults[n] === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select></div>`).join('');
     _grLoaded = true; _grDirty = false; updateGrSave();
     if (window.enhanceAllSelects) try { window.enhanceAllSelects(grid); } catch {}
     return;
@@ -36,7 +38,7 @@ async function loadGameRules() {
     let ctl;
     if (isGrBool(n, v)) ctl = `<select class="ol-select" data-gr="${esc(n)}"><option value="true" ${v === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${v === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select>`;
     else ctl = `<input data-gr="${esc(n)}" value="${esc(v)}" spellcheck="false">`;
-    return `<label class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span>${ctl}</label>`;
+    return `<div class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span>${ctl}</div>`;
   }).join('');
   _grLoaded = true;
   _grDirty = false;
