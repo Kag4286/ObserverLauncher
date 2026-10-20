@@ -145,15 +145,18 @@ function registerSettings(ipcMain, ctx) {
     return r.canceled ? null : r.filePaths[0];
   });
 
-  // Pick the Playit agent executable directly, so users don't have to type/paste the path by hand.
-  ipcMain.handle('dialog:playit-file', async () => {
+  // Pick an executable path via the OS file dialog, so users don't have to type/paste by hand.
+  // Shared by the Playit agent picker and the SSH client picker (Pinggy needs an ssh.exe).
+  const pickExecutable = async (title) => {
     const r = await dialog.showOpenDialog(ctx.win, {
-      title: 'Select the Playit agent executable',
+      title,
       properties: ['openFile'],
       filters: process.platform === 'win32' ? [{ name: 'Executable', extensions: ['exe'] }] : [],
     });
     return r.canceled ? null : r.filePaths[0];
-  });
+  };
+  ipcMain.handle('dialog:playit-file', () => pickExecutable('Select the Playit agent executable'));
+  ipcMain.handle('dialog:ssh-file', () => pickExecutable('Select the SSH executable'));
 
   ipcMain.handle('settings:save', async (_, settings) => {
     const prev = loadSettings();

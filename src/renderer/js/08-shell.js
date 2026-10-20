@@ -860,6 +860,7 @@ window.observer.onTunnelStatus(applyTunnelStatus);
 refreshTunnelUI();
 setInterval(refreshTunnelUI,15000);
 $('#playitBrowse')?.addEventListener('click',async()=>{const f=await window.observer.pickPlayitFile();if(f){const inp=$('#playitPathInput');inp.value=f;inp.dispatchEvent(new Event('input',{bubbles:true}))}});
+$('#pinggyBrowse')?.addEventListener('click',async()=>{const f=await window.observer.pickSshFile();if(f){const inp=$('#pinggyPathInput');inp.value=f;inp.dispatchEvent(new Event('input',{bubbles:true}))}});
 $('#refreshConnectInfo').onclick=loadConnectInfo;
 $('#checkPublicIp').onclick=async()=>{
   const btn=$('#checkPublicIp');btn.disabled=true;const original=btn.textContent;btn.textContent='…';
