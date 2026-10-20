@@ -123,6 +123,24 @@ globals, so read this before touching backend state.
   `server:log` unless `ctx.inst()` is the active instance; `server:state` and error log lines always
   pass. New push channels default to ungated — add them to `GATED_CHANNELS` if they are per-instance.
 
+## Reliability features
+
+Four features keep a server alive without user action. Each is small enough to live in its own module rather than inside the lifecycle code.
+
+- **Scheduler** (`scheduler.js`). A pure `shouldFire()` decides whether a scheduled start or stop is due for a given instance, time and status. `startScheduler` runs one interval for every instance inside `ctx.runInInstance(id)`. A stop is skipped while a backup is in progress. Times are the PC's local clock; a scheduled action that lands while the computer is asleep is skipped, not replayed hours later.
+- **Webhook** (`webhook.js`). `fire()` is fire-and-forget. `isSafeWebhookUrl` reuses the public-host rule in `isSafeDownloadUrl`, so a webhook cannot be pointed at a loopback or private host. Messages have a Discord shape or a generic JSON shape.
+- **Crash analyser** (`mcp/doctor.js`). The pure `classifyCrash` and `summarizeCrashText` helpers classify the newest crash report. `server-lifecycle.js` calls them on an unexpected exit and pushes a `crash:analysis` event; the renderer draws a banner above the console.
+- **Orphan adoption** (`orphan.js`, `orphan-prompt.js`). If a server process is still running when the app starts, a tier-2 orphan asks the user to reconnect or stop. The prompt resolves to `reconnect` after 60 s, so a closed renderer never force-stops a live server.
+
+Prometheus (`prometheus.js`) and the Remote dashboard (`remote.js`) share the loopback guards in `http-guard.js`. Do not write a second Origin or IP check; extend the shared one.
+
+## Bedrock crossplay and tunnels
+
+Two features put a server on the network from a desktop machine.
+
+- **Geyser and Floodgate** (`geyser.js`). `config.yml` is inspected for the four issues that break crossplay most often: `clone-remote-port: true`, a non-default `bedrock.port`, `auth-type` other than floodgate when Floodgate is present, and `use-haproxy-protocol: false`. The Apply fix path edits the file LINE BY LINE and takes a backup first, so a user's own comments and spacing survive. The built-in YAML reader is lossy on purpose; do not re-serialize the file.
+- **Tunnels** (`tunnel.js`, `pinggy-tunnel.js`, `tunnel-manager.js`). Playit handles the Java TCP port. Pinggy handles the Bedrock UDP port and runs alongside it. Both are per-instance. Windows OpenSSH reads the password from a console handle, not from stdin, so `pinggy.js` writes a small SSH_ASKPASS helper and spawns ssh with `SSH_ASKPASS_REQUIRE=force`. Do not switch back to piping the password; it hangs.
+
 ## Minecraft data formats change between versions
 
 A recurring source of bugs in this project: Mojang moves things around between

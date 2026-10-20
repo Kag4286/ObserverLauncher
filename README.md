@@ -37,13 +37,13 @@ The core flow works: create a server, start and stop it, watch the console, mana
 <td width="50%" valign="top">
 
 **Server setup**
-Downloads Vanilla, Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot or Velocity from official sources. Version lists load live, so new Minecraft releases appear without an app update. Java is checked against the jar and can be installed for you.
+Downloads Vanilla, Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot or Velocity from official sources. Version lists load live, so new Minecraft releases appear without an app update. Java is checked against the jar and can be installed for you. When the app starts and finds a server already running in your folder, it offers to reconnect to that process instead of launching a second copy.
 
 </td>
 <td width="50%" valign="top">
 
 **Console**
-Live output with timestamps, level filters, search, command history and log export.
+Live output with timestamps, level filters, search, command history and log export. Known player names in the log are clickable and open the inspector.
 
 </td>
 </tr>
@@ -51,13 +51,13 @@ Live output with timestamps, level filters, search, command history and log expo
 <td width="50%" valign="top">
 
 **Performance**
-TPS, MSPT, CPU and RAM graphs with 15m / 1h / 6h / 24h / 7d / 30d ranges. History persists to disk, so it survives a restart. A banner appears when the tick rate drops sharply or memory keeps climbing, and names the likely cause.
+TPS, MSPT, CPU and RAM graphs with 15m / 1h / 6h / 24h / 7d / 30d ranges. History persists to disk, so it survives a restart. A banner appears when the tick rate drops sharply or memory keeps climbing, and names the likely cause. JVM presets (Aikar, G1 tuned, ZGC) fill the launch flags from one click.
 
 </td>
 <td width="50%" valign="top">
 
 **Players**
-One roster for online, whitelisted, banned and OP players. The inspector draws a rotatable 3D model of the player wearing their armor, reads equipment, inventory and ender chest with real item icons, runs live actions, and edits saved data while the server is stopped. Skins come from SkinsRestorer when the plugin is installed, so offline-mode servers show the skin players actually wear.
+One roster for online, whitelisted, banned and OP players. The inspector draws a rotatable 3D model of the player wearing their armor, reads equipment, inventory and ender chest with real item icons, runs live actions, and edits saved data while the server is stopped. Skins come from SkinsRestorer when the plugin is installed, so offline-mode servers show the skin players actually wear. A leaderboard ranks every player on the save by playtime and reads worlds that older builds missed.
 
 </td>
 </tr>
@@ -65,13 +65,13 @@ One roster for online, whitelisted, banned and OP players. The inspector draws a
 <td width="50%" valign="top">
 
 **Marketplace**
-Search Modrinth, Hangar, SpigotMC and CurseForge in one box. Compatibility is checked against the detected server before install. Modrinth dependencies resolve, and `.mrpack` files import and export.
+Search Modrinth, Hangar, SpigotMC and CurseForge in one box. Compatibility is checked against the detected server before install. Modrinth dependencies resolve, `.mrpack` files import and export, and a check-updates pass flags installed projects with a newer build. CurseForge imports roll back cleanly when a download fails partway.
 
 </td>
 <td width="50%" valign="top">
 
 **Content editor**
-Edit `server.properties`, `spigot.yml`, plugin configs and `whitelist.json`, with syntax highlighting and JSON validation. A collapsible tree keeps large folders manageable.
+Edit `server.properties`, `spigot.yml`, plugin configs and `whitelist.json`, with syntax highlighting and JSON validation. A collapsible tree keeps large folders manageable. Datapacks can be validated, extracted and reordered in `level.dat`.
 
 </td>
 </tr>
@@ -79,7 +79,7 @@ Edit `server.properties`, `spigot.yml`, plugin configs and `whitelist.json`, wit
 <td width="50%" valign="top">
 
 **World map**
-Renders terrain and real biomes from your world save, with surface blocks, waypoints, an explored-chunk overlay, jump-to-coordinates and PNG export.
+Renders terrain and real biomes from your world save, with surface blocks, waypoints, an explored-chunk overlay, jump-to-coordinates and PNG export. A Game rules panel edits `level.dat` without typing `/gamerule` and backs the file up first.
 
 </td>
 <td width="50%" valign="top">
@@ -93,7 +93,7 @@ Manual or scheduled ZIP snapshots of world folders, taken with `save-off` / `sav
 <td width="50%" valign="top">
 
 **Multi-instance**
-Run several servers at once. Each instance has its own folder, Java runtime, RCON, schedule, backups and tunnel.
+Run several servers at once. Each instance has its own folder, Java runtime, RCON, schedule, backups and tunnel. Instances can carry a group name, and Start all / Stop all runs the set one after another.
 
 </td>
 <td width="50%" valign="top">
@@ -103,7 +103,30 @@ The app can act as an MCP server so an AI client reads and controls the server. 
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+**Bedrock crossplay**
+Detects Geyser and Floodgate, checks their `config.yml` for the mismatches that break crossplay, and applies a one-click fix that edits the file line by line with a backup. A Pinggy tunnel shares the Bedrock UDP port next to the Playit Java tunnel.
+
+</td>
+<td width="50%" valign="top">
+
+**Operations**
+A daily scheduler starts and stops a server at set times. Webhooks post to Discord or a generic endpoint on start, stop, crash and player join. On an unexpected exit the crash analyser reads the newest report and lists repair hints. Prometheus `/metrics` exposes the same snapshots the dashboard uses.
+
+</td>
+</tr>
 </table>
+
+## Also in the app
+
+- **Properties history.** A snapshot is taken before every `server.properties` save; pick one to view a line diff and restore it.
+- **Server templates.** Save the current setup as a named template and reuse it from the wizard.
+- **Proxy backend manager.** A Velocity instance can add and remove backend servers in `velocity.toml` without hand-editing the file.
+- **MOTD preview.** The `motd` line in `server.properties` is shown with its colours, the way the game renders it. A `\u00a7` escape in the file is decoded first, because that is what Java's properties reader hands the server.
+- **Docker export.** Generate a Dockerfile and a compose file for the current instance from Settings.
+- **Remote dashboard.** A loopback-only web page shows status, console and players from another device on the same network, guarded by a token and an optional IP allowlist.
 
 ## Screenshots
 
@@ -198,7 +221,7 @@ No admin rights are needed. Java installs into your user folder; elevation is re
 
 ## Data and privacy
 
-ObserverLauncher is a local tool with no account, no telemetry and no analytics. Downloads happen only when you ask, and only from official sources: server jars from Mojang, PaperMC, Purpur, Leaf, Fabric and Forge; plugins and mods from Modrinth, Hangar and SpigotMC; item and block icons and default player skins from the public PrismarineJS mirror; player skins from Mojang when a server is in online mode; Java runtimes when you use auto-install; and update metadata from GitHub Releases. Nothing is uploaded, and the app runs no background service once closed.
+ObserverLauncher is a local tool with no account, no telemetry and no analytics. Downloads happen only when you ask, and only from official sources: server jars from Mojang, PaperMC, Purpur, Leaf, Fabric and Forge; plugins and mods from Modrinth, Hangar and SpigotMC; item and block icons and default player skins from the public PrismarineJS mirror; player skins from Mojang when a server is in online mode; Java runtimes when you use auto-install; and update metadata from GitHub Releases. CurseForge is queried only when you supply your own API key. The Pinggy tunnel opens an outbound SSH session to free.pinggy.io, a webhook posts to the URL you configure, and Prometheus `/metrics` listens on loopback only. Nothing else is uploaded, and the app runs no background service once closed.
 
 The player inspector reads files that already exist on your machine: the player `.dat` files in your world folder, the mod jars in your server's `mods` folder for item icons, your own Minecraft client jar for a default skin, and SkinsRestorer's data folder when that plugin is installed. No Mojang texture or model is bundled with the app; everything is read on your machine or downloaded to it at runtime.
 
@@ -210,6 +233,8 @@ Launcher data lives outside the server folder, in Electron's `userData` director
 - TPS/MSPT need a supported server. Vanilla and Fabric report player count only.
 - The longer performance ranges (7d, 30d) fill up over time. Right after an update they hold only what has been recorded since then.
 - SkinsRestorer skins are read from its default file storage. A server that stores them in MySQL or PostgreSQL falls back to the default skin.
+- Bedrock crossplay needs a Geyser jar in the server folder. The free Pinggy tier closes a tunnel after about an hour and the app opens it again.
+- The scheduler fires on the PC's local clock. An action scheduled while the computer is asleep is skipped, not replayed later.
 - Spigot needs Git and a full JDK, and compiles slowly.
 - Velocity proxies do not tick a world, so their TPS/MSPT panel shows N/A.
 - Auto-update requires the packaged installer or AppImage.
