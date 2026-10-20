@@ -8,6 +8,14 @@ let _grDirty = false;
 // A few rules are booleans; everything else is a number or free string.
 const GR_BOOL = new Set(['doDaylightCycle','doWeatherCycle','doMobSpawning','doMobLoot','doTileDrops','keepInventory','mobGriefing','naturalRegeneration','doFireTick','doEntityDrops','doInsomnia','doImmediateRespawn','disableElytraMovementCheck','disableRaids','spectatorsGenerateChunks','doPatrolSpawning','doTraderSpawning','doWardenSpawning','doVinesSpread','announceAdvancements','commandBlockOutput','commandBlocksEnabled','logAdminCommands','sendCommandFeedback','showDeathMessages','reducedDebugInfo','spawnRadius','doLimitedCrafting','playersSleepingPercentage','randomTickSpeed','maxCommandChainLength','maxEntityCramming']);
 function isGrBool(name, value) { return value === 'true' || value === 'false' || /^do[A-Z]|^keepInventory$|^mobGriefing$|^naturalRegeneration$/.test(name); }
+// BUGFIX (v6.0.0 follow-up): game-rule ids are camelCase (doDaylightCycle, randomTickSpeed). They
+// were printed raw in a narrow mono column, so a 20-character name was cut to "doDaylightCyc...".
+// Split on the camelCase boundary and capitalise: "Do Daylight Cycle". The raw id stays on the
+// row's title attribute for anyone who needs to copy it.
+function grLabel(name) {
+  const words = String(name || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : String(name || '');
+}
 
 async function loadGameRules() {
   const grid = $('#grGrid'); if (!grid) return;
@@ -28,7 +36,16 @@ async function loadGameRules() {
     const defaults = { doDaylightCycle: 'true', keepInventory: 'false', mobGriefing: 'true', naturalRegeneration: 'true', randomTickSpeed: '3', doMobSpawning: 'true' };
     // A <div>, not a <label>: the row now wraps an enhanced dropdown, and a label pointing at the
     // hidden native select fired a second, empty picker on every click on the row.
-    grid.innerHTML += Object.keys(defaults).map(n => `<div class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span><select class="ol-select" data-gr="${esc(n)}"><option value="true" ${defaults[n] === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${defaults[n] === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select></div>`).join('');
+    // BUGFIX: every default used to be rendered as an On/Off select, so randomTickSpeed (a NUMBER)
+    // showed as a boolean toggle and saving wrote the string "true" into it. The control is chosen
+    // per rule now, exactly like the loaded-rules path below.
+    grid.innerHTML += Object.keys(defaults).map(n => {
+      const v = defaults[n];
+      const ctl = isGrBool(n, v)
+        ? `<select class="ol-select" data-gr="${esc(n)}"><option value="true" ${v === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${v === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select>`
+        : `<input data-gr="${esc(n)}" value="${esc(v)}" spellcheck="false">`;
+      return `<div class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(grLabel(n))}</span>${ctl}</div>`;
+    }).join('');
     _grLoaded = true; _grDirty = false; updateGrSave();
     if (window.enhanceAllSelects) try { window.enhanceAllSelects(grid); } catch {}
     return;
@@ -38,7 +55,7 @@ async function loadGameRules() {
     let ctl;
     if (isGrBool(n, v)) ctl = `<select class="ol-select" data-gr="${esc(n)}"><option value="true" ${v === 'true' ? 'selected' : ''}>${esc(t('gr.on'))}</option><option value="false" ${v === 'false' ? 'selected' : ''}>${esc(t('gr.off'))}</option></select>`;
     else ctl = `<input data-gr="${esc(n)}" value="${esc(v)}" spellcheck="false">`;
-    return `<div class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(n)}</span>${ctl}</div>`;
+    return `<div class="gr-row" data-gr-row title="${esc(n)}"><span class="gr-name">${esc(grLabel(n))}</span>${ctl}</div>`;
   }).join('');
   _grLoaded = true;
   _grDirty = false;
@@ -68,6 +85,10 @@ async function saveGameRules() {
   _grDirty = false; updateGrSave();
   toast(t('gr.saved'), 'success');
   if (r.backup) toast(t('gr.backup', { p: r.backup }), 'success');
+  // BUGFIX: the grid was never reloaded after a successful save. On a world that had no GameRules
+  // compound yet, the 'no saved game rules' message stayed on screen even though level.dat now held
+  // the new rules, which read as "the save did nothing". Reload so the grid shows what is on disk.
+  await loadGameRules();
 }
 
 // Wire the disclosure: load once when opened; mark dirty on any edit.

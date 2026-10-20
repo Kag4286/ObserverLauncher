@@ -74,7 +74,14 @@ function imRenderCompat(){
     const loaderOk=srv.loader==='unknown'?null:(ld.length?ld.some(l=>l===srv.loader||(srv.loader==='paper'&&/paper|spigot|bukkit/.test(l))):null);
     cells.push(`<div class="im-compat-cell"><small>LOADER</small>${imBadge(ld.length?(loaderOk===null?null:loaderOk):null,ld.length?ld.join(' / '):'vanilla',loaderOk===false)}</div>`);
   } else {
-    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(gameV?(chosen?(chosen.gameVersions||[]).includes(gameV):null):null,gameV||t('mkt.allVersionsShort'),chosen&&gameV&&!(chosen.gameVersions||[]).includes(gameV))}</div>`);
+    // BUGFIX: this cell used to LABEL itself with the server's Minecraft version (gameV), so on a
+    // 26.3 server a plugin that supports 1.8-1.16 showed "MINECRAFT 26.3" in red, which reads as
+    // "the mod targets 26.3". The label is what the BUILD supports now; the red/green still says
+    // whether the server's version is inside that list.
+    const buildMc=(chosen&&chosen.gameVersions||[]).filter(Boolean);
+    const buildMcLabel=buildMc.length?(buildMc.length>2?`${buildMc[0]} – ${buildMc[buildMc.length-1]}`:buildMc.join(', ')):(gameV||t('mkt.allVersionsShort'));
+    const mcMatches=!(chosen&&gameV&&buildMc.length&&!buildMc.includes(gameV));
+    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(mcMatches,buildMcLabel,!mcMatches)}${(!mcMatches&&gameV)?`<small class="im-sub">${esc(t('mkt.serverShort',{v:gameV}))}</small>`:''}</div>`);
     const itemLoaders=item.loaders||[];
     const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind]||null;
@@ -180,7 +187,20 @@ function imRenderVersionPicker(){
   const vs=installState.detail?.versions;
   if(!vs||!vs.length){sec.hidden=true;return}
   sec.hidden=false;
-  sel.innerHTML=vs.map((v,i)=>`<option value="${esc(v.id)}">${esc(v.number)} — ${new Date(v.date).toLocaleDateString()} · ${imFmtBytes(v.size)} · ${(v.gameVersions||[]).slice(-1)[0]||'?'}${v.blocked?' · '+t('mkt.cfBlocked'):''}</option>`).join('');
+  // BUGFIX (v6.0.0 follow-up): the option label packed version, date, size and a Minecraft version
+  // onto one line. In the narrow modal the dot in "1.16" was lost at that font size, so it read
+  // "116". Split it: the version number is the label, the rest is the title tooltip. A Spigot
+  // version also has no per-build MC list, so show the range the RESOURCE declares, not a single
+  // element that looks like the build's own.
+  sel.innerHTML=vs.map(v=>{
+    const mcList=(v.gameVersions||[]).filter(Boolean);
+    const mc=mcList.length?(mcList.length>2?`${mcList[0]} – ${mcList[mcList.length-1]}`:mcList.join(', ')):'—';
+    const bits=[new Date(v.date).toLocaleDateString()];
+    if(v.size)bits.push(imFmtBytes(v.size));
+    bits.push(`Minecraft ${mc}`);
+    if(v.blocked)bits.push(t('mkt.cfBlocked'));
+    return `<option value="${esc(v.id)}" title="${esc(bits.join(' · '))}">${esc(v.number)} — ${esc(bits.join(' · '))}</option>`;
+  }).join('');
   sel.onchange=()=>{installState.versionId=sel.value;imRenderCompat();imRenderWarns();imRenderDeps()};
 }
 function imSetDone(r){
@@ -248,9 +268,13 @@ async function imInstallDeps(){
 $('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
 function openInstallModal(item){
   installState={item,detail:null,versionId:null,busy:false,done:false};
+  const m=$('#installModal');
+  // Cancel a pending close from the previous modal, or its timer will hide THIS one mid-open.
+  if(m._closeTimer){ clearTimeout(m._closeTimer); m._closeTimer=0; }
+  m.classList.remove('closing');
   const card=$('#installModal .im');if(card)card.classList.remove('installing','success');
-  $('#installModal').hidden=false;
-  trapFocus($('#installModal'));
+  m.hidden=false;
+  trapFocus(m);
   $('#imTitle').textContent=item.title||'—';
   $('#imMeta').textContent=`${item.author||t('mkt.unknownAuthor')} · ${item.source} · ${t('mkt.downloads',{n:Number(item.downloads||0).toLocaleString()})}`;
   $('#imKind').textContent=item.kind;
@@ -278,7 +302,21 @@ function openInstallModal(item){
     const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.install');
   });
 }
-function closeInstallModal(){const m=$('#installModal');if(installState.busy)return toast(t('toast.waitInstall'),'error');if(m.hidden)return;releaseFocus();m.classList.add('closing');setTimeout(()=>{m.hidden=true;m.classList.remove('closing')},140);installState.done=false;const btn=$('#imInstall');btn.textContent=t('mkt.install')}
+// BUGFIX (v6.0.0 follow-up): closing scheduled a 140 ms hide timer but never stored it. If the user
+// closed the modal and opened another mod within that window, the STALE timer fired after the new
+// modal was already open and set hidden=true, so the modal for the second mod was invisible while
+// JS believed it was open. Clicking Install then did nothing visible. The timer is stored on the
+// modal now and cancelled the moment the modal is reopened.
+function closeInstallModal(){
+  const m=$('#installModal');
+  if(installState.busy)return toast(t('toast.waitInstall'),'error');
+  if(m.hidden)return;
+  releaseFocus();
+  m.classList.add('closing');
+  m._closeTimer=setTimeout(()=>{m.hidden=true;m.classList.remove('closing');m._closeTimer=0},140);
+  installState.done=false;
+  const btn=$('#imInstall');btn.textContent=t('mkt.install');
+}
 $('#imClose').onclick=closeInstallModal;
 $('#imCancel').onclick=closeInstallModal;
 $('#imInstall').onclick=()=>{if(installState.done)return closeInstallModal();if(installState.busy)return;startInstall()};
