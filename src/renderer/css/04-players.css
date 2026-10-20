@@ -30,6 +30,11 @@
 .row-action:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface-3)}
 .row-action.danger{color:var(--danger);border-color:var(--danger-weak)} .row-action.danger:hover{background:var(--danger-weak);border-color:var(--danger)}
 .row-action.active{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+/* v6.0.0: a toggle button (Leaderboard) lights up when its view is showing. This class exists
+   instead of adding `primary` next to `secondary`, which produced dark text on a transparent
+   button (both rules share specificity and secondary comes last). */
+.btn.is-active{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);box-shadow:0 0 0 3px var(--brand-soft)}
+.btn.is-active:hover{background:var(--brand);border-color:var(--brand)}
 /* INSPECT MODAL — professional */
 .player-modal{width:min(760px,100%);max-height:88vh;display:flex;flex-direction:column}
 .player-modal #playerInspector{flex:1;min-height:0;overflow:auto;padding-right:4px}

@@ -13,7 +13,14 @@ const path = require('path');
 // Returns an array of { uuid, name, playTimeSec, deaths, mobKills, playerKills, blocksMined }.
 function getPlayerAnalytics(root, levelName, knownPlayers) {
   const world = levelName || 'world';
-  const statsDir = path.join(root, world, 'stats');
+  // BUGFIX (v6.0.0 follow-up): 1.21.5+/26.x moved the per-player stats from <world>/stats/ into
+  // <world>/players/stats/, the same snapshot that moved playerdata into <world>/players/data/.
+  // findPlayerDataFile already handles the new layout, but this reader still looked only at the
+  // old one, so a modern server returned an empty leaderboard even with dozens of players.
+  // Prefer the new location, fall back to the old one for older servers.
+  const newDir = path.join(root, world, 'players', 'stats');
+  const oldDir = path.join(root, world, 'stats');
+  const statsDir = fs.existsSync(newDir) ? newDir : oldDir;
   if (!fs.existsSync(statsDir)) return [];
 
   // Build a UUID -> name map from knownPlayers (from usercache.json)

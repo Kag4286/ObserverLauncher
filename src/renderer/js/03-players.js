@@ -468,13 +468,20 @@ async function openPlayerInspector(uuid,name){
   renderPdStats(d.stats);
 }
 // v6.0.0 Track B - B2: Leaderboard toggle
+// BUGFIX: the toggle added `primary` on top of `secondary`. Both rules have the same specificity
+// and `secondary` comes later in the cascade, so `background:transparent` won while `color` came
+// from `primary` (--brand-ink, near black) -> dark text on a dark button, invisible. The active
+// state is its own class now (`is-active`) with a single, unambiguous style.
 let showLeaderboard = false;
 $('#toggleLeaderboardBtn')?.addEventListener('click', () => {
   showLeaderboard = !showLeaderboard;
-  $('#toggleLeaderboardBtn').classList.toggle('primary', showLeaderboard);
+  $('#toggleLeaderboardBtn').classList.toggle('is-active', showLeaderboard);
+  $('#toggleLeaderboardBtn').setAttribute('aria-pressed', showLeaderboard ? 'true' : 'false');
   $('#playersList').hidden = showLeaderboard;
   $('#playersPager').hidden = showLeaderboard || $('#playersPager').hidden;
   $('#playersLeaderboard').hidden = !showLeaderboard;
+  // The filter row belongs to the roster; hide it too while the leaderboard is showing.
+  const toolbar = document.querySelector('.roster-toolbar'); if (toolbar) toolbar.hidden = showLeaderboard;
   if (showLeaderboard) renderLeaderboard();
   else renderPlayers();
 });

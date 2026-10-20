@@ -766,16 +766,22 @@
         </div>
         <div class="inspect-panel" id="pdPanelLive">
           <div class="inspect-note" data-i18n="pd.liveNote">Live actions run as server commands and work while the server is running — the player must be online.</div>
-          <div class="pd-live-grid">
-            <div class="pd-live-cell"><label><span data-i18n="pd.gamemode">Gamemode</span><select id="liveGameType" class="ol-select"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select></label><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div>
-            <div class="pd-live-cell"><label><span data-i18n="pd.xp">XP level</span><input id="liveXp" type="number" min="0" max="2000000"></label><button type="button" class="btn primary sm" data-live-cmd="xp">Set</button></div>
-            <div class="pd-live-cell"><label><span data-i18n="pd.giveItem">Give item (id)</span><input id="liveGiveId" placeholder="minecraft:diamond"></label><label><span data-i18n="pd.giveCount">Count</span><input id="liveGiveCount" type="number" min="1" max="6400" value="1"></label><button type="button" class="btn primary sm" data-live-cmd="give">Give</button></div>
-            <div class="pd-live-cell"><label><span data-i18n="pd.teleport">Teleport (X Y Z)</span><input id="liveTp" placeholder="100 64 -200"></label><button type="button" class="btn primary sm" data-live-cmd="tp">Teleport</button></div>
-            <div class="pd-live-cell actions">
+          <!-- v6.0.0 redesign: five equal-weight cards left four narrow columns and one lonely action
+               card floating on its own row. This is ONE panel with a two-column form and a
+               separated quick-action strip, so the width is used and the dangerous action sits
+               away from the everyday ones. Element ids are unchanged; the JS reads them as before. -->
+          <div class="pd-live-panel">
+            <div class="pd-live-form">
+              <label class="pd-live-field"><span data-i18n="pd.gamemode">Gamemode</span><div class="pd-live-row"><select id="liveGameType" class="ol-select"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div></label>
+              <label class="pd-live-field"><span data-i18n="pd.xp">XP level</span><div class="pd-live-row"><input id="liveXp" type="number" min="0" max="2000000"><button type="button" class="btn primary sm" data-live-cmd="xp">Set</button></div></label>
+              <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.giveItem">Give item (id)</span><div class="pd-live-row"><input id="liveGiveId" placeholder="minecraft:diamond"><input id="liveGiveCount" class="pd-live-count" type="number" min="1" max="6400" value="1" data-i18n-title="pd.giveCount" title="Count" aria-label="Count"><button type="button" class="btn primary sm" data-live-cmd="give">Give</button></div></label>
+              <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.teleport">Teleport (X Y Z)</span><div class="pd-live-row"><input id="liveTp" placeholder="100 64 -200"><button type="button" class="btn primary sm" data-live-cmd="tp">Teleport</button></div></label>
+            </div>
+            <div class="pd-live-quick">
               <button type="button" class="btn secondary sm" data-live-cmd="heal" data-i18n="pd.heal">Heal</button>
               <button type="button" class="btn secondary sm" data-live-cmd="feed" data-i18n="pd.feed">Feed</button>
               <button type="button" class="btn secondary sm" data-live-cmd="clear" data-i18n="pd.clearInvBtn">Clear inventory</button>
-              <button type="button" class="btn danger sm" data-live-cmd="kick" data-i18n="ply.kick">Kick</button>
+              <button type="button" class="btn danger sm pd-live-danger" data-live-cmd="kick" data-i18n="ply.kick">Kick</button>
             </div>
           </div>
         </div>
