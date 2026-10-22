@@ -309,7 +309,9 @@ async function imInstallDeps(){
 $('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
 function openInstallModal(item){
   const srv=imDetectServer();
-  installState={item:{...item,software:srv.software,loader:srv.loader},detail:null,versionId:null,busy:false,done:false};
+  item.software=srv.software;
+  item.loader=srv.loader;
+  installState={item,detail:null,versionId:null,busy:false,done:false};
   const m=$('#installModal');
   // Cancel a pending close from the previous modal, or its timer will hide THIS one mid-open.
   if(m._closeTimer){ clearTimeout(m._closeTimer); m._closeTimer=0; }
