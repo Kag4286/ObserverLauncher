@@ -151,6 +151,9 @@ function buildCube(w, h, d, faces) {
 }
 
 function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
+  if (canvas && canvas._playerRenderer && typeof canvas._playerRenderer.destroy === 'function') {
+    canvas._playerRenderer.destroy();
+  }
   const gl = canvas.getContext('webgl', { alpha: true, antialias: true });
   if (!gl) return null;
 
@@ -326,12 +329,12 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // Use Pointer Events on the canvas itself to avoid leaking window-level listeners
   // when the Player Inspector is opened multiple times.
   canvas.style.touchAction = 'none';
-  canvas.addEventListener('pointerdown', e => {
+  const onPointerDown = e => {
     e.preventDefault(); // Prevent native drag/selection, which locks the cursor and blocks pointermove
     dragging = true; lastX = e.clientX; lastY = e.clientY;
     canvas.setPointerCapture(e.pointerId);
     canvas.style.cursor = 'grabbing';
-  });
+  };
   const endDrag = (e) => {
     if (!dragging) return;
     dragging = false;
@@ -340,9 +343,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     }
     canvas.style.cursor = 'grab';
   };
-  canvas.addEventListener('pointerup', endDrag);
-  canvas.addEventListener('lostpointercapture', endDrag);
-  canvas.addEventListener('pointermove', e => {
+  const onPointerMove = e => {
     if (!dragging) return;
     e.preventDefault();
     rotY += (e.clientX - lastX) * 0.01;
@@ -350,7 +351,11 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, rotX));
     lastX = e.clientX; lastY = e.clientY;
     draw();
-  });
+  };
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('lostpointercapture', endDrag);
+  canvas.addEventListener('pointermove', onPointerMove);
 
   function bindBufs(cube) {
     gl.bindBuffer(gl.ARRAY_BUFFER, bufPos);
@@ -443,5 +448,25 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     }
   }
 
-  return { draw };
+  function destroy() {
+    canvas.removeEventListener('pointerdown', onPointerDown);
+    canvas.removeEventListener('pointerup', endDrag);
+    canvas.removeEventListener('lostpointercapture', endDrag);
+    canvas.removeEventListener('pointermove', onPointerMove);
+    try {
+      if (bufPos) gl.deleteBuffer(bufPos);
+      if (bufTex) gl.deleteBuffer(bufTex);
+      if (tex) gl.deleteTexture(tex);
+      if (armorTex1) gl.deleteTexture(armorTex1);
+      if (armorTex2) gl.deleteTexture(armorTex2);
+      if (prog) gl.deleteProgram(prog);
+    } catch {}
+    if (canvas._playerRenderer === handle) {
+      canvas._playerRenderer = null;
+    }
+  }
+
+  const handle = { draw, destroy };
+  canvas._playerRenderer = handle;
+  return handle;
 }

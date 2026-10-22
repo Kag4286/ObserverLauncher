@@ -137,7 +137,8 @@ async function resolveMarketDownload(item) {
   const kind = ['forge', 'fabric', 'datapack', 'mod', 'modpack'].includes(item.kind) ? item.kind : 'plugin';
   if (item.source === 'modrinth' || !item.source) {
     const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
-    const wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
+    const isVel = item && (item.software === 'velocity' || item.loader === 'velocity' || item.loader === 'proxy');
+    const wantedLoaders = { plugin: isVel ? ['velocity', 'waterfall', 'bungeecord', 'paper', 'spigot', 'purpur', 'folia', 'bukkit'] : ['paper', 'spigot', 'purpur', 'folia', 'bukkit', 'velocity', 'waterfall', 'bungeecord'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
     const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
     let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
     if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || null;
@@ -176,12 +177,32 @@ async function resolveMarketDownload(item) {
   }
   if (item.source === 'hangar') {
     const [owner, slug] = String(item.id).split('/');
-    const versions = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=20`);
-    const target = (versions.result || []).find(v => v.downloads?.PAPER?.downloadUrl);
-    const file = target?.downloads?.PAPER;
-    if (!file) throw new Error('No Paper download was found for this Hangar project.');
+    const versions = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=25`);
+    const isVel = item && (item.software === 'velocity' || item.loader === 'velocity' || item.loader === 'proxy');
+    const pickFile = v => isVel ? (v.downloads?.VELOCITY || v.downloads?.PAPER || v.downloads?.WATERFALL) : (v.downloads?.PAPER || v.downloads?.VELOCITY || v.downloads?.WATERFALL);
+    const list = (versions.result || []).filter(v => pickFile(v)?.downloadUrl);
+    let target = null;
+    if (item.versionId) {
+      target = list.find(v => v.name === item.versionId || String(v.id) === String(item.versionId)) || null;
+    }
+    if (!target && item.version) {
+      target = list.find(v => (v.platformDependencies?.PAPER || v.platformDependencies?.VELOCITY || []).includes(item.version)) || null;
+    }
+    if (!target) target = list[0] || null;
+    const file = target ? pickFile(target) : null;
+    if (!file) throw new Error('No Paper or Velocity download was found for this Hangar project.');
     const hangarHashes = file.fileInfo?.sha256Hash ? { sha256: file.fileInfo.sha256Hash } : null;
-    return { url: file.downloadUrl, filename: file.fileInfo?.name || `${slug}.jar`, source: 'hangar', size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0, hashes: hangarHashes, projectId: item.id, versionId: target?.id || null, gameVersion: item.version || null, versionNumber: target?.name || null };
+    return {
+      url: file.downloadUrl,
+      filename: file.fileInfo?.name || `${slug}.jar`,
+      source: 'hangar',
+      size: file.fileInfo?.sizeBytes || file.fileInfo?.size || 0,
+      hashes: hangarHashes,
+      projectId: item.id,
+      versionId: target?.name || (target?.id != null ? String(target.id) : null),
+      gameVersion: item.version || (target?.platformDependencies?.PAPER && target.platformDependencies.PAPER[0]) || null,
+      versionNumber: target?.name || null,
+    };
   }
   if (item.source === 'spigot') {
     // Spiget only serves ONE download endpoint: /v2/resources/{id}/download, and it always
@@ -341,22 +362,26 @@ function registerMarketplace(ipcMain, ctx) {
         let versions = [];
         try {
           const vres = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=25`);
+          const isVel = item && (item.software === 'velocity' || item.loader === 'velocity' || item.loader === 'proxy');
+          const pickDl = v => (isVel ? (v.downloads?.VELOCITY || v.downloads?.PAPER || v.downloads?.WATERFALL) : (v.downloads?.PAPER || v.downloads?.VELOCITY || v.downloads?.WATERFALL)) || null;
           versions = (vres.result || [])
-            .filter(v => v.downloads && v.downloads.PAPER && v.downloads.PAPER.downloadUrl)
-            .map(v => ({
-              id: v.name,
-              number: v.name,
-              // platformDependencies.PAPER is the list of Minecraft versions this build supports.
-              gameVersions: (v.platformDependencies && v.platformDependencies.PAPER) || [],
-              loaders: ['paper'],
-              date: v.createdAt || null,
-              size: (v.downloads.PAPER.fileInfo && v.downloads.PAPER.fileInfo.sizeBytes) || 0,
-              // Hangar publishes no per-version dependencies in this shape; leave the list empty so
-              // the UI shows no deps section rather than a false 'none required'.
-              dependencies: [],
-            }));
+            .filter(v => v.downloads && pickDl(v)?.downloadUrl)
+            .map(v => {
+              const dl = pickDl(v);
+              const gv = (v.platformDependencies && (v.platformDependencies.PAPER || v.platformDependencies.VELOCITY || v.platformDependencies.WATERFALL)) || [];
+              const ld = Object.keys(v.downloads || {}).map(k => k.toLowerCase());
+              return {
+                id: v.name,
+                number: v.name,
+                gameVersions: gv,
+                loaders: ld.length ? ld : ['paper'],
+                date: v.createdAt || null,
+                size: (dl?.fileInfo && dl.fileInfo.sizeBytes) || 0,
+                dependencies: [],
+              };
+            });
         } catch { versions = []; }
-        return buildDetail({ item, title: proj.name, description: proj.description, icon: proj.avatarUrl, author: (proj.memberNames && proj.memberNames[0]), loaders: ['paper'], versions, sourceUrl: sourceLink ? sourceLink.url : null, projectUrl });
+        return buildDetail({ item, title: proj.name, description: proj.description, icon: proj.avatarUrl, author: (proj.memberNames && proj.memberNames[0]), loaders: ['paper', 'velocity'], versions, sourceUrl: sourceLink ? sourceLink.url : null, projectUrl });
       }
       if (item && item.source === 'spigot') {
         // v6.0.0: SpigotMC's API DOES expose a resource's versions, its tested Minecraft versions,

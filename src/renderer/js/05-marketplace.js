@@ -87,7 +87,7 @@ function imRenderCompat(){
     const mcMatches=!(chosen&&gameV&&buildMc.length&&!buildMc.includes(gameV));
     cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(mcMatches,buildMcLabel,!mcMatches)}${(!mcMatches&&gameV)?`<small class="im-sub">${esc(t('mkt.serverShort',{v:gameV}))}</small>`:''}</div>`);
     const itemLoaders=item.loaders||[];
-    const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
+    const groupMap={plugin:['paper','spigot','purpur','folia','bukkit','proxy'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind]||null;
     const match=wanted?(srv.loader!=='unknown'&&wanted.includes(srv.loader)):null;
     cells.push(`<div class="im-compat-cell"><small>YOUR SERVER</small>${imBadge(match,srv.software==='unknown'?'unknown':srv.software,itemLoaders.length&&match===false)}</div>`);
@@ -308,7 +308,8 @@ async function imInstallDeps(){
 }
 $('#imInstallDeps')&&($('#imInstallDeps').onclick=()=>{imInstallDeps()});
 function openInstallModal(item){
-  installState={item,detail:null,versionId:null,busy:false,done:false};
+  const srv=imDetectServer();
+  installState={item:{...item,software:srv.software,loader:srv.loader},detail:null,versionId:null,busy:false,done:false};
   const m=$('#installModal');
   // Cancel a pending close from the previous modal, or its timer will hide THIS one mid-open.
   if(m._closeTimer){ clearTimeout(m._closeTimer); m._closeTimer=0; }

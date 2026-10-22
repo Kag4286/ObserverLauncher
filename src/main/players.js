@@ -123,7 +123,7 @@ async function opToggle(ctx, { uuid, name, op, level }) {
 }
 
 function registerPlayers(ipcMain, ctx) {
-  ipcMain.handle('player:read', async (_, uuid) => readPlayer(ctx, uuid));
+  ipcMain.handle('player:read', async (_, uuid, name) => readPlayer(ctx, uuid, name));
   ipcMain.handle('player:whitelist-toggle', async (_, args) => whitelistToggle(ctx, args));
   ipcMain.handle('player:ban-toggle', async (_, args) => banToggle(ctx, args));
   ipcMain.handle('player:op-toggle', async (_, args) => opToggle(ctx, args));

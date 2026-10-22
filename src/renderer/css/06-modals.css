@@ -295,6 +295,11 @@ details.prop-group .properties-grid{padding:10px 12px;border-top:1px solid var(-
 .prop-row.is-bool .prop-ctl{justify-content:flex-end}
 /* v6.0.0 G1: MOTD live preview, full-width under the motd row's label+input. */
 .prop-motd-preview{grid-column:1 / -1;display:block;margin-top:6px;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);font:600 13px var(--font-mono);white-space:pre-wrap;word-break:break-word;min-height:18px}
+.motd-palette{grid-column:1 / -1;display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:6px}
+.motd-chip{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,0.22);cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--text);font:700 11px var(--font-mono);line-height:1;box-sizing:border-box}
+.motd-chip:hover{transform:scale(1.15);border-color:var(--brand)}
+.motd-chip.fmt{background:var(--surface-3);min-width:20px;width:auto;padding:0 5px}
+.motd-palette-sep{width:1px;height:14px;background:var(--border);margin:0 2px}
 /* v6.0.0 G2: server.properties history modal. */
 .prop-history-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;margin:8px 0}
 .prop-hist-row{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel);color:var(--text);font:600 12px var(--font-ui);cursor:pointer;text-align:left;transition:border-color var(--dur-micro),background var(--dur-micro)}

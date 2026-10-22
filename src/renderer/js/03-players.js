@@ -258,7 +258,7 @@ function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.
   if(window.enhanceAllSelects)try{window.enhanceAllSelects(m)}catch{} }
 // Fade-out is handled by the universal .modal-overlay [hidden] transition (08-motion.css) — just
 // flip the attribute and drop the transient class after the fade finishes.
-function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; releaseFocus(); m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
+function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; const cv=$('#pd3dCanvas'); if(cv&&cv._playerRenderer&&typeof cv._playerRenderer.destroy==='function') cv._playerRenderer.destroy(); releaseFocus(); m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
 // ============ PLAYER INSPECTOR (3-tab rework) ============
 // Overview (always read-only) · Live actions (console commands while the server runs) ·
 // Saved data (edit the .dat — server must be stopped). Separating these keeps reading, live
@@ -434,9 +434,13 @@ async function openPlayerInspector(uuid,name){
   if(saveBtn){saveBtn.disabled=state.running;if(state.running)saveBtn.setAttribute('data-tip',t('ply.stopBeforeEdit'));else saveBtn.removeAttribute('data-tip')}
   if(offHint)offHint.textContent=state.running?t('pd.stopToEdit'):'';
   $('#playerDataForm').hidden=true;$('#playerDataEmpty').hidden=false;$('#playerDataError').textContent=t('ply.loadingData');
-  if(!uuid){ const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.textContent=t('ply.uuidUnknown'); uuidEl.hidden=false; uuidEl.setAttribute('data-tip', t('ply.uuidNone')); uuidEl.onclick=null; } $('#playerDataError').textContent=t('ply.noUuidLong',{n:name});return}
   let r;
-  try{r=await window.observer.playerRead(uuid)}catch(e){$('#playerDataError').textContent=t('ply.readError',{m:e?.message||e});return}
+  try{r=await window.observer.playerRead(uuid, name)}catch(e){$('#playerDataError').textContent=t('ply.readError',{m:e?.message||e});return}
+  if(!r||!r.ok){
+    if(!uuid){ const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.textContent=t('ply.uuidUnknown'); uuidEl.hidden=false; uuidEl.setAttribute('data-tip', t('ply.uuidNone')); uuidEl.onclick=null; } $('#playerDataError').textContent=t('ply.noUuidLong',{n:name}); }
+    else { $('#playerDataError').textContent=r?.error||t('ply.unknownReadError'); }
+    return;
+  }
   if(!r||!r.ok){$('#playerDataError').textContent=r?.error||t('ply.unknownReadError');return}
   const d=r.data;
   if(!d){$('#playerDataError').textContent=t('ply.corrupt');return}

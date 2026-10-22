@@ -108,8 +108,10 @@ async function writeDatapackOrder(root, levelName, enabled) {
   if (arr.length === cur.length && arr.every((v, i) => v === cur[i])) {
     return { ok: true, enabled: cur, backup: null };
   }
-  const backup = `${file}.bak-${Date.now()}`;
-  try { fs.copyFileSync(file, backup); } catch { return { ok: false, error: 'backup' }; }
+  const { backupLevelDat } = require('./gamerules.js');
+  const bRes = backupLevelDat(file);
+  if (!bRes.ok) return bRes;
+  const backup = bRes.backup;
   // Ensure DataPacks compound exists, and set Enabled as a list-of-string. Leave Disabled alone.
   if (!data.DataPacks || !data.DataPacks.value || typeof data.DataPacks.value !== 'object') {
     data.DataPacks = { type: 'compound', name: 'DataPacks', value: {} };

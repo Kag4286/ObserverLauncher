@@ -106,6 +106,26 @@ function saveLevelAtomic(L) {
   return { ok: true };
 }
 
+const LEVEL_DAT_BACKUP_MAX = 5;
+function backupLevelDat(file, maxKeep = LEVEL_DAT_BACKUP_MAX) {
+  const backup = `${file}.bak-${Date.now()}`;
+  try {
+    fs.copyFileSync(file, backup);
+    const dir = path.dirname(file);
+    const base = path.basename(file);
+    const pattern = new RegExp(`^${base.replace(/\./g, '\\.')}\\.bak-\\d+$`);
+    const backups = fs.readdirSync(dir).filter(f => pattern.test(f)).sort();
+    if (backups.length > maxKeep) {
+      for (const old of backups.slice(0, backups.length - maxKeep)) {
+        try { fs.rmSync(path.join(dir, old), { force: true }); } catch {}
+      }
+    }
+    return { ok: true, backup };
+  } catch {
+    return { ok: false, error: 'backup' };
+  }
+}
+
 // Write a batch of game-rule changes. Backs up level.dat first. Returns { ok, changed, skipped, backup }.
 async function writeGameRules(root, levelName, changes) {
   const L = await loadLevel(root, levelName);
@@ -114,8 +134,9 @@ async function writeGameRules(root, levelName, changes) {
   const res = applyRuleChanges(rulesFromGr(data.GameRules), changes);
   if (!res.changed.length) return { ok: true, changed: [], skipped: res.skipped, backup: null };
   // Backup BEFORE mutating the file.
-  const backup = `${file}.bak-${Date.now()}`;
-  try { fs.copyFileSync(file, backup); } catch { return { ok: false, error: 'backup' }; }
+  const bRes = backupLevelDat(file);
+  if (!bRes.ok) return bRes;
+  const backup = bRes.backup;
   // Mutate the NBT tree: ensure a GameRules compound exists, then set each changed rule as a string tag.
   if (!data.GameRules || !data.GameRules.value || typeof data.GameRules.value !== 'object') {
     data.GameRules = { type: 'compound', name: 'GameRules', value: {} };
@@ -126,4 +147,4 @@ async function writeGameRules(root, levelName, changes) {
   return { ok: true, changed: res.changed, skipped: res.skipped, backup };
 }
 
-module.exports = { readGameRules, writeGameRules, applyRuleChanges, findLevelDat, loadLevel, saveLevelAtomic, RULE_RE };
+module.exports = { readGameRules, writeGameRules, applyRuleChanges, findLevelDat, loadLevel, saveLevelAtomic, backupLevelDat, RULE_RE };

@@ -10,6 +10,45 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.0.2] — 2026-10-22
+
+**Hangar version selection works as chosen, Velocity plugins can be installed, console player links look up names case-insensitively, and the 3D player inspector frees WebGL resources on close.**
+
+### Fixed: Hangar marketplace install ignored the chosen version
+
+- **Root cause:** In `src/main/marketplace.js`, `resolveMarketDownload()` for Hangar always picked `(versions.result || []).find(...)` (the latest build), completely ignoring `item.versionId` passed from the modal picker. Furthermore, when `item.versionId` was not provided, it did not filter by the server Minecraft release (`item.version`).
+- **Fix:** `resolveMarketDownload()` checks `item.versionId` (matching by version name or numeric ID). If omitted, it filters by `platformDependencies.PAPER` or `platformDependencies.VELOCITY`. The returned `versionId` now carries the version string name matching `market:detail` so manifest entries and update checks remain consistent.
+
+### Fixed: Console player link click failed on case-mismatch or whitelist players
+
+- **Root cause:** In `src/renderer/js/08-shell.js`, console player link clicks checked only `knownPlayers` using strict `===` equality. A player whose name casing differed in chat or whose record existed in `whitelist.json`, `ops.json` or `banned-players.json` resolved to a null UUID and failed to open the inspector.
+- **Fix:** Name matching is now case-insensitive (`toLowerCase()`) and checks `knownPlayers`, `whitelist`, `ops`, and `banned`. Additionally, `player:read` IPC forwards the player name so offline servers can resolve the player data file by offline UUID when a direct UUID is absent.
+
+### Fixed: 3D player inspector accumulated event listeners and leaked WebGL buffers
+
+- **Root cause:** Each time `createPlayerRenderer()` ran in `src/renderer/js/03b-player-3d.js`, it attached four pointer listeners to `#pd3dCanvas` without removing listeners from previous runs. Old closures continued firing on drag, and WebGL buffers, textures, and programs were never freed.
+- **Fix:** `createPlayerRenderer()` attaches a `destroy()` method to `canvas._playerRenderer`. It removes all pointer listeners and deletes WebGL buffers, textures, and programs. The method is called on modal close and before creating a replacement renderer on the same canvas.
+
+### Fixed: Game rules and datapack order accumulated unbounded level.dat backups
+
+- **Root cause:** Each save in `src/main/gamerules.js` and `src/main/datapack-order.js` created `level.dat.bak-<timestamp>` in the world folder without quota enforcement.
+- **Fix:** `backupLevelDat()` prunes old backups in the directory, keeping at most the 5 most recent backup files.
+
+### Added: Velocity proxy plugin support on Marketplace
+
+- Modrinth `wantedLoaders` now includes `velocity`, `waterfall`, and `bungeecord` when the active server is a Velocity proxy.
+- Hangar version resolution and detail view now parse `downloads.VELOCITY` and `downloads.WATERFALL` alongside `downloads.PAPER`.
+- The Marketplace compatibility badge marks proxy servers as compatible with plugin content.
+
+### Added: Quick MOTD colour and formatting palette
+
+- The Server Properties MOTD field includes a row of 16 Minecraft colour chips (§0 to §f) and 4 formatting chips (bold, italic, underline, reset). Clicking a chip inserts the code at the cursor position and updates the live MOTD preview immediately.
+
+### Changed: Development dependencies upgraded
+
+- `@playwright/test` upgraded to 1.64.1.
+- `electron` upgraded to 44.9.3.
+
 ## [6.0.1] — 2026-10-20
 
 **The MOTD preview shows real colours, Spigot plugins name their author, and a CurseForge pack

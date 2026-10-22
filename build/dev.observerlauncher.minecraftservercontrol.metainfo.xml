@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="6.0.2" date="2026-10-22">
+      <description>
+        <p>Marketplace builds on Hangar now honour the version you pick and match your Minecraft release, and proxy plugins for Velocity can be installed. Console player links work when the name uses different casing or lives in the whitelist. The 3D player viewer cleans up its mouse listeners and graphic resources when closed. Saving game rules or datapack order no longer leaves endless backup files behind, and the server message field gains quick colour buttons.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-6.0.2.md</url>
+    </release>
     <release version="6.0.1" date="2026-10-20">
       <description>
         <p>Bug fixes and a few honest labels. The server message preview now shows the colours the player will actually see. Spigot plugins show the author's name in the install window. Installing a CurseForge modpack no longer leaves half the pack behind when a file fails to download.</p>

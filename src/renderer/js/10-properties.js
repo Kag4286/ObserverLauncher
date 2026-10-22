@@ -53,6 +53,22 @@ const markPropsDirty=e=>{const el=e.target;if(!el||!(el.closest?.('#propertiesGr
 };
 document.addEventListener('input',markPropsDirty);
 document.addEventListener('change',markPropsDirty);
+// v6.0.2: click handler for MOTD color and format chips
+document.addEventListener('click',e=>{
+  const chip=e.target.closest('[data-motd-code]');
+  if(!chip)return;
+  const row=chip.closest('[data-prop-row]');
+  const input=row?.querySelector('input[data-property="motd"]');
+  if(!input)return;
+  e.preventDefault();
+  const code=chip.dataset.motdCode;
+  const start=input.selectionStart??input.value.length;
+  const end=input.selectionEnd??input.value.length;
+  input.value=input.value.slice(0,start)+code+input.value.slice(end);
+  input.selectionStart=input.selectionEnd=start+code.length;
+  input.focus();
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+});
 // v6.0.0 G2: server.properties history modal — list snapshots, show a line diff, restore one.
 let _propHistSel=null;
 function openPropHistory(){

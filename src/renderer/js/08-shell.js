@@ -55,17 +55,28 @@ function flushLogs(){
 function consolePlayerNames(){
   const set=new Set();
   try{ for(const p of (state.live?.players||[])){ const n=typeof p==='string'?p:(p&&p.name); if(isSafePlayerName(n)) set.add(n); } }catch{}
-  try{ const f=state.files||{}; for(const k of ['knownPlayers','whitelist','ops']){ for(const p of (f[k]||[])){ const n=typeof p==='string'?p:(p&&p.name); if(isSafePlayerName(n)) set.add(n); } } }catch{}
+  try{ const f=state.files||{}; for(const k of ['knownPlayers','whitelist','ops','banned']){ for(const p of (f[k]||[])){ const n=typeof p==='string'?p:(p&&p.name); if(isSafePlayerName(n)) set.add(n); } } }catch{}
   return [...set];
 }
-// One delegated click handler for every console player link. Resolves the UUID from known players
-// (if any) and opens the existing inspector; a name with no stored UUID still opens it (offline).
+// One delegated click handler for every console player link. Resolves the UUID case-insensitively
+// from known/whitelist/ops/banned players (if any) and opens the existing inspector; a name with no
+// stored UUID still opens it, letting the backend resolve an offline UUID.
 $('#logOutput')?.addEventListener('click',e=>{
   const a=e.target.closest('.log-player'); if(!a) return;
   e.preventDefault();
   const name=a.dataset.player; if(!isSafePlayerName(name)) return;
   let uuid=null;
-  try{ const known=state.files?.knownPlayers||[]; const hit=known.find(p=>(typeof p==='string'?p:p&&p.name)===name); if(hit&&typeof hit==='object') uuid=hit.uuid||null; }catch{}
+  try{
+    const f=state.files||{};
+    const lower=String(name).toLowerCase();
+    for(const k of ['knownPlayers','whitelist','ops','banned']){
+      const hit=(f[k]||[]).find(p=>{
+        const pn=typeof p==='string'?p:(p&&p.name);
+        return pn && String(pn).toLowerCase()===lower;
+      });
+      if(hit&&typeof hit==='object'&&hit.uuid){ uuid=hit.uuid; break; }
+    }
+  }catch{}
   if(typeof openPlayerInspector==='function') openPlayerInspector(uuid,name);
 });
 function addLog(line){ logQueue.push(line); if(!logFlushScheduled){ logFlushScheduled=true; requestAnimationFrame(flushLogs); } }
