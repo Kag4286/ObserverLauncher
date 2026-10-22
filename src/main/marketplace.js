@@ -138,7 +138,7 @@ async function resolveMarketDownload(item) {
   if (item.source === 'modrinth' || !item.source) {
     const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
     const isVel = item && (item.software === 'velocity' || item.loader === 'velocity' || item.loader === 'proxy');
-    const wantedLoaders = { plugin: isVel ? ['velocity', 'waterfall', 'bungeecord', 'paper', 'spigot', 'purpur', 'folia', 'bukkit'] : ['paper', 'spigot', 'purpur', 'folia', 'bukkit', 'velocity', 'waterfall', 'bungeecord'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
+    const wantedLoaders = { plugin: isVel ? ['velocity', 'waterfall', 'bungeecord'] : ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
     const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
     let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
     if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || null;

@@ -107,8 +107,12 @@ function saveLevelAtomic(L) {
 }
 
 const LEVEL_DAT_BACKUP_MAX = 5;
+let lastBackupTs = 0;
 function backupLevelDat(file, maxKeep = LEVEL_DAT_BACKUP_MAX) {
-  const backup = `${file}.bak-${Date.now()}`;
+  let now = Date.now();
+  if (now <= lastBackupTs) now = lastBackupTs + 1;
+  lastBackupTs = now;
+  const backup = `${file}.bak-${now}`;
   try {
     fs.copyFileSync(file, backup);
     const dir = path.dirname(file);
