@@ -10,6 +10,37 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.1.0] — 2026-10-23
+
+**Pre-start conflict detector for mods and plugins, bulk content updates with rollback, stability crash guard, and internal version inspection for loose jars.**
+
+### Added: Conflict detector for Content tab (Track C3)
+
+- `src/main/content-conflicts.js` scans the server `mods/` and `plugins/` folders before boot using existing metadata parsers (`mod-metadata.js`, `modpack-resolve.js`).
+- Flags duplicate mod IDs across multiple files, loader mismatches (such as Fabric mods placed in a NeoForge server), missing mandatory dependencies, incompatible mod declarations, and client-only mods.
+- Exposes `content:conflicts` IPC and `window.observer.contentConflicts()`.
+- Renders `#contentConflictsBanner` at the top of the Content tab with an expandable issue list, badge colours (error, warning), and per-row issue badges in the file list.
+
+### Added: Internal version inspection for loose jars (Track C1)
+
+- `src/main/content-updates.js` inspects jar metadata (`inspectJarVersion()`) for files placed manually into `mods/` or `plugins/` that lack install manifest records.
+- Displays internal version numbers in the Content table rather than leaving the column blank.
+- Preserves the `checked = present.length` contract in `checkUpdates()`.
+
+### Added: Bulk content update with rollback and stability guard (Track C2)
+
+- `applyUpdates()` in `src/main/content-updates.js` persists update transactions into `observerlauncher-update-sessions.json`. Each session stores replaced file paths, backup relative locations in `observerlauncher-content-backups/`, and previous manifest records.
+- Added `rollbackLastUpdate()`, `getLastUpdateSession()`, and `confirmUpdateSession()`.
+- Exposed `content:rollback` and `content:lastUpdate` IPC handlers and corresponding preload bindings.
+- New MCP write tool `rollback_content_update` added to `src/mcp/tools.js` and synchronized with `src/mcp/bridge.js` `STATIC_TOOLS`.
+- Added `#contentUpdateAll` ("Update all") button and `#contentRollbackUpdate` ("Roll back update") button in the Content tab toolbar menu.
+- Completion toast provides an immediate "Undo" button to roll back the applied updates.
+- Integrated with `src/main/server-lifecycle.js`: if a server crashes shortly after an update before reaching the 2-minute stability threshold, the stability guard automatically restores previous files and logs the recovery action to the console.
+
+### Added: Localization for conflict detector and rollback
+
+- Added 15 translation keys across all 7 supported locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`). Total key count reaches 1,258.
+
 ## [6.0.2] — 2026-10-22
 
 **Hangar version selection works as chosen, Velocity plugins can be installed, console player links look up names case-insensitively, and the 3D player inspector frees WebGL resources on close.**

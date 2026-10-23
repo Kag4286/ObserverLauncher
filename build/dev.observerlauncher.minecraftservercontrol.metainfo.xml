@@ -45,6 +45,12 @@
   </screenshots>
 
   <releases>
+    <release version="6.1.0" date="2026-10-23">
+      <description>
+        <p>Pre-start conflict scanner detects duplicates, wrong loaders, missing dependencies and incompatible mods directly in the Content tab. Updates can be applied in bulk with automatic file backups, immediate undo toast actions, manual rollback, and an automatic crash-recovery rollback guard. Loose jar files copied into the server folder now display their internal versions.</p>
+      </description>
+      <url>https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-6.1.0.md</url>
+    </release>
     <release version="6.0.2" date="2026-10-22">
       <description>
         <p>Marketplace builds on Hangar now honour the version you pick and match your Minecraft release, and proxy plugins for Velocity can be installed. Console player links work when the name uses different casing or lives in the whitelist. The 3D player viewer cleans up its mouse listeners and graphic resources when closed. Saving game rules or datapack order no longer leaves endless backup files behind, and the server message field gains quick colour buttons.</p>
