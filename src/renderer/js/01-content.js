@@ -45,18 +45,17 @@ function renderContentConflicts(){
   const issues=(data&&data.issues)||[];
   if(!issues.length){
     box.hidden=true;
-    if(list)list.hidden=true;
+    box.classList.remove('is-open');
     return;
   }
   box.hidden=false;
   if(title)title.textContent=t('cnt.conflictsFound',{n:issues.length});
   if(toggle){
-    const isExpanded=list&&!list.hidden;
+    const isExpanded=box.classList.contains('is-open');
     toggle.textContent=isExpanded?t('cnt.hideDetails'):t('cnt.showDetails');
     toggle.onclick=()=>{
-      if(!list)return;
-      const show=list.hidden;
-      list.hidden=!show;
+      const show=!box.classList.contains('is-open');
+      box.classList.toggle('is-open',show);
       toggle.textContent=show?t('cnt.hideDetails'):t('cnt.showDetails');
     };
   }

@@ -317,11 +317,15 @@
         </div>
         <div class="content-conflicts-banner" id="contentConflictsBanner" hidden>
           <div class="ccb-head">
-            <span class="ccb-icon" aria-hidden="true">⚠</span>
+            <div class="ccb-icon-badge" aria-hidden="true">⚠</div>
             <span class="ccb-title" id="ccbTitle"></span>
             <button type="button" class="btn xs secondary ccb-toggle" id="ccbToggle"></button>
           </div>
-          <ul class="ccb-list" id="ccbList" hidden></ul>
+          <div class="ccb-drawer" id="ccbDrawer">
+            <div class="ccb-drawer-inner">
+              <ul class="ccb-list" id="ccbList"></ul>
+            </div>
+          </div>
         </div>
         <div class="content-listwrap">
           <ul id="pluginsList" class="file-list content-list" data-dk-kind="plugin"></ul>
