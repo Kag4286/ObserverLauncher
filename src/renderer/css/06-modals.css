@@ -629,3 +629,18 @@ html.motion-lite #fileBrowser:not([hidden]),html.motion-lite #fileEditor:not([hi
 .mcp-section .sec-head h3{color:var(--accent)}
 .mcp-pill{margin-left:auto;font:700 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-dim)}
 .mcp-pill.on{border-color:rgba(0,229,160,.4);background:var(--success-weak);color:var(--success)}
+
+/* ============ CONTENT CONFLICTS (6.1.0) ============ */
+.content-conflicts-banner{margin-bottom:var(--space-3);border:1px solid var(--warn);border-radius:var(--r);background:var(--warn-soft);padding:var(--space-3) var(--space-4);display:flex;flex-direction:column;gap:var(--space-2)}
+.ccb-head{display:flex;align-items:center;gap:var(--space-3)}
+.ccb-icon{font-size:16px;color:var(--warn);line-height:1}
+.ccb-title{font:600 13px var(--font-ui);color:var(--text);flex:1}
+.ccb-list{list-style:none;padding:var(--space-2) 0 0;margin:0;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border)}
+.ccb-item{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:var(--space-3);font:500 12px var(--font-ui);color:var(--text-muted)}
+.ccb-badge{font:700 9px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:var(--r-xs);border:1px solid var(--border);color:var(--text-dim)}
+.ccb-badge.bad{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
+.ccb-badge.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.ccb-file{color:var(--text);font-weight:600}
+.file-badge{margin-left:8px;font:700 9px var(--font-mono);letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r-xs);border:1px solid var(--border);color:var(--text-dim)}
+.file-badge.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+

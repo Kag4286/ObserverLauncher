@@ -233,6 +233,13 @@ function registerContent(ipcMain, ctx) {
     try { const { checkUpdates } = require('./content-updates.js'); return await checkUpdates(ctx.currentServerPath); }
     catch (e) { return { ok: false, error: e?.message || 'Could not check for updates.' }; }
   });
+  ipcMain.handle('content:conflicts', async () => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.', issues: [] };
+    try {
+      const { scanContentConflicts } = require('./content-conflicts.js');
+      return await scanContentConflicts(ctx.currentServerPath);
+    } catch (e) { return { ok: false, error: e?.message || 'Could not check for conflicts.', issues: [] }; }
+  });
   ipcMain.handle('content:update', async (_, { names } = {}) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     if (ctx.serverProcess) return { ok: false, error: 'Stop the server before updating content - a running server locks its jars.' };

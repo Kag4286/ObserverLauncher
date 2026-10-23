@@ -30,6 +30,18 @@ function updatable(entry) {
   return { kind: entry.kind || 'plugin', projectId: entry.projectId, versionId: entry.versionId || null, gameVersion: entry.gameVersion || null, source: entry.source };
 }
 
+function inspectJarVersion(folder, fileName) {
+  try {
+    const { openJar } = require('./jar-read.js');
+    const { classifyJar } = require('./mod-metadata.js');
+    const jar = openJar(path.join(folder, fileName));
+    const cls = classifyJar(jar.read, fileName);
+    return (cls && cls.version) ? cls.version : null;
+  } catch {
+    return null;
+  }
+}
+
 // opts.resolve is injectable so tests run offline. Returns { ok, checked, updates, items:[...] }.
 async function checkUpdates(root, opts) {
   const o = opts || {};
@@ -50,7 +62,12 @@ async function checkUpdates(root, opts) {
   const items = [];
   for (const e of present) {
     const u = updatable(e);
-    if (!u) { items.push({ fileName: e.fileName, source: e.source || null, status: 'unknown', version: e.version || null, reason: 'installed before update tracking (no project id)' }); continue; }
+    if (!u) {
+      const folder = contentFolder(e.kind || 'plugin', levelName);
+      const version = e.version || inspectJarVersion(path.join(root, folder), e.fileName);
+      items.push({ fileName: e.fileName, source: e.source || null, status: 'unknown', version, reason: 'installed before update tracking (no project id)' });
+      continue;
+    }
     // Spigot has no public version API, so versionId is always null - report it explicitly instead
     // of 'current' or a bogus 'update', so an AI does not keep guessing.
     if (u.source === 'spigot') { items.push({ fileName: e.fileName, source: 'spigot', status: 'manual', reason: 'Spigot has no version API - check the resource page manually.' }); continue; }
@@ -68,6 +85,29 @@ async function checkUpdates(root, opts) {
       items.push({ fileName: e.fileName, source: u.source, status: 'error', error: err?.message || String(err) });
     }
   }
+
+  // v6.1.0 C1: inspect loose jars on disk that have no manifest entry so their versions appear on the UI
+  const manifestFiles = new Set(present.map(e => String(e.fileName).toLowerCase()));
+  const sFiles = require('./server-files.js').serverFiles(root);
+  const loose = [];
+  for (const f of sFiles.plugins || []) {
+    if (!manifestFiles.has(String(f).toLowerCase())) loose.push({ fileName: f, kind: 'plugin' });
+  }
+  for (const f of sFiles.mods || []) {
+    if (!manifestFiles.has(String(f).toLowerCase())) loose.push({ fileName: f, kind: 'mod' });
+  }
+  for (const it of loose) {
+    const folder = contentFolder(it.kind, levelName);
+    const version = inspectJarVersion(path.join(root, folder), it.fileName);
+    items.push({
+      fileName: it.fileName,
+      source: null,
+      status: 'unknown',
+      version,
+      reason: 'manually installed jar (no project id)'
+    });
+  }
+
   return { ok: true, checked: present.length, updates: items.filter(i => i.status === 'update').length, items };
 }
 

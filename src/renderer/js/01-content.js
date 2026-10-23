@@ -27,7 +27,54 @@ async function loadContentUpdates(btn){
   }catch{state.contentUpdates=null}
   if(btn)btn.disabled=false;
   renderContentUpdatesPill();
+  loadContentConflicts();
   refreshUI();
+}
+async function loadContentConflicts(){
+  if(!window.observer.contentConflicts)return;
+  try{
+    const r=await window.observer.contentConflicts();
+    state.contentConflicts=(r&&r.ok===false)?r:null;
+  }catch{state.contentConflicts=null}
+  renderContentConflicts();
+}
+function renderContentConflicts(){
+  const box=$('#contentConflictsBanner'),title=$('#ccbTitle'),list=$('#ccbList'),toggle=$('#ccbToggle');
+  if(!box)return;
+  const data=state.contentConflicts;
+  const issues=(data&&data.issues)||[];
+  if(!issues.length){
+    box.hidden=true;
+    if(list)list.hidden=true;
+    return;
+  }
+  box.hidden=false;
+  if(title)title.textContent=t('cnt.conflictsFound',{n:issues.length});
+  if(toggle){
+    const isExpanded=list&&!list.hidden;
+    toggle.textContent=isExpanded?t('cnt.hideDetails'):t('cnt.showDetails');
+    toggle.onclick=()=>{
+      if(!list)return;
+      const show=list.hidden;
+      list.hidden=!show;
+      toggle.textContent=show?t('cnt.hideDetails'):t('cnt.showDetails');
+    };
+  }
+  if(list){
+    list.innerHTML=issues.map(iss=>{
+      const isDup=iss.type==='duplicate';
+      const isMismatch=iss.type==='loader-mismatch';
+      const isMissing=iss.type==='missing-dep';
+      const badgeClass=isDup?'bad':isMismatch?'bad':isMissing?'warn':'';
+      let badgeText=t('cnt.conflictBadge');
+      if(iss.type==='duplicate')badgeText=t('cnt.issue_duplicate');
+      else if(iss.type==='loader-mismatch')badgeText=t('cnt.issue_loader_mismatch');
+      else if(iss.type==='missing-dep')badgeText=t('cnt.issue_missing_dep');
+      else if(iss.type==='conflict')badgeText=t('cnt.issue_conflict');
+      else if(iss.type==='client-only')badgeText=t('cnt.issue_client_only');
+      return `<li class="ccb-item"><span class="ccb-badge ${badgeClass}">${esc(badgeText)}</span><span class="ccb-file mono">${esc(iss.fileName||iss.neededBy||'')}</span><span class="ccb-detail">${esc(iss.detail)}</span></li>`;
+    }).join('');
+  }
 }
 function renderContentUpdatesPill(){
   const pill=$('#contentUpdatesPill');if(!pill)return;
@@ -134,12 +181,15 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
     return;
   }
   const upd=(state.contentUpdates&&state.contentUpdates.byFile)||{};
+  const conflictList=(state.contentConflicts&&state.contentConflicts.issues)||[];
   node.innerHTML=files.map(x=>{
     const off=/\.disabled$/i.test(x);
     const info=upd[x]||null;
     // version badge: shows the installed version, and "-> latest" when an update is available.
     const ver=info&&info.version?`<span class="file-ver mono">${esc(info.version)}${info.status==='update'&&info.latestNumber?' → '+esc(info.latestNumber):''}</span>`:'';
     const upBtn=(info&&info.status==='update'&&!off)?`<button class="text-btn" data-update-content="${esc(kind)}" data-update-file="${esc(x)}">${esc(t('cnt.update'))}</button>`:'';
+    const fileConflict=conflictList.find(iss=>String(iss.fileName||iss.neededBy).toLowerCase()===String(x).toLowerCase());
+    const conflictBadge=fileConflict?`<span class="file-badge warn" title="${esc(fileConflict.detail)}">⚠ ${esc(t('cnt.conflictBadge'))}</span>`:'';
     // v6.0.0 C5: datapack-only actions. Check validates pack_format against the server MC version;
     // Extract turns a .zip datapack into a folder (disabled for a folder already, and for `.disabled`).
     let dpBtns='';
@@ -147,13 +197,13 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
       dpBtns+='<button class="text-btn" data-validate-dp="'+esc(x)+'">'+esc(t('cnt.validate'))+'</button>';
       if(/\.zip$/i.test(x)) dpBtns+='<button class="text-btn" data-extract-dp="'+esc(x)+'">'+esc(t('cnt.extract'))+'</button>';
     }
-    return `<li data-name="${esc(x)}" class="${off?'is-disabled':''}" title="${esc(x)}"><span class="file-name">${esc(x)}</span>${ver}${dpBtns}<button class="text-btn" data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}">${esc(t(off?'cnt.enable':'cnt.disable'))}</button>${upBtn}<button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`}).join('');
+    return `<li data-name="${esc(x)}" class="${off?'is-disabled':''}" title="${esc(x)}"><span class="file-name">${esc(x)}</span>${ver}${conflictBadge}${dpBtns}<button class="text-btn" data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}">${esc(t(off?'cnt.enable':'cnt.disable'))}</button>${upBtn}<button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`}).join('');
   // CB6 (v3.3.0): enable/disable a content file (rename <name> <-> <name>.disabled). Cheap + reversible.
   if(kind==='datapack') { try{ renderDatapackOrder(); }catch{} }
-  node.querySelectorAll('[data-toggle-content]').forEach(b=>b.onclick=async()=>{const r=await window.observer.toggleContent({kind,fileName:b.dataset.toggleFile});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI()});
+  node.querySelectorAll('[data-toggle-content]').forEach(b=>b.onclick=async()=>{const r=await window.observer.toggleContent({kind,fileName:b.dataset.toggleFile});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();loadContentConflicts()});
   // CB5 (v3.3.0): update one file to its newer build (backup first). Refused while the server runs.
   node.querySelectorAll('[data-update-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.updateFile;if(!await confirmDialog({title:t('cnt.update'),body:t('cnt.confirmUpdate',{n:file}),ok:t('cnt.update')}))return;const r=await window.observer.contentUpdate({names:[file]});if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:file}),'error');state.files=r.files||state.files;await loadContentUpdates();toast(t('toast.updated',{n:file}),'success')});
-  node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('toast.deleted',{n:file}),'success')});
+  node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();loadContentConflicts();toast(t('toast.deleted',{n:file}),'success')});
   // v6.0.0 C5a: validate a datapack's pack_format against the server's MC version. Read-only; the
   // toast shape matches the level the backend reports (ok / warn / unknown).
   node.querySelectorAll('[data-validate-dp]').forEach(b=>b.onclick=async()=>{const file=b.dataset.validateDp;b.disabled=true;let r;try{ r=await window.observer.contentValidateDatapack(file); }catch(e){ b.disabled=false; return toast(e?.message||'Validate failed.','error'); }b.disabled=false;if(!r||!r.ok)return toast((r&&r.error)||'Validate failed.','error');const lvl=r.result&&r.result.level;const note=r.result&&r.result.note||'';toast(note,lvl==='ok'?'success':lvl==='warn'?'error':undefined)});
