@@ -74,6 +74,23 @@ function recordSpawnedProcess(ctx, serverPath) {
   // v3.2.0 D4: record a persistent run-start so a crash that takes the launcher down with it can
   // still be classified on the next boot. Guarded - stability tracking must never break a spawn.
   try { require('./stability.js').noteStart(instanceId); } catch {}
+  // v6.1.0 C2: Check if there is a pending content update session to monitor for stability.
+  try {
+    const { getLastUpdateSession, confirmUpdateSession } = require('./content-updates.js');
+    const sess = getLastUpdateSession(serverPath);
+    if (sess && sess.status === 'pending') {
+      ctx.pendingUpdateSession = sess.id;
+      clearTimeout(ctx.stabilityTimer);
+      ctx.stabilityTimer = setTimeout(() => {
+        try {
+          if (ctx.serverProcess && ctx.pendingUpdateSession === sess.id) {
+            confirmUpdateSession(serverPath, sess.id);
+            ctx.pendingUpdateSession = null;
+          }
+        } catch {}
+      }, 120000);
+    }
+  } catch {}
   Promise.resolve(platform.getProcessInfo(proc.pid)).then(info => {
     if (info && info.startTimeMs && ctx.serverProcess === proc) {
       setInstanceProcess(instanceId, { pid: proc.pid, processStartedAt: info.startTimeMs, serverPath });
@@ -462,6 +479,19 @@ async function startServerInternal(ctx, settings) {
       if (!wasManual) {
         const d = st.decideRollback(rec);
         if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
+      }
+    } catch {}
+    // v6.1.0 C2: Automatic rollback if server crashed shortly after a content update
+    try {
+      clearTimeout(ctx.stabilityTimer);
+      if (!wasManual && ctx.pendingUpdateSession) {
+        const { rollbackLastUpdate } = require('./content-updates.js');
+        const rb = rollbackLastUpdate(ctx.currentServerPath, ctx.pendingUpdateSession);
+        if (rb && rb.ok && rb.rolledBackCount > 0) {
+          ctx.appendLog(`Stability guard: Server crashed after content update. Rolled back ${rb.rolledBackCount} item(s) to restore stability.`, 'error');
+          if (typeof ctx.send === 'function') ctx.send('content:update-rolled-back', { sessionId: ctx.pendingUpdateSession, rolledBack: rb.rolledBack });
+        }
+        ctx.pendingUpdateSession = null;
       }
     } catch {}
     // v6.0.0 D2: on an UNEXPECTED exit, analyse the newest crash report (if any) and push a summary to

@@ -249,6 +249,22 @@ function registerContent(ipcMain, ctx) {
       return { ...r, files: serverFiles(ctx.currentServerPath) };
     } catch (e) { return { ok: false, error: e?.message || 'Could not update content.' }; }
   });
+  ipcMain.handle('content:rollback', async (_, { sessionId } = {}) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverProcess) return { ok: false, error: 'Stop the server before rolling back content updates.' };
+    try {
+      const { rollbackLastUpdate } = require('./content-updates.js');
+      const r = rollbackLastUpdate(ctx.currentServerPath, sessionId);
+      return { ...r, files: serverFiles(ctx.currentServerPath) };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not roll back content update.' }; }
+  });
+  ipcMain.handle('content:lastUpdate', async () => {
+    if (!ctx.currentServerPath) return { ok: false, session: null };
+    try {
+      const { getLastUpdateSession } = require('./content-updates.js');
+      return { ok: true, session: getLastUpdateSession(ctx.currentServerPath) };
+    } catch (e) { return { ok: false, session: null }; }
+  });
 
   ipcMain.handle('content:import', async (_, kind) => {
     const levelName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';

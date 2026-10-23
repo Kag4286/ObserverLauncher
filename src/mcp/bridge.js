@@ -201,6 +201,7 @@ const STATIC_TOOLS = [
   ['list_content', 'Plugins, mods and datapacks (mods carry a loader flag).'],
   ['check_updates', 'Check the install manifest against the registry for newer builds of installed plugins/mods. Read-only.'],
   ['update_content', 'Install newer builds over installed plugins/mods (backs up the replaced file). Pass names[] to limit to specific files; omit to update everything with an update. Pass version to also move to a new Minecraft version. One confirmation for the batch.'],
+  ['rollback_content_update', 'Roll back the most recent content update batch (or a specific sessionId) using the automated backups. Refuses while the server runs.'],
   ['get_properties', 'Parsed server.properties.'],
   ['get_raw_properties', 'Raw velocity.toml content.'],
   ['get_world_info', 'Seed, spawn, players and waypoints.'],

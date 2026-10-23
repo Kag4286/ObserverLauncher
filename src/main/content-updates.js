@@ -15,12 +15,14 @@ function writeContentBackup(folderAbs, srcFile, originalName) {
   const dir = path.join(folderAbs, CONTENT_BACKUP_DIR);
   fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  fs.copyFileSync(srcFile, path.join(dir, `${stamp}-${originalName}`));
+  const backupRel = path.join(CONTENT_BACKUP_DIR, `${stamp}-${originalName}`);
+  fs.copyFileSync(srcFile, path.join(folderAbs, backupRel));
   // Prune: name sort == chronological (timestamp prefix), keep the newest MAX.
   try {
     const files = fs.readdirSync(dir).filter(f => fs.statSync(path.join(dir, f)).isFile()).sort();
     for (const f of files.slice(0, Math.max(0, files.length - CONTENT_BACKUP_MAX))) fs.rmSync(path.join(dir, f), { force: true });
   } catch {}
+  return backupRel;
 }
 
 // PURE: an entry can be update-checked only when it recorded a projectId + source (CB2). Old
@@ -115,6 +117,114 @@ async function checkUpdates(root, opts) {
 // file to <name>.bak first (inert — the server never loads a .bak). Injectable download/resolve/verify
 // so tests run offline. ONE call handles a whole batch (like assemble_modpack). opts.names limits to
 // specific fileNames; omit to update every item that has a newer build.
+const UPDATE_SESSIONS_FILE = 'observerlauncher-update-sessions.json';
+const MAX_SESSIONS = 10;
+
+function recordUpdateSession(root, session) {
+  const { readJsonList, writeJsonList } = require('./fs-utils.js');
+  try {
+    const list = readJsonList(root, UPDATE_SESSIONS_FILE) || [];
+    list.push(session);
+    const pruned = list.slice(-MAX_SESSIONS);
+    writeJsonList(root, UPDATE_SESSIONS_FILE, pruned);
+  } catch {}
+}
+
+function getLastUpdateSession(root) {
+  const { readJsonList } = require('./fs-utils.js');
+  try {
+    const list = readJsonList(root, UPDATE_SESSIONS_FILE) || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i] && list[i].status !== 'rolled_back') return list[i];
+    }
+  } catch {}
+  return null;
+}
+
+function confirmUpdateSession(root, sessionId) {
+  const { readJsonList, writeJsonList } = require('./fs-utils.js');
+  try {
+    const list = readJsonList(root, UPDATE_SESSIONS_FILE) || [];
+    let updated = false;
+    for (const s of list) {
+      if (s && s.status === 'pending' && (!sessionId || s.id === sessionId)) {
+        s.status = 'confirmed';
+        s.confirmedAt = new Date().toISOString();
+        updated = true;
+      }
+    }
+    if (updated) writeJsonList(root, UPDATE_SESSIONS_FILE, list);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+function rollbackLastUpdate(root, sessionId) {
+  const { safeTarget, readJsonList, writeJsonList } = require('./fs-utils.js');
+  const list = readJsonList(root, UPDATE_SESSIONS_FILE) || [];
+  let targetSession = null;
+  if (sessionId) {
+    targetSession = list.find(s => s && s.id === sessionId && s.status !== 'rolled_back');
+  } else {
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i] && list[i].status !== 'rolled_back') { targetSession = list[i]; break; }
+    }
+  }
+  if (!targetSession || !Array.isArray(targetSession.items) || !targetSession.items.length) {
+    return { ok: false, error: 'No update session available to roll back.' };
+  }
+
+  const rolledBack = [];
+  const errors = [];
+  let manifest = readJsonList(root, 'observerlauncher-manifest.json') || [];
+
+  for (const item of targetSession.items) {
+    try {
+      const folderAbs = safeTarget(root, item.folder || 'plugins');
+      if (!folderAbs) {
+        errors.push({ fileName: item.from, error: 'Unsafe folder path.' });
+        continue;
+      }
+      const newPath = safeTarget(folderAbs, item.to);
+      const oldPath = safeTarget(folderAbs, item.from);
+      const backupPath = item.backupRel ? safeTarget(folderAbs, item.backupRel) : null;
+
+      if (!backupPath || !fs.existsSync(backupPath)) {
+        errors.push({ fileName: item.from, error: `Backup file not found for ${item.from}.` });
+        continue;
+      }
+
+      if (newPath && fs.existsSync(newPath)) {
+        try { fs.rmSync(newPath, { force: true }); } catch {}
+      }
+
+      if (oldPath) {
+        fs.copyFileSync(backupPath, oldPath);
+      }
+
+      manifest = manifest.filter(e => e && e.fileName !== item.to && e.fileName !== item.from);
+      if (item.previousManifestEntry) {
+        manifest.push(item.previousManifestEntry);
+      }
+
+      rolledBack.push({ from: item.to, to: item.from });
+    } catch (err) {
+      errors.push({ fileName: item.from, error: err?.message || String(err) });
+    }
+  }
+
+  try { writeJsonList(root, 'observerlauncher-manifest.json', manifest); } catch {}
+  targetSession.status = 'rolled_back';
+  targetSession.rolledBackAt = new Date().toISOString();
+  try { writeJsonList(root, UPDATE_SESSIONS_FILE, list); } catch {}
+
+  return { ok: true, rolledBackCount: rolledBack.length, rolledBack, errors };
+}
+
+// Apply the updates checkUpdates found: download the newer build over the old, backing up the old
+// file first. Injectable download/resolve/verify so tests run offline. ONE call handles a whole batch.
+// opts.names limits to specific fileNames; omit to update every item that has a newer build.
 async function applyUpdates(root, opts) {
   const o = opts || {};
   const resolve = o.resolve || require('./marketplace.js').resolveMarketDownload;
@@ -131,6 +241,7 @@ async function applyUpdates(root, opts) {
   const gameVersion = String(o.version || '').trim() || null;
   const manifest = readJsonList(root, 'observerlauncher-manifest.json') || [];
   const out = { ok: true, updated: [], skipped: [], errors: [] };
+  const sessionItems = [];
   for (const e of manifest) {
     if (!e || !e.fileName) continue;
     if (targets && !targets.includes(e.fileName)) continue;
@@ -146,7 +257,10 @@ async function applyUpdates(root, opts) {
       const oldPath = safeTarget(root, path.join(folder, e.fileName));
       if (!destNew) { out.errors.push({ fileName: e.fileName, error: 'Unsafe destination path.' }); continue; }
       fs.mkdirSync(path.dirname(destNew), { recursive: true });
-      if (oldPath && fs.existsSync(oldPath)) { try { writeContentBackup(path.dirname(oldPath), oldPath, e.fileName); } catch {} }
+      let backupRel = null;
+      if (oldPath && fs.existsSync(oldPath)) {
+        try { backupRel = writeContentBackup(path.dirname(oldPath), oldPath, e.fileName); } catch {}
+      }
       await download(dl.url, destNew, null, null, { maxBytes: 512 * 1024 * 1024 });
       const vh = verify(destNew, dl.hashes);
       if (!vh.ok) { try { fs.rmSync(destNew, { force: true }); } catch {} out.errors.push({ fileName: e.fileName, error: vh.error }); continue; }
@@ -159,9 +273,42 @@ async function applyUpdates(root, opts) {
         } catch {}
       }
       out.updated.push({ from: e.fileName, to: newName });
+      sessionItems.push({
+        kind: u.kind,
+        folder,
+        from: e.fileName,
+        to: newName,
+        backupRel,
+        previousManifestEntry: { ...e }
+      });
     } catch (err) { out.errors.push({ fileName: e.fileName, error: err?.message || String(err) }); }
   }
+
+  if (sessionItems.length > 0) {
+    const sessionId = 'upd-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    const session = {
+      id: sessionId,
+      timestamp: Date.now(),
+      iso: new Date().toISOString(),
+      status: 'pending',
+      items: sessionItems
+    };
+    recordUpdateSession(root, session);
+    out.sessionId = sessionId;
+  }
+
   return out;
 }
 
-module.exports = { updatable, checkUpdates, applyUpdates, writeContentBackup, CONTENT_BACKUP_DIR };
+module.exports = {
+  updatable,
+  checkUpdates,
+  applyUpdates,
+  writeContentBackup,
+  CONTENT_BACKUP_DIR,
+  rollbackLastUpdate,
+  getLastUpdateSession,
+  confirmUpdateSession,
+  recordUpdateSession
+};
+

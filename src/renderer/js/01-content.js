@@ -76,11 +76,39 @@ function renderContentConflicts(){
     }).join('');
   }
 }
-function renderContentUpdatesPill(){
-  const pill=$('#contentUpdatesPill');if(!pill)return;
+async function renderContentUpdatesPill(){
+  const pill=$('#contentUpdatesPill'), upAll=$('#contentUpdateAll'), rbBtn=$('#contentRollbackUpdate');
   const n=state.contentUpdates?state.contentUpdates.updates:0;
-  if(n>0){pill.hidden=false;pill.textContent=t('cnt.updatesAvailable',{n});pill.classList.add('accent')}
-  else{pill.hidden=true}
+  if(pill){
+    if(n>0){pill.hidden=false;pill.textContent=t('cnt.updatesAvailable',{n});pill.classList.add('accent')}
+    else{pill.hidden=true}
+  }
+  if(upAll){
+    upAll.hidden=n<=0;
+  }
+  if(rbBtn && window.observer && window.observer.contentLastUpdate){
+    try{
+      const r=await window.observer.contentLastUpdate();
+      rbBtn.hidden=!r || !r.session || r.session.status==='rolled_back';
+      if(r && r.session && r.session.items){
+        state.lastUpdateSession=r.session;
+      }else{
+        state.lastUpdateSession=null;
+      }
+    }catch{
+      rbBtn.hidden=true;
+      state.lastUpdateSession=null;
+    }
+  }
+}
+async function rollbackLastContentUpdate(sessionId){
+  if(!window.observer || !window.observer.contentRollback)return;
+  const r=await window.observer.contentRollback({sessionId});
+  if(!r||!r.ok)return toast((r&&r.error)||t('toast.rollbackFailed',{m:'error'}),'error');
+  state.files=r.files||state.files;
+  await loadContentUpdates();
+  refreshUI();
+  toast(t('toast.rollbackSuccess',{n:r.rolledBackCount||1}),'success');
 }
 function jumpToMarket(kind){
   switchTab('marketplace');
@@ -202,7 +230,7 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
   if(kind==='datapack') { try{ renderDatapackOrder(); }catch{} }
   node.querySelectorAll('[data-toggle-content]').forEach(b=>b.onclick=async()=>{const r=await window.observer.toggleContent({kind,fileName:b.dataset.toggleFile});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();loadContentConflicts()});
   // CB5 (v3.3.0): update one file to its newer build (backup first). Refused while the server runs.
-  node.querySelectorAll('[data-update-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.updateFile;if(!await confirmDialog({title:t('cnt.update'),body:t('cnt.confirmUpdate',{n:file}),ok:t('cnt.update')}))return;const r=await window.observer.contentUpdate({names:[file]});if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:file}),'error');state.files=r.files||state.files;await loadContentUpdates();toast(t('toast.updated',{n:file}),'success')});
+  node.querySelectorAll('[data-update-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.updateFile;if(!await confirmDialog({title:t('cnt.update'),body:t('cnt.confirmUpdate',{n:file}),ok:t('cnt.update')}))return;const r=await window.observer.contentUpdate({names:[file]});if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:file}),'error');state.files=r.files||state.files;await loadContentUpdates();toast(t('toast.updated',{n:file}),'success',{label:t('toast.undo'),fn:()=>rollbackLastContentUpdate(r.sessionId)})});
   node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();loadContentConflicts();toast(t('toast.deleted',{n:file}),'success')});
   // v6.0.0 C5a: validate a datapack's pack_format against the server's MC version. Read-only; the
   // toast shape matches the level the backend reports (ok / warn / unknown).
@@ -214,6 +242,50 @@ function renderFiles(id,files,kind){const node=$(id);if(!node) return;
 $$('#contentSeg .seg').forEach(b=>b.onclick=()=>setContentKind(b.dataset.ckind));
 $('#contentFilter')?.addEventListener('input',filterContentList);
 $('#contentCheckUpdates')?.addEventListener('click',e=>loadContentUpdates(e.currentTarget));
+$('#contentUpdateAll')?.addEventListener('click',async()=>{
+  const n=state.contentUpdates?state.contentUpdates.updates:0;
+  if(n<=0)return;
+  if(state.running){
+    return toast(t('cnt.confirmRunningDelete'),'error');
+  }
+  if(!await confirmDialog({
+    title:t('cnt.updateAll'),
+    body:t('cnt.confirmUpdateAll',{n}),
+    ok:t('cnt.updateAll')
+  }))return;
+  const r=await window.observer.contentUpdate({names:null});
+  if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:'all'}),'error');
+  state.files=r.files||state.files;
+  await loadContentUpdates();
+  refreshUI();
+  const updatedCount=r.updated?r.updated.length:n;
+  toast(t('toast.updated',{n:updatedCount}),'success',{
+    label:t('toast.undo'),
+    fn:()=>rollbackLastContentUpdate(r.sessionId)
+  });
+});
+
+$('#contentRollbackUpdate')?.addEventListener('click',async()=>{
+  const sess=state.lastUpdateSession;
+  const count=(sess&&sess.items)?sess.items.length:1;
+  if(!await confirmDialog({
+    title:t('cnt.rollbackUpdate'),
+    body:t('cnt.confirmRollback',{n:count}),
+    ok:t('cnt.rollbackUpdate'),
+    danger:true
+  }))return;
+  await rollbackLastContentUpdate(sess?.id);
+});
+
+if(window.observer&&window.observer.onContentRolledBack){
+  window.observer.onContentRolledBack(d=>{
+    window.observer.getFiles().then(r=>{
+      if(r&&r.ok){state.files=r.files;refreshUI();}
+      loadContentUpdates();
+    });
+    toast(t('toast.rollbackSuccess',{n:d?.rolledBack?.length||1}),'warn');
+  });
+}
 
 // ============ v4.0.0 CONTENT UX: reveal + right-click ============
 // The three lists share a delegation root so a row can be revealed in the OS file manager

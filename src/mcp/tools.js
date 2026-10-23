@@ -864,6 +864,12 @@ async function tUpdateContent(ctx, a) {
   const { applyUpdates } = require('../main/content-updates.js');
   return await applyUpdates(root, { names: Array.isArray(a.names) ? a.names : null, version: a.version ? String(a.version) : null });
 }
+async function tRollbackContentUpdate(ctx, a) {
+  const root = needPath(ctx);
+  if (ctx.serverProcess) return { ok: false, error: 'Stop the server before rolling back content updates.' };
+  const { rollbackLastUpdate } = require('../main/content-updates.js');
+  return rollbackLastUpdate(root, a?.sessionId || null);
+}
 async function tGetSchedule(ctx) {
   // M12: the TARGET instance's schedule, not the active one.
   const s = loadSettingsFor(ctx.inst());
@@ -1259,6 +1265,7 @@ const TOOLS = [
   { name: 'list_content', risk: 'read', description: 'Plugins, mods and datapacks (mods carry a loader flag + loaderMismatch when they do not match the server).', inputSchema: S(), handler: tListContent },
   { name: 'check_updates', risk: 'read', description: 'Check the install manifest against the registry for newer builds of installed plugins/mods. Read-only.', inputSchema: S(), handler: tCheckUpdates },
   { name: 'update_content', risk: 'write', description: 'Install newer builds over installed plugins/mods (backs up the replaced file). Pass names[] to limit to specific files; omit to update everything with an update. Pass version to also move to a new Minecraft version. One confirmation for the batch.', inputSchema: S({ names: { type: 'array', items: { type: 'string' }, description: 'file names to update (optional, default all)' }, version: STR('target Minecraft version, e.g. 1.21.4 (optional; default = the version each item was installed for)') }), handler: tUpdateContent },
+  { name: 'rollback_content_update', risk: 'write', description: 'Roll back the most recent content update batch (or a specific sessionId) using the automated backups. Refuses while the server runs.', inputSchema: S({ sessionId: STR('update session id to roll back (optional; default = the most recent pending or active update session)') }), handler: tRollbackContentUpdate },
   { name: 'check_mod_compat', risk: 'read', description: 'Pre-start scan of mods/: reports jars for the wrong loader, client-only mods, MISSING required dependencies (read from each jar metadata, incl. non-registry deps), and CONFLICTS (a declared type="incompatible" mod that is installed). Run before start_server to catch the crash chain early.', inputSchema: S(), handler: tCheckModCompat },
   { name: 'read_crash_report', risk: 'read', description: 'Read a crash-report from crash-reports/ (default newest; pass name). Path is confined to the server folder (unlike read_file, which is rooted at the project).', inputSchema: S({ name: STR('crash report file name (optional, default newest)') }), handler: tReadCrashReport },
   { name: 'get_properties', risk: 'read', description: 'Parsed server.properties.', inputSchema: S(), handler: tGetProperties },
