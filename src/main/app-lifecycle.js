@@ -161,13 +161,16 @@ async function initApp(ctx, ipcMain) {
   cleanOrphanTmp(app.getPath('userData'));
   textures.init({
     serverNames: () => {
-      try { const i = serverFiles(ctx.currentServerPath); return [i.jar, i.launchScript].filter(Boolean); }
-      catch { return []; }
+      try {
+        const root = ctx.currentServerPath || ctx.instances?.get(ctx.activeInstanceId || ctx.inst())?.serverPath || loadSettings().serverPath;
+        const i = serverFiles(root);
+        return [i.jar, i.launchScript].filter(Boolean);
+      } catch { return []; }
     },
     // FEATURE (v6.0.0): mod item icons read their PNG straight from the server's mods/*.jar,
     // because the PrismarineJS mirror is vanilla-only. A getter so the active instance can change.
     modsDir: () => {
-      const root = ctx.currentServerPath;
+      const root = ctx.currentServerPath || ctx.instances?.get(ctx.activeInstanceId || ctx.inst())?.serverPath || loadSettings().serverPath;
       return root ? path.join(root, 'mods') : null;
     }
   });

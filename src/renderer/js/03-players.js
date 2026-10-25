@@ -3,11 +3,15 @@
 // TEXT-ONLY item display — no textures, just readable labels. Keeps the same IDs so save logic is untouched.
 function itemLabel(id){
   const raw=String(id||'');
-  // Keep the namespace when it's a MOD's: "create:wrench" must not render as the vanilla
-  // "Wrench" -- different items, and the player would be looking at the wrong thing.
-  const i=raw.indexOf(':');
-  if(i>0)return (raw.slice(0,i)+' '+raw.slice(i+1)).replace(/[_.]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-  return raw.replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||t('ply.unknownItem')
+  if(!raw)return t('ply.unknownItem');
+  const isVanilla=!raw.includes(':')||raw.startsWith('minecraft:');
+  if(!isVanilla){
+    const i=raw.indexOf(':');
+    const ns=raw.slice(0,i);
+    const nm=raw.slice(i+1);
+    return (ns+' '+nm).replace(/[_.]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  }
+  return raw.replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||t('ply.unknownItem');
 }
 // Durability bar colour follows the game's own convention: green -> yellow -> red.
 function durColor(d){const r=d.remaining/d.max;return r>0.5?'var(--success)':r>0.25?'#e2b93b':'#e05a4a'}
@@ -18,38 +22,57 @@ const romanNum=n=>ROMAN[n]||String(n);
 function itemTooltip(x,label){
   const lines=[label];
   if(x.customName&&x.customName!==label)lines.push(itemLabel(x.id));
-  for(const e of x.enchantments||[])lines.push(`${itemLabel(e.id)} ${romanNum(e.level)}`);
-  for(const e of x.storedEnchantments||[])lines.push(`${itemLabel(e.id)} ${romanNum(e.level)}`);
-  if(x.durability)lines.push(`${x.durability.remaining} / ${x.durability.max}`);
-  lines.push(`×${x.count}`,x.id);
+  for(const e of x.enchantments||[])lines.push(`✨ ${itemLabel(e.id)} ${romanNum(e.level)}`);
+  for(const e of x.storedEnchantments||[])lines.push(`✨ ${itemLabel(e.id)} ${romanNum(e.level)}`);
+  if(x.durability)lines.push(`Durability: ${x.durability.remaining} / ${x.durability.max}`);
+  lines.push(`×${x.count} · ${x.id}`);
   return esc(lines.join('\n'));
+}
+function itemTooltipHtml(x,label){
+  const parts=[];
+  parts.push(`<div class="tip-title">${esc(label)}</div>`);
+  if(x.customName&&x.customName!==label)parts.push(`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`);
+  const enchs=[...(x.enchantments||[]),...(x.storedEnchantments||[])];
+  if(enchs.length){
+    parts.push(enchs.map(e=>`<div class="tip-ench">✨ ${esc(itemLabel(e.id))} ${romanNum(e.level)}</div>`).join(''));
+  }
+  if(x.durability){
+    const pct=Math.round(x.durability.remaining/x.durability.max*100);
+    const col=durColor(x.durability);
+    parts.push(`<div class="tip-dur" style="color:${col}">Durability: ${x.durability.remaining} / ${x.durability.max} (${pct}%)</div>`);
+  }
+  parts.push(`<div class="tip-meta"><span>×${x.count}</span><span>${esc(x.id)}</span></div>`);
+  return esc(parts.join(''));
 }
 // ONE place decides which tex:// URL an item id maps to. The inventory grid used to carry this
 // logic inline while the equipment row did not, so a mod item worn as armor fell through to the
 // initials badge even though the mod jar had the texture. Both call this now.
+let iconEpoch = 0;
 function itemIconUrl(id){
   const s=String(id||'');
   if(!s) return null;
+  const q=iconEpoch?`?e=${iconEpoch}`:'';
   const vanilla=!s.includes(':')||s.startsWith('minecraft:');
   if(vanilla){
     const idNoPrefix=s.replace(/^minecraft:/,'').replace(/[^a-z0-9_]/g, '');
-    return `tex://auto/item/${idNoPrefix}.png`;
+    return `tex://auto/item/${idNoPrefix}.png${q}`;
   }
   // tex:// path segments cannot hold a slash, so pack `<namespace>~<name>` and split it in main.
   // The tilde is not valid in a resource location, so it can never collide with an underscore
   // that lives inside either the namespace or the item name (cofh_core_wrench).
   const [ns, ...rest]=s.split(':');
   const nm=rest.join(':').replace(/\.png$/,'');
-  return (ns&&nm)?`tex://auto/itemmod/${encodeURIComponent(ns)}~${encodeURIComponent(nm)}.png`:null;
+  return (ns&&nm)?`tex://auto/itemmod/${encodeURIComponent(ns)}~${encodeURIComponent(nm)}.png${q}`:null;
+}
+function getInitials(label){
+  const words=String(label||'').trim().split(/\s+/).filter(Boolean);
+  if(words.length>=2) return (words[0][0]+words[1][0]).toUpperCase();
+  return (String(label||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2)||'?').toUpperCase();
 }
 // tex:// answers a cache miss with a 1x1 transparent PNG and HTTP 200, so onerror never fires.
 // Detect that placeholder in onload and swap in the readable label instead of a blank cell.
 function itemCellInner(iconUrl,label){
-  // Fallback: two-letter initials inside the square cell. The full label used to be written as
-  // text, which overflowed neighbouring cells (a grid item's min-width was auto) and could never
-  // be replaced when the real icon finally arrived. Initials stay short enough to keep the cell
-  // square.
-  const initials=(String(label||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2)||'?').toUpperCase();
+  const initials=getInitials(label);
   if(!iconUrl)return `<span class="inv-initial">${esc(initials)}</span>`;
   return `<img src="${iconUrl}" alt="" data-fb="${esc(initials)}">`;
 }
@@ -73,6 +96,16 @@ const GRID_CFG={
   '#inventoryList':{slots:27,base:9,count:'#invCount',bar:'#invBar',getQ:()=>invSearchQuery,getShow:()=>invShowEmpty,getSort:()=>invSortBy},
   '#enderChestList':{slots:27,base:0,count:'#ecCount',bar:'#ecBar',getQ:()=>ecSearchQuery,getShow:()=>ecShowEmpty,getSort:()=>ecSortBy},
 };
+function showInvItemDetail(x){
+  const d=$('#invItemDetail');if(!d)return;
+  const label=x.customName||itemLabel(x.id);
+  const iconUrl=itemIconUrl(x.id);
+  const enchs=[...(x.enchantments||[]),...(x.storedEnchantments||[])];
+  const enchHtml=enchs.length?`<div class="inv-item-detail-enchs">${enchs.map(e=>`<span class="pd-ench-pill">✨ ${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}</div>`:'';
+  const durHtml=x.durability?`<div class="inv-item-detail-meta"><span style="color:${durColor(x.durability)}">Durability: ${x.durability.remaining} / ${x.durability.max} (${Math.round(x.durability.remaining/x.durability.max*100)}%)</span></div>`:'';
+  d.hidden=false;
+  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,label)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${esc(label)}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==label?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true">✕</button>`;
+}
 function renderItemGrid(id,items){
   const n=$(id);if(!n)return;
   const cfg=GRID_CFG[id];if(!cfg)return;
@@ -99,44 +132,46 @@ function renderItemGrid(id,items){
   n.innerHTML=list.map((x,i)=>{
     if(x.empty) return `<div class="inv-cell empty" data-tip="Slot ${x.slot}"></div>`;
     const label=x.customName||itemLabel(x.id);
-    // Vanilla ids resolve on the PrismarineJS mirror; a mod id is read from the server's own
-    // mods/*.jar through the tex:// itemmod kind (see itemIconUrl).
     const iconUrl=itemIconUrl(x.id);
     const tip=itemTooltip(x,label);
-    // BUGFIX: `ench` was computed and then never applied, and no .enchanted rule existed, so an
-    // enchanted item looked identical to a plain one. The flag is applied now and the CSS draws a
-    // subtle glint overlay. The old `no-tex` class is gone too: the initials badge replaced it
-    // during the redesign and nothing styles it any more.
+    const tipHtml=itemTooltipHtml(x,label);
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
-    return `<div class="inv-cell${ench}" data-tip="${tip}">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${tipHtml}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
-  // v6.0.0 redesign: equipment is a row of real icon tiles that reuses the inventory cell, so the
-  // icon sizing, the durability bar and the missing-texture fallback are shared instead of a
-  // second implementation (the old version was a text row with a dashed border).
   const n=$('#equipmentGrid');if(!n)return;
-  const slots=[...(armor||[]),...(offhand?[{slot:'Offhand',id:offhand.id,count:offhand.count}]:[])];
+  const slots=[...(armor||[]),...(offhand?[{slot:'Offhand',...offhand}]:[])];
   const order=['Helmet','Chestplate','Leggings','Boots','Offhand'];
   n.innerHTML=order.map(label=>{
     const it=slots.find(x=>x.slot===label);
-    // A short dash, not the long "— Empty —" label: inside a fixed-height square cell the long
-    // string wrapped onto three lines and stretched that one tile taller than the icon tiles
-    // beside it (the uneven row the user saw). The slot name under the tile already says which
-    // piece is empty.
     let cell='–';
+    const isEnch=it&&(it.enchantments?.length||it.storedEnchantments?.length);
+    const enchCls=isEnch?' enchanted':'';
+    let dur='';
+    let enchList='';
     if(it&&it.id){
-      // BUGFIX: this used to build a vanilla-only URL and pass null for a mod item, so worn mod
-      // armor always showed the initials badge. itemIconUrl routes a mod id to the jar texture.
       cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id));
+      if(it.durability){
+        dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
+      }
+      const enchs=[...(it.enchantments||[]),...(it.storedEnchantments||[])];
+      if(enchs.length){
+        const show=enchs.slice(0,2);
+        const rem=enchs.length-show.length;
+        const allTip=esc(enchs.map(e=>`${itemLabel(e.id)} ${romanNum(e.level)}`).join(', '));
+        enchList=`<div class="pd-equip-ench-list">${show.map(e=>`<span class="pd-ench-pill" title="${esc(itemLabel(e.id))} ${romanNum(e.level)}">${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}${rem>0?`<span class="pd-ench-pill" title="${allTip}">+${rem} more</span>`:''}</div>`;
+      }
     }
-    // The long "— Empty —" label stays available as the hover title instead of being rendered
-    // inside the tile, where it wrapped and stretched the row.
-    // Use the same rich tooltip as the inventory grid (enchantments, durability, count), not the
-    // bare id, so a worn enchanted chestplate says so on hover.
-    const tip = it && it.id ? itemTooltip(it, itemLabel(it.id)) : t('ply.emptySlot');
-    return `<div class="pd-equip"><div class="inv-cell${it&&it.id?'':' empty'}" data-tip="${esc(tip)}">${cell}</div><span>${esc(label)}</span></div>`;
+    const tipHtml=it&&it.id?itemTooltipHtml(it,itemLabel(it.id)):'';
+    const tip=it&&it.id?itemTooltip(it,itemLabel(it.id)):t('ply.emptySlot');
+    return `<div class="pd-equip">
+      <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipHtml?`data-tip-html="${tipHtml}"`:''} tabindex="0">${cell}${dur}</div>
+      <span class="pd-equip-slot">${esc(label)}</span>
+      ${it&&it.id?`<span class="pd-equip-name" title="${esc(it.customName||itemLabel(it.id))}">${esc(it.customName||itemLabel(it.id))}</span>`:''}
+      ${enchList}
+    </div>`;
   }).join('');
 }
 let playerFilter='online';
@@ -383,6 +418,14 @@ async function pdLiveAction(action){
 }
 $$('.inspect-tab').forEach(b=>b.onclick=()=>pdSetTab(b.dataset.pdTab));
 $('#pdPanelLive')?.addEventListener('click',e=>{const b=e.target.closest('[data-live-cmd]');if(b&&!b.disabled)pdLiveAction(b.dataset.liveCmd)});
+$('#pdPanelInventory')?.addEventListener('click',e=>{
+  const cell=e.target.closest('.inv-cell');
+  if(!cell||cell.classList.contains('empty')||cell.dataset.slot===undefined)return;
+  const slotNum=Number(cell.dataset.slot);
+  const item=(lastInspectData?.inventory||[]).find(x=>x.slot===slotNum)||
+             (lastInspectData?.enderChest||[]).find(x=>x.slot===slotNum);
+  if(item)showInvItemDetail(item);
+});
 
 // Build (or rebuild) the 3D model in the inspector. Extracted from openPlayerInspector so the
 // icons:update handler can call it again: tex:// serves a 1x1 placeholder on a cache miss, and
@@ -571,6 +614,7 @@ $('#refreshPlayersBtn').onclick=async()=>{
 // icons:update — a placeholder icon just got its real pixels; re-render the open player
 // inspector grid. Lives with the inspector that owns lastInspectData (was misplaced in 02-worldmap.js).
 window.observer.onIconsUpdate(()=>{
+  iconEpoch++;
   if($('#playerInspectModal').hidden||!lastInspectData)return;
   renderEquipment(lastInspectData.armor,lastInspectData.offhand);
   renderItemGrid('#inventoryList',lastInspectData.inventory);

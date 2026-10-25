@@ -47,8 +47,14 @@
     const html = anchor.getAttribute('data-tip-html');
     if (!text && !html) return;
     const b = ensure();
-    if (html) b.innerHTML = html;
-    else { b.textContent = ''; b.textContent = text; }
+    if (html) {
+      b.classList.add('has-html');
+      b.innerHTML = html;
+    } else {
+      b.classList.remove('has-html');
+      b.textContent = '';
+      b.textContent = text;
+    }
     active = anchor;
     place(anchor);
   }

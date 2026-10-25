@@ -38,7 +38,7 @@ function findPlayerDataFile(root, properties, uuid, name) {
   return null;
 }
 function emptyServerFiles() {
-  return { jar: null, launchScript: null, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {}, geyser: false };
+  return { jar: null, launchScript: null, target: { mc: null, loader: 'unknown', software: 'unknown' }, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {}, geyser: false };
 }
 // server.properties is read by Java's java.util.Properties, which decodes a backslash escape
 // before the game ever sees the value. The most common one by far is \uXXXX, used for the
@@ -143,7 +143,21 @@ function serverFiles(root) {
   // its companion for auth. Either name present (enabled OR .disabled) marks the server as a
   // Bedrock-crossplay candidate, which the Overview surfaces with UDP-tunnel guidance.
   const geyser = [...plugins, ...mods].some(x => /(^|\/)geyser|floodgate/i.test(x));
-  return { jar, launchScript, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
+  let target = { mc: null, loader: 'unknown', software: 'unknown' };
+  try {
+    const { detectServerTarget } = require('./server-compat.js');
+    const dt = detectServerTarget(root, { jar, launchScript, hasSpigotConfig });
+    let soft = dt.loader;
+    const name = String(jar || launchScript || '').toLowerCase();
+    if (/purpur/.test(name)) soft = 'purpur';
+    else if (/leaf/.test(name)) soft = 'leaf';
+    else if (/folia/.test(name)) soft = 'folia';
+    else if (/paper/.test(name)) soft = 'paper';
+    else if (/spigot/.test(name) || hasSpigotConfig) soft = 'spigot';
+    else if (/velocity|bungee|waterfall/.test(name)) soft = 'velocity';
+    target = { mc: dt.mc || null, loader: dt.loader || 'unknown', software: soft || dt.loader || 'unknown' };
+  } catch {}
+  return { jar, launchScript, target, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
 }
 function detectSoftware(info) {
   const name = String(info.jar || info.launchScript || '');
@@ -246,24 +260,79 @@ function textOf(value) {
   if (Array.isArray(value.extra)) out += value.extra.map(textOf).filter(Boolean).join('');
   return out || undefined;
 }
+const LEGACY_ENCHANT_IDS = {
+  0: 'protection', 1: 'fire_protection', 2: 'feather_falling', 3: 'blast_protection', 4: 'projectile_protection',
+  5: 'respiration', 6: 'aqua_affinity', 7: 'thorns', 8: 'depth_strider', 9: 'frost_walker', 10: 'binding_curse',
+  16: 'sharpness', 17: 'smite', 18: 'bane_of_arthropods', 19: 'knockback', 20: 'fire_aspect', 21: 'looting', 22: 'sweeping',
+  32: 'efficiency', 33: 'silk_touch', 34: 'unbreaking', 35: 'fortune',
+  48: 'power', 49: 'punch', 50: 'flame', 51: 'infinity',
+  61: 'luck_of_the_sea', 62: 'lure', 65: 'loyalty', 66: 'impaling', 67: 'riptide', 68: 'channeling',
+  70: 'mending', 71: 'vanishing_curse',
+  52: 'multishot', 53: 'quick_charge', 54: 'piercing',
+};
+const LEGACY_ITEM_IDS = {
+  1: 'stone', 2: 'grass_block', 3: 'dirt', 4: 'cobblestone', 5: 'oak_planks', 7: 'bedrock', 12: 'sand', 13: 'gravel',
+  14: 'gold_ore', 15: 'iron_ore', 16: 'coal_ore', 17: 'oak_log', 18: 'oak_leaves', 19: 'sponge', 20: 'glass',
+  35: 'white_wool', 41: 'gold_block', 42: 'iron_block', 46: 'tnt', 47: 'bookshelf', 48: 'mossy_cobblestone',
+  49: 'obsidian', 50: 'torch', 54: 'chest', 56: 'diamond_ore', 57: 'diamond_block', 58: 'crafting_table', 61: 'furnace',
+  256: 'iron_shovel', 257: 'iron_pickaxe', 258: 'iron_axe', 259: 'flint_and_steel', 260: 'apple', 261: 'bow', 262: 'arrow',
+  263: 'coal', 264: 'diamond', 265: 'iron_ingot', 266: 'gold_ingot', 267: 'iron_sword', 268: 'wooden_sword', 269: 'wooden_shovel',
+  270: 'wooden_pickaxe', 271: 'wooden_axe', 272: 'stone_sword', 273: 'stone_shovel', 274: 'stone_pickaxe', 275: 'stone_axe',
+  276: 'diamond_sword', 277: 'diamond_shovel', 278: 'diamond_pickaxe', 279: 'diamond_axe', 280: 'stick', 281: 'bowl',
+  282: 'mushroom_stew', 283: 'golden_sword', 284: 'golden_shovel', 285: 'golden_pickaxe', 286: 'golden_axe', 287: 'string',
+  288: 'feather', 289: 'gunpowder', 290: 'wooden_hoe', 291: 'stone_hoe', 292: 'iron_hoe', 293: 'diamond_hoe', 294: 'golden_hoe',
+  295: 'wheat_seeds', 296: 'wheat', 297: 'bread', 298: 'leather_helmet', 299: 'leather_chestplate', 300: 'leather_leggings',
+  301: 'leather_boots', 302: 'chainmail_helmet', 303: 'chainmail_chestplate', 304: 'chainmail_leggings', 305: 'chainmail_boots',
+  306: 'iron_helmet', 307: 'iron_chestplate', 308: 'iron_leggings', 309: 'iron_boots', 310: 'diamond_helmet', 311: 'diamond_chestplate',
+  312: 'diamond_leggings', 313: 'diamond_boots', 314: 'golden_helmet', 315: 'golden_chestplate', 316: 'golden_leggings', 317: 'golden_boots',
+  318: 'flint', 319: 'porkchop', 320: 'cooked_porkchop', 322: 'golden_apple', 325: 'bucket', 326: 'water_bucket', 327: 'lava_bucket',
+  331: 'redstone', 332: 'snowball', 339: 'paper', 340: 'book', 341: 'slime_ball', 344: 'egg', 345: 'compass', 346: 'fishing_rod',
+  347: 'clock', 348: 'glowstone_dust', 349: 'cod', 350: 'cooked_cod', 351: 'dye', 352: 'bone', 353: 'sugar', 357: 'cookie',
+  364: 'cooked_beef', 365: 'chicken', 366: 'cooked_chicken', 367: 'rotten_flesh', 368: 'ender_pearl', 369: 'blaze_rod',
+  370: 'ghast_tear', 371: 'gold_nugget', 372: 'nether_wart', 373: 'potion', 374: 'glass_bottle', 375: 'spider_eye',
+  376: 'fermented_spider_eye', 377: 'blaze_powder', 378: 'magma_cream', 381: 'ender_eye', 382: 'glistering_melon_slice',
+  384: 'experience_bottle', 385: 'fire_charge', 388: 'emerald', 391: 'carrot', 392: 'potato', 393: 'baked_potato',
+  394: 'poisonous_potato', 395: 'map', 396: 'golden_carrot', 397: 'skeleton_skull', 398: 'carrot_on_a_stick', 399: 'nether_star',
+  400: 'pumpkin_pie', 401: 'firework_rocket', 402: 'firework_star', 403: 'enchanted_book', 420: 'lead', 421: 'name_tag',
+  442: 'shield', 443: 'elytra', 449: 'totem_of_undying', 450: 'shulker_shell', 452: 'iron_nugget', 453: 'knowledge_book',
+};
 function enchantmentsOf(components, tag, newKey, oldKey) {
   const out = [];
-  const push = (id, lvl) => { if (id) out.push({ id: String(id).includes(':') ? String(id) : `minecraft:${id}`, level: Number(lvl) || 1 }); };
+  const push = (id, lvl) => {
+    if (id === undefined || id === null) return;
+    let sId = String(id);
+    if (typeof id === 'number' || /^\d+$/.test(sId)) {
+      const mapped = LEGACY_ENCHANT_IDS[Number(id)];
+      sId = mapped ? `minecraft:${mapped}` : `minecraft:enchantment_${id}`;
+    } else if (!sId.includes(':')) {
+      sId = `minecraft:${sId}`;
+    }
+    out.push({ id: sId, level: Number(lvl) || 1 });
+  };
   const modern = components && components[newKey];
   if (modern && typeof modern === 'object') {
     const levels = modern.levels && typeof modern.levels === 'object' ? modern.levels : modern;
     for (const [id, lvl] of Object.entries(levels)) if (typeof lvl === 'number') push(id, lvl);
   }
-  for (const e of (tag && tag[oldKey]) || []) if (e && e.id) push(e.id, e.lvl ?? 1);
+  const legacyList = (tag && (tag[oldKey] || (oldKey === 'Enchantments' ? (tag.ench || tag.enchantments) : (oldKey === 'StoredEnchantments' ? tag.stored_enchantments : null)))) || [];
+  for (const e of legacyList) {
+    if (e && (e.id !== undefined || e.Id !== undefined)) {
+      push(e.id ?? e.Id, e.lvl ?? e.level ?? e.Lvl ?? 1);
+    }
+  }
   return out;
 }
 function stackOf(item) {
-  const out = { id: item.id, count: item.count ?? item.Count ?? 1 };
-  if (!item || typeof item !== 'object') return out;
+  if (!item || typeof item !== 'object') return { id: item?.id, count: item?.count ?? item?.Count ?? 1 };
+  let rawId = item.id;
+  if (typeof rawId === 'number' || (typeof rawId === 'string' && /^\d+$/.test(rawId))) {
+    rawId = LEGACY_ITEM_IDS[Number(rawId)] ? `minecraft:${LEGACY_ITEM_IDS[Number(rawId)]}` : `minecraft:item_${rawId}`;
+  }
+  const out = { id: rawId, count: item.count ?? item.Count ?? 1 };
   const components = item.components || {};
   const tag = item.tag || {};
-  const max = components['minecraft:max_damage'] ?? maxDamageFor(item.id);
-  const damage = components['minecraft:damage'] ?? tag.Damage;
+  const max = components['minecraft:max_damage'] ?? tag.MaxDamage ?? tag.maxDamage ?? maxDamageFor(out.id);
+  const damage = components['minecraft:damage'] ?? tag.Damage ?? tag.damage;
   if (typeof damage === 'number' && damage > 0 && typeof max === 'number' && max > 0) {
     out.durability = { remaining: Math.max(0, max - damage), max };
   }
@@ -321,7 +390,8 @@ async function readPlayerData(root, uuid, name) {
     offhand = eq.offhand ? stackOf(eq.offhand) : null;
   } else {
     armor = raw.filter(x => x.Slot in armorNames).map(x => ({ slot: armorNames[x.Slot], ...stackOf(x) })).sort((a, b) => Object.values(armorNames).indexOf(a.slot) - Object.values(armorNames).indexOf(b.slot));
-    const offhandItem = raw.find(x => x.Slot === -106); offhand = offhandItem ? stackOf(offhandItem) : null;
+    const offhandItem = raw.find(x => x.Slot === -106 || x.Slot === 150 || x.Slot === 40);
+    offhand = offhandItem ? stackOf(offhandItem) : null;
   }
   const enderChest = (simple.EnderItems || simple.ender_items || []).map(x => ({ slot: x.Slot, ...stackOf(x) }));
   // v4.0.0: active potion/status effects live in the NBT `active_effects` list (Id / Amplifier / Duration).
@@ -337,7 +407,11 @@ async function readPlayerData(root, uuid, name) {
     const statsFile = path.join(path.dirname(file), '..', 'stats', `${path.basename(file).replace(/\.dat$/, '')}.json`);
     if (fs.existsSync(statsFile)) stats = JSON.parse(fs.readFileSync(statsFile, 'utf8')) || {};
   } catch { stats = {}; }
-  return { file, parsed, type: parsed.type, data: { health: simple.Health ?? null, food: simple.foodLevel ?? null, saturation: simple.foodSaturationLevel ?? null, xpLevel: simple.XpLevel ?? 0, xpTotal: simple.XpTotal ?? 0, gameType: simple.playerGameType ?? 0, dimension: simple.Dimension ?? 'unknown', pos: simple.Pos || [], inventory: mainInventory, armor, offhand, enderChest, effects, stats } };
+  let dim = simple.Dimension ?? 'minecraft:overworld';
+  if (dim === 0 || dim === '0') dim = 'minecraft:overworld';
+  else if (dim === -1 || dim === '-1') dim = 'minecraft:the_nether';
+  else if (dim === 1 || dim === '1') dim = 'minecraft:the_end';
+  return { file, parsed, type: parsed.type, data: { health: simple.Health ?? null, food: simple.foodLevel ?? null, saturation: simple.foodSaturationLevel ?? null, xpLevel: simple.XpLevel ?? 0, xpTotal: simple.XpTotal ?? 0, gameType: simple.playerGameType ?? 0, dimension: dim, pos: simple.Pos || [], inventory: mainInventory, armor, offhand, enderChest, effects, stats } };
 }
 function parseServerLine(text, live, send) {
   // Strip Minecraft color codes (§a) AND ANSI escape codes (\u001b[31m etc.) that servers/plugins inject.

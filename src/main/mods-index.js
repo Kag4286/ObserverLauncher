@@ -140,6 +140,15 @@ class ModsIndex {
           return buf;
         } catch { /* try next spelling */ }
       }
+      try {
+        const nm = String(name || '').toLowerCase();
+        const fallback = jar.list().find(e => e.startsWith(`assets/${ns}/textures/`) && e.endsWith(`/${nm}.png`));
+        if (fallback) {
+          const buf = jar.read(fallback);
+          this.extractCache.set(cacheKey, buf);
+          return buf;
+        }
+      } catch {}
     }
     return null;
   }

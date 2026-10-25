@@ -399,14 +399,37 @@
         <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/modrinth.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.market">CONTENT BAY</p><h2 data-i18n="mkt.title">Marketplace</h2><p class="sub" data-i18n="mkt.sub">Official Modrinth, Hangar and Spigot — install directly to your server folder</p></div></div>
         <div class="tab-head-actions"><span class="stat-pill" id="marketplaceCount">—</span></div>
       </header>
+      <div class="market-server-banner" id="marketServerBanner">
+        <div class="msb-info">
+          <span class="msb-dot"></span>
+          <div class="msb-text">
+            <span class="msb-label" data-i18n="mkt.activeServer">Active Server</span>
+            <b class="msb-target" id="marketServerTarget">—</b>
+          </div>
+          <span class="msb-pill" id="marketServerBadge">Auto-locked to server</span>
+        </div>
+        <button type="button" class="btn sm secondary msb-toggle" id="marketStrictToggle" data-i18n="mkt.strictFilter">Strict Filter</button>
+      </div>
       <div class="market-hero">
         <div class="market-search-bar"><span class="search-icon">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. ViaVersion, Spark, LuckPerms, WorldEdit"><button class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
         <div class="market-quick"><span class="market-quick-label" data-i18n="mkt.popular">Popular</span><button class="quick-chip" data-quick="EssentialsX">EssentialsX</button><button class="quick-chip" data-quick="LuckPerms">LuckPerms</button><button class="quick-chip" data-quick="ViaVersion">ViaVersion</button><button class="quick-chip" data-quick="Spark">Spark</button><button class="quick-chip" data-quick="WorldEdit">WorldEdit</button><button class="quick-chip" data-quick="Vault">Vault</button></div>
       </div>
+      <div class="market-type-bar">
+        <div class="market-type-chips" id="marketTypeChips">
+          <button type="button" class="type-chip active" data-type="" data-i18n="mkt.typeAll">All Types</button>
+          <button type="button" class="type-chip" data-type="perf" data-i18n="mkt.typePerf">Optimization</button>
+          <button type="button" class="type-chip" data-type="qol" data-i18n="mkt.typeQol">QoL (Utility)</button>
+          <button type="button" class="type-chip" data-type="admin" data-i18n="mkt.typeAdmin">Admin &amp; Tools</button>
+          <button type="button" class="type-chip" data-type="security" data-i18n="mkt.typeSecurity">Security &amp; Protection</button>
+          <button type="button" class="type-chip" data-type="economy" data-i18n="mkt.typeEconomy">Economy</button>
+          <button type="button" class="type-chip" data-type="worldgen" data-i18n="mkt.typeWorldgen">World Gen &amp; Mobs</button>
+          <button type="button" class="type-chip" data-type="library" data-i18n="mkt.typeLibrary">Library / API</button>
+        </div>
+      </div>
       <div class="market-toolbar">
         <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" hidden>CurseForge</button></div>
         <input type="hidden" id="marketSource" value="modrinth">
-        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="forge" data-i18n="mkt.forgeType">Forge / NeoForge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="neoforge" data-i18n="mkt.neoforgeType">NeoForge mod</option><option value="forge" data-i18n="mkt.forgeType">Forge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
         <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select"><option value="">All versions</option></select></label>
         <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort" class="ol-select"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
       </div>
@@ -771,6 +794,7 @@
         <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
         </div>
         <div class="inspect-panel" id="pdPanelInventory">
+        <div id="invItemDetail" class="inv-item-detail" hidden></div>
         <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div><div id="hotbarList" class="inv-grid"></div></div>
         <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><span class="inv-count" id="invCount">0 / 36</span><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory"><label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="invSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="inventoryList" class="inv-grid"></div></div>
         <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="inv-grid"></div></div>
@@ -1024,16 +1048,18 @@
     <div class="im-head">
       <img id="imIcon" alt="">
       <div class="im-head-main"><h2 id="imTitle">—</h2><p class="text-muted" id="imMeta">—</p></div>
-      <span class="im-kind" id="imKind">—</span>
+      <div class="im-head-tags"><span class="im-kind" id="imKind">—</span><span class="im-target-pill" id="imTargetPill"></span></div>
     </div>
     <div class="im-desc text-muted" id="imDesc">—</div>
+    <div id="imCompatAlert" class="im-compat-alert" hidden></div>
     <div id="imBody">
       <div class="im-section">
         <p class="eyebrow" data-i18n="im.compat">COMPATIBILITY</p>
         <div class="im-compat" id="imCompat"></div>
       </div>
       <div class="im-section" id="imVersionSection">
-        <p class="eyebrow" data-i18n="im.version">VERSION</p>
+        <div class="im-sec-head"><p class="eyebrow" data-i18n="im.version">VERSION</p><div class="im-sec-right"><span class="im-pick-title" id="imVersionPickTitle" data-i18n="im.versionPickTitle">Pick a build compatible with your server</span><button type="button" class="text-btn im-filter-toggle" id="imToggleLoaderFilter" hidden></button></div></div>
+        <div class="im-version-cards" id="imVersionCards"></div>
         <select id="imVersion" class="launcher-select ol-select" aria-label="Version"></select>
         <ul class="im-versions" id="imVersionList" hidden></ul>
         <p class="im-hint" id="imVersionNote" hidden></p>

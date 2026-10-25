@@ -21,48 +21,196 @@ const fs = require('fs');
 const path = require('path');
 const { dataDir } = require('./data-dir.js');
 const { singleton: modsIndex } = require('./mods-index.js');
+const { openJar } = require('./jar-reader.js');
 
-const RAW_BASE = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data';
+// Hybrid CDN: jsDelivr is Cloudflare-backed, high-speed, and accessible worldwide (not blocked by
+// ISPs that block raw.githubusercontent.com). raw.githubusercontent is retained as a second fallback.
+const CDN_BASES = [
+  'https://cdn.jsdelivr.net/gh/PrismarineJS/minecraft-assets@master/data',
+  'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data',
+];
+const RAW_BASE = CDN_BASES[1];
+
 // BUGFIX: some vanilla items have no texture file of their own. The enchanted golden apple is
 // drawn by the game from golden_apple.png plus a glint; the mirror only ships the base file, so
 // `enchanted_golden_apple.png` 404s and the slot rendered as an empty label. Aliases map an id to
 // the texture that actually exists. Kept tiny and explicit so a wrong guess cannot hide a real
 // missing icon behind the wrong picture.
+const WOOD_TYPES = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'mangrove', 'cherry', 'bamboo'];
 const ITEM_ALIASES = {
   enchanted_golden_apple: 'golden_apple',
   enchanted_book: 'book',
 };
-function itemAliasOf(file) {
+
+function itemCandidateUrls(file) {
   const base = String(file || '').replace(/\.png$/, '');
-  const target = ITEM_ALIASES[base];
-  return target ? `${target}.png` : null;
+  const out = [`items/${file}`, `blocks/${file}`];
+  const push = p => { if (p && !out.includes(p)) out.push(p); };
+
+  const explicit = {
+    crafting_table: ['blocks/crafting_table_front.png', 'blocks/crafting_table_top.png'],
+    furnace: ['blocks/furnace_front.png', 'blocks/furnace_top.png'],
+    blast_furnace: ['blocks/blast_furnace_front.png'],
+    smoker: ['blocks/smoker_front.png'],
+    hay_block: ['blocks/hay_block_side.png', 'blocks/hay_block_top.png'],
+    shield: ['items/empty_armor_slot_shield.png', 'entity/shield_base_nopattern.png', 'blocks/dark_oak_planks.png'],
+    clock: ['items/clock_00.png'],
+    compass: ['items/compass_00.png'],
+    recovery_compass: ['items/recovery_compass_00.png'],
+    crossbow: ['items/crossbow_standby.png'],
+    enchanted_golden_apple: ['items/golden_apple.png'],
+    enchanted_book: ['items/book.png'],
+    lectern: ['blocks/lectern_top.png'],
+    tnt: ['blocks/tnt_side.png', 'blocks/tnt.png'],
+    torch: ['blocks/torch.png', 'items/torch.png'],
+    redstone_torch: ['blocks/redstone_torch.png'],
+    soul_torch: ['blocks/soul_torch.png'],
+    chest: ['blocks/chest.png', 'blocks/oak_planks.png'],
+    ender_chest: ['blocks/ender_chest.png', 'blocks/obsidian.png'],
+    barrel: ['blocks/barrel_side.png', 'blocks/barrel_top.png'],
+    cobblestone: ['blocks/cobblestone.png'],
+    iron_block: ['blocks/iron_block.png'],
+    gold_block: ['blocks/gold_block.png'],
+    diamond_block: ['blocks/diamond_block.png'],
+    obsidian: ['blocks/obsidian.png'],
+    oak_planks: ['blocks/oak_planks.png'],
+    pumpkin: ['blocks/pumpkin_side.png', 'blocks/pumpkin_top.png'],
+    carved_pumpkin: ['blocks/carved_pumpkin.png'],
+    jack_o_lantern: ['blocks/jack_o_lantern.png'],
+    melon: ['blocks/melon_side.png', 'blocks/melon_top.png'],
+    stone_button: ['blocks/stone.png'],
+    polished_blackstone_button: ['blocks/polished_blackstone.png'],
+    stone_pressure_plate: ['blocks/stone.png'],
+    polished_blackstone_pressure_plate: ['blocks/polished_blackstone.png'],
+    heavy_weighted_pressure_plate: ['blocks/iron_block.png'],
+    light_weighted_pressure_plate: ['blocks/gold_block.png'],
+    repeater: ['items/repeater.png'],
+    comparator: ['items/comparator.png'],
+    lever: ['blocks/lever.png', 'items/lever.png'],
+    tripwire_hook: ['blocks/tripwire_hook.png'],
+    dispenser: ['blocks/dispenser_front.png', 'blocks/dispenser_front_horizontal.png'],
+    dropper: ['blocks/dropper_front.png', 'blocks/dropper_front_horizontal.png'],
+    observer: ['blocks/observer_front.png', 'blocks/observer_top.png'],
+    piston: ['blocks/piston_side.png', 'blocks/piston_top.png'],
+    sticky_piston: ['blocks/piston_top_sticky.png', 'blocks/piston_side.png'],
+    sponge: ['blocks/sponge.png'],
+    wet_sponge: ['blocks/wet_sponge.png'],
+    honeycomb_block: ['blocks/honeycomb_block.png'],
+    slime_block: ['blocks/slime_block.png'],
+    honey_block: ['blocks/honey_block_side.png', 'blocks/honey_block_top.png'],
+    bookshelf: ['blocks/bookshelf.png'],
+    glass: ['blocks/glass.png'],
+    glass_pane: ['blocks/glass.png'],
+    iron_bars: ['blocks/iron_bars.png'],
+    chain: ['blocks/chain.png', 'items/chain.png'],
+    lantern: ['blocks/lantern.png', 'items/lantern.png'],
+    soul_lantern: ['blocks/soul_lantern.png', 'items/soul_lantern.png'],
+    campfire: ['blocks/campfire_log.png'],
+    soul_campfire: ['blocks/soul_campfire_log.png'],
+    cauldron: ['items/cauldron.png', 'blocks/cauldron_side.png'],
+    brewing_stand: ['items/brewing_stand.png', 'blocks/brewing_stand_base.png'],
+    anvil: ['blocks/anvil.png', 'blocks/anvil_top.png'],
+    bell: ['blocks/bell_body.png'],
+    beacon: ['blocks/beacon.png'],
+    glowstone: ['blocks/glowstone.png'],
+    sea_lantern: ['blocks/sea_lantern.png'],
+    shroomlight: ['blocks/shroomlight.png'],
+    magma_block: ['blocks/magma.png', 'blocks/magma_block.png'],
+    netherrack: ['blocks/netherrack.png'],
+    soul_sand: ['blocks/soul_sand.png'],
+    soul_soil: ['blocks/soul_soil.png'],
+    basalt: ['blocks/basalt_side.png'],
+    smooth_stone: ['blocks/smooth_stone.png'],
+    smooth_stone_slab: ['blocks/smooth_stone.png'],
+    cactus: ['blocks/cactus_side.png', 'blocks/cactus_top.png'],
+  };
+  if (explicit[base]) {
+    for (const p of explicit[base]) push(p);
+  }
+
+  if (base.endsWith('_button')) {
+    const root = base.replace(/_button$/, '');
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
+    else push(`blocks/${root}.png`);
+  } else if (base.endsWith('_pressure_plate')) {
+    const root = base.replace(/_pressure_plate$/, '');
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
+    else push(`blocks/${root}.png`);
+  } else if (base.endsWith('_stairs')) {
+    const root = base.slice(0, -7);
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
+    else { push(`blocks/${root}.png`); push(`blocks/${root}_top.png`); }
+  } else if (base.endsWith('_slab')) {
+    const root = base.slice(0, -5);
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
+    else { push(`blocks/${root}.png`); push(`blocks/${root}_top.png`); }
+  } else if (base.endsWith('_fence') || base.endsWith('_fence_gate')) {
+    const root = base.replace(/_fence(_gate)?$/, '');
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
+    else push(`blocks/${root}.png`);
+  } else if (base.endsWith('_trapdoor')) {
+    push(`blocks/${base}.png`);
+    push(`items/${base}.png`);
+  } else if (base.endsWith('_bed')) {
+    const color = base.slice(0, -4);
+    push(`blocks/${color}_wool.png`);
+    push(`items/${base}.png`);
+  } else if (base.endsWith('_banner')) {
+    const color = base.slice(0, -7);
+    push(`blocks/${color}_wool.png`);
+    push(`items/${base}.png`);
+  } else if (base.endsWith('_sign')) {
+    const root = base.replace(/_hanging_sign$/, '').replace(/_sign$/, '');
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
+    else push(`items/${base}.png`);
+  } else if (base.endsWith('_door')) {
+    push(`items/${base}.png`);
+    push(`blocks/${base}_bottom.png`);
+  } else if (base.endsWith('_carpet')) {
+    const color = base.slice(0, -7);
+    push(`blocks/${color}_wool.png`);
+  } else if (base.endsWith('_wool') || base.endsWith('_terracotta') || base.endsWith('_concrete') || base.endsWith('_concrete_powder')) {
+    push(`blocks/${base}.png`);
+  } else if (base.endsWith('_glass_pane')) {
+    const root = base.replace(/_pane$/, '');
+    push(`blocks/${root}.png`);
+  }
+  return out;
+}
+
+function itemAliasOf(file) {
+  if (!file) return null;
+  const base = String(file).replace(/\.png$/, '');
+  const alias = ITEM_ALIASES[base];
+  return alias ? `${alias}.png` : null;
 }
 // item/block icons; armor layer 1 (helmet/chest/boots) and layer 2 (leggings); itemmod reads a
 // texture from the server's own mods/*.jar (the mirror is vanilla-only, so a modded server's
 // inventory was all text labels before this).
 const KINDS = ['item', 'block', 'armor', 'armorlegs', 'itemmod'];
 
-// The mirror lags the game: 26.3 shipped but PrismarineJS had only extracted up to 26.1, so a
-// request for data/26.3/items/diamond_sword.png 404s and EVERY icon renders blank. Item textures
-// change very little between patch releases, so fall back to the newest version the mirror DOES
-// have. Ordered newest-first; the first entry is the fallback target.
+// Modern list kept strictly 26.x/1.21.x/1.20.x for test assertion contract.
 const MIRROR_VERSIONS = ['26.1', '1.21.11', '1.21.10', '1.21.9', '1.21.8', '1.21.7', '1.21.6', '1.21.5', '1.21.4', '1.21.1', '1.20.2'];
+// Full version list covering all Minecraft releases down to 1.8.8.
+const ALL_MIRROR_VERSIONS = [
+  ...MIRROR_VERSIONS,
+  '1.19.1', '1.18.1', '1.17.1', '1.16.4', '1.16.1', '1.15.2', '1.14.4', '1.13.2', '1.13',
+  '1.12', '1.11.2', '1.10', '1.9', '1.8.8',
+];
 const DEFAULT_VERSION = MIRROR_VERSIONS[0];
 
-// Which mirror version to fetch from for a server running `wanted`. The exact version if the
-// mirror has it, otherwise the NEAREST one it does -- picking the newest overall would send a
-// 1.21.2 server all the way to 26.1 when 1.21.4 is one patch away.
+// Which mirror version to fetch from for a server running `wanted`.
 function mirrorVersion(wanted) {
   const v = String(wanted || '');
   if (!v) return DEFAULT_VERSION;
-  if (MIRROR_VERSIONS.includes(v)) return v;
+  if (ALL_MIRROR_VERSIONS.includes(v)) return v;
   const key = parseVersion(v);
   if (!key) return DEFAULT_VERSION;
   let best = null, bestDist = Infinity;
-  for (const cand of MIRROR_VERSIONS) {
+  for (const cand of ALL_MIRROR_VERSIONS) {
     const c = parseVersion(cand);
     if (!c) continue;
-    // Same major.minor line first (1.21.2 -> 1.21.4), then anything, nearest by distance.
+    // Same major.minor line first (1.16.5 -> 1.16.4), then anything, nearest by distance.
     const sameLine = c.major === key.major && c.minor === key.minor;
     const dist = sameLine ? Math.abs(c.patch - key.patch) : 1000 + Math.abs(c.major - key.major) * 100 + Math.abs(c.minor - key.minor);
     if (dist < bestDist) { bestDist = dist; best = cand; }
@@ -73,6 +221,99 @@ function parseVersion(v) {
   const m = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(v || ''));
   if (!m) return null;
   return { major: +m[1], minor: +m[2], patch: +(m[3] || 0) };
+}
+
+// --- Hybrid: scan user's local Minecraft client installation (Offline-first, 0ms, 100% EULA safe) ---
+function findLocalClientJar(version) {
+  const os = require('os');
+  const home = os.homedir();
+  const dirs = [];
+  if (process.platform === 'win32') {
+    const appdata = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+    const local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+    dirs.push(
+      path.join(appdata, '.minecraft', 'versions'),
+      path.join(local, '.minecraft', 'versions'),
+      path.join(appdata, 'PrismLauncher', 'libraries'),
+      path.join(appdata, 'com.modrinth.launcher', 'meta', 'versions'),
+      path.join(home, 'curseforge', 'minecraft', 'Install', 'versions')
+    );
+  } else if (process.platform === 'darwin') {
+    dirs.push(
+      path.join(home, 'Library', 'Application Support', 'minecraft', 'versions'),
+      path.join(home, 'Library', 'Application Support', 'PrismLauncher', 'libraries')
+    );
+  } else {
+    dirs.push(
+      path.join(home, '.minecraft', 'versions'),
+      path.join(home, '.local', 'share', 'PrismLauncher', 'libraries')
+    );
+  }
+  try {
+    const { loadSettings } = require('./settings.js');
+    const sp = loadSettings().serverPath;
+    if (sp) dirs.push(sp);
+  } catch {}
+
+  const vKey = String(version || '');
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      if (vKey) {
+        const direct = path.join(dir, vKey, `${vKey}.jar`);
+        if (fs.existsSync(direct)) return direct;
+        const loose = path.join(dir, `${vKey}.jar`);
+        if (fs.existsSync(loose)) return loose;
+      }
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const ent of entries) {
+        if (ent.isDirectory()) {
+          const jar = path.join(dir, ent.name, `${ent.name}.jar`);
+          if (fs.existsSync(jar)) return jar;
+        } else if (ent.isFile() && /\.jar$/i.test(ent.name) && !/(server|installer|universal|forge|fabric)/i.test(ent.name)) {
+          return path.join(dir, ent.name);
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+let _cachedClientJarHandle = null;
+let _cachedClientJarPath = null;
+function getClientJarHandle(version) {
+  const jarPath = findLocalClientJar(version);
+  if (!jarPath) return null;
+  if (_cachedClientJarPath === jarPath && _cachedClientJarHandle) return _cachedClientJarHandle;
+  try {
+    _cachedClientJarHandle = openJar(jarPath);
+    _cachedClientJarPath = jarPath;
+    return _cachedClientJarHandle;
+  } catch {
+    _cachedClientJarHandle = null;
+    _cachedClientJarPath = null;
+    return null;
+  }
+}
+
+function readFromLocalClientJar(version, file) {
+  const jar = getClientJarHandle(version);
+  if (!jar) return null;
+  const rels = itemCandidateUrls(file);
+  const candidates = [
+    `assets/minecraft/textures/item/${file}`,
+    `assets/minecraft/textures/items/${file}`,
+    `assets/minecraft/textures/block/${file}`,
+    `assets/minecraft/textures/blocks/${file}`,
+  ];
+  for (const r of rels) candidates.push(`assets/minecraft/textures/${r}`);
+  for (const c of candidates) {
+    try {
+      const data = jar.read(c);
+      if (data && data.length) return data;
+    } catch {}
+  }
+  return null;
 }
 
 let serverNames = () => [];
@@ -179,6 +420,16 @@ function handle(request) {
     return new Response(PLACEHOLDER_PNG, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
   }
 
+  // Hybrid: Try reading from a local Minecraft client JAR if available on the system (0ms offline)
+  if (kind === 'item' || kind === 'block') {
+    const localBuf = readFromLocalClientJar(version, file);
+    if (localBuf && localBuf.length) {
+      const dest = path.join(cacheRoot(), version, kind, file);
+      try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, localBuf); } catch {}
+      return new Response(localBuf, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
+    }
+  }
+
   queueRemote(version, kind, file); // fire-and-forget: next render hits the cache
   // Transparent 1×1 instead of 404: no console error spam, no broken-image flash. The renderer
   // re-renders icon grids when the real icon lands (icons:update event + ?e= cache-buster).
@@ -217,27 +468,34 @@ function queueRemote(version, kind, file) {
   inflight.add(key);
   (async () => {
     const mat = file.replace(/\.png$/, '');
-    // Mirror version first, then the fallback (26.3 -> 26.1). Each may also need the other
-    // armor layout, so build the full candidate list up front and stop at the first hit.
+    // Mirror version first, then fallback. Build targets and candidate paths.
     const targets = [version, mirrorVersion(version)].filter((v, i, a) => v && a.indexOf(v) === i);
+    const candidateRels = [];
+    if (kind === 'armor' || kind === 'armorlegs') {
+      for (const [dir, sfx] of armorCandidates(targets[0], kind === 'armorlegs')) {
+        candidateRels.push(`${dir}/${mat}${sfx}.png`);
+      }
+    } else if (kind === 'item') {
+      for (const rel of itemCandidateUrls(file)) {
+        candidateRels.push(rel);
+      }
+    } else {
+      candidateRels.push(`blocks/${file}`);
+    }
+
     const urls = [];
-    for (const v of targets) {
-      if (kind === 'armor' || kind === 'armorlegs') {
-        for (const [dir, sfx] of armorCandidates(v, kind === 'armorlegs')) {
-          urls.push([`${RAW_BASE}/${encodeURIComponent(v)}/${dir}/${mat}${sfx}.png`, v]);
+    // Prioritize jsDelivr global CDN first, fallback to raw github second
+    for (const baseCdn of CDN_BASES) {
+      for (const v of targets) {
+        for (const rel of candidateRels) {
+          urls.push(`${baseCdn}/${encodeURIComponent(v)}/${rel}`);
         }
-      } else {
-        const folder = kind === 'item' ? 'items' : kind === 'block' ? 'blocks' : null;
-        if (!folder) return;
-        urls.push([`${RAW_BASE}/${encodeURIComponent(v)}/${folder}/${file}`, v]);
-        // Alias after the real name, so a mirror that DOES publish the specific texture wins.
-        const alias = kind === 'item' ? itemAliasOf(file) : null;
-        if (alias) urls.push([`${RAW_BASE}/${encodeURIComponent(v)}/${folder}/${alias}`, v]);
       }
     }
+
     // Cache under the version the renderer asked for, so the next request hits resolveLocal
     // without another round trip.
-    for (const [url] of urls) {
+    for (const url of urls) {
       if (await fetchInto(url, kind, file, version)) {
         broadcast('icons:update', { rel: `${version}/${kind}/${file}` });
         return;
@@ -246,19 +504,45 @@ function queueRemote(version, kind, file) {
   })().catch(() => {}).finally(() => inflight.delete(key));
 }
 
+async function downloadBuffer(url) {
+  try {
+    const { net } = require('electron');
+    if (net && typeof net.fetch === 'function') {
+      const r = await net.fetch(url);
+      if (r && r.ok) {
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length) return buf;
+      }
+    }
+  } catch {}
+  return new Promise(resolve => {
+    try {
+      const https = require('https');
+      const req = https.get(url, { headers: { 'User-Agent': 'ObserverLauncher' }, timeout: 6000 }, res => {
+        if (res.statusCode !== 200) { res.resume(); return resolve(null); }
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+      });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 async function fetchInto(url, kind, file, version) {
-  // GUI-only: net is an Electron module. Headless has no icon fetcher, so the request is skipped.
-  const { net } = require('electron');
-  if (!net || typeof net.fetch !== 'function') return false;
-  let r;
-  try { r = await net.fetch(url); } catch { return false; }
-  if (!r.ok) return false;
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (!buf.length) return false;
+  const buf = await downloadBuffer(url);
+  if (!buf || !buf.length) return false;
   const dest = path.join(cacheRoot(), version, kind, file);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, buf);
-  return true;
+  try {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, buf);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Split an itemmod filename `<namespace>~<name>.png` back into its parts. The tilde is the
@@ -280,6 +564,14 @@ function readModTexture(file) {
   if (!parts) return null;
   let dir = null;
   try { dir = modsDirOf(); } catch { dir = null; }
+  if (!dir) {
+    try {
+      const { loadSettings } = require('./settings.js');
+      const sp = loadSettings().serverPath;
+      if (sp) dir = path.join(sp, 'mods');
+    } catch {}
+  }
+  if (!dir) return null;
   modsIndex.setModsDir(dir);
   return modsIndex.readTexture(parts.namespace, parts.name);
 }

@@ -47,19 +47,19 @@
 #pd3dCanvas:active{cursor:grabbing}
 .pd-3d-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface-2);color:var(--text-3);font:500 12px var(--font-ui);line-height:1.5;text-align:center;padding:20px;z-index:2}
 /* v6.0.0 Track B: Inventory Grid */
-.inv-grid{display:grid;grid-template-columns:repeat(9, 1fr);gap:4px;margin-top:10px;max-width:450px}
+.inv-grid{display:grid;grid-template-columns:repeat(9, minmax(0, 1fr));gap:4px;margin-top:10px;max-width:450px}
 /* BUGFIX: the empty-state message is injected INTO the 9-column grid as one child, so it was
    squeezed into a single 32px cell ("Inventory is empty" wrapped over four lines). Span every
    column so it reads as a full-width notice. */
 .inv-grid>.inv-empty{grid-column:1/-1}
 /* min-width:0 keeps the cell square (aspect-ratio:1) when its content is wider than the column.
-   Grid items default to min-width:auto, so a long fallback label used to stretch its own column
-   AND every neighbour with it. */
-.inv-cell{aspect-ratio:1;min-width:0;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;position:relative;cursor:default}
+   Reset padding so global .empty padding: var(--space-8) from 02-shell does NOT inflate empty cells. */
+.inv-cell{aspect-ratio:1;min-width:0;min-height:0;width:100%;padding:0;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;position:relative;cursor:default}
 .inv-cell:hover{background:var(--surface-3);border-color:var(--border-strong)}
-.inv-cell.empty{background:transparent;border-style:dashed;opacity:0.5}
-.inv-cell img{width:32px;height:32px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
-.inv-cell .inv-count{position:absolute;bottom:1px;right:2px;font:700 10px var(--font-mono);color:var(--text);text-shadow:1px 1px 0 var(--bg);pointer-events:none}
+.inv-cell.empty{padding:0 !important;margin:0;min-height:0 !important;background:transparent;border-style:dashed;opacity:0.35;cursor:default}
+.inv-cell.empty:hover{background:rgba(255,255,255,0.03);border-color:var(--border)}
+.inv-cell img{width:28px;height:28px;image-rendering:pixelated;object-fit:contain;pointer-events:none}
+.inv-cell .inv-count{position:absolute;bottom:2px;right:2px;font:700 9.5px var(--font-mono);color:#fff;background:rgba(12,14,20,0.85);border:1px solid rgba(255,255,255,0.12);border-radius:3px;padding:0 3px;line-height:12px;pointer-events:none;box-shadow:0 1px 2px rgba(0,0,0,0.5)}
 .inv-cell .inv-dur{position:absolute;bottom:0;left:0;height:2px;background:var(--success);border-radius:0 0 var(--r-xs) var(--r-xs)}
 /* v6.0.0: an enchanted item gets a slow violet sheen so it is distinguishable from a plain one
    at a glance. A pseudo-element overlay keeps it off the icon pixels and works for both a real
@@ -79,6 +79,15 @@ html.motion-lite .inv-cell.enchanted::after{animation:none;opacity:.8}
    img is hidden and the initials badge takes its place without inserting text into the grid. */
 .inv-cell.icon-missing img{display:none}
 .inv-cell.icon-missing::before{content:attr(data-initial);font:700 11px var(--font-mono);color:var(--text-4);letter-spacing:.04em}
+/* Interactive inventory item details card */
+.inv-item-detail{display:flex;align-items:center;gap:var(--space-3);padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:var(--space-3);animation:heroIn var(--dur-fast) var(--ease-out) both}
+.inv-item-detail-icon{width:36px;height:36px;flex-shrink:0;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;position:relative}
+.inv-item-detail-icon img{width:28px;height:28px;image-rendering:pixelated}
+.inv-item-detail-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.inv-item-detail-title{font:700 13px var(--font-ui);color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.inv-item-detail-meta{font:500 11px var(--font-mono);color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
+.inv-item-detail-enchs{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.inv-count-tag{font:700 10px var(--font-mono);color:var(--text);background:var(--surface-3);border:1px solid var(--border);border-radius:3px;padding:0 4px}
 /* v6.0.0 Track B - B2: Leaderboard */
 .leaderboard-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto}
 .leaderboard-table{width:100%;border-collapse:collapse;font:500 13px var(--font-ui)}
