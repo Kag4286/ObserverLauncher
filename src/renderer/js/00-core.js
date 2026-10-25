@@ -35,6 +35,7 @@ function applyLocale(){
   const activeNav = document.querySelector('.nav-item.active');
   const titleEl = document.getElementById('pageTitle');
   if (activeNav?.dataset.tab && titleEl) titleEl.textContent = t('nav.' + activeNav.dataset.tab) || titles[activeNav.dataset.tab] || titleEl.textContent;
+  if (typeof updateMarketServerBanner === 'function') updateMarketServerBanner();
 }
 const tf=t;
 // "?" bubbles: hover shows the native title, click/tap opens an instant translated bubble.

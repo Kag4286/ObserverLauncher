@@ -194,13 +194,19 @@ function cfDependencies(file) {
 function mapCfFileToVersion(file) {
   if (!file) return null;
   const sha1 = (file.hashes || []).find(h => Number(h.algo) === 1)?.value || null;
+  const gv = file.gameVersions || [];
+  const gvLoaders = gv.filter(x => /^(neoforge|forge|fabric|quilt|paper|spigot|purpur|velocity)$/i.test(x)).map(x => x.toLowerCase());
+  const modLoaderMap = { 1: 'forge', 4: 'fabric', 5: 'quilt', 6: 'neoforge' };
+  const ml = modLoaderMap[Number(file.modLoader)];
+  const loaders = [...new Set([...(ml ? [ml] : []), ...gvLoaders])];
+  const realGameVersions = gv.filter(x => !gvLoaders.includes(x.toLowerCase()) && !/client|server/i.test(x));
   return {
     id: String(file.id),
     number: file.displayName || file.fileName || String(file.id),
     name: file.displayName || file.fileName || String(file.id),
     date: file.fileDate || null,
-    gameVersions: file.gameVersions || [],
-    loaders: [],
+    gameVersions: realGameVersions.length ? realGameVersions : gv,
+    loaders,
     size: file.fileLength || 0,
     sha1,
     blocked: !cfFileInstallable(file).ok,

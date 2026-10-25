@@ -4,17 +4,51 @@
 // exact version picker, warnings and byte progress replace the old native confirm() prompts.
 // Card grid: icon + title/author + source/kind badges + clamped description + meta foot + Install.
 // The kind badge class carries the colour (plugin/mod/datapack), source badge shows the registry.
-function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.innerHTML=`<article class="panel market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;return}n.innerHTML=items.map((x,i)=>{const kind=x.kind||'plugin';const blocked=!!x.blocked;const action=blocked?`<button class="btn secondary" data-market-open="${i}">${t('mkt.cfOpenPage')}</button>`:`<button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button>`;const badge=blocked?`<span class="mi-badge warn">${t('mkt.cfBlocked')}</span>`:'';return `<article class="market-item" data-mid="${esc(x.id)}"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(t('mkt.'+kind+'Type')||kind)}</span>${badge}</div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small>${action}</div></div></article>`}).join('');$$('[data-market-install]').forEach(b=>b.onclick=()=>{
-  const item=items[Number(b.dataset.marketInstall)];
-  openInstallModal(item);
-});$$('[data-market-open]').forEach(b=>b.onclick=()=>{const item=items[Number(b.dataset.marketOpen)];if(item&&item.projectUrl)window.observer.marketOpenExternal(item.projectUrl)});
-  // CSP-safe broken-image fallback: a remote icon that 404s / is blocked must show the generic
-  // placeholder, not the browser's broken-image glyph. Inline onerror is forbidden by the CSP, so
-  // bind here instead.
+function renderMarket(items){
+  const n=$('#marketResults');
+  if(!items?.length){
+    n.innerHTML=`<article class="panel market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;
+    return;
+  }
+  const srv=imDetectServer();
+  n.innerHTML=items.map((x,i)=>{
+    const kind=x.kind||'plugin';
+    const blocked=!!x.blocked;
+    const action=blocked?`<button class="btn secondary" data-market-open="${i}">${t('mkt.cfOpenPage')}</button>`:`<button class="btn primary" data-market-install="${i}">${t('mkt.install')}</button>`;
+    const badge=blocked?`<span class="mi-badge warn">${t('mkt.cfBlocked')}</span>`:'';
+    const itemLoaders = Array.isArray(x.loaders) ? x.loaders : (x.loader ? [x.loader] : []);
+    let isCompat = true;
+    let compatBadge = '';
+    const checkLdr = srv.loader;
+
+    if(kind === 'datapack' || itemLoaders.includes('datapack') || checkLdr === 'datapack'){
+      isCompat = true;
+    } else if(checkLdr && checkLdr !== 'unknown'){
+      const groupMap = { plugin: ['paper','purpur','leaf','folia','spigot','bukkit'], neoforge: ['neoforge'], forge: ['forge'], fabric: ['fabric','quilt'], proxy: ['proxy','velocity'] };
+      if(kind === 'neoforge' && checkLdr !== 'neoforge') isCompat = false;
+      else if(kind === 'forge' && checkLdr !== 'forge') isCompat = false;
+      else if(kind === 'fabric' && checkLdr !== 'fabric') isCompat = false;
+      else if(kind === 'plugin' && !groupMap.plugin.includes(checkLdr)) isCompat = false;
+      else if(itemLoaders.length && !itemLoaders.some(l => {
+        const cl = String(l).toLowerCase();
+        return cl === checkLdr || (checkLdr === 'paper' && /paper|spigot|purpur|folia/.test(cl)) || (checkLdr === 'neoforge' && cl === 'neoforge') || (checkLdr === 'fabric' && /fabric|quilt/.test(cl)) || (checkLdr === 'forge' && cl === 'forge');
+      })) isCompat = false;
+
+      if(!isCompat){
+        compatBadge = `<span class="mi-badge compat-warn">${esc(t('mkt.compatWarn'))}</span>`;
+      }
+    }
+
+    const kindLabel = t('mkt.' + kind + 'Type') || (kind === 'mod' ? t('mkt.modType') : kind);
+    return `<article class="market-item${isCompat?'':' incompatible'}" data-mid="${esc(x.id)}"><div class="market-icon">${x.icon?`<img src="${esc(x.icon)}" alt="" loading="lazy">`:'<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>'}</div><div class="mi-body"><div class="mi-top"><h3>${esc(x.title)}</h3><span class="mi-author">${esc(x.author||t('mkt.unknownAuthor'))}</span></div><div class="mi-badges"><span class="mi-badge src">${esc(x.source)}</span><span class="mi-badge kind-${esc(kind)}">${esc(kindLabel)}</span>${compatBadge}${badge}</div><p>${esc(x.description||t('mkt.noDescription'))}</p><div class="mi-foot"><small>⤓ ${Number(x.downloads||0).toLocaleString()}</small>${action}</div></div></article>`;
+  }).join('');
+  $$('[data-market-install]').forEach(b=>b.onclick=()=>{
+    const item=items[Number(b.dataset.marketInstall)];
+    openInstallModal(item);
+  });
+  $$('[data-market-open]').forEach(b=>b.onclick=()=>{const item=items[Number(b.dataset.marketOpen)];if(item&&item.projectUrl)window.observer.marketOpenExternal(item.projectUrl)});
   const PH='<svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg>';
   n.querySelectorAll('.market-icon img').forEach(img=>{img.addEventListener('error',()=>{const d=img.parentElement;if(d){d.innerHTML=PH}},{once:true})});
-  // Spigot lazily enriches its rows (search has no icon/author) WITHOUT re-rendering: fetch the page's
-  // details in the background and patch each card in place. Cached backend-side, so re-paging is free.
   if(items.some(x=>x.source==='spigot')&&window.observer.marketSpigotDetails){
     const ids=items.filter(x=>x.source==='spigot').map(x=>String(x.id));
     window.observer.marketSpigotDetails(ids).then(r=>{
@@ -25,9 +59,6 @@ function renderMarket(items){const n=$('#marketResults');if(!items?.length){n.in
         if(d.icon){const box=card.querySelector('.market-icon');if(box&&!box.querySelector('img')){const im=document.createElement('img');im.loading='lazy';im.alt='';im.onerror=()=>{box.innerHTML=PH};im.src=d.icon;box.innerHTML='';box.appendChild(im)}}
         if(d.author){const a=card.querySelector('.mi-author');if(a)a.textContent=d.author}
       });
-      // BUGFIX: the enrichment only patched the DOM, so the MODEL kept the empty author. Clicking
-      // Install handed that raw row to the modal, which then showed "Unknown author" for a
-      // project whose name was already on screen in the list. Write it back into the model too.
       for(const x of items){const d=map[String(x.id)];if(!d)continue;if(d.author)x.author=d.author;if(d.icon)x.icon=d.icon}
     }).catch(()=>{});
   }
@@ -45,6 +76,13 @@ const imFmtBytes=n=>{if(!n)return'—';if(n<1024)return n+' B';if(n<1048576)retu
 // "YOUR SERVER: paper". neoforge is checked BEFORE forge on purpose: "neoforge" contains "forge",
 // so a forge test first would mislabel every NeoForge server as Forge.
 function imDetectServer(){
+  if(state.files?.target?.loader && state.files.target.loader !== 'unknown'){
+    return {
+      mc: state.files.target.mc || (String(state.files?.jar||'').match(/\b(1\.\d{1,2}(?:\.\d{1,2})?|26\.\d{1,2})\b/)||[])[1]||null,
+      loader: state.files.target.loader,
+      software: state.files.target.software || state.files.target.loader
+    };
+  }
   const jar=String(state.files?.jar||'');
   const mc=(jar.match(/\b(1\.\d{1,2}(?:\.\d{1,2})?|26\.\d{1,2})\b/)||[])[1]||null;
   let loader='unknown',software='unknown';
@@ -59,6 +97,29 @@ function imDetectServer(){
   else if(/fabric|quilt/i.test(jar)){loader='fabric';software='fabric'}
   else if(jar){loader='vanilla';software='vanilla'}
   return {mc,loader,software};
+}
+function imLoaderMatches(targetList, srvLoader){
+  if(!srvLoader||srvLoader==='unknown')return null;
+  const lds=targetList.map(l=>String(l).toLowerCase());
+  if(lds.includes('datapack')||srvLoader==='datapack')return true;
+  if(srvLoader==='paper')return lds.some(l=>/paper|spigot|purpur|folia|bukkit/.test(l));
+  if(srvLoader==='fabric')return lds.includes('fabric')||lds.includes('quilt');
+  if(srvLoader==='neoforge')return lds.includes('neoforge');
+  if(srvLoader==='forge')return lds.includes('forge')&&!lds.includes('neoforge');
+  if(srvLoader==='proxy')return lds.some(l=>/velocity|bungee|waterfall|proxy/.test(l));
+  return lds.includes(srvLoader);
+}
+function imVersionMatchesLoader(v, ldr){
+  if(!ldr||ldr==='auto'||ldr==='unknown'||ldr==='all')return true;
+  const lds=(v.loaders||[]).map(l=>String(l).toLowerCase());
+  if(!lds.length)return true;
+  if(ldr==='neoforge')return lds.includes('neoforge');
+  if(ldr==='forge')return lds.includes('forge')&&!lds.includes('neoforge');
+  if(ldr==='fabric')return lds.includes('fabric')||lds.includes('quilt');
+  if(ldr==='plugin'||ldr==='paper')return lds.some(l=>/paper|spigot|purpur|folia|bukkit/.test(l));
+  if(ldr==='proxy')return lds.some(l=>/velocity|bungee|waterfall|proxy/.test(l));
+  if(ldr==='datapack')return lds.includes('datapack');
+  return lds.includes(ldr);
 }
 function imBadge(ok,label,warn){return `<span class="im-badge ${ok===true?'ok':ok===false?'bad':warn?'warn':''}">${label}</span>`}
 function imRenderCompat(){
@@ -86,14 +147,31 @@ function imRenderCompat(){
     const buildMcLabel=buildMc.length?(buildMc.length>2?`${buildMc[0]} – ${buildMc[buildMc.length-1]}`:buildMc.join(', ')):(gameV||t('mkt.allVersionsShort'));
     const mcMatches=!(chosen&&gameV&&buildMc.length&&!buildMc.includes(gameV));
     cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(mcMatches,buildMcLabel,!mcMatches)}${(!mcMatches&&gameV)?`<small class="im-sub">${esc(t('mkt.serverShort',{v:gameV}))}</small>`:''}</div>`);
-    const itemLoaders=item.loaders||[];
-    const groupMap={plugin:['paper','spigot','purpur','folia','bukkit','proxy'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
-    const wanted=groupMap[item.kind]||null;
-    const match=wanted?(srv.loader!=='unknown'&&wanted.includes(srv.loader)):null;
-    cells.push(`<div class="im-compat-cell"><small>YOUR SERVER</small>${imBadge(match,srv.software==='unknown'?'unknown':srv.software,itemLoaders.length&&match===false)}</div>`);
+    const chosenLds=(chosen&&chosen.loaders&&chosen.loaders.length)?chosen.loaders:(item.loaders||[]);
+    let match=null;
+    if(item.kind==='datapack'||chosenLds.map(l=>String(l).toLowerCase()).includes('datapack')){
+      match=true;
+    }else if(srv.loader!=='unknown'){
+      if(chosenLds.length){
+        match=imLoaderMatches(chosenLds,srv.loader);
+      }else{
+        const groupMap={plugin:['paper','spigot','purpur','folia','bukkit','proxy'],neoforge:['neoforge'],forge:['forge'],fabric:['fabric','quilt']};
+        const wanted=groupMap[item.kind]||null;
+        match=wanted?wanted.includes(srv.loader):null;
+      }
+    }
+    cells.push(`<div class="im-compat-cell"><small>YOUR SERVER</small>${imBadge(match,srv.software==='unknown'?'unknown':srv.software,chosenLds.length&&match===false)}</div>`);
   }
   // server-side support (Modrinth env)
-  if(detail?.env){const sup=detail.env.server;cells.push(`<div class="im-compat-cell"><small>SERVER-SIDE</small>${imBadge(sup==='required'?true:sup==='optional'?null:false,sup==='required'?'required':sup==='optional'?'optional':'client-only',sup!=='required')}</div>`)}
+  if(detail?.env){
+    const srvVal = (typeof detail.env === 'object' && detail.env) ? (detail.env.server || (detail.env.normalized === 'client-only' ? 'unsupported' : 'required')) : (detail.env === 'client-only' ? 'unsupported' : 'required');
+    const isClientOnly = srvVal === 'unsupported';
+    const isOptional = srvVal === 'optional';
+    const isRequired = srvVal === 'required' || !isClientOnly;
+    const ok = isRequired ? true : isOptional ? null : false;
+    const label = isClientOnly ? 'client-only' : isOptional ? 'optional' : 'required';
+    cells.push(`<div class="im-compat-cell"><small>SERVER-SIDE</small>${imBadge(ok,label,isClientOnly)}</div>`);
+  }
   if(chosen?.size)cells.push(`<div class="im-compat-cell"><small>SIZE</small>${imBadge(null,imFmtBytes(chosen.size))}</div>`);
   if(chosen?.date)cells.push(`<div class="im-compat-cell"><small>UPDATED</small>${imBadge(null,new Date(chosen.date).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}))}</div>`);
   el.innerHTML=cells.map(c=>`<div class="im-compat-cell">${c}</div>`).join('');
@@ -102,6 +180,38 @@ function imChosenVersion(){
   const {detail,versionId}=installState;
   if(!detail?.versions)return null;
   return detail.versions.find(v=>v.id===versionId)||null;
+}
+function imSyncCompatAlert(){
+  const alertEl=$('#imCompatAlert');
+  if(!alertEl)return;
+  const srv=imDetectServer();
+  const chosen=imChosenVersion();
+  const btn=$('#imInstall');
+  if(!chosen){alertEl.hidden=true;return}
+  let isCompat=true;
+  if(srv.mc && chosen.gameVersions?.length && !chosen.gameVersions.includes(srv.mc)){
+    isCompat=false;
+  }
+  const chosenLds=(chosen.loaders||[]).map(l=>String(l).toLowerCase());
+  const isDatapack=(installState.item?.kind==='datapack'||chosenLds.includes('datapack'));
+  if(!isDatapack && srv.loader && srv.loader!=='unknown' && chosenLds.length){
+    const match=imLoaderMatches(chosenLds,srv.loader);
+    if(!match) isCompat=false;
+  }
+  alertEl.hidden=false;
+  const lStr=srv.loader!=='unknown'?srv.loader:(chosenLds.length?chosenLds.join('/'):'Minecraft');
+  const vStr=srv.mc||(chosen.gameVersions?.length?chosen.gameVersions[0]:'any');
+  const buildLdr=chosenLds.length?chosenLds.join('/'):'unknown';
+  const slStr=srv.software!=='unknown'?srv.software:(srv.loader!=='unknown'?srv.loader:'unknown');
+  if(isCompat){
+    alertEl.className='im-compat-alert ok';
+    alertEl.innerHTML=`<span>✔</span> ${esc(t('im.compatNotice',{l:lStr,v:vStr}))}`;
+    if(btn&&!installState.busy&&!installState.done) btn.textContent=t('im.install');
+  } else {
+    alertEl.className='im-compat-alert warn';
+    alertEl.innerHTML=`<span>⚠</span> ${esc(t('im.incompatNotice',{l:buildLdr,sl:slStr}))}`;
+    if(btn&&!installState.busy&&!installState.done) btn.textContent=t('im.installIncompat');
+  }
 }
 function imRenderWarns(){
   const el=$('#imWarns');if(!el)return;
@@ -121,14 +231,16 @@ function imRenderWarns(){
     if(gameV&&chosen&&!(chosen.gameVersions||[]).includes(gameV))warns.push(t('im.warnPackMc',{v:(chosen.gameVersions||[]).slice(-1)[0]||'?',s:esc(gameV)}));
     warns.push(t('im.warnOverwrite'));
   } else {
-    if(detail?.env?.server==='unsupported')warns.push(t('im.warnClientOnly'));
-    if(detail?.env?.server==='optional')warns.push(t('im.warnOptional'));
+    const isDatapack=(item.kind==='datapack'||(chosen?.loaders||[]).map(l=>String(l).toLowerCase()).includes('datapack'));
+    const envSrv=(typeof detail?.env==='object'&&detail?.env)?detail.env.server:(detail?.env==='client-only'?'unsupported':'required');
+    if(!isDatapack && envSrv==='unsupported')warns.push(t('im.warnClientOnly'));
+    if(!isDatapack && envSrv==='optional')warns.push(t('im.warnOptional'));
     if(chosen&&gameV&&!(chosen.gameVersions||[]).includes(gameV))warns.push(t('im.warnMc',{v:(chosen.gameVersions||[]).slice(-1)[0]||'?',s:esc(gameV)}));
     const itemLoaders=item.loaders||[];
     const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind];
     if(wanted&&itemLoaders.length&&srv.loader!=='unknown'&&!itemLoaders.some(l=>wanted.includes(srv.loader)&&wanted.includes(l))&&!wanted.includes(srv.loader))warns.push(t('im.warnLoader',{l:esc(itemLoaders.join('/')),s:esc(srv.loader)}));
-    warns.push(t('mkt.installsInto',{p:esc(item.kind==='datapack'?(state.files?.datapackFolder||'world/datapacks'):item.kind==='mod'?'mods':'plugins')}));
+    warns.push(t('mkt.installsInto',{p:esc(item.kind==='datapack'?(state.files?.datapackFolder||'world/datapacks'):item.kind==='plugin'?'plugins':'mods')}));
   }
   el.innerHTML=warns.map(w=>`<li>${w}</li>`).join('');
   $('#imWarnSection').hidden=!warns.length;
@@ -147,6 +259,8 @@ function imRenderDeps(){
   const sec=$('#imDepsSection'),list=$('#imDeps'),btn=$('#imInstallDeps');
   if(!sec)return;
   const chosen=imChosenVersion();
+  const isDatapack=(installState.item?.kind==='datapack'||(chosen?.loaders||[]).map(l=>String(l).toLowerCase()).includes('datapack'));
+  if(isDatapack){sec.hidden=true;return}
   const deps=(chosen?.dependencies||[]).filter(d=>d.type==='required'||d.type==='incompatible');
   if(!deps.length){sec.hidden=true;return}
   installState.deps=deps;
@@ -200,49 +314,112 @@ function imVersionBits(v){
 }
 function imRenderVersionPicker(){
   const sec=$('#imVersionSection'),sel=$('#imVersion');
-  const vs=installState.detail?.versions;
+  const allVs=installState.detail?.versions;
   const list=$('#imVersionList'),note=$('#imVersionNote');
-  // The <select> is a custom dropdown: enhanceSelect() wraps it in a div.ol-dd and moves the
-  // native select inside. Hiding the select alone leaves the WRAPPER on screen, which is how an
-  // empty dropdown box ended up under the VERSION heading. Hide the wrapper.
+  const cards=$('#imVersionCards');
+  const srv=imDetectServer();
   const dd=sel.closest('.ol-dd');
-  if(!vs||!vs.length){sec.hidden=true;if(list)list.hidden=true;return}
+  if(!allVs||!allVs.length){sec.hidden=true;if(list)list.hidden=true;if(cards)cards.hidden=true;return}
   sec.hidden=false;
-  // A source that cannot install a chosen build must not offer the choice. Spiget serves only
-  // the resource's latest build: the version-specific download endpoint answers 403 and the
-  // ?version= parameter is ignored (every version returns the same file). The list is still
-  // shown, read-only, because it carries the Minecraft versions the resource declares.
   if(installState.detail.versionPickable===false){
-    // Nothing to choose: the select is emptied, and the dropdown hides itself (a select with no
-    // options has no dropdown to show). The list below carries the information instead.
     sel.innerHTML='';
     if(dd&&dd._olSync)dd._olSync();else sel.hidden=true;
+    if(cards)cards.hidden=true;
     if(list){
       list.hidden=false;
-      // A Spigot resource can have 25+ builds. Listing them all pushed the Install button off
-      // the bottom of the window, so only the newest few are shown; the note below says how many
-      // the resource has in total.
-      const shown=vs.slice(0,5);
+      const shown=allVs.slice(0,5);
       list.innerHTML=shown.map(v=>`<li class="im-version"><b>${esc(v.number)}</b><span>${esc(imVersionBits(v).join(' · '))}</span></li>`).join('')
-        + (vs.length>shown.length?`<li class="im-version more"><span>${t('mkt.moreBuilds',{n:vs.length-shown.length})}</span></li>`:'');
+        + (allVs.length>shown.length?`<li class="im-version more"><span>${t('mkt.moreBuilds',{n:allVs.length-shown.length})}</span></li>`:'');
     }
     if(note){note.hidden=false;note.textContent=t('mkt.latestOnly')}
     return;
   }
   if(dd)dd.hidden=false;else sel.hidden=false;
   if(list)list.hidden=true;
-  if(note)note.hidden=true;  // BUGFIX (v6.0.0 follow-up): the option label packed version, date, size and a Minecraft version
-  // onto one line. In the narrow modal the dot in "1.16" was lost at that font size, so it read
-  // "116". Split it: the version number is the label, the rest is the title tooltip.
+  if(note)note.hidden=true;
+
+  const targetLoader = installState.targetLoader || (srv.loader !== 'unknown' ? srv.loader : 'all');
+  const canFilter = !!(targetLoader && targetLoader !== 'auto' && targetLoader !== 'unknown' && targetLoader !== 'all');
+  const matchingVs = canFilter ? allVs.filter(v => imVersionMatchesLoader(v, targetLoader)) : allVs;
+  const hasMultipleLoaders = canFilter && matchingVs.length > 0 && matchingVs.length < allVs.length;
+
+  const toggleBtn = $('#imToggleLoaderFilter');
+  if(toggleBtn){
+    if(hasMultipleLoaders){
+      toggleBtn.hidden = false;
+      toggleBtn.textContent = installState.showAllLoaders
+        ? t('im.filterToLoader', { l: targetLoader })
+        : t('im.showAllLoaders', { n: allVs.length });
+      toggleBtn.onclick = () => {
+        installState.showAllLoaders = !installState.showAllLoaders;
+        imRenderVersionPicker();
+        imRenderCompat();imRenderWarns();imRenderDeps();imSyncCompatAlert();
+      };
+    } else {
+      toggleBtn.hidden = true;
+    }
+  }
+
+  const vs = (hasMultipleLoaders && !installState.showAllLoaders) ? matchingVs : allVs;
+
+  let recId=null;
+  const isDatapack=(targetLoader==='datapack'||installState.item?.kind==='datapack');
+  for(const v of vs){
+    const mcMatch=!srv.mc||(v.gameVersions||[]).includes(srv.mc);
+    const ldMatch=isDatapack ? (v.loaders||[]).map(l=>l.toLowerCase()).includes('datapack') : (srv.loader==='unknown'||(v.loaders||[]).some(l=>{
+      const cl=String(l).toLowerCase();
+      return cl===srv.loader||(srv.loader==='paper'&&/paper|spigot|bukkit/.test(cl))||(srv.loader==='neoforge'&&cl==='neoforge')||(srv.loader==='fabric'&&/fabric|quilt/.test(cl))||(srv.loader==='forge'&&cl==='forge');
+    }));
+    const isRel=(v.versionType||'release')==='release';
+    if(mcMatch&&ldMatch&&isRel){recId=v.id;break}
+  }
+  if(!recId&&vs[0])recId=vs[0].id;
+  if(!installState.versionId||!vs.some(v=>v.id===installState.versionId)){
+    installState.versionId=recId;
+  }
+
+  if(cards){
+    cards.hidden=false;
+    cards.innerHTML=vs.map(v=>{
+      const isSel=v.id===installState.versionId;
+      const isRec=v.id===recId;
+      const ch=v.versionType||'release';
+      const chLabel=ch==='release'?t('im.channelRelease'):ch==='beta'?t('im.channelBeta'):t('im.channelAlpha');
+      const mcList=(v.gameVersions||[]).filter(Boolean);
+      const mcBadge=mcList.length?(mcList.length>2?`${mcList[0]}–${mcList[mcList.length-1]}`:mcList.join(',')):'';
+      return `<div class="im-vcard${isSel?' selected':''}" data-vid="${esc(v.id)}">`
+        + `<div class="im-vcard-top"><span class="im-vcard-num">${esc(v.number||v.name||v.id)}</span>`
+        + `${isRec?`<span class="im-vcard-badge rec">${esc(t('im.recBadge'))}</span>`:''}`
+        + `<span class="im-vcard-badge channel-${ch}">${esc(chLabel)}</span></div>`
+        + `<div class="im-vcard-loaders">${(v.loaders||[]).slice(0,3).map(l=>`<span class="im-vcard-loader">${esc(l)}</span>`).join('')}`
+        + `${mcBadge?`<span class="im-vcard-loader">MC ${esc(mcBadge)}</span>`:''}</div>`
+        + `<div class="im-vcard-foot"><span>${v.date?new Date(v.date).toLocaleDateString():'—'}</span><span>${imFmtBytes(v.size)}</span></div>`
+        + `</div>`;
+    }).join('');
+
+    cards.querySelectorAll('.im-vcard[data-vid]').forEach(card=>{
+      card.onclick=()=>{
+        const vid=card.dataset.vid;
+        installState.versionId=vid;
+        cards.querySelectorAll('.im-vcard').forEach(c=>c.classList.toggle('selected',c.dataset.vid===vid));
+        sel.value=vid;
+        if(dd&&dd._olSync)dd._olSync();
+        imRenderCompat();imRenderWarns();imRenderDeps();imSyncCompatAlert();
+      };
+    });
+  }
+
   sel.innerHTML=vs.map(v=>{
     const info=imVersionBits(v).join(' · ');
-    return `<option value="${esc(v.id)}" title="${esc(info)}">${esc(v.number)} — ${esc(info)}</option>`;
+    return `<option value="${esc(v.id)}" title="${esc(info)}"${v.id===installState.versionId?' selected':''}>${esc(v.number)} — ${esc(info)}</option>`;
   }).join('');
-  // The custom dropdown caches the button label from the moment it was enhanced, and this
-  // select was empty then. Without this the button shows no text at all, which reads as an
-  // empty version list.
+  sel.value=installState.versionId;
   if(dd&&dd._olSync)dd._olSync();
-  sel.onchange=()=>{installState.versionId=sel.value;imRenderCompat();imRenderWarns();imRenderDeps()};
+  sel.onchange=()=>{
+    installState.versionId=sel.value;
+    if(cards)cards.querySelectorAll('.im-vcard').forEach(c=>c.classList.toggle('selected',c.dataset.vid===sel.value));
+    imRenderCompat();imRenderWarns();imRenderDeps();imSyncCompatAlert();
+  };
 }
 function imSetDone(r){
   installState.done=true;installState.busy=false;
@@ -311,7 +488,28 @@ function openInstallModal(item){
   const srv=imDetectServer();
   item.software=srv.software;
   item.loader=srv.loader;
-  installState={item,detail:null,versionId:null,busy:false,done:false};
+  const isDatapack=(item.kind==='datapack'||(item.loaders||[]).map(l=>String(l).toLowerCase()).includes('datapack'));
+  let activeLdr;
+  if(isDatapack){
+    item.kind='datapack';
+    activeLdr='datapack';
+  } else {
+    activeLdr=(srv.loader!=='unknown'?srv.loader:'all');
+    const itemLoaders=(item.loaders||[]).map(l=>String(l).toLowerCase());
+    if(itemLoaders.some(l=>/fabric|quilt|neoforge|forge/.test(l))){
+      if(activeLdr==='fabric'||(itemLoaders.includes('fabric')&&!itemLoaders.includes('neoforge')&&!itemLoaders.includes('forge'))){
+        item.kind='fabric';
+      }else if(activeLdr==='neoforge'||(itemLoaders.includes('neoforge')&&!itemLoaders.includes('fabric')&&!itemLoaders.includes('forge'))){
+        item.kind='neoforge';
+      }else if(activeLdr==='forge'){
+        item.kind='forge';
+      }else{
+        item.kind='mod';
+      }
+    }
+  }
+  item.targetLoader=activeLdr;
+  installState={item,detail:null,versionId:null,busy:false,done:false,targetLoader:activeLdr,showAllLoaders:false};
   const m=$('#installModal');
   // Cancel a pending close from the previous modal, or its timer will hide THIS one mid-open.
   if(m._closeTimer){ clearTimeout(m._closeTimer); m._closeTimer=0; }
@@ -322,6 +520,12 @@ function openInstallModal(item){
   $('#imTitle').textContent=item.title||'—';
   $('#imMeta').textContent=`${item.author||t('mkt.unknownAuthor')} · ${item.source} · ${t('mkt.downloads',{n:Number(item.downloads||0).toLocaleString()})}`;
   $('#imKind').textContent=item.kind;
+  const tp=$('#imTargetPill');
+  if(tp){
+    const sName=srv.software!=='unknown'?srv.software:srv.loader!=='unknown'?srv.loader:'auto';
+    tp.textContent=t('im.targetServer',{s:sName,v:srv.mc||'?'});
+  }
+  const alt=$('#imCompatAlert');if(alt)alt.hidden=true;
   $('#imDesc').textContent=item.description||'';
   $('#imIcon').src=item.icon||'';
   $('#imIcon').style.visibility=item.icon?'visible':'hidden';
@@ -349,9 +553,8 @@ function openInstallModal(item){
       if(d.icon){$('#imIcon').src=d.icon;$('#imIcon').style.visibility='visible'}
     }
     imRenderVersionPicker();
-    installState.versionId=installState.detail.versions?.[0]?.id||null;
-    imRenderCompat();imRenderWarns();imRenderDeps();imRenderLinks();
-    const b2=$('#imInstall');b2.disabled=false;b2.textContent=t('mkt.install');
+    imRenderCompat();imRenderWarns();imRenderDeps();imRenderLinks();imSyncCompatAlert();
+    const b2=$('#imInstall');b2.disabled=false;
   });
 }
 // BUGFIX (v6.0.0 follow-up): closing scheduled a 140 ms hide timer but never stored it. If the user

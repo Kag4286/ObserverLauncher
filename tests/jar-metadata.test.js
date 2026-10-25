@@ -61,6 +61,12 @@ check('toml deps parsed (2)', deps.length === 2);
 check('neoforge mandatory detected', deps.some(d => d.modId === 'neoforge' && d.mandatory === true));
 check('fzzy_config detected', deps.some(d => d.modId === 'fzzy_config'));
 
+// Test inline comments like JEI (modId="forge" #mandatory)
+const jeiToml = '[[dependencies.jei]]\nmodId="forge" #mandatory\nmandatory=true #mandatory\nversionRange="[34.0.3,)" #mandatory\n';
+const jeiDeps = parseTomlDependencies(jeiToml);
+check('inline comment stripped from modId', jeiDeps[0].modId === 'forge');
+check('inline comment stripped from versionRange', jeiDeps[0].versionRange === '[34.0.3,)');
+
 // --- classifyJar via a read() stub ---
 const neoClass = classifyJar((n) => n === 'META-INF/neoforge.mods.toml' ? { ok: true, content: toml } : { ok: false });
 check('classify neoforge', neoClass.loader === 'neoforge');

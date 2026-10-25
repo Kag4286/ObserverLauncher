@@ -33,21 +33,32 @@ function cfHeaders() {
 // Pure marketplace search shared by the IPC handler (GUI) and the MCP search_marketplace tool, so
 // both support the same three sources and never drift. Caller is responsible for try/catch.
 async function searchMarket(opts) {
-  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0, loader = '' } = opts || {};
+  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0, loader = '', category = '' } = opts || {};
   const skip = Math.max(0, Number(offset) || 0);
   if (source === 'modrinth') {
-    // 2.3.0: an explicit `loader` (neoforge|forge|fabric|quilt) pins the search to that loader
-    // instead of the loose kind-group (which returned Forge builds for a NeoForge server).
     const loaderGroups = {
       plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
-      forge: ['loaders:forge', 'loaders:neoforge'],
+      neoforge: ['loaders:neoforge'],
+      forge: ['loaders:forge'],
       fabric: ['loaders:fabric', 'loaders:quilt'],
-      // BUGFIX (2.5.1): a generic 'mod' search used to fall through to the PLUGIN group, so a mod
-      // lookup (e.g. apply_fix installing a missing dependency) matched nothing. Union all mod
-      // loaders; an explicit `loader` param still pins one (see `explicit` below).
+      quilt: ['loaders:quilt', 'loaders:fabric'],
+      proxy: ['loaders:velocity', 'loaders:waterfall', 'loaders:bungeecord'],
       mod: ['loaders:forge', 'loaders:neoforge', 'loaders:fabric', 'loaders:quilt'],
     };
-    const explicit = ['neoforge', 'forge', 'fabric', 'quilt'].includes(loader) ? [`loaders:${loader}`] : null;
+    const explicit = ['neoforge', 'forge', 'fabric', 'quilt', 'paper', 'velocity', 'proxy'].includes(loader)
+      ? (['velocity', 'proxy'].includes(loader) ? ['loaders:velocity', 'loaders:waterfall', 'loaders:bungeecord'] : [`loaders:${loader}`])
+      : null;
+    const catMap = {
+      qol: ['categories:quality-of-life', 'categories:utility'],
+      perf: ['categories:optimization'],
+      optimization: ['categories:optimization'],
+      admin: ['categories:utility', 'categories:management', 'categories:administration'],
+      security: ['categories:management', 'categories:protection', 'categories:utility'],
+      economy: ['categories:economy'],
+      worldgen: ['categories:worldgen', 'categories:adventure'],
+      library: ['categories:library'],
+    };
+    const catFacets = catMap[category] || (category ? [`categories:${category}`] : null);
     const index = sort === 'latest' ? 'newest' : sort === 'downloads' ? 'downloads' : 'relevance';
     let lastTotal = null;
     const runSearch = async filters => {
@@ -64,18 +75,27 @@ async function searchMarket(opts) {
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['loaders:datapack']]); if (hits.length) relaxed = 'loader'; }
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['categories:datapack']]); if (hits.length) relaxed = 'loader'; }
     } else {
-      // BUGFIX (2.5.1): `explicit` was computed but never used, so the `loader` param did nothing.
-      // A caller pinning loader=neoforge still got the loose kind-group back. Use `explicit` when set.
-      const loaderGroup = explicit || loaderGroups[kind] || loaderGroups.plugin;
+      const loaderGroup = explicit || loaderGroups[loader] || loaderGroups[kind] || loaderGroups.plugin;
       let filters = [['project_type:mod'], loaderGroup];
       if (version) filters.push([`versions:${version}`]);
+      if (catFacets) filters.push(catFacets);
       hits = await runSearch(filters);
+      if (!hits.length && skip === 0 && catFacets) {
+        const fNoCat = [['project_type:mod'], loaderGroup];
+        if (version) fNoCat.push([`versions:${version}`]);
+        hits = await runSearch(fNoCat);
+        if (hits.length) relaxed = 'category';
+      }
       if (!hits.length && skip === 0 && version) { hits = await runSearch([['project_type:mod'], loaderGroup]); if (hits.length) relaxed = 'version'; }
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod']]); if (hits.length) relaxed = 'loader'; }
     }
-    // BUGFIX (v2.3.0): Modrinth search does NOT return `env` — it returns client_side/server_side
-    // ('required'|'optional'|'unsupported'). Map them to our 4-bucket env so the field is populated.
-    return { ok: true, relaxed, total: lastTotal, items: hits.map(x => ({ source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: normalizeEnv({ client: x.client_side, server: x.server_side }), loaders: x.loaders || [], date: x.date_created || null })) };
+    const KNOWN_LOADERS = ['datapack', 'fabric', 'quilt', 'neoforge', 'forge', 'paper', 'purpur', 'spigot', 'folia', 'bukkit', 'velocity', 'waterfall', 'bungeecord', 'vanilla'];
+    const mapHit = x => {
+      const hitLoaders = (x.loaders && x.loaders.length) ? x.loaders : (x.categories || []).map(c => String(c).toLowerCase()).filter(c => KNOWN_LOADERS.includes(c));
+      const hitEnv = { client: x.client_side || null, server: x.server_side || null, normalized: normalizeEnv({ client: x.client_side, server: x.server_side }) };
+      return { source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: hitEnv, loaders: hitLoaders, date: x.date_created || null };
+    };
+    return { ok: true, relaxed, total: lastTotal, items: hits.map(mapHit) };
   }
   if (source === 'hangar') {
     // BUGFIX (6.0.1): the sort field was "updatedAt", which Hangar does not accept. Its search
@@ -120,7 +140,8 @@ async function searchMarket(opts) {
     const headers = cfHeaders();
     if (!headers) { const e = new Error('CurseForge API key not set. Add your own key in Settings to search CurseForge.'); e.code = 'noKey'; throw e; }
     const classId = cf.classIdForKind(kind);
-    const loaderId = cf.loaderIdFor(kind === 'fabric' ? 'fabric' : kind === 'forge' ? 'forge' : kind === 'neoforge' ? 'neoforge' : 'any');
+    const targetLoader = loader || (kind === 'fabric' ? 'fabric' : kind === 'neoforge' ? 'neoforge' : kind === 'forge' ? 'forge' : 'any');
+    const loaderId = cf.loaderIdFor(targetLoader);
     const params = new URLSearchParams({ gameId: String(cf.CF_GAME_ID), classId: String(classId), searchFilter: query || '', sortField: sort === 'latest' ? '3' : '2', sortOrder: 'desc', index: String(skip), pageSize: '20' });
     if (version) params.set('gameVersion', version);
     if (loaderId) params.set('modLoaderType', String(loaderId));
@@ -138,9 +159,28 @@ async function resolveMarketDownload(item) {
   if (item.source === 'modrinth' || !item.source) {
     const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
     const isVel = item && (item.software === 'velocity' || item.loader === 'velocity' || item.loader === 'proxy');
-    const wantedLoaders = { plugin: isVel ? ['velocity', 'waterfall', 'bungeecord'] : ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], forge: ['forge', 'neoforge'], mod: ['forge', 'neoforge'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['forge', 'neoforge', 'fabric', 'quilt'] }[kind];
+    let wantedLoaders;
+    if (kind === 'datapack' || (item && item.loader === 'datapack')) wantedLoaders = ['datapack', 'minecraft'];
+    else if (item && item.loader === 'neoforge') wantedLoaders = ['neoforge'];
+    else if (item && item.loader === 'forge') wantedLoaders = ['forge'];
+    else if (item && (item.loader === 'fabric' || item.loader === 'quilt')) wantedLoaders = ['fabric', 'quilt'];
+    else if (item && item.loader === 'paper') wantedLoaders = ['paper', 'spigot', 'purpur', 'folia', 'bukkit'];
+    else if (isVel) wantedLoaders = ['velocity', 'waterfall', 'bungeecord'];
+    else {
+      wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], neoforge: ['neoforge'], forge: ['forge'], mod: ['neoforge', 'forge', 'fabric', 'quilt'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['neoforge', 'forge', 'fabric', 'quilt'] }[kind] || ['paper', 'spigot', 'purpur', 'folia', 'bukkit'];
+    }
     const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
     let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
+    if (target && item.loader && !item.allowIncompatible && Array.isArray(target.loaders) && target.loaders.length) {
+      if (kind === 'datapack' || target.loaders.includes('datapack')) {
+        // Datapacks are universally compatible with all server loaders
+      } else {
+        const match = target.loaders.some(l => wantedLoaders.includes(l));
+        if (!match) {
+          throw new Error(`The selected build (${target.version_number || target.id}) supports ${target.loaders.join('/')}, which is incompatible with your ${item.loader} server.`);
+        }
+      }
+    }
     if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || null;
     // BUGFIX (v3.3.1): the old fallback `|| byVersion[0] || versions[0]` silently installed a
     // MISMATCHED jar (e.g. a Floodgate NeoForge build onto a Paper/Purpur server) that then crashed
@@ -441,7 +481,7 @@ function registerMarketplace(ipcMain, ctx) {
       const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
       const map = v => {
         const f = (v.files || []).find(x => x.primary) || (v.files || [])[0] || {};
-        return { id: v.id, number: v.version_number, name: v.name || v.version_number, date: v.date_published, gameVersions: v.game_versions || [], loaders: v.loaders || [], size: f.size || 0,
+        return { id: v.id, number: v.version_number, name: v.name || v.version_number, date: v.date_published, gameVersions: v.game_versions || [], loaders: v.loaders || [], size: f.size || 0, versionType: v.version_type || 'release',
           dependencies: (v.dependencies || []).filter(d => d && d.project_id).map(d => ({ projectId: d.project_id, versionId: d.version_id || null, type: d.dependency_type || 'required' })) };
       };
       const mapped = versions.map(map);
@@ -457,9 +497,15 @@ function registerMarketplace(ipcMain, ctx) {
         } catch {}
       }
       for (const v of mapped) for (const d of v.dependencies) { const m = depMeta[d.projectId]; if (m) { d.title = m.title; d.slug = m.slug; d.icon = m.icon; } }
+      const projectLoaders = (proj.loaders && proj.loaders.length) ? proj.loaders : (item.loaders || []);
+      const projectEnv = {
+        client: proj.client_side || item.env?.client || null,
+        server: proj.server_side || item.env?.server || null,
+        normalized: normalizeEnv({ client: proj.client_side || item.env?.client, server: proj.server_side || item.env?.server })
+      };
       const sourceUrl = proj.source_url || proj.wiki_url || proj.issues_url || null;
       const projectUrl = `https://modrinth.com/project/${encodeURIComponent(proj.slug || item.id)}`;
-      return { ok: true, title: proj.title, description: proj.description, body: String(proj.body || '').slice(0, 1500), icon: proj.icon_url || item.icon || '', author: item.author || (proj.owner || ''), env: item.env || null, loaders: item.loaders || null, versions: mapped, sourceUrl, projectUrl };
+      return { ok: true, title: proj.title, description: proj.description, body: String(proj.body || '').slice(0, 1500), icon: proj.icon_url || item.icon || '', author: item.author || (proj.owner || ''), env: projectEnv, loaders: projectLoaders, versions: mapped, sourceUrl, projectUrl };
     } catch (error) { return { ok: false, error: marketplaceError(error).error }; }
   });
 

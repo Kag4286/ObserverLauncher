@@ -85,7 +85,7 @@ console.log(extraFail ? `extra keys in ${extraFail} locale(s)` : 'no extra keys 
 // quoted literal, so a plain scan cannot see them. Keep this list in sync when a new key
 // family is built by string concatenation instead of a literal.
 const DEAD_DYN = new Set();
-for (const k of ['plugin', 'forge', 'fabric', 'datapack', 'modpack']) DEAD_DYN.add('mkt.' + k + 'Type');
+for (const k of ['plugin', 'forge', 'fabric', 'neoforge', 'mod', 'datapack', 'modpack']) DEAD_DYN.add('mkt.' + k + 'Type');
 for (const b of ['water', 'plains', 'forest', 'desert', 'snow', 'mountain', 'swamp', 'nether', 'end']) DEAD_DYN.add('wm.lg.' + b);
 for (const g of ['gameplay', 'world', 'network', 'security']) DEAD_DYN.add('prop.group.' + g);
 // v6.0.0 D2: crash categories are built as 'crash.cat.' + category (doctor.classifyCrash).

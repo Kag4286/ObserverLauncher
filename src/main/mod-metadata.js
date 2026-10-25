@@ -40,7 +40,8 @@ function parseTomlDependencies(toml) {
     const kv = line.match(/^([\w]+)\s*=\s*(.+?)\s*$/);
     if (!kv) continue;
     const key = kv[1].toLowerCase();
-    let val = kv[2].replace(/^["']|["']$/g, '').replace(/\s*#.*$/, '').trim();
+    const qm = kv[2].match(/^"([^"]*)"|^'([^']*)'/);
+    let val = qm ? (qm[1] !== undefined ? qm[1] : qm[2]) : kv[2].replace(/\s*#.*$/, '').trim().replace(/^["']|["']$/g, '').trim();
     if (key === 'modid') { if (!cur) cur = {}; cur.modId = val; }
     else if (key === 'mandatory') { if (!cur) cur = {}; cur.mandatory = /true/i.test(val); }
     else if (key === 'versionrange') { if (!cur) cur = {}; cur.versionRange = val; }

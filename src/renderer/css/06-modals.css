@@ -422,9 +422,33 @@ html.motion-lite #saveSettings.dirty,html.motion-lite #saveProperties.dirty{anim
 .im-head h2{font-size:17px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .im-head p{font:500 11px var(--font-mono);margin:0}
 .im-kind{flex-shrink:0;font:700 9px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(34,197,94,.35);border-radius:999px;padding:4px 10px;background:var(--accent-weak)}
+.im-head-tags{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.im-target-pill{font:600 10px var(--font-mono);padding:3px 8px;border-radius:999px;background:var(--field);border:1px solid var(--border);color:var(--text-muted)}
 .im-desc{font-size:12px;line-height:1.5;margin:10px 0 2px;max-height:52px;overflow:hidden}
+.im-compat-alert{padding:9px 12px;border-radius:var(--r-sm);margin:10px 0 2px;font:500 12px var(--font-ui);display:flex;align-items:center;gap:8px}
+.im-compat-alert.ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--accent)}
+.im-compat-alert.warn{background:rgba(255,183,77,.12);border:1px solid rgba(255,183,77,.35);color:var(--warning)}
 .im-section{margin-top:14px}
 .im-section>.eyebrow{margin-bottom:8px}
+.im-sec-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.im-pick-title{font:500 11px var(--font-ui);color:var(--text-dim)}
+.im-sec-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.im-filter-toggle{font:600 10.5px var(--font-mono);color:var(--accent);cursor:pointer;padding:2px 7px;border-radius:var(--r-xs);background:var(--accent-weak);border:1px solid rgba(34,197,94,.25);transition:all .12s}
+.im-filter-toggle:hover{background:rgba(34,197,94,.2);border-color:var(--accent)}
+.im-version-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:210px;overflow-y:auto;margin-bottom:8px;padding-right:2px}
+.im-vcard{padding:9px 11px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--field);cursor:pointer;display:flex;flex-direction:column;gap:5px;transition:all .12s}
+.im-vcard:hover{border-color:var(--border-hover);background:var(--panel-raised)}
+.im-vcard.selected{border-color:var(--accent);background:var(--accent-weak);box-shadow:0 0 0 1px var(--accent)}
+.im-vcard-top{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.im-vcard-num{font:700 12.5px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.im-vcard-badge{font:700 9px var(--font-mono);padding:2px 5px;border-radius:3px;text-transform:uppercase}
+.im-vcard-badge.rec{background:var(--accent);color:var(--accent-ink)}
+.im-vcard-badge.channel-release{background:rgba(34,197,94,.15);color:var(--accent)}
+.im-vcard-badge.channel-beta{background:rgba(255,210,63,.15);color:var(--warning)}
+.im-vcard-badge.channel-alpha{background:rgba(255,59,92,.15);color:var(--danger)}
+.im-vcard-loaders{display:flex;gap:4px;flex-wrap:wrap}
+.im-vcard-loader{font:600 9px var(--font-mono);padding:1px 5px;border-radius:2px;background:var(--surface-3);color:var(--text-muted);text-transform:uppercase}
+.im-vcard-foot{display:flex;justify-content:space-between;font:500 10px var(--font-mono);color:var(--text-dim)}
 /* A one-line note under a section, used when the version picker is hidden because the
    registry cannot install a chosen build. */
 .im-hint{font:500 11.5px var(--font-ui);color:var(--text-muted);line-height:1.5;margin:6px 0 0}
