@@ -10,6 +10,59 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.1.5] — 2026-10-25
+
+**Cross-version Player Inspector overhaul (1.8–1.21+), EULA-compliant 4-tier hybrid texture engine, inventory & equipment layout fix, marketplace active server locking, and world map optimizations.**
+
+### Added: EULA-Compliant 4-Tier Hybrid Texture Engine (`src/main/textures.js`)
+
+- Implemented a 4-tier texture resolution pipeline:
+  - **Tier 1:** Local texture disk cache in `%APPDATA%/ObserverLauncher/textures/<version>/`.
+  - **Tier 2:** Mod jar extraction via zero-dependency `jar-reader.js` and `mods-index.js`, reading PNG assets directly from the server's `mods/*.jar` archives.
+  - **Tier 3:** Local client Minecraft installation scan (`%APPDATA%/.minecraft/versions/<v>/<v>.jar`, Prism Launcher, Modrinth App, and CurseForge) with offline zip extraction.
+  - **Tier 4:** High-speed Cloudflare CDN (`cdn.jsdelivr.net/gh/PrismarineJS/minecraft-assets@master/data`) with fallback to raw GitHub.
+- Candidate URL mappings (`itemCandidateUrls`) for vanilla blocks without dedicated 2D item textures (pumpkins, buttons, crafting tables, furnaces, stairs, slabs, beds, banners, doors, concrete, terracotta, wool, etc.).
+- Dual network fetch using Chromium's `net.fetch` with automatic fallback to Node.js `https.get`.
+- Live in-memory cache busting: appends `?e=${iconEpoch}` to `tex://` protocol URLs on `icons:update` events to bypass Chromium's 1x1 placeholder image cache without requiring an application restart.
+
+### Added: Cross-Version Player Inspector Compatibility (`src/main/server-files.js`, `src/renderer/js/03-players.js`)
+
+- Legacy Minecraft (1.12.2 and older) support:
+  - Added `LEGACY_ITEM_IDS` and `LEGACY_ENCHANT_IDS` (0..71) translating numeric IDs to namespaced string identifiers.
+  - Parses legacy NBT `tag.ench` numeric structures into standard enchantment objects.
+  - Resolves numeric dimensions (`0` = overworld, `-1` = the_nether, `1` = the_end) and offhand slot codes (`-106`, `150`, `40`).
+- Modern Minecraft (1.20.5 to 1.21+) support:
+  - Parses Component-based items (`components['minecraft:enchantments']` with flat maps and nested `levels`, `components['minecraft:damage']`, and top-level `equipment` compounds).
+- Equipment enrichment:
+  - Durability meters (`.inv-dur`) calculated from damage and item max-durability tables.
+  - Enchantment pill badges with Roman numeral levels (`Unbreaking II`).
+  - Subtle purple glint pulse animation (`.enchanted`) on enchanted gear.
+  - Rich hover tooltips (`data-tip-html`) and interactive item detail card (`#invItemDetail`).
+
+### Fixed: Equipment and Inventory Grid Layout Distortion (`src/renderer/css/04-players.css`, `src/renderer/css/07-polish.css`)
+
+- **Empty inventory slot ballooning:** Neutralized a CSS collision where `.inv-cell.empty` inherited 32px vertical padding from global `.empty` in `02-shell.css`, restoring clean square cells in the 9-column grid.
+- **Equipment slot elongation & text overlap:**
+  - Removed `height: 100%` from `.inv-cell`, preventing flex children from stretching vertically into tall rectangles.
+  - Set fixed 48x48px square tiles for `.pd-equip .inv-cell` with centered pixel-art icons and baseline durability bars.
+  - Expanded `.pd-equipment` max-width to 540px (~100px per column) and added `flex-shrink: 0` with proper line-heights, eliminating horizontal text clipping and badge overlapping.
+  - Capped displayed enchantment pills per equipment slot to 2 with a `+N more` badge to preserve row height balance.
+
+### Added: Marketplace Active Server Locking & Categories (`src/renderer/js/05-marketplace.js`, `src/renderer/js/11-market.js`, `src/main/marketplace.js`)
+
+- Automatically detects active server version and mod loader, locking search results to compatible content.
+- Added strict filter toggle and compatibility warning chips for mismatched loaders.
+- Added content category filters (Performance, QoL, Admin, Security, Economy, Worldgen, Library).
+
+### Optimized: World Map Chunk Caching (`src/main/worldmap.js`, `tests/explored-chunks.test.js`)
+
+- Implemented an explored chunk set cache with `mtime`-based invalidation to prevent redundant disk traversals on map pans.
+- Multi-version heightmap and biome resolution across 1.12, 1.16, and 1.18+ negative Y coordinate sections.
+
+### Added: Internationalization
+
+- Updated translation strings across all 7 supported locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`) with 100% key parity verified by `tests/i18n.test.js`.
+
 ## [6.1.0] — 2026-10-23
 
 **Pre-start conflict detector for mods and plugins, bulk content updates with rollback, stability crash guard, and internal version inspection for loose jars.**
