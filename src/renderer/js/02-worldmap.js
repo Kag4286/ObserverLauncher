@@ -80,6 +80,16 @@ const BIOME_COLORS={
   the_end:'#C9C29A',end_highlands:'#C2BB92',end_midlands:'#B8B189',small_end_islands:'#A8A17C',end_barrens:'#9C9577',
   // --- caves ---
   the_void:'#0A0F14',dripstone_caves:'#8A7355',lush_caves:'#4E8A5A',deep_dark:'#1E3A4A',
+  // --- 1.16 legacy & variant biome names ---
+  mountains:'#8A8A7E',wooded_mountains:'#5E7A55',gravelly_mountains:'#97968B',modified_gravelly_mountains:'#97968B',
+  snowy_tundra:'#DCE1E5',snowy_mountains:'#DCE2E6',stone_shore:'#8A8477',
+  giant_tree_taiga:'#427047',giant_tree_taiga_hills:'#427047',giant_spruce_taiga:'#406B47',giant_spruce_taiga_hills:'#406B47',
+  tall_birch_forest:'#85A85F',tall_birch_hills:'#85A85F',birch_forest_hills:'#78A056',
+  desert_hills:'#D9C97C',desert_lakes:'#D9C97C',wooded_hills:'#4E8A3C',taiga_hills:'#4F7C58',snowy_taiga_hills:'#5C7C72',snowy_taiga_mountains:'#5C7C72',
+  jungle_hills:'#2E7D32',jungle_edge:'#4E8B3E',modified_jungle:'#2E7D32',modified_jungle_edge:'#4E8B3E',
+  badlands_plateau:'#9C6B3F',wooded_badlands_plateau:'#9C6B3F',modified_badlands_plateau:'#B4744A',modified_wooded_badlands_plateau:'#9C6B3F',
+  shattered_savanna:'#A89A46',shattered_savanna_plateau:'#A89A46',
+  mushroom_field_shore:'#8A7C8E',swamp_hills:'#5A6B45',bamboo_jungle_hills:'#5C9A3E',
 };
 // Brightness tint by surface height for a subtle relief (0..~320 → ~0.72..1.25).
 function shadeHex(hex,h){
@@ -115,17 +125,27 @@ const BLOCK_COLORS={
 };
 function blockColor(name){
   if(!name)return null;
-  const k=String(name).replace(/^minecraft:/,'');
-  return BLOCK_COLORS[k]||null;
+  const k=String(name).replace(/^[a-z0-9_.-]+:/,'');
+  if(BLOCK_COLORS[k])return BLOCK_COLORS[k];
+  if(/leaves/.test(k))return '#3F7A3A';
+  if(/log|wood/.test(k))return '#5B4330';
+  if(/grass_block|grass/.test(k))return '#6B9E44';
+  if(/dirt|podzol/.test(k))return '#79553A';
+  if(/mushroom_block/.test(k))return '#A13430';
+  if(/sand/.test(k))return '#D9CF97';
+  if(/snow/.test(k))return '#E9EDF0';
+  if(/ice/.test(k))return '#8FBFE0';
+  if(/water/.test(k))return '#2E5A8A';
+  return null;
 }
 // Mix a surface block colour with the biome tint (grass/foliage hue) so grass stays green per biome
 // while sand stays sand. t small so the block colour dominates.
 function surfaceColor(blockName,biomeId){
   const b=blockColor(blockName);
   if(!b)return null;
-  const bare=String(blockName||'').replace(/^minecraft:/,'');
-  if(bare==='grass_block'||bare==='moss_block'||bare==='podzol'||bare==='mycelium'){
-    // tint the grass toward the biome hue (forest darker, savanna yellow-green...)
+  const bare=String(blockName||'').replace(/^[a-z0-9_.-]+:/,'');
+  if(/grass|moss|podzol|mycelium|leaves/.test(bare)){
+    // tint the grass/leaves toward the biome hue (forest darker, savanna yellow-green...)
     return mixHex(b,biomeColor(biomeId),0.45);
   }
   return b;
@@ -203,20 +223,20 @@ function hashBiomeColor(k){
 }
 function biomeColor(id){
   if(!id)return '#3A4250';
-  const k=String(id).replace(/^minecraft:/,'');
+  const k=String(id).replace(/^[a-z0-9_.-]+:/,'');
   if(BIOME_COLORS[k])return BIOME_COLORS[k];
   if(/ocean|sea/.test(k))return '#2E5A8A';
   if(/river/.test(k))return '#3E7FB0';
-  if(/forest|wood|taiga|grove/.test(k))return '#3F7A3A';
+  if(/forest|wood|taiga|grove|rainforest|orchard/.test(k))return '#3F7A3A';
   if(/jungle/.test(k))return '#2E7D32';
-  if(/desert|sand|badland/.test(k))return '#D8C77A';
-  if(/snow|frozen|ice/.test(k))return '#D7DCE0';
-  if(/mountain|peak|hill|slope/.test(k))return '#8A8A7E';
-  if(/swamp|mangrove/.test(k))return '#5A6B45';
-  if(/savanna/.test(k))return '#B0A24E';
+  if(/desert|sand|badland|wasteland|dune/.test(k))return '#D8C77A';
+  if(/snow|frozen|ice|alp|glacier|tundra/.test(k))return '#D7DCE0';
+  if(/mountain|peak|hill|slope|highland|cliff/.test(k))return '#8A8A7E';
+  if(/swamp|mangrove|bayou|marsh|bog|fen|sludge/.test(k))return '#5A6B45';
+  if(/savanna|steppe|prairie|plain|meadow|pasture|grassland/.test(k))return '#7CA94E';
   if(/beach|shore/.test(k))return '#C9BE8A';
   if(/cave|dripstone|deep_dark/.test(k))return '#5A5548';
-  if(/nether|crimson|warped|basalt|soul/.test(k))return '#7A3B33';
+  if(/nether|crimson|warped|basalt|soul|volcano/.test(k))return '#7A3B33';
   if(/end/.test(k))return '#C2BB92';
   return hashBiomeColor(k);
 }
