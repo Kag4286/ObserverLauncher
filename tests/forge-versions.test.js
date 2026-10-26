@@ -33,6 +33,7 @@ ok('annotate non-array safe', annotateVersions(null).length === 0);
 // --- calendar scheme (26.x) must map to a real MC id, NOT '1.26' ---
 ok('NeoForge 26.3.0.33-beta -> 26.3', mcFor('26.3.0.33-beta') === '26.3');
 ok('NeoForge 26.2.0.88 -> 26.2', mcFor('26.2.0.88') === '26.2');
+ok('NeoForge 26.1.15 -> 26.1', mcFor('26.1.15') === '26.1');
 
 // --- sortMcVersionsDesc: numeric, newest first (fixes Leaf's unsorted list) ---
 const sorted = sortMcVersionsDesc(['1.21.4', '26.3', '1.21.11', '1.21.1', '26.2']);

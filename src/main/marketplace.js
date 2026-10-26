@@ -582,23 +582,37 @@ async function listMarketVersions(opts) {
   const id = String(item.id || '');
   if (!id) throw new Error('id is required.');
   const source = ['modrinth', 'hangar', 'curseforge'].includes(item.source) ? item.source : 'modrinth';
+  const limit = Math.min(Math.max(1, Number(item.limit) || 25), 100);
+  const filterVer = item.version || item.gameVersion || null;
+  const filterLoader = item.loader || null;
+
   if (source === 'modrinth') {
     const r = await json('https://api.modrinth.com/v2/project/' + encodeURIComponent(id) + '/version');
-    return (r || []).map(v => ({ id: v.id, number: v.version_number, gameVersions: v.game_versions || [], loaders: v.loaders || [], date: v.date_published, size: (v.files || []).find(f => f.primary)?.size || (v.files || [])[0]?.size || 0 }));
+    let mapped = (r || []).map(v => ({ id: v.id, number: v.version_number, gameVersions: v.game_versions || [], loaders: v.loaders || [], date: v.date_published, size: (v.files || []).find(f => f.primary)?.size || (v.files || [])[0]?.size || 0 }));
+    if (filterVer) mapped = mapped.filter(v => (v.gameVersions || []).includes(filterVer));
+    if (filterLoader) mapped = mapped.filter(v => (v.loaders || []).includes(filterLoader));
+    return mapped.slice(0, limit);
   }
   if (source === 'hangar') {
     const [owner, slug] = String(id).split('/');
     if (!owner || !slug) throw new Error('Hangar id must be owner/slug.');
-    const data = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=25`);
-    return (data.result || []).map(v => ({ id: v.name, number: v.name, gameVersions: v.platformDependencies?.PAPER ? [v.platformDependencies.PAPER] : [], loaders: ['paper'], date: v.createdAt || null }));
+    const data = await json(`https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/versions?limit=${limit}`);
+    let mapped = (data.result || []).map(v => {
+      const gv = (v.platformDependencies && (v.platformDependencies.PAPER || v.platformDependencies.VELOCITY || v.platformDependencies.WATERFALL)) || [];
+      return { id: v.name, number: v.name, gameVersions: Array.isArray(gv) ? gv : (gv ? [gv] : []), loaders: ['paper'], date: v.createdAt || null };
+    });
+    if (filterVer) mapped = mapped.filter(v => (v.gameVersions || []).includes(filterVer));
+    return mapped.slice(0, limit);
   }
   // curseforge
   const headers = cfHeaders();
   if (!headers) { const e = new Error('CurseForge API key not set. Add your own key in Settings.'); e.code = 'noKey'; throw e; }
-  const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(id)}/files?pageSize=50`, headers);
-  const versions = (files.data || []).map(cf.mapCfFileToVersion).filter(Boolean);
+  const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(id)}/files?pageSize=${Math.min(limit, 50)}`, headers);
+  let versions = (files.data || []).map(cf.mapCfFileToVersion).filter(Boolean);
   versions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  return versions;
+  if (filterVer) versions = versions.filter(v => (v.gameVersions || []).includes(filterVer));
+  if (filterLoader) versions = versions.filter(v => (v.loaders || []).includes(filterLoader));
+  return versions.slice(0, limit);
 }
 
 // v2.5.0 (Doctor fix): resolve a modId-ish string to a REAL Modrinth project, without blindly

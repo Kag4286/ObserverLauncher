@@ -39,7 +39,7 @@ function requiredJavaForJar(jar) {
     if (minor >= 17) return 16;
     return 8;
   }
-  if (/\b26\.\d{1,2}\b/.test(s)) return 25;
+  if (/\b26\.\d{1,2}(?:\.\d{1,2})?\b/.test(s)) return 25;
   return null; // unknown scheme — validation skipped rather than guessed
 }
 function javaMajor(version) { const m = String(version || '').match(/(?:1\.)?(\d+)/); return m ? Number(m[1]) : null; }

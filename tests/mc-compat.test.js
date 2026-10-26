@@ -21,6 +21,10 @@ check('1.20 and 1.20.1 are minor compatible', areMcMinorCompatible('1.20', '1.20
 check('1.19.1 and 1.19.2 are minor compatible', areMcMinorCompatible('1.19.1', '1.19.2'));
 check('1.18 and 1.18.1 are minor compatible', areMcMinorCompatible('1.18', '1.18.1'));
 check('1.21 and 1.21.1 are minor compatible', areMcMinorCompatible('1.21', '1.21.1'));
+check('1.21.2 and 1.21.3 are minor compatible', areMcMinorCompatible('1.21.2', '1.21.3'));
+check('26.1 and 26.1.1 are minor compatible', areMcMinorCompatible('26.1', '26.1.1'));
+check('1.21 and 1.21.0 are minor compatible via zero-normalization', areMcMinorCompatible('1.21', '1.21.0'));
+check('26.1 and 26.1.0 are minor compatible via zero-normalization', areMcMinorCompatible('26.1', '26.1.0'));
 check('1.16.5 and 1.17 are NOT compatible', !areMcMinorCompatible('1.16.5', '1.17'));
 check('1.12.2 and 1.16.5 are NOT compatible', !areMcMinorCompatible('1.12.2', '1.16.5'));
 
@@ -52,6 +56,13 @@ check('>=1.16.4 <=1.16.5 rejects 1.17', !testMcVersionAgainstRange('1.17', '>=1.
 // Tilde: ~1.16.4
 check('~1.16.4 satisfies 1.16.5', testMcVersionAgainstRange('1.16.5', '~1.16.4'));
 check('~1.16.4 rejects 1.17', !testMcVersionAgainstRange('1.17', '~1.16.4'));
+
+// Caret: ^1.16.4, ^26.1
+check('^1.16.4 satisfies 1.16.5', testMcVersionAgainstRange('1.16.5', '^1.16.4'));
+check('^1.16.4 rejects 1.17', !testMcVersionAgainstRange('1.17', '^1.16.4'));
+check('^26.1 satisfies 26.1', testMcVersionAgainstRange('26.1', '^26.1'));
+check('^26.1 satisfies 26.1.1', testMcVersionAgainstRange('26.1.1', '^26.1'));
+check('^26.1 rejects 26.2', !testMcVersionAgainstRange('26.2', '^26.1'));
 
 // Wildcard
 check('* satisfies 1.20.1', testMcVersionAgainstRange('1.20.1', '*'));

@@ -12,7 +12,7 @@ function isPrerelease(v) { return /-/.test(String(v || '')); }
 function mcFor(v) {
   const s = String(v || '');
   if (/^\d+\.\d+\.\d+\.\d+/.test(s)) { const p = s.split('.'); return `${p[0]}.${p[1]}`; }
-  if (/^\d{2}\.\d/.test(s)) { const p = s.split('.'); return `1.${p[0]}.${p[1]}`; }
+  if (/^\d{2}\.\d/.test(s)) { const p = s.split('.'); return Number(p[0]) >= 26 ? `${p[0]}.${p[1]}` : `1.${p[0]}.${p[1]}`; }
   const m = s.match(/^(1\.\d{1,2}(?:\.\d{1,2})?)-/); return m ? m[1] : null;
 }
 

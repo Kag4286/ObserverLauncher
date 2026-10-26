@@ -32,16 +32,21 @@ const needPath = ctx => { if (!ctx.currentServerPath) throw new Error('No server
 // ---- READ tools ----
 async function tGetStatus(ctx) {
   let files = {}; try { files = serverFiles(ctx.currentServerPath); } catch {}
+  let serverTarget = null;
+  if (ctx.currentServerPath) {
+    try { serverTarget = detectServerTarget(ctx.currentServerPath, files); } catch {}
+  }
   return { ok: true, result: {
     status: ctx.serverStatus, running: ctx.serverStatus === 'running',
     serverPath: ctx.currentServerPath || null, jar: files.jar || null, launchScript: files.launchScript || null,
-    software: ctx.currentSoftware || null, java: ctx.javaInfo || null,
+    software: ctx.currentSoftware || null, mc: serverTarget?.mc || null, loader: serverTarget?.loader || null,
+    java: ctx.javaInfo || null,
     javaRequired: requiredJavaForServer(ctx.currentServerPath, serverFiles) || null,
   } };
 }
 async function tReadConsole(ctx, a) {
-  const n = Math.min(Math.max(1, Number(a.lines) || 100), 2000);
-  const buf = ctx.consoleBuffer.slice(-n);
+  const n = Math.min(Math.max(1, Number(a?.lines) || 100), 2000);
+  const buf = (ctx.consoleBuffer || []).slice(-n);
   // Phase C (item 17): scrub IPv4/email before console text leaves to an AI client.
   const { scrubPII } = require('./doctor.js');
   return { ok: true, result: { lines: buf.map(l => `[${l.time}] ${scrubPII(l.text)}`), count: buf.length } };
@@ -52,19 +57,33 @@ async function tListPlayers(ctx) {
 }
 async function tListFiles(ctx, a) {
   const root = needPath(ctx);
-  const rel = a.path || '.';
+  const rel = (a && a.path) || '.';
   const target = safeTarget(root, rel);
   if (!target) return { ok: false, error: 'Path outside the server folder.' };
-  const all = fs.readdirSync(target, { withFileTypes: true })
-    .map(e => ({ name: e.name, dir: e.isDirectory() }))
-    .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+  if (!fs.existsSync(target)) return { ok: false, error: 'Directory does not exist: ' + rel };
+  let all;
+  try {
+    all = fs.readdirSync(target, { withFileTypes: true })
+      .map(e => ({ name: e.name, dir: e.isDirectory() }))
+      .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+  } catch (e) {
+    return { ok: false, error: 'Could not read directory: ' + (e.message || e) };
+  }
   const CAP = 500;
   const entries = all.slice(0, CAP);
   return { ok: true, result: { path: rel, entries, truncated: all.length > CAP, total: all.length } };
 }
+function friendlyEditorError(err) {
+  if (err === 'notAllowed') return 'Refused: file type is not an editable text type. Allowed: ' + editor.ALLOWED.join(', ');
+  if (err === 'notFound') return 'File not found or outside server folder.';
+  if (err === 'tooBig') return 'File is too large to open (exceeds 8MB).';
+  if (err === 'binary') return 'Binary file detected (not plain text).';
+  return err;
+}
 async function tReadFile(ctx, a) {
   const root = needPath(ctx);
-  const r = editor.openFile(root, a.path);
+  const r = editor.openFile(root, a?.path);
+  if (!r.ok) return { ok: false, error: friendlyEditorError(r.error) };
   return ok(r);
 }
 async function tSearchFiles(ctx, a) {
@@ -233,7 +252,7 @@ async function tCheckModCompat(ctx) {
 // route through the general file reader, which is rooted at the project, not the server folder.
 async function tReadCrashReport(ctx, a) {
   const root = needPath(ctx);
-  const name = String(a.name || '');
+  const name = String((a && a.name) || '');
   let pick = name ? doctor.resolveCrashReport(root, name) : null;
   if (name && !pick) return { ok: false, error: 'Crash report not found: ' + name };
   if (!pick) { const latest = doctor.latestCrashReport(root); if (!latest) return { ok: true, result: { found: false } }; pick = latest.file; }
@@ -283,7 +302,13 @@ async function tListBackups(ctx) {
 async function tGetNetworkInfo(ctx) {
   const f = serverFiles(ctx.currentServerPath || '');
   const isProxy = /velocity|bungee|waterfall/i.test(f.jar || '');
-  return { ok: true, result: { localIps: localIPv4s(), port: Number(f.properties?.['server-port']) || (isProxy ? 25577 : 25565), platform: process.platform } };
+  return { ok: true, result: {
+    localIps: localIPv4s(),
+    port: Number(f.properties?.['server-port']) || (isProxy ? 25577 : 25565),
+    tunnelAddress: ctx.tunnelAddress || null,
+    tunnelStatus: ctx.tunnelStatus || null,
+    platform: process.platform,
+  } };
 }
 async function tGetJavaInfo(ctx) { return { ok: true, result: ctx.javaInfo || null }; }
 async function tSearchMarketplace(ctx, a) {
@@ -301,10 +326,14 @@ async function tSearchMarketplace(ctx, a) {
   } catch (e) { return { ok: false, error: e?.message || 'Search failed.' }; }
 }
 async function tListMarketVersions(ctx, a) {
-  const id = String(a.id || '');
+  const id = String((a && a.id) || '');
   if (!id) return { ok: false, error: 'id is required.' };
   // A2: delegate to the shared resolver so Modrinth + Hangar + CurseForge all work (was Modrinth-only).
-  try { return { ok: true, result: await listMarketVersions({ id, source: a.source }) }; }
+  try {
+    const list = await listMarketVersions({ id, source: a && a.source, version: a && a.version, loader: a && a.loader, limit: a && a.limit });
+    const versions = Array.isArray(list) ? list : [];
+    return { ok: true, result: { versions, count: versions.length } };
+  }
   catch (e) { return { ok: false, error: e?.message || 'Could not list versions.' }; }
 }
 // A1 (v2.1.0): search Modrinth for installable MODPACKS. Thin wrapper over the shared search so the
@@ -318,7 +347,10 @@ async function tSearchModpacks(ctx, a) {
 }
 
 // ---- WRITE tools ----
-async function tStartServer(ctx) { return ok(await startServerInternal(ctx, loadSettings())); }
+async function tStartServer(ctx) {
+  const s = loadSettingsFor ? loadSettingsFor(ctx.inst()) : loadSettings();
+  return ok(await startServerInternal(ctx, s));
+}
 async function tSendCommand(ctx, a) {
   const cmd = String(a.command || '').trim();
   if (!cmd) return { ok: false, error: 'command is required.' };
@@ -338,7 +370,7 @@ async function tSetProperty(ctx, a) {
   const { buildPropertiesContent } = require('../main/server-files.js');
   const { writeFileAtomic } = require('../main/fs-utils.js');
   writeFileAtomic(path.join(root, 'server.properties'), buildPropertiesContent(root, f));
-  return { ok: true };
+  return { ok: true, result: { key, value: val } };
 }
 async function tSetRawProperties(ctx, a) {
   const root = needPath(ctx);
@@ -398,6 +430,7 @@ async function tWriteFile(ctx, a) {
   if (String(a.content || '').length > 2 * 1024 * 1024) return { ok: false, error: 'Content too large (max 2 MB).' };
   const { writeFileAtomic } = require('../main/fs-utils.js');
   backupBeforeWrite(target);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
   writeFileAtomic(target, String(a.content || ''));
   return { ok: true };
 }
@@ -411,7 +444,8 @@ async function tEditFile(ctx, a) {
   if (!txt.includes(oldS)) return { ok: false, error: 'oldString not found in file.' };
   const { writeFileAtomic } = require('../main/fs-utils.js');
   backupBeforeWrite(target);
-  writeFileAtomic(target, txt.replace(oldS, newS));
+  const nextTxt = (a && a.replaceAll === true) ? txt.replaceAll(oldS, newS) : txt.replace(oldS, newS);
+  writeFileAtomic(target, nextTxt);
   return { ok: true };
 }
 async function tCreateBackup(ctx) { return ok(await createBackupInternal(ctx)); }
@@ -422,7 +456,13 @@ async function tInstallJava(ctx) {
 async function tGetSettings(ctx) {
   // M12: read the TARGET instance (ctx.inst() is set by runInInstance in callTool), not the active one.
   const s = loadSettingsFor(ctx.inst());
-  return { ok: true, result: { serverPath: s.serverPath || null, javaPath: s.javaPath || null, memoryMin: s.memoryMin, memoryMax: s.memoryMax, jvmArgs: s.jvmArgs || '', autoEula: !!s.autoEula, autoRestart: !!s.autoRestart, locale: s.locale || 'en', autoBackupMinutes: s.autoBackupMinutes || 0 } };
+  return { ok: true, result: {
+    serverPath: s.serverPath || null, javaPath: s.javaPath || null,
+    memoryMin: s.memoryMin, memoryMax: s.memoryMax, jvmArgs: s.jvmArgs || '',
+    autoEula: !!s.autoEula, autoRestart: !!s.autoRestart,
+    backupRetention: s.backupRetention || 10,
+    locale: s.locale || 'en', autoBackupMinutes: s.autoBackupMinutes || 0
+  } };
 }
 // serverPath is intentionally NOT settable over MCP (root of every file op) — GUI only.
 const SETTABLE = {
@@ -431,6 +471,7 @@ const SETTABLE = {
   autoRestart: v => typeof v === 'boolean',
   autoEula: v => typeof v === 'boolean',
   autoBackupMinutes: v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1440,
+  backupRetention: v => Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 100,
   locale: v => typeof v === 'string' && v.length <= 10,
   jvmArgs: v => typeof v === 'string' && v.length <= 2000 && !/["'<>|]/.test(v),
   // SECURITY: playitPath is NOT settable over MCP. tunnel:start spawns whatever binary that path
@@ -455,13 +496,13 @@ async function tSetSetting(ctx, a) {
 async function tInstallFromMarket(ctx, a) {
   const id = String(a.id || '');
   if (!id) return { ok: false, error: 'id is required.' };
-  const kind = ['forge', 'fabric', 'datapack', 'mod', 'modpack'].includes(a.kind) ? a.kind : 'plugin';
+  const kind = ['forge', 'fabric', 'neoforge', 'quilt', 'datapack', 'mod', 'modpack'].includes(a.kind) ? a.kind : 'plugin';
   // curseforge works only when the USER set their own API key in the GUI (ToS forbids a bundled key).
   const source = ['modrinth', 'hangar', 'spigot', 'curseforge'].includes(a.source) ? a.source : 'modrinth';
   // PARITY: use the SAME resolver the GUI market:install uses, so install now supports Modrinth,
   // Hangar and Spigot — not just Modrinth (search already offered all three).
   let dl;
-  try { dl = await resolveMarketDownload({ id, kind, source, version: a.version || '', versionId: a.versionId, title: a.title }); }
+  try { dl = await resolveMarketDownload({ id, kind, source, version: a.version || '', versionId: a.versionId, title: a.title, loader: a.loader }); }
   catch (e) {
     if (e && e.code === 'blocked') return { ok: false, blocked: true, error: 'This CurseForge project does not allow third-party downloads. Install it manually from its page.' };
     return { ok: false, error: e?.message || 'No download found.' };
@@ -485,7 +526,8 @@ async function tInstallFromMarket(ctx, a) {
       try { fs.unlinkSync(tmp); } catch {}
     }
   }
-  const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : (kind === 'mod' || kind === 'forge' || kind === 'fabric') ? 'mods' : 'plugins';
+  const isMod = ['mod', 'forge', 'fabric', 'neoforge', 'quilt'].includes(kind);
+  const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks') : isMod ? 'mods' : 'plugins';
   const dest = safeTarget(root, path.join(folder, path.basename(dl.filename)));
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   const { download } = require('../main/http.js');
@@ -533,18 +575,22 @@ async function tInstallLocalJar(ctx, a) {
   if (!st.isFile()) return { ok: false, error: 'Source is not a file.' };
   if (!/\.jar$/i.test(src)) return { ok: false, error: 'Only .jar files can be installed.' };
   if (st.size > 100 * 1024 * 1024) return { ok: false, error: 'File too large (max 100 MB).' };
-  const kind = a.kind || 'plugin';
-  // WARNING FIX: forge/fabric/neoforge are MOD loaders and belong in mods/, not plugins/. The
-  // marketplace install path already mapped them correctly; this tool did not, so a mod jar
-  // installed via MCP landed in plugins/ and never loaded.
+  let kind = a.kind;
+  if (!kind) {
+    try {
+      const cls = classifyJar(openJar(src).read, path.basename(src));
+      if (cls.loader && ['fabric', 'forge', 'neoforge', 'quilt'].includes(cls.loader)) kind = 'mod';
+      else kind = 'plugin';
+    } catch { kind = 'plugin'; }
+  }
+  const isMod = ['mod', 'forge', 'fabric', 'neoforge', 'quilt'].includes(kind);
   const folder = kind === 'datapack' ? path.join(serverFiles(root).properties['level-name'] || 'world', 'datapacks')
-    : (kind === 'mod' || kind === 'forge' || kind === 'fabric' || kind === 'neoforge') ? 'mods'
-    : 'plugins';
+    : isMod ? 'mods' : 'plugins';
   const dest = safeTarget(root, path.join(folder, path.basename(src)));
   if (!dest) return { ok: false, error: 'Unsafe destination path.' };
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
-  return { ok: true, result: { name: path.basename(src), files: serverFiles(root) } };
+  return { ok: true, result: { name: path.basename(src), kind: isMod ? 'mod' : kind, files: serverFiles(root) } };
 }
 async function tImportModpackPath(ctx, a) {
   const src = String(a.path || '');
@@ -572,6 +618,7 @@ async function tExportModpack(ctx, a) {
   const index = { formatVersion: 1, game: 'minecraft', versionId: 'mcp-' + Date.now(), name: path.basename(root), summary: 'Exported via MCP - ' + files.length + ' item(s).', files, dependencies };
   fs.writeFileSync(path.join(stagingDir, 'modrinth.index.json'), JSON.stringify(index, null, 2));
   try { fs.copyFileSync(path.join(root, 'server.properties'), path.join(stagingDir, 'overrides', 'server.properties')); } catch {}
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
   const r = await platform.createArchive(stagingDir, dest);
   try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
   if (!r.ok) return { ok: false, error: r.error || 'Archive failed.' };
@@ -743,7 +790,11 @@ const { readPlayer, whitelistToggle, banToggle, opToggle, savePlayer } = require
 async function tReadPlayer(ctx, a) { return ok(await readPlayer(ctx, a.uuid, a.name)); }
 async function tOpPlayer(ctx, a) { needPath(ctx); return ok(await opToggle(ctx, { uuid: a.uuid || null, name: a.name, op: a.on !== false, level: a.level })); }
 async function tWhitelistPlayer(ctx, a) { needPath(ctx); return ok(await whitelistToggle(ctx, { uuid: a.uuid || null, name: a.name, add: a.add !== false })); }
-async function tBanPlayer(ctx, a) { needPath(ctx); return ok(await banToggle(ctx, { uuid: a.uuid || null, name: a.name, ban: a.ban !== false, reason: a.reason, ip: a.ip })); }
+async function tBanPlayer(ctx, a) {
+  needPath(ctx);
+  const name = (a && a.name) || (a && a.ip ? String(a.ip).trim() : '');
+  return ok(await banToggle(ctx, { uuid: (a && a.uuid) || null, name, ban: !a || a.ban !== false, reason: a && a.reason, ip: a && a.ip }));
+}
 
 // ---- DESTROY tools ----
 // Graceful stop sequence shared by tStopServer + tStopInstance (gotcha #20): flip manualStop, cancel
@@ -860,8 +911,8 @@ async function tCreateInstance(ctx, a) {
 }
 async function tDeleteContent(ctx, a) {
   const root = needPath(ctx);
-  const kind = a.kind || 'plugin';
-  const name = String(a.name || '');
+  const kind = (a && a.kind) || 'plugin';
+  const name = String((a && a.name) || '');
   if (!name) return { ok: false, error: 'name is required.' };
   const f = serverFiles(root);
   const folder = kind === 'datapack' ? f.datapackFolder : kind === 'mod' ? 'mods' : 'plugins';
@@ -871,22 +922,28 @@ async function tDeleteContent(ctx, a) {
   // Detect the type FIRST and use rmSync(recursive) for a directory; a file still uses unlinkSync.
   let isDir = false;
   try { isDir = fs.statSync(target).isDirectory(); } catch {}
-  try { isDir ? fs.rmSync(target, { recursive: true, force: true }) : fs.unlinkSync(target); }
-  catch (e) { return { ok: false, error: e.message }; }
+  try {
+    isDir ? fs.rmSync(target, { recursive: true, force: true }) : fs.unlinkSync(target);
+  } catch (e) {
+    if (e.code === 'EBUSY' || e.code === 'EPERM') {
+      return { ok: false, error: `Could not delete "${name}" - file is locked by the running server. Stop the server and try again.` };
+    }
+    return { ok: false, error: e.message };
+  }
   // Lean by default (v3.3.1): the full serverFiles() snapshot is huge and blew the AI context.
   // verbose:true restores the old full snapshot for callers that need it.
   const result = { deleted: name, kind };
-  if (a.verbose) result.files = serverFiles(root);
+  if (a && a.verbose) result.files = serverFiles(root);
   return { ok: true, result };
 }
 async function tToggleContent(ctx, a) {
   const root = needPath(ctx);
   const { toggleContent } = require('../main/content-ops.js');
-  const r = toggleContent(root, a.kind || 'plugin', String(a.name || ''), a.action);
+  const r = toggleContent(root, (a && a.kind) || 'plugin', String((a && a.name) || ''), a && a.action);
   if (!r.ok) return r;
   // Lean by default (v3.3.1); verbose:true restores the full serverFiles() snapshot.
   const result = { from: r.from, to: r.to };
-  if (a.verbose) result.files = serverFiles(root);
+  if (a && a.verbose) result.files = serverFiles(root);
   return { ok: true, result };
 }
 // 3.3.0: validate a datapack's pack.mcmeta against the server MC version (datapack.js is pure +
@@ -895,7 +952,9 @@ async function tValidateDatapack(ctx, a) {
   // v6.0.0 C5a: the GUI IPC (content:validate-datapack) and this MCP tool share one helper so the
   // classification rules cannot drift (content-ops.js validateDatapack).
   const root = needPath(ctx);
-  const r = require('../main/content-ops.js').validateDatapack(root, String(a.name || ''));
+  const name = String((a && a.name) || '');
+  if (!name) return { ok: false, error: 'name is required.' };
+  const r = require('../main/content-ops.js').validateDatapack(root, name);
   if (!r.ok) return r;
   return { ok: true, result: r.result };
 }
@@ -905,24 +964,32 @@ async function tExtractDatapack(ctx, a) {
   // v6.0.0 C5b: shared with the GUI (content-ops.js extractDatapack) so the zip-slip guard and the
   // single-top-folder flatten live in one place.
   const root = needPath(ctx);
-  const r = await require('../main/content-ops.js').extractDatapack(root, String(a.name || ''), { removeZip: !!a.removeZip });
+  const name = String((a && a.name) || '');
+  if (!name) return { ok: false, error: 'name is required.' };
+  const r = await require('../main/content-ops.js').extractDatapack(root, name, { removeZip: !!(a && a.removeZip) });
   if (!r.ok) return r;
   return { ok: true, result: { folder: r.folder, files: serverFiles(root) } };
 }
-async function tDeleteBackup(ctx, a) {
+function needBackupFile(ctx, a) {
   const { resolveBackupFile } = require('../main/backups.js');
-  const backup = resolveBackupFile(ctx, String(a.name || ''));
-  if (!backup || !fs.existsSync(backup)) return { ok: false, error: 'Backup not found.' };
-  try { fs.unlinkSync(backup); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+  const name = String((a && a.name) || '');
+  if (!name) return { ok: false, error: 'name is required.' };
+  const file = resolveBackupFile(ctx, name);
+  if (!file || !fs.existsSync(file)) return { ok: false, error: 'Backup not found.' };
+  return { ok: true, file, name };
+}
+async function tDeleteBackup(ctx, a) {
+  const b = needBackupFile(ctx, a);
+  if (!b.ok) return b;
+  try { fs.unlinkSync(b.file); return { ok: true, result: { deleted: b.name } }; } catch (e) { return { ok: false, error: e.message }; }
 }
 async function tRestoreBackup(ctx, a) {
   if (ctx.serverProcess) return { ok: false, error: 'Stop the server before restoring.' };
-  const { resolveBackupFile } = require('../main/backups.js');
+  const b = needBackupFile(ctx, a);
+  if (!b.ok) return b;
   const platform = require('../main/platform');
-  const backup = resolveBackupFile(ctx, String(a.name || ''));
-  if (!backup || !fs.existsSync(backup)) return { ok: false, error: 'Backup not found.' };
-  const r = await platform.restoreBackup({ destPath: ctx.currentServerPath, zipPath: backup });
-  return ok(r);
+  const r = await platform.restoreBackup({ destPath: ctx.currentServerPath, zipPath: b.file });
+  return r && r.ok ? { ok: true, result: { restored: b.name, ...r } } : (r || { ok: false, error: 'Restore failed' });
 }
 
 async function tCheckUpdates(ctx) {
@@ -947,37 +1014,48 @@ async function tRollbackContentUpdate(ctx, a) {
 async function tGetSchedule(ctx) {
   // M12: the TARGET instance's schedule, not the active one.
   const s = loadSettingsFor(ctx.inst());
-  return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };
+  const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const days = s.scheduleDays || [];
+  const dayNames = days.map(n => DAY_NAMES[n] || String(n));
+  return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days, dayNames } };
 }
 async function tSetSchedule(ctx, a) {
   const { parseTime } = require('../main/scheduler.js');
   const VALID_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const DAY_NUM = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   const target = ctx.inst();
   const s = loadSettingsFor(target);
-  if (a.enabled !== undefined) {
+  if (a && a.enabled !== undefined) {
     if (typeof a.enabled !== 'boolean') return { ok: false, error: 'enabled must be a boolean.' };
     s.scheduleEnabled = a.enabled;
   }
-  if (a.startTime !== undefined) {
+  if (a && a.startTime !== undefined) {
     if (a.startTime !== '' && !parseTime(a.startTime)) return { ok: false, error: 'startTime must be HH:MM (24h) or empty.' };
     s.scheduleStartTime = String(a.startTime);
   }
-  if (a.stopTime !== undefined) {
+  if (a && a.stopTime !== undefined) {
     if (a.stopTime !== '' && !parseTime(a.stopTime)) return { ok: false, error: 'stopTime must be HH:MM (24h) or empty.' };
     s.scheduleStopTime = String(a.stopTime);
   }
-  if (a.days !== undefined) {
-    if (!Array.isArray(a.days) || a.days.some(d => !VALID_DAYS.includes(String(d).toLowerCase()))) {
-      return { ok: false, error: 'days must be an array of ' + VALID_DAYS.join('/') + ' (empty = every day).' };
+  if (a && a.days !== undefined) {
+    if (!Array.isArray(a.days)) return { ok: false, error: 'days must be an array.' };
+    const parsedDays = [];
+    for (const d of a.days) {
+      if (typeof d === 'number' && Number.isInteger(d) && d >= 0 && d <= 6) {
+        parsedDays.push(d);
+      } else {
+        const str = String(d).toLowerCase().slice(0, 3);
+        if (DAY_NUM[str] !== undefined) parsedDays.push(DAY_NUM[str]);
+        else return { ok: false, error: 'days elements must be 0-6 or ' + VALID_DAYS.join('/') + ' (empty = every day).' };
+      }
     }
-    // CRITICAL FIX: store NUMBERS (0=Sun..6=Sat), matching what the GUI saves and what
-    // scheduler.shouldFire() compares against now.getDay(). Storing names here made every
-    // MCP-created schedule silently never fire.
-    s.scheduleDays = a.days.map(d => DAY_NUM[String(d).toLowerCase().slice(0, 3)]).filter(n => Number.isInteger(n));
+    s.scheduleDays = [...new Set(parsedDays)];
   }
   saveSettingsFor(target, s);
-  return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days: s.scheduleDays || [] } };
+  const days = s.scheduleDays || [];
+  const dayNames = days.map(n => DAY_NAMES[n] || String(n));
+  return { ok: true, result: { enabled: !!s.scheduleEnabled, startTime: s.scheduleStartTime || '', stopTime: s.scheduleStopTime || '', days, dayNames } };
 }
 async function tListWaypoints(ctx) {
   const root = ctx.currentServerPath;
@@ -1009,21 +1087,23 @@ async function tReadAuditLog(ctx, a) {
   } catch { return { ok: true, result: { lines: [], count: 0, note: 'No audit log yet - write/destroy tool calls are recorded here.' } }; }
 }
 async function tKickPlayer(ctx, a) {
-  const name = String(a.name || '').trim();
+  const name = String((a && a.name) || '').trim();
   if (!name) return { ok: false, error: 'name is required.' };
   const { isSafePlayerName } = require('../main/validate.js');
   if (!isSafePlayerName(name)) return { ok: false, error: 'Invalid player name - use 3-16 letters, numbers or underscores.' };
   if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
+  const reason = String((a && a.reason) || '').trim();
+  const cmd = reason ? `kick ${name} ${reason}` : `kick ${name}`;
   // M12: route through sendConsoleCommand (RCON-first) so kick works on an RCON/adopted server too.
-  const r = await sendConsoleCommand(ctx, 'kick ' + name);
+  const r = await sendConsoleCommand(ctx, cmd);
   if (!r.ok) return r;
-  return { ok: true, result: { kicked: name } };
+  return { ok: true, result: { kicked: name, reason: reason || null } };
 }
 
 // ---- SERVER DOCTOR (1.2.0) ---- read-only diagnostics + composite workflows.
 async function tDiagnoseServer(ctx) {
   const root = ctx.currentServerPath || '';
-  const s = loadSettings();
+  const s = loadSettingsFor ? loadSettingsFor(ctx.inst ? ctx.inst() : undefined) : loadSettings();
   let files = {}; try { files = serverFiles(root); } catch {}
   const javaRequired = requiredJavaForServer(root, serverFiles) || null;
   let eulaAccepted = false; try { eulaAccepted = readEula(root); } catch {}
@@ -1100,12 +1180,23 @@ async function tCheckPerformance(ctx) {
   else if (tps == null) { const secs = Math.round((Date.now() - (ctx.startedAt || Date.now())) / 1000); push('info', `Metrics are still warming up (server has been up ~${Math.max(0, secs)}s) - retry in a few seconds.`); }
   if (tps != null) { if (tps < 15) push('error', `TPS ${tps} - the server is struggling.`, 'Reduce view-distance, remove heavy plugins, or allocate more RAM.'); else if (tps < 19) push('warn', `TPS ${tps} - mild lag.`, 'Consider lowering view-distance or plugin load.'); else push('ok', `TPS ${tps} - healthy.`); }
   if (mspt != null) { if (mspt > 50) push('error', `MSPT ${mspt}ms - above the 50ms tick budget.`, 'The main thread cannot keep up; reduce load.'); else if (mspt > 40) push('warn', `MSPT ${mspt}ms - close to the 50ms budget.`); else push('ok', `MSPT ${mspt}ms - healthy.`); }
-  return { ok: true, result: { running: ctx.serverStatus === 'running', tps, mspt, players, notes } };
+  const hist = ctx.metricsHistory || [];
+  const lastSample = hist[hist.length - 1] || null;
+  const cpu = lastSample ? (lastSample.cpu ?? null) : null;
+  const ram = lastSample ? (lastSample.ram ?? null) : null;
+  if (ram != null) {
+    const s = loadSettingsFor ? loadSettingsFor(ctx.inst ? ctx.inst() : undefined) : loadSettings();
+    const maxRamMb = (Number(s.memoryMax) || 6) * 1024;
+    if (ram > maxRamMb * 0.9) {
+      push('warn', `RAM usage (${ram}MB) is near limit (${maxRamMb}MB).`, 'Consider allocating more RAM or finding memory leaks.');
+    }
+  }
+  return { ok: true, result: { running: ctx.serverStatus === 'running', tps, mspt, cpu, ram, players, notes } };
 }
 async function tGetMetricsHistory(ctx, a) {
   const { queryHistory } = require('../main/server-metrics.js');
   const minutes = Math.min(Math.max(1, Number(a?.minutes) || 30), 180);
-  const maxSamples = Math.min(Math.max(1, Number(a?.max_samples) || 500), 1000);
+  const maxSamples = Math.min(Math.max(1, Number(a?.max_samples) || 60), 1000);
   const hist = ctx.metricsHistory || [];
   const q = queryHistory(hist, { minutes, maxSamples });
   return { ok: true, result: { minutes, ...q } };
@@ -1130,8 +1221,9 @@ async function tCheckPort(ctx, a) {
   let holder = null;
   if (r.free === false) {
     try {
-      for (const [id, st] of ctx.instances || []) {
-        if (id === ctx.inst()) continue;
+      const instList = ctx.instances ? (ctx.instances instanceof Map ? Array.from(ctx.instances.entries()) : Array.isArray(ctx.instances) ? ctx.instances : Object.entries(ctx.instances)) : [];
+      for (const [id, st] of instList) {
+        if (!st || id === ctx.inst()) continue;
         const root = st.currentServerPath || st.serverPath;
         if (!root) continue;
         let p = 0; try { p = Number(serverFiles(root).properties?.['server-port']) || 0; } catch {}
@@ -1154,14 +1246,14 @@ async function tCheckPort(ctx, a) {
 }
 async function tReadManyFiles(ctx, a) {
   const root = needPath(ctx);
-  const paths = Array.isArray(a.paths) ? a.paths.slice(0, 5) : [];
+  const paths = Array.isArray(a && a.paths) ? a.paths.slice(0, 5) : [];
   if (!paths.length) return { ok: false, error: 'paths must be a non-empty array (max 5).' };
   const out = [];
   for (const rel of paths) {
     // Reuse the editor's rails (safeTarget + binary sniff + size cap) so a .jar/.dat can't be
     // returned as utf8 garbage. editor.openFile already runs everything we need.
     const r = editor.openFile(root, rel);
-    if (!r.ok) { out.push({ path: rel, ok: false, error: r.error }); continue; }
+    if (!r.ok) { out.push({ path: rel, ok: false, error: friendlyEditorError(r.error) }); continue; }
     out.push({ path: rel, ok: true, content: r.content, readOnly: r.readOnly, size: r.size });
   }
   return { ok: true, result: { files: out } };
@@ -1173,7 +1265,8 @@ async function tPrepareAndStart(ctx) {
   if (errors.length) return { ok: false, error: 'Cannot start - fix these first: ' + errors.map(e => e.detail).join(' ') };
   let backup = null;
   try { const b = await createBackupInternal(ctx, { auto: true }); if (b.ok) backup = b.name; } catch {}
-  const r = await startServerInternal(ctx, loadSettings());
+  const s = loadSettingsFor ? loadSettingsFor(ctx.inst ? ctx.inst() : undefined) : loadSettings();
+  const r = await startServerInternal(ctx, s);
   return r.ok ? { ok: true, result: { backup, start: r } } : { ok: false, error: r.error, result: { backup } };
 }
 async function tSafeRestart(ctx) {
@@ -1182,11 +1275,13 @@ async function tSafeRestart(ctx) {
   try { const b = await createBackupInternal(ctx, { auto: true }); if (b.ok) backup = b.name; } catch {}
   ctx.manualStop = true;
   clearTimeout(ctx.restartTimer);
-  try { if (ctx.serverProcess?.stdin?.writable) ctx.serverProcess.stdin.write('stop\r\n'); } catch {}
+  if (ctx.setServerStatus) ctx.setServerStatus('stopping');
+  try { await sendConsoleCommand(ctx, 'stop'); } catch {}
   const deadline = Date.now() + 30000;
   while (ctx.serverProcess && Date.now() < deadline) await new Promise(r => setTimeout(r, 500));
   if (ctx.serverProcess) return { ok: false, error: 'Server did not stop within 30s - force_stop_server may be needed.', result: { backup } };
-  const r = await startServerInternal(ctx, loadSettings());
+  const s = loadSettingsFor ? loadSettingsFor(ctx.inst ? ctx.inst() : undefined) : loadSettings();
+  const r = await startServerInternal(ctx, s);
   return r.ok ? { ok: true, result: { backup, start: r } } : { ok: false, error: r.error, result: { backup } };
 }
 async function tDoctorReport(ctx) {
@@ -1195,7 +1290,20 @@ async function tDoctorReport(ctx) {
   const perf = await tCheckPerformance(ctx);
   let config = { checks: [] }; try { config = (await tValidateConfig(ctx)).result; } catch {}
   let crash = { found: false }; try { crash = (await tExplainCrash(ctx)).result; } catch {}
-  return { ok: true, result: { healthy: diag.result?.healthy ?? null, checks: diag.result?.checks || [], console: cons.result, performance: perf.result, config: config.checks, crash } };
+  let mods = null;
+  try {
+    const compat = (await tCheckModCompat(ctx)).result;
+    if (compat && compat.totalMods > 0) {
+      mods = {
+        totalMods: compat.totalMods,
+        issues: (compat.issues && compat.issues.length) || 0,
+        missingDeps: (compat.missingDeps && compat.missingDeps.length) || 0,
+        conflicts: (compat.conflicts && compat.conflicts.length) || 0,
+        ok: compat.ok,
+      };
+    }
+  } catch {}
+  return { ok: true, result: { healthy: diag.result?.healthy ?? null, checks: diag.result?.checks || [], console: cons.result, performance: perf.result, config: config.checks, crash, ...(mods ? { mods } : {}) } };
 }
 
 // ============ v2.5.0 AUTONOMOUS DOCTOR (propose + apply) ============
@@ -1298,24 +1406,24 @@ const OPEN_WORLD_TOOLS = new Set([
 // v5.0.0: outputSchema for the highest-value READ tools. The bridge already sends structuredContent;
 // declaring the shape lets a client validate/act on fields instead of re-parsing the text blob.
 const OUTPUT_SCHEMAS = {
-  get_status: S({ status: STR('running|starting|stopping|stopped'), running: { type: 'boolean' }, serverPath: { type: ['string', 'null'] }, jar: { type: ['string', 'null'] }, launchScript: { type: ['string', 'null'] }, software: { type: ['string', 'null'] }, javaRequired: { type: ['number', 'null'] } }),
+  get_status: S({ status: STR('running|starting|stopping|stopped'), running: { type: 'boolean' }, serverPath: { type: ['string', 'null'] }, jar: { type: ['string', 'null'] }, launchScript: { type: ['string', 'null'] }, software: { type: ['string', 'null'] }, mc: { type: ['string', 'null'] }, loader: { type: ['string', 'null'] }, javaRequired: { type: ['number', 'null'] } }),
   list_players: S({ online: { type: 'array', items: { type: 'object' } }, whitelist: { type: 'array', items: { type: 'object' } }, banned: { type: 'array', items: { type: 'object' } }, ops: { type: 'array', items: { type: 'object' } }, known: { type: 'array', items: { type: 'object' } } }),
   list_content: S({ plugins: { type: 'array', items: { type: 'object' } }, mods: { type: 'array', items: { type: 'object' } }, datapacks: { type: 'array', items: { type: 'object' } } }),
   list_instances: S({ instances: { type: 'array', items: { type: 'object' } }, activeInstanceId: { type: ['string', 'null'] } }),
-  get_instance_snapshot: S({ id: STR('instance id'), status: STR(''), running: { type: 'boolean' }, logs: { type: 'array', items: { type: 'object' } }, metricsHistory: { type: 'array', items: { type: 'object' } }, active: { type: 'boolean' } }),
-  get_properties: S({ properties: { type: 'object' } }),
+  get_instance_snapshot: S({ id: STR('instance id'), name: { type: ['string', 'null'] }, serverPath: { type: ['string', 'null'] }, status: STR(''), running: { type: 'boolean' }, logs: { type: 'array', items: { type: 'string' } }, metricsSamples: { type: 'number' }, active: { type: 'boolean' } }),
+  get_properties: { type: 'object', additionalProperties: { type: 'string' } },
   get_metrics_history: S({ samples: { type: 'array', items: { type: 'object' } }, count: { type: 'number' } }),
-  check_performance: S({ tps: { type: ['number', 'null'] }, mspt: { type: ['number', 'null'] }, players: { type: ['number', 'null'] }, warnings: { type: 'array', items: { type: 'string' } } }),
-  diagnose_server: S({ checks: { type: 'array', items: { type: 'object' } } }),
-  doctor_report: S({ checks: { type: 'array', items: { type: 'object' } } }),
-  analyze_console: S({ findings: { type: 'array', items: { type: 'object' } } }),
-  explain_crash: S({ summary: STR('plain-language crash summary'), causes: { type: 'array', items: { type: 'string' } } }),
-  list_crash_reports: S({ reports: { type: 'array', items: { type: 'object' } } }),
-  read_audit_log: S({ entries: { type: 'array', items: { type: 'object' } } }),
-  check_updates: S({ updates: { type: 'array', items: { type: 'object' } }, current: { type: 'array', items: { type: 'object' } }, unknown: { type: 'array', items: { type: 'object' } } }),
-  propose_fix: S({ plan: { type: 'array', items: { type: 'object' } } }),
-  list_market_versions: S({ versions: { type: 'array', items: { type: 'object' } } }),
-  search_marketplace: S({ results: { type: 'array', items: { type: 'object' } } }),
+  check_performance: S({ running: { type: 'boolean' }, tps: { type: ['number', 'null'] }, mspt: { type: ['number', 'null'] }, cpu: { type: ['number', 'null'] }, ram: { type: ['number', 'null'] }, players: { type: ['number', 'null'] }, notes: { type: 'array', items: { type: 'object' } } }),
+  diagnose_server: S({ checks: { type: 'array', items: { type: 'object' } }, healthy: { type: 'boolean' } }),
+  doctor_report: S({ healthy: { type: ['boolean', 'null'] }, checks: { type: 'array', items: { type: 'object' } } }),
+  analyze_console: S({ scanned: { type: 'number' }, errors: { type: 'number' }, warns: { type: 'number' }, issues: { type: 'array', items: { type: 'object' } } }),
+  explain_crash: S({ found: { type: 'boolean' }, description: { type: 'string' }, cause: { type: 'string' }, classification: { type: 'object' } }),
+  list_crash_reports: S({ count: { type: 'number' }, reports: { type: 'array', items: { type: 'object' } } }),
+  read_audit_log: S({ lines: { type: 'array', items: { type: 'string' } }, count: { type: 'number' } }),
+  check_updates: S({ updates: { type: 'number' }, items: { type: 'array', items: { type: 'object' } } }),
+  propose_fix: S({ plan: { type: 'array', items: { type: 'object' } }, summary: { type: 'string' } }),
+  list_market_versions: S({ versions: { type: 'array', items: { type: 'object' } }, count: { type: 'number' } }),
+  search_marketplace: S({ items: { type: 'array', items: { type: 'object' } }, total: { type: 'number' } }),
 };
 
 // 5.5.0 MCP Apps (SEP-1865): tools that render an in-host UI. The value is the tool's `_meta`; a
@@ -1350,7 +1458,7 @@ const TOOLS = [
   { name: 'get_network_info', risk: 'read', description: 'LAN IPs and server port.', inputSchema: S(), handler: tGetNetworkInfo },
   { name: 'get_java_info', risk: 'read', description: 'Detected Java version/path/arch.', inputSchema: S(), handler: tGetJavaInfo },
   { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar, Spigot or CurseForge for plugins/mods/datapacks/modpacks. Pass loader (neoforge|forge|fabric|quilt) to pin the search to a loader instead of the loose kind group. CurseForge requires the user to have set an API key in Settings.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), loader: STR('neoforge|forge|fabric|quilt (pin to one loader)'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
-  { name: 'list_market_versions', risk: 'read', description: 'Versions of a project (Modrinth, Hangar or CurseForge). Pick a versionId then install_from_market.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), source: STR('modrinth|hangar|curseforge (default modrinth)') }, ['id']), handler: tListMarketVersions },
+  { name: 'list_market_versions', risk: 'read', description: 'Versions of a project (Modrinth, Hangar or CurseForge). Pick a versionId then install_from_market.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), source: STR('modrinth|hangar|curseforge (default modrinth)'), version: STR('MC version (optional filter)'), loader: STR('neoforge|forge|fabric|quilt (optional filter)'), limit: { type: 'number', description: 'max versions (default 25, max 100)' } }, ['id']), handler: tListMarketVersions },
   { name: 'diagnose_server', risk: 'read', description: 'Full server health check: folder, jar, Java version/arch, EULA, port, world, backups, recent crash. Returns per-check level (ok/warn/error) + fixes.', inputSchema: S(), handler: tDiagnoseServer },
   { name: 'analyze_console', risk: 'read', description: 'Scan the console buffer for errors/warnings (OOM, port-busy, exceptions, lag), grouped and ranked.', inputSchema: S({ lines: { type: 'number', description: 'lines to scan (default 500, max 2000)' } }), handler: tAnalyzeConsole },
   { name: 'explain_crash', risk: 'read', description: 'Summarise a crash-report (default: newest; pass name to read an older one from list_crash_reports).', inputSchema: S({ name: STR('crash report file name (optional, default newest)') }), handler: tExplainCrash },
@@ -1370,7 +1478,7 @@ const TOOLS = [
   { name: 'set_raw_properties', risk: 'write', description: 'Replace velocity.toml content.', inputSchema: S({ content: STR('full file') }, ['content']), handler: tSetRawProperties },
   { name: 'apply_geyser_fix', risk: 'write', description: 'Repair the safe GeyserMC config problems (clone-remote-port, remote.auth-type, advanced.bedrock.use-haproxy-protocol) in Geyser config.yml. Writes at the line level with a timestamped backup; never re-serializes the file. Pass includeBedrockPort:true to also reset bedrock.port to 19132.', inputSchema: S({ includeBedrockPort: { type: 'boolean', description: 'also reset bedrock.port to 19132 (default false)' } }), handler: tApplyGeyserFix },
   { name: 'write_file', risk: 'write', description: 'Write a text file inside the server folder.', inputSchema: S({ path: STR('relative path'), content: STR('full content') }, ['path', 'content']), handler: tWriteFile },
-  { name: 'edit_file', risk: 'write', description: 'Replace oldString with newString in a file.', inputSchema: S({ path: STR('relative path'), oldString: STR('exact text'), newString: STR('replacement') }, ['path', 'oldString', 'newString']), handler: tEditFile },
+  { name: 'edit_file', risk: 'write', description: 'Replace oldString with newString in a file.', inputSchema: S({ path: STR('relative path'), oldString: STR('exact text'), newString: STR('replacement'), replaceAll: { type: 'boolean', description: 'replace all occurrences of oldString (default false)' } }, ['path', 'oldString', 'newString']), handler: tEditFile },
   { name: 'create_backup', risk: 'write', description: 'Create a world backup (ZIP).', inputSchema: S(), handler: tCreateBackup },
   { name: 'get_settings', risk: 'read', description: 'Read launcher settings (RAM, Java, auto-restart, locale, backup interval).', inputSchema: S(), handler: tGetSettings },
   { name: 'get_schedule', risk: 'read', description: 'Read the server schedule (enabled, start/stop time, weekdays).', inputSchema: S(), handler: tGetSchedule },
@@ -1378,9 +1486,9 @@ const TOOLS = [
   { name: 'install_java', risk: 'write', description: 'Download and install a portable Java runtime (Adoptium) matching the server needs.', inputSchema: S(), handler: tInstallJava },
   { name: 'set_setting', risk: 'write', description: 'Change one launcher setting (memoryMin/Max, autoRestart, autoEula, autoBackupMinutes, locale, jvmArgs). serverPath is NOT settable.', inputSchema: S({ key: STR('setting name'), value: { description: 'new value' } }, ['key', 'value']), handler: tSetSetting },
   { name: 'set_schedule', risk: 'write', description: 'Set the server schedule. Any of enabled (bool), startTime/stopTime (HH:MM 24h or ""), days (array of mon..sun, empty = every day).', inputSchema: S({ enabled: { type: 'boolean', description: 'true = scheduler on' }, startTime: STR('HH:MM (24h) or empty to disable'), stopTime: STR('HH:MM (24h) or empty to disable'), days: { type: 'array', items: { type: 'string' }, description: 'weekdays mon..sun (empty = every day)' } }), handler: tSetSchedule },
-  { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name') }, ['name']), handler: tKickPlayer },
+  { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name'), reason: STR('kick reason (optional)') }, ['name']), handler: tKickPlayer },
   { name: 'search_modpacks', risk: 'read', description: 'Search Modrinth for installable modpacks. Install one with install_from_market { kind: "modpack", id }.', inputSchema: S({ query: STR('search text'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchModpacks },
-  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack/MODPACK from Modrinth, Hangar, Spigot or CurseForge (same resolver as the GUI). Refuses a build whose loader/MC does not match the server, or one OLDER than the installed version (pass force:true / allowDowngrade:true to override). kind:"modpack" downloads the .mrpack and imports it. CurseForge needs the user to have set an API key in Settings, and refuses projects whose author blocks third-party downloads.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)'), env: STR('client|server|both (optional, recorded in the manifest)'), force: { type: 'boolean', description: 'install even on a loader/MC mismatch (default false)' }, allowDowngrade: { type: 'boolean', description: 'allow installing an older version over a newer one (default false)' }, verbose: { type: 'boolean', description: 'return the full server file snapshot (default false, lean result)' } }, ['id']), handler: tInstallFromMarket },
+  { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack/MODPACK from Modrinth, Hangar, Spigot or CurseForge (same resolver as the GUI). Refuses a build whose loader/MC does not match the server, or one OLDER than the installed version (pass force:true / allowDowngrade:true to override). kind:"modpack" downloads the .mrpack and imports it. CurseForge needs the user to have set an API key in Settings, and refuses projects whose author blocks third-party downloads.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)'), loader: STR('neoforge|forge|fabric|quilt (optional, filter download by loader)'), env: STR('client|server|both (optional, recorded in the manifest)'), force: { type: 'boolean', description: 'install even on a loader/MC mismatch (default false)' }, allowDowngrade: { type: 'boolean', description: 'allow installing an older version over a newer one (default false)' }, verbose: { type: 'boolean', description: 'return the full server file snapshot (default false, lean result)' } }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
@@ -1391,7 +1499,7 @@ const TOOLS = [
   { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat (health/food/xp/gamemode). Server must be stopped; a backup is written first.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object', description: 'health, food, saturation, xpLevel, xpTotal, gameType' }, clearInventory: { type: 'boolean', description: 'also clear inventory + equipment' } }, ['uuid']), handler: tSavePlayerData },
   { name: 'op_player', risk: 'write', description: 'Grant or revoke operator. level 1-4 applies when the server is STOPPED (writes ops.json); a running server always grants level 4 (vanilla /op has no level arg).', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), on: { type: 'boolean', description: 'true = op, false = deop' }, level: { type: 'number', description: 'operator level 1-4 (default 4; stopped server only)' } }, ['name']), handler: tOpPlayer },
   { name: 'whitelist_player', risk: 'write', description: 'Add or remove from the whitelist.', inputSchema: S({ name: STR('player name'), uuid: STR('known UUID (optional)'), add: { type: 'boolean', description: 'true = add, false = remove' } }, ['name']), handler: tWhitelistPlayer },
-  { name: 'ban_player', risk: 'write', description: 'Ban or unban a player, or ban/unban an IP with ip.', inputSchema: S({ name: STR('player name (or any label when using ip)'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)'), ip: STR('ban by IP instead of name (optional)') }, ['name']), handler: tBanPlayer },
+  { name: 'ban_player', risk: 'write', description: 'Ban or unban a player, or ban/unban an IP with ip.', inputSchema: S({ name: STR('player name (or IP if banning by IP)'), uuid: STR('known UUID (optional)'), ban: { type: 'boolean', description: 'true = ban, false = unban' }, reason: STR('ban reason (optional)'), ip: STR('ban by IP instead of name (optional)') }, ['name']), handler: tBanPlayer },
   { name: 'create_instance', risk: 'write', description: 'Create a NEW server instance and download its server jar. Opens a folder picker in the app for the user to choose an empty folder (the AI cannot pass a path). Pass software (vanilla|paper|purpur|leaf|folia|fabric|forge|neoforge|spigot|velocity) + optional version and name. The new instance becomes active.', inputSchema: S({ software: STR('server software (default vanilla)'), version: STR('Minecraft version (optional; default = latest stable)'), name: STR('display name (optional)') }), handler: tCreateInstance },
   { name: 'list_instances', risk: 'read', description: 'List all configured server instances (id, name, serverPath, status, active). Call this FIRST to discover which instance to target, then pass instance: <id> to other tools.', inputSchema: S(), handler: tListInstances },
   { name: 'get_instance_snapshot', risk: 'read', description: 'Read ONE instance\'s full state (status, console tail, live metrics, java, files) WITHOUT making it active - use to inspect/compare a background server without disturbing the user\'s GUI.', inputSchema: S({ instance: STR('instance id (from list_instances)'), lines: { type: 'number', description: 'console lines to return (default 100, max 2000)' } }, ['instance']), handler: tGetInstanceSnapshot },

@@ -23,37 +23,45 @@ Minecraft minor updates frequently patch critical server vulnerabilities without
 - **1.16.4 <-> 1.16.5:** Mojang's 1.16.5 update was strictly two server vulnerability fixes. Forge 1.16.4 mods run on 1.16.5 without modification.
 - **1.20 <-> 1.20.1:** Binary and network compatible sub-patches.
 - **1.19.1 <-> 1.19.2, 1.18 <-> 1.18.1, 1.15.1 <-> 1.15.2, 1.21 <-> 1.21.1:** Full cross-patch bridges supported.
+- **1.21.2 <-> 1.21.3:** Minor hotfix patch with identical network and bytecode mappings.
+- **26.1 <-> 26.1.1:** 2026 calendar version hotfix (MC-307140) sharing identical datapack format (101.1) and protocol.
 
 The new `areMcVersionsCompatible()` and `checkMcCompat()` engines evaluate these bridges automatically.
 
-### B. Universal Range Parsing & Natural Version Comparison
+### B. Minecraft 1.21.1+ and 2026 Calendar Versioning Support
 
-- **Forge / Maven Interval Ranges:** Accurately evaluates `[1.16.4, 1.16.5]`, `[1.16.4, 1.17)`, `[1.16.4,)`, `(,1.16.5]`, and exact `[version]` syntax.
-- **Fabric / NPM Semver:** Accurately evaluates `>=1.16.4 <=1.16.5`, `~1.16.4`, `^1.16.4`, and `*`.
-- **Natural Comparison:** Replaces string length or lexicographic checks with numerical segment comparison (`1.10` > `1.9`).
+- **2026 Calendar Versioning (`26.1+`):** Full compatibility with Mojang's 2026 calendar versioning scheme (game drops `26.1`, `26.2`, `26.3` and hotfixes `26.1.1`).
+- **Java 25 Requirement:** `requiredJavaForJar()` recognizes `26.x` servers and automatically verifies Java 25 (`java-runtime-epsilon`, class file version 69.0), while `1.20.5+/1.21.x` map to Java 21.
+- **NeoForge 26.x Tag Resolution:** Fixed `mcFor()` in `src/main/forge-versions.js` to ensure 3-part NeoForge builds (e.g. `26.1.15`) map cleanly to `26.1` instead of `1.26.1`.
+- **Zero-Normalization:** Semantically equates `1.21` with `1.21.0` and `26.1` with `26.1.0` so manifest differences never trigger false incompatibilities.
+- **Calendar Semver Caret Bounding:** `^26.1` automatically bounds `< 26.2` to respect Minecraft 2026 game drop breaking boundaries.
 
-### C. Authoritative Descriptor Parsing (`src/main/mod-metadata.js`)
+### C. AI Context & Token Optimization
+
+- **Marketplace Versions Pagination (`list_market_versions`):** Added `limit` (default 25, max 100), `version`, and `loader` filtering. Slashes Modrinth payload size from over 140,000 tokens down to ~1,000 tokens (a 99.3% reduction in AI context consumption).
+- **Streamlined Metrics Sampling (`get_metrics_history`):** Lowered default sample count from 500 down to 60, eliminating ~88% of token overhead while maintaining clear analytical performance curves.
+
+### D. Audit & Hardening of All 78 MCP Tools (`src/mcp/tools.js`)
+
+- **Windows File Lock Hardening:** Gracefully traps `EBUSY` and `EPERM` errors in `delete_content` when files are held by a running server, returning clear recovery guidance.
+- **Schedule Day Handling:** `set_schedule` and `get_schedule` seamlessly support both numeric days (`0..6`) and weekday names (`'mon'..'sun'`).
+- **Multi-Instance Isolation:** Isolated active settings lookup per target instance across `start_server`, `diagnose_server`, `prepare_and_start`, and `safe_restart`.
+- **Output Schema Synchronization:** All 18 MCP `OUTPUT_SCHEMAS` are fully verified against runtime JSON structures.
+
+### E. Authoritative Descriptor Parsing (`src/main/mod-metadata.js`)
 
 - **Authoritative Dependency Ranges:** Reads Minecraft dependencies directly from `[[dependencies.<modId>]]` in `mods.toml`, `depends.minecraft` in `fabric.mod.json`, and `mcversion` in legacy `mcmod.info`.
 - **Legacy Forge Support (1.7.10–1.12.2):** Added `parseMcModInfo()` to read `mcmod.info` JSON descriptors.
 - **Gradle Token Resolution:** Ignores unexpanded `${file.jarVersion}` or `${version}` template tokens, resolving real mod versions from `META-INF/MANIFEST.MF` or filename fallbacks.
 - **Metadata vs. Filename Separation:** Classifies whether version info originated from authoritative metadata (`mcSource: 'metadata'`) or a filename guess (`mcSource: 'filename'`).
-
-### D. MCP Tool Enhancements (`src/mcp/tools.js`)
-
-- **`list_content`:** Every mod item now includes `modId`, `mcVersionRange`, `mcSource`, `mcCompatible`, `mcStatus`, and `mcNote`. AI assistants see verified compatibility status directly in the payload.
-- **`check_mod_compat`:**
-  - Evaluates Minecraft version compatibility against the server target.
-  - Detects duplicate `modId`s across multiple jar files (a primary cause of Forge startup crashes).
-  - Returns structured `mcSummary` (`scanned`, `compatible`, `crossPatch`, `incompatible`, `unknown`) and per-mod breakdowns.
-  - Generates human- and AI-readable notes explaining why cross-patch builds are safe.
-- **`plan_modpack` & `install_from_market`:** Allows cross-patch compatible items to pass preflight planning without false rejection warnings.
+- **Duplicate modId Detection:** Catches duplicate mod declarations before launch.
 
 ---
 
 ## 3. Developer Verification
 
-- **New Test Suite:** `tests/mc-compat.test.js` covers range evaluation, cross-patch groups, and descriptor parsing (59 tests).
-- **MCP Test Suite:** `tests/mcp-mod-compat.test.js` exercises `tCheckModCompat` and `tListContent` against real jar structures and duplicate jars (29 tests).
+- **New Test Suite:** `tests/mc-compat.test.js` covers range evaluation, cross-patch groups, calendar semver, and descriptor parsing (68 tests).
+- **MCP Surface & Tools Suites:** `tests/mcp-tools.test.js` (79 tests) and `tests/mcp-surface.test.js` (63 tests) passing 100%.
+- **Forge Versions Suite:** `tests/forge-versions.test.js` covers calendar and 3-part NeoForge mappings (25 tests).
 - **Code Quality:** Zero duplicated CSS selectors or copy-pasted JS blocks verified via `tests/no-dup.test.js`.
 - **All 152 Test Files:** Passing cleanly via `node tests/run.js`.

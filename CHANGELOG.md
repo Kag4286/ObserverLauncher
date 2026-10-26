@@ -20,9 +20,13 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - `1.16.4` <-> `1.16.5` (zero protocol/bytecode changes; Forge loads 1.16.4 mods on 1.16.5 seamlessly).
   - `1.20` <-> `1.20.1` (sub-patch compatibility).
   - `1.19.1` <-> `1.19.2`, `1.18` <-> `1.18.1`, `1.15.1` <-> `1.15.2`, and `1.21` <-> `1.21.1`.
+  - `1.21.2` <-> `1.21.3` (identical network/bytecode protocol patches).
+  - `26.1` <-> `26.1.1` (2026 calendar versioning hotfix MC-307140 with identical data pack format 101.1).
+- Added zero-normalization: equates `1.21` with `1.21.0` and `26.1` with `26.1.0`.
 - Built universal range parsing and evaluation (`testMcVersionAgainstRange`):
   - Forge/Maven intervals: `[min, max]`, `[min, max)`, `[min,)`, `(,max]`, `[exact]`, and bare versions.
   - Fabric/NPM semver: `>=min <=max`, `~version`, `^version`, and `*`.
+  - Calendar semver caret (`^26.1`) bounds `< 26.2` to respect 2026 game drop breaking boundaries.
   - Multi-version lists and arrays.
 - Structured compatibility diagnostics (`checkMcCompat`):
   - Returns `{ compatible: boolean, status: 'exact'|'range'|'cross-patch'|'incompatible'|'unknown', declaredRange, serverMc, note }`.
@@ -54,6 +58,22 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Evaluates Minecraft version compatibility using authoritative metadata (`mcSource === 'metadata'`), preventing false conflict reports on benign filename differences.
 - **`prompts.js`:**
   - Updated `audit_mods` prompt instructions to explicitly guide AI assistants to inspect `mcRange`, `mcStatus`, and `mcNote` instead of relying on filenames.
+
+### Hardened: MCP Tool Reliability & AI Token Context Optimization (`src/mcp/tools.js`, `src/main/marketplace.js`)
+
+- **Marketplace Version Token Optimization (`list_market_versions`):**
+  - Added pagination (`limit`, default 25, max 100), optional `version` (MC target filter), and `loader` filtering.
+  - Slashes Modrinth response payloads from 140,000+ tokens to ~1,000 tokens (99.3% reduction in context window footprint).
+- **Streamlined Metrics History Sampling (`get_metrics_history`):**
+  - Reduced default `max_samples` from 500 to 60 (~88% token reduction) while maintaining accurate analytical trends.
+- **Windows File Lock Recovery (`delete_content`):**
+  - Added try-catch guards for `EBUSY` and `EPERM` when attempting to delete running server jars, advising the client to stop the server before deletion.
+- **Schedule Day Handling Synchronization (`set_schedule`, `get_schedule`):**
+  - Full bidirectional support for numeric days (`0..6`) and named strings (`'mon'..'sun'`).
+- **Multi-Instance Isolation:**
+  - Applied per-instance settings (`loadSettingsFor(ctx.inst())`) across `start_server`, `diagnose_server`, `prepare_and_start`, and `safe_restart`.
+- **Schema Alignment:**
+  - Realignment of all 18 MCP `OUTPUT_SCHEMAS` with runtime JSON schemas.
 
 ## [6.1.5] — 2026-10-25
 

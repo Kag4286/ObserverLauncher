@@ -19,13 +19,21 @@ const MC_COMPAT_GROUPS = [
   ['1.18', '1.18.1'],
   ['1.15.1', '1.15.2'],
   ['1.21', '1.21.1'],
+  ['1.21.2', '1.21.3'],
+  ['26.1', '26.1.1'],
 ];
+
+// Normalize trailing zero segments (e.g. 1.21.0 -> 1.21, 26.1.0 -> 26.1)
+function normalizeMcVersion(v) {
+  if (!v) return '';
+  return String(v).trim().replace(/^(\d+\.\d+)\.0$/, '$1');
+}
 
 // Check if two Minecraft versions belong to the same cross-patch compatibility group.
 function areMcMinorCompatible(v1, v2) {
   if (!v1 || !v2) return false;
-  const s1 = String(v1).trim();
-  const s2 = String(v2).trim();
+  const s1 = normalizeMcVersion(v1);
+  const s2 = normalizeMcVersion(v2);
   if (s1 === s2) return true;
   for (const group of MC_COMPAT_GROUPS) {
     if (group.includes(s1) && group.includes(s2)) return true;
@@ -36,11 +44,15 @@ function areMcMinorCompatible(v1, v2) {
 // Get all versions compatible with a given Minecraft version (itself + cross-patch peers).
 function getMcCompatPeers(version) {
   if (!version) return [];
-  const v = String(version).trim();
-  const peers = new Set([v]);
+  const raw = String(version).trim();
+  const v = normalizeMcVersion(raw);
+  const peers = new Set([raw, v]);
   for (const group of MC_COMPAT_GROUPS) {
-    if (group.includes(v)) {
-      for (const item of group) peers.add(item);
+    if (group.includes(v) || group.includes(raw)) {
+      for (const item of group) {
+        peers.add(item);
+        peers.add(normalizeMcVersion(item));
+      }
     }
   }
   return Array.from(peers);
@@ -49,13 +61,16 @@ function getMcCompatPeers(version) {
 // Test if targetMc satisfies a single constraint condition like ">=1.16.4", "<1.17", "=1.16.5".
 function testSimpleConstraint(targetMc, op, bound) {
   if (!targetMc || !bound) return false;
+  const tNorm = normalizeMcVersion(targetMc);
+  const bNorm = normalizeMcVersion(bound);
+  if ((op === '=' || op === '==') && tNorm === bNorm) return true;
   const cmp = compareVersions(targetMc, bound);
-  if (op === '>=') return cmp >= 0;
-  if (op === '<=') return cmp <= 0;
-  if (op === '>') return cmp > 0;
-  if (op === '<') return cmp < 0;
-  if (op === '=' || op === '==') return cmp === 0;
-  return cmp === 0;
+  if (op === '>=') return cmp >= 0 || tNorm === bNorm;
+  if (op === '<=') return cmp <= 0 || tNorm === bNorm;
+  if (op === '>') return cmp > 0 && tNorm !== bNorm;
+  if (op === '<') return cmp < 0 && tNorm !== bNorm;
+  if (op === '=' || op === '==') return cmp === 0 || tNorm === bNorm;
+  return cmp === 0 || tNorm === bNorm;
 }
 
 // Test whether a single Minecraft version strictly satisfies a declared range string.
@@ -89,6 +104,7 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
   // Exact bracket: "[1.16.4]"
   const exactBracket = raw.match(/^\[\s*([^,\]\)]+)\s*\]$/);
   if (exactBracket) {
+    if (normalizeMcVersion(targetMc) === normalizeMcVersion(exactBracket[1])) return true;
     return compareVersions(targetMc, exactBracket[1]) === 0;
   }
 
@@ -105,13 +121,18 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
     return compareVersions(targetMc, base) >= 0;
   }
 
-  // 3. Semver caret: "^1.16.4"
+  // 3. Semver caret: "^1.16.4", "^26.1"
   if (raw.startsWith('^')) {
     const base = raw.slice(1).trim();
     const parts = base.split('.');
     if (parts[0] === '1' && parts.length >= 2) {
       const nextMinor = `1.${parseInt(parts[1], 10) + 1}`;
       return compareVersions(targetMc, base) >= 0 && compareVersions(targetMc, nextMinor) < 0;
+    }
+    if (Number(parts[0]) >= 26 && parts.length >= 2) {
+      // 2026+ calendar versioning: drops are 26.1, 26.2, 26.3
+      const nextDrop = `${parts[0]}.${parseInt(parts[1], 10) + 1}`;
+      return compareVersions(targetMc, base) >= 0 && compareVersions(targetMc, nextDrop) < 0;
     }
     return compareVersions(targetMc, base) >= 0;
   }
@@ -134,6 +155,7 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
   }
 
   // 5. Bare version string: "1.16.4"
+  if (normalizeMcVersion(targetMc) === normalizeMcVersion(raw)) return true;
   return compareVersions(targetMc, raw) === 0;
 }
 

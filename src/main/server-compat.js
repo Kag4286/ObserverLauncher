@@ -17,7 +17,7 @@ function mcFromName(name) {
   if (mcPrefixed) return mcPrefixed[1];
   // Standard delimiter-bounded MC versions for modding are 1.7 through 1.29 (or 26.x NeoForge).
   // Sub-1.7 versions (e.g. 1.0, 1.2, 1.5) in modern filenames are mod build numbers (e.g. "cloth-config-1.0.jar").
-  const m = str.match(/(?:^|[^0-9])(1\.(?:[7-9]|[1-2]\d)(?:\.\d{1,2})?|26\.\d{1,2})(?:[^0-9]|$)/);
+  const m = str.match(/(?:^|[^0-9])(1\.(?:[7-9]|[1-2]\d)(?:\.\d{1,2})?|26\.\d{1,2}(?:\.\d{1,2})?)(?:[^0-9]|$)/);
   return m ? m[1] : null;
 }
 
