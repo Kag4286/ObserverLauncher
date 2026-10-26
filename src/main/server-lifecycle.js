@@ -51,7 +51,8 @@ function spawnServerProcess(ctx, serverPath, info, customArgs, args) {
     if (info.launchScript.toLowerCase().endsWith('.sh')) {
       ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
     } else if (process.platform === 'win32') {
-      ctx.serverProcess = spawn('cmd.exe', ['/d', '/c', info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false, env });
+      const scriptCmd = info.launchScript.includes(' ') ? `"${info.launchScript}"` : info.launchScript;
+      ctx.serverProcess = spawn('cmd.exe', ['/d', '/c', scriptCmd, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false, env });
     } else {
       ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
     }

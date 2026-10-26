@@ -132,12 +132,18 @@ async function extractArchive(archivePath, destDir) {
   // Expand-Archive already blocks traversal itself, but this makes the two platforms behave the
   // same and fails with a clear message instead of a partial extract.
   const { isSafeArchiveEntry } = require('../validate.js');
+  let entries = null;
   try {
     const list = await runPowerShell(`Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::OpenRead(${psQuote(archivePath)}).Entries | ForEach-Object { $_.FullName }`, 30000);
-    const entries = (list.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    const bad = entries.find(e => !isSafeArchiveEntry(e));
-    if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
-  } catch {}
+    if (list && list.ok) {
+      entries = (list.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    }
+  } catch {
+    entries = null;
+  }
+  if (!entries) return { ok: false, error: 'Could not read the archive to verify it is safe (unsupported or corrupt format) — extraction stopped.' };
+  const bad = entries.find(e => !isSafeArchiveEntry(e));
+  if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
   const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(archivePath)} -DestinationPath ${psQuote(destDir)} -Force`, 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive.' };
 }

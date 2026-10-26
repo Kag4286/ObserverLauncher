@@ -10,6 +10,25 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.1.7] — 2026-10-26
+
+**Smart JVM optimization engine for Java 21/25 and modded workloads, Java version mismatch doctor (class file version 69.0 / Java 25 detection), fail-closed Windows archive security, space-safe launch scripts, and marketplace progress polish.**
+
+### Added: Smart JVM Tuning Engine (`src/renderer/js/00-core.js`, `src/renderer/js/08-shell.js`)
+- Added `shenandoahFlags` preset for ultra-low pause garbage collection on modded servers.
+- Updated `zgcFlags` to detect Java 25+ / 23+ and omit `-XX:+ZGenerational`, avoiding obsolete option warnings or errors on modern runtimes.
+- Added pure helper `recommendJvmPreset` and interactive "Auto pick" chip in Settings to recommend optimal JVM flags based on installed Java runtime, allocated RAM, and modded loader status.
+
+### Added: Intelligent Java Version Mismatch Doctor (`src/mcp/doctor.js`, `src/renderer/js/08-shell.js`)
+- Enhanced `classifyCrash` to parse bytecode class file versions (`69.0` -> Java 25 / Minecraft 26.x, `65.0` -> Java 21, `61.0` -> Java 17, `52.0` -> Java 8).
+- Added contextual hints and direct "Open Settings > Java" action button in the console crash panel for immediate resolution.
+
+### Fixed: Windows Archive Security & Process Launching
+- Hardened `extractArchive` in `src/main/platform/win32.js` to fail-closed on corrupt or unreadable archives, eliminating parity gaps with Linux Zip-Slip validation.
+- Wrapped `info.launchScript` in `src/main/server-lifecycle.js` with quotes when running under Windows `cmd.exe /d /c` to support paths with whitespace.
+- Polished single file download progress feedback in `src/renderer/js/05-marketplace.js` when Content-Length is chunked or undefined.
+- Synchronized all 5 new localization keys across 7 locale files (1290 keys complete).
+
 ## [6.1.6] — 2026-10-26
 
 **Deep MCP modpack conflict & mod compatibility engine upgrade, cross-patch compatibility bridges (1.16.4/1.16.5, 1.20/1.20.1), authoritative descriptor parsing (mods.toml, fabric.mod.json, mcmod.info), and duplicate modId detection.**

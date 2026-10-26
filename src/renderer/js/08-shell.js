@@ -800,12 +800,34 @@ function applyJvmPreset(name){
   const fn=JVM_PRESETS[String(name||'').toLowerCase()];
   if(typeof fn!=='function'||!$('#jvmArgsInput'))return false;
   const min=Number($('#memoryMinInput')?.value)||2, max=Number($('#memoryMaxInput')?.value)||6;
-  $('#jvmArgsInput').value=fn(min,max);
+  const jv=state.java?.major||state.javaRequired||17;
+  $('#jvmArgsInput').value=fn(min,max,jv);
   try{ renderJvmPreview(); }catch{}
   return true;
 }
-$('#jvmPresetRow')?.addEventListener('click',e=>{const b=e.target.closest('[data-jvm-preset]');if(!b)return;applyJvmPreset(b.dataset.jvmPreset);toast(t('set.presetFilled',{n:t('set.preset.'+b.dataset.jvmPreset)}))});
-$('#jvmPresetHelp')?.addEventListener('click',()=>{toast(t('set.presetHelp.aikar'),undefined);setTimeout(()=>toast(t('set.presetHelp.zgc')),2500);setTimeout(()=>toast(t('set.presetHelp.g1')),5000);});
+$('#jvmPresetRow')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-jvm-preset]');
+  if(b){
+    applyJvmPreset(b.dataset.jvmPreset);
+    toast(t('set.presetFilled',{n:t('set.preset.'+b.dataset.jvmPreset)}));
+    return;
+  }
+  const smart=e.target.closest('#smartJvmBtn');
+  if(smart){
+    const min=Number($('#memoryMinInput')?.value)||2, max=Number($('#memoryMaxInput')?.value)||6;
+    const jv=state.java?.major||state.javaRequired||17;
+    const isModded=!!(state.files?.target?.loader && state.files.target.loader!=='vanilla');
+    const pick=recommendJvmPreset({ maxGB: max, javaVersion: jv, isModded });
+    applyJvmPreset(pick);
+    toast(t('set.presetSmartToast',{n:t('set.preset.'+pick),v:jv,r:max}),'success');
+  }
+});
+$('#jvmPresetHelp')?.addEventListener('click',()=>{
+  toast(t('set.presetHelp.aikar'),undefined);
+  setTimeout(()=>toast(t('set.presetHelp.zgc')),2500);
+  setTimeout(()=>toast(t('set.presetHelp.shenandoah')),5000);
+  setTimeout(()=>toast(t('set.presetHelp.g1')),7500);
+});
 $('#applyAikarFlags').onclick=()=>{applyJvmPreset('aikar');toast(t('set.aikarFilled'))};
 $('#showWelcomeAgain').onclick=()=>showOnboarding();
 
@@ -855,8 +877,18 @@ window.observer.onCrashAnalysis?.(a=>{
   const cc=$('#crashCat'); if(cc) cc.innerHTML=`<span class="crash-badge ${cat==='unknown'?'warn':'bad'}">${esc(catLabel)}</span><span class="text-muted">${esc(a.confidence||'')}${a.description?' · '+esc(a.description):''}${a.version?' · MC '+esc(a.version):''}</span>`;
   const hints=$('#crashHints'); if(hints) hints.innerHTML=(a.hints||[]).map(h=>`<li>${esc(h)}</li>`).join('');
   const stack=$('#crashStack'); if(stack) stack.textContent=(a.cause||[]).join('\n');
+  const act=$('#crashActions');
+  if(act){
+    act.hidden = (cat !== 'java-version' && !a.action);
+  }
   panel.hidden=false;
   try{ switchTab('console'); }catch{}
+});
+$('#crashFixJavaBtn')?.addEventListener('click',()=>{
+  try{
+    switchTab('settings');
+    $('#javaPathInput')?.focus();
+  }catch{}
 });
 $('#crashClose')?.addEventListener('click',()=>{const p=$('#crashPanel');if(p)p.hidden=true});
 try{window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{})}catch{}

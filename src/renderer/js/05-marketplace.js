@@ -582,9 +582,15 @@ window.observer.onMarketProgress(p=>{
   if(p.phase==='pack'||(p.phase==='file'&&!p.index)){
     // single archive / single file download — bytes only
     $('#imPhase').textContent=t('im.downloading');
-    const pct=p.total?Math.min(100,Math.round(p.received/p.total*100)):0;
-    $('#imBar').style.width=pct+'%';
-    $('#imBarLabel').textContent=`${p.name} — ${imFmtBytes(p.received)} / ${imFmtBytes(p.total)} (${pct}%)`;
+    if(p.total){
+      const pct=Math.min(100,Math.round(p.received/p.total*100));
+      $('#imBar').classList.remove('indeterminate');
+      $('#imBar').style.width=pct+'%';
+      $('#imBarLabel').textContent=`${p.name} — ${imFmtBytes(p.received)} / ${imFmtBytes(p.total)} (${pct}%)`;
+    }else{
+      $('#imBar').classList.add('indeterminate');
+      $('#imBarLabel').textContent=`${p.name} — ${imFmtBytes(p.received)}`;
+    }
     return;
   }
   if(p.phase==='modpack'){

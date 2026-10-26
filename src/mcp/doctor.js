@@ -169,7 +169,40 @@ function classifyCrash(text) {
     if (m) {
       // Confidence: a dedicated marker (OOM / mixin / bind) is high; a broad token (NoClassDefFoundError) is medium.
       const strong = ['out-of-memory', 'mixin-conflict', 'port-conflict', 'corrupt-jar', 'java-version'].includes(rule.category);
-      return { category: rule.category, confidence: strong ? 'high' : 'medium', hints: rule.hints };
+      let hints = rule.hints;
+      let detail = null;
+      let action = null;
+      if (rule.category === 'java-version') {
+        const classVerMatch = s.match(/class file version (\d+(?:\.\d+)?)/i);
+        const upToMatch = s.match(/only recognizes class file versions up to (\d+(?:\.\d+)?)/i);
+        const reqJavaMatch = s.match(/requires Java (\d+)/i);
+        if (classVerMatch) {
+          const major = Math.floor(parseFloat(classVerMatch[1]));
+          const reqJava = major >= 45 ? (major - 44) : null;
+          let curJava = null;
+          if (upToMatch) {
+            const upMajor = Math.floor(parseFloat(upToMatch[1]));
+            curJava = upMajor >= 45 ? (upMajor - 44) : null;
+          }
+          if (reqJava) {
+            const mcHint = reqJava === 25 ? 'Minecraft 26.x requires Java 25.' : (reqJava === 21 ? 'Minecraft 1.20.5+ / 1.21.x requires Java 21.' : (reqJava === 17 ? 'Minecraft 1.18 - 1.20.4 requires Java 17.' : ''));
+            detail = `Requires Java ${reqJava}${curJava ? ` (detected Java ${curJava})` : ''}.${mcHint ? ` ${mcHint}` : ''}`;
+            hints = [
+              detail,
+              `Open Settings > Java and select or install Java ${reqJava}.`,
+            ];
+            action = { type: 'open_settings_java', javaRequired: reqJava };
+          }
+        } else if (reqJavaMatch) {
+          const req = reqJavaMatch[1];
+          hints = [
+            `The server explicitly requires Java ${req}+.`,
+            `Open Settings > Java and select or install Java ${req}.`,
+          ];
+          action = { type: 'open_settings_java', javaRequired: Number(req) };
+        }
+      }
+      return { category: rule.category, confidence: strong ? 'high' : 'medium', hints, ...(detail ? { description: detail } : {}), ...(action ? { action } : {}) };
     }
   }
   return { category: 'unknown', confidence: 'low', hints: ['No known crash signature matched. Read the crash report and the server log for the first real cause.'] };

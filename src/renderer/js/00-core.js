@@ -146,13 +146,27 @@ function renderMotdPreview(text){
   }
   return out;
 }
-// v6.0.0 G3: JVM argument presets. PURE (min/max GB in, arg string out) so they are unit-tested in
+// v6.0.0 G3 + v6.1.7: JVM argument presets. PURE (min/max GB in, arg string out) so they are unit-tested in
 // 00-core; 08-shell.js wires them to the input + toast. Aikar's flags are the default recommendation
-// for Paper/Purpur; ZGC suits very large heaps on Java 21+; G1-tuned is a lighter alternative.
+// for Paper/Purpur; ZGC suits very large heaps on Java 21+ and 25; Shenandoah suits modded servers; G1-tuned is a lighter alternative.
 function aikarFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Dusing.aikars.flags=https://mcflags.emc.gs -Dfile.encoding=UTF-8`}
-function zgcFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseZGC -XX:+ZGenerational -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -Dfile.encoding=UTF-8`}
+function zgcFlags(minGB,maxGB,javaVersion){
+  const gen=(javaVersion&&Number(javaVersion)>=23)?'':' -XX:+ZGenerational';
+  return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseZGC${gen} -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -Dfile.encoding=UTF-8`;
+}
+function shenandoahFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseShenandoahGC -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -Dfile.encoding=UTF-8`}
 function g1TunedFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=50 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=15 -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -Dfile.encoding=UTF-8`}
-const JVM_PRESETS={ aikar:aikarFlags, zgc:zgcFlags, g1:g1TunedFlags };
+const JVM_PRESETS={ aikar:aikarFlags, zgc:zgcFlags, shenandoah:shenandoahFlags, g1:g1TunedFlags };
+function recommendJvmPreset(opts){
+  const o=opts||{};
+  const max=Number(o.maxGB)||4;
+  const jv=Number(o.javaVersion)||17;
+  const modded=!!o.isModded;
+  if(jv>=21&&max>=10)return 'zgc';
+  if(modded&&max>=6&&jv>=17)return 'shenandoah';
+  if(max<4)return 'g1';
+  return 'aikar';
+}
 function friendlyError(msg){
   const m=String(msg==null?'':msg);
   for(const [re,key] of _ERR_MAP){ if(re.test(m)){ const s=t(key); if(s!==key) return s; } }

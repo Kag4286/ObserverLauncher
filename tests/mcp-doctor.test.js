@@ -119,6 +119,9 @@ ck('analyze budget stops early', capped.timedOut === true && (Date.now() - t0) <
 // ---- classifyCrash (C1) ----
 ck('OOM -> out-of-memory high', doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space').category === 'out-of-memory' && doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space').confidence === 'high');
 ck('UnsupportedClassVersion -> java-version', doctor.classifyCrash('java.lang.UnsupportedClassVersionError: class file version 65.0').category === 'java-version');
+const c69 = doctor.classifyCrash('UnsupportedClassVersionError: ... has been compiled by a more recent version of the Java Runtime (class file version 69.0), this version only recognizes class file versions up to 65.0');
+ck('class file 69.0 -> Java 25 hint', c69.hints[0].includes('Requires Java 25') && c69.hints[0].includes('detected Java 21') && c69.hints[0].includes('Minecraft 26.x'));
+ck('class file 69.0 -> action has javaRequired 25', c69.action && c69.action.javaRequired === 25);
 ck('mixin error -> mixin-conflict', doctor.classifyCrash('org.spongepowered.asm.mixin.MixinApplyError: Mixin failed to apply').category === 'mixin-conflict');
 ck('Missing deps -> mod-dependency', doctor.classifyCrash('Missing or unsupported mandatory dependencies: mod x requires y').category === 'mod-dependency');
 ck('NoClassDefFoundError -> mod-dependency medium', doctor.classifyCrash('java.lang.NoClassDefFoundError: net/foo/Bar').category === 'mod-dependency' && doctor.classifyCrash('java.lang.NoClassDefFoundError: net/foo/Bar').confidence === 'medium');
