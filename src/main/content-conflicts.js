@@ -8,6 +8,7 @@ const { serverFiles } = require('./server-files.js');
 const { detectServerTarget, LOADER_FAMILY } = require('./server-compat.js');
 const { readJsonList } = require('./fs-utils.js');
 const { missingDependencies, conflictingDependencies } = require('../mcp/modpack-plan.js');
+const { checkMcCompat } = require('./mc-compat.js');
 
 function safeClassify(folder, fileName) {
   try {
@@ -86,6 +87,24 @@ async function scanContentConflicts(root, options = {}) {
         type: 'client-only',
         detail: 'Client-only mod (has no server-side effect).'
       });
+    }
+
+    // v6.1.6: verify Minecraft version compatibility (respects cross-patch bridges).
+    // Authoritative metadata (mods.toml/fabric.mod.json/mcmod.info) is used for hard conflict errors;
+    // filename hints alone are not treated as hard conflicts.
+    if (server.mc) {
+      const mcCheck = checkMcCompat(server.mc, cls.mcVersionRange || cls.mcHint);
+      cls.mcCompatibility = mcCheck;
+      if (mcCheck.compatible === false && cls.mcSource === 'metadata') {
+        issues.push({
+          fileName: name,
+          kind: 'mod',
+          type: 'mc-incompatible',
+          declaredRange: cls.mcVersionRange,
+          serverMc: server.mc,
+          detail: mcCheck.note || `Incompatible with Minecraft ${server.mc}.`
+        });
+      }
     }
 
     for (const d of cls.dependencies || []) {

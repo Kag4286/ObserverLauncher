@@ -146,5 +146,36 @@ const { scanContentConflicts } = require('../src/main/content-conflicts.js');
     ok('client-only mod recognized', !!co && co.fileName === 'client-hud.jar');
   }
 
+  // 7. Cross-patch compatible mod (1.16.4 mod on 1.16.5 server) -> NO mc-incompatible issue
+  {
+    mockJars['appleskin-mc1.16.4.jar'] = {
+      'META-INF/mods.toml': 'modId="appleskin"\nversion="0.8.1"\n[[dependencies.appleskin]]\nmodId="minecraft"\nmandatory=true\nversionRange="[1.16.4, 1.16.5]"\n',
+    };
+
+    const res = await scanContentConflicts('/mock/root', {
+      files: { mods: ['appleskin-mc1.16.4.jar'], plugins: [] },
+      server: { mc: '1.16.5', loader: 'forge' },
+    });
+
+    ok('1.16.4 mod with [1.16.4, 1.16.5] range on 1.16.5 server has ok=true', res.ok === true);
+    ok('no mc-incompatible issue for 1.16.4 mod on 1.16.5 server', !res.issues.some(i => i.type === 'mc-incompatible'));
+  }
+
+  // 8. Incompatible mod (mod declares 1.18 on 1.20.1 server)
+  {
+    mockJars['old-mod-1.18.jar'] = {
+      'META-INF/mods.toml': 'modId="old_mod"\nversion="1.0"\n[[dependencies.old_mod]]\nmodId="minecraft"\nmandatory=true\nversionRange="[1.18, 1.19)"\n',
+    };
+
+    const res = await scanContentConflicts('/mock/root', {
+      files: { mods: ['old-mod-1.18.jar'], plugins: [] },
+      server: { mc: '1.20.1', loader: 'forge' },
+    });
+
+    ok('1.18 mod on 1.20.1 server reports ok=false', res.ok === false);
+    const mi = res.issues.find(i => i.type === 'mc-incompatible');
+    ok('mc-incompatible issue found', !!mi && mi.serverMc === '1.20.1');
+  }
+
   console.log(`\n${pass} passed, 0 failed`);
 })();

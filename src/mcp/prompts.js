@@ -80,15 +80,16 @@ const PROMPTS = [
   {
     name: 'audit_mods',
     title: 'Audit installed mods/plugins',
-    description: 'Scan installed content for wrong-loader jars, missing dependencies and conflicts.',
+    description: 'Scan installed content for wrong-loader jars, Minecraft version incompatibilities, missing dependencies, duplicates, and conflicts.',
     arguments: [],
     build: () => userMsg([
       'Audit my installed mods and plugins for problems.',
       'Steps:',
       '1. Call list_content and check_mod_compat.',
-      '2. Group the findings: wrong loader, client-only mods, missing required dependencies, declared conflicts.',
-      '3. For each problem, name the file and the concrete fix (install dependency X, remove Y, disable Z).',
-      '4. Offer to fix what is safe (toggle_content / install_from_market) and wait for confirmation.',
+      '2. Inspect authoritative metadata (mcRange, mcStatus, mcNote) rather than guessing from filenames (e.g. a 1.16.4 file on a 1.16.5 server with cross-patch compatibility is safe).',
+      '3. Group the findings: wrong loader, Minecraft incompatibilities, duplicate modIds, client-only mods, missing required dependencies, declared conflicts.',
+      '4. For each problem, name the file and the concrete fix (install dependency X, remove duplicate Y, disable Z).',
+      '5. Offer to fix what is safe (toggle_content / install_from_market) and wait for confirmation.',
     ].join('\n')),
   },
   {

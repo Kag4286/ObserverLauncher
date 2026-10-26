@@ -23,6 +23,7 @@ const { detectServerTarget, versionMatchesServer } = require('../main/server-com
 const { compareVersions, isComparableVersion } = require('../main/version-compare.js');
 const { openJar } = require('../main/jar-read.js');
 const { classifyJar } = require('../main/mod-metadata.js');
+const { checkMcCompat } = require('../main/mc-compat.js');
 const repair = require('./repair.js');
 
 const ok = r => (r && typeof r === 'object' && 'ok' in r) ? r : { ok: true, result: r };
@@ -104,10 +105,20 @@ async function tListContent(ctx) {
     try {
       const jar = openJar(path.join(root, folder, name));
       const cls = classifyJar(jar.read, name);
+      if (cls.modId) row.modId = cls.modId;
       if (cls.loader) row.loader = cls.loader;
       // CB3 (v3.3.0): surface the declared name + version so the AI/user sees real versions.
       if (cls.version) row.version = cls.version;
       if (cls.name) row.name = cls.name;
+      // v6.1.6: surface authoritative Minecraft version range + compatibility so AI never guesses from filename
+      if (cls.mcVersionRange) row.mcVersionRange = cls.mcVersionRange;
+      if (cls.mcSource) row.mcSource = cls.mcSource;
+      if (server.mc) {
+        const mcCheck = checkMcCompat(server.mc, cls.mcVersionRange || cls.mcHint);
+        row.mcCompatible = mcCheck.compatible;
+        row.mcStatus = mcCheck.status;
+        row.mcNote = mcCheck.note;
+      }
       // Priority: authoritative env (Fabric metadata) > Modrinth env from the install manifest >
       // weak jar hint (displayTest). A hint-only value is marked so callers know it may be wrong.
       let env = cls.env || manifestEnv[String(name).toLowerCase()] || null;
@@ -121,8 +132,8 @@ async function tListContent(ctx) {
   });
   return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, plugins: f.plugins || [], mods: flagJars(f.mods, 'mods'), datapacks: f.datapacks || [], datapackFolder: f.datapackFolder || null } };
 }
-// 2.3.0: pre-start compatibility scan of mods/ + plugins/. Reports loader mismatches, missing
-// required dependencies (from each jar's own metadata), and client-only mods. Read-only.
+// 2.3.0 / 6.1.6: pre-start compatibility scan of mods/ + plugins/. Reports loader mismatches, missing
+// required dependencies (from each jar's own metadata), Minecraft version conflicts, duplicate modIds, and client-only mods.
 async function tCheckModCompat(ctx) {
   const root = needPath(ctx);
   const f = serverFiles(root);
@@ -130,6 +141,7 @@ async function tCheckModCompat(ctx) {
   const families = LOADER_FAMILY[server.loader] || [];
   const jarIssues = [];
   const present = new Set();
+  const idToFiles = new Map();
   // env fallback from the install manifest (NeoForge jars carry no static side field).
   const manifestEnv = {};
   try { for (const e of readJsonList(root, 'observerlauncher-manifest.json')) { if (e && e.fileName && e.env) manifestEnv[String(e.fileName).toLowerCase()] = e.env; } } catch {}
@@ -139,21 +151,83 @@ async function tCheckModCompat(ctx) {
     const cls = classifyJar(openJar(path.join(root, 'mods', name)).read, name);
     if (!cls.env) cls.env = manifestEnv[String(name).toLowerCase()] || cls.envHint || null;
     metas.push({ name, cls });
-    if (cls.modId) present.add(String(cls.modId).toLowerCase());
+    if (cls.modId) {
+      const mid = String(cls.modId).toLowerCase();
+      present.add(mid);
+      if (!idToFiles.has(mid)) idToFiles.set(mid, []);
+      idToFiles.get(mid).push(name);
+    }
   }
+
+  // Check duplicate modIds (crashes Forge on startup)
+  const duplicates = [];
+  for (const [mid, files] of idToFiles.entries()) {
+    if (files.length > 1) {
+      duplicates.push({ modId: mid, files });
+      for (const fn of files) {
+        jarIssues.push({ name: fn, modId: mid, problem: 'duplicate', detail: `Duplicate modId "${mid}" found in multiple jars: ${files.join(', ')}` });
+      }
+    }
+  }
+
   const declared = [];
+  const modsDetail = [];
   for (const m of metas) {
+    const mcCheck = checkMcCompat(server.mc, m.cls.mcVersionRange || m.cls.mcHint);
     const row = { name: m.name, loader: m.cls.loader || null, modId: m.cls.modId || null };
     if (m.cls.loader && !m.cls.loaderGuessed && families.length && !families.includes(m.cls.loader)) { row.problem = 'loader-mismatch'; row.detail = `declares ${m.cls.loader}, server is ${server.loader}`; }
     if (m.cls.env === 'client-only') { row.problem = row.problem || 'client-only'; row.detail = row.detail || 'client-only mod (no server effect)'; }
+    if (server.mc && mcCheck.compatible === false) {
+      row.problem = row.problem || 'mc-incompatible';
+      row.detail = row.detail || mcCheck.note;
+    }
     // Collect ALL declared deps (required AND incompatible) so both checks can use them.
     for (const d of m.cls.dependencies || []) { declared.push({ from: m.cls.modId || m.name, modId: d.modId, mandatory: !!d.mandatory, optional: !!d.optional, incompatible: !!d.incompatible, reason: d.reason || null, versionRange: d.versionRange }); }
-    jarIssues.push(row);
+    if (row.problem) jarIssues.push(row);
+
+    modsDetail.push({
+      file: m.name,
+      modId: m.cls.modId || null,
+      title: m.cls.name || m.cls.modId || m.name,
+      version: m.cls.version || null,
+      loader: m.cls.loader || null,
+      mcRange: m.cls.mcVersionRange || m.cls.mcHint || null,
+      mcSource: m.cls.mcSource || null,
+      mcCompatible: mcCheck.compatible,
+      mcStatus: mcCheck.status,
+      note: mcCheck.note,
+    });
   }
   const missing = missingDependencies(declared, present);
   // v2.3.1: a declared `type="incompatible"` dep that IS present is a CONFLICT, not a missing dep.
   const conflicts = conflictingDependencies(declared, present);
-  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, modsScanned: metas.length, issues: jarIssues.filter(r => r.problem), missingDeps: missing, conflicts, ok: jarIssues.every(r => !r.problem) && missing.length === 0 && conflicts.length === 0 } };
+  const mcSummary = {
+    scanned: metas.length,
+    compatible: modsDetail.filter(m => m.mcCompatible).length,
+    crossPatch: modsDetail.filter(m => m.mcStatus === 'cross-patch').length,
+    incompatible: modsDetail.filter(m => m.mcCompatible === false).length,
+    unknown: modsDetail.filter(m => m.mcStatus === 'unknown').length,
+  };
+  const isHealthy = jarIssues.length === 0 && missing.length === 0 && conflicts.length === 0;
+  return {
+    ok: true,
+    result: {
+      server: { mc: server.mc, loader: server.loader },
+      modsScanned: metas.length,
+      issues: jarIssues,
+      missingDeps: missing,
+      conflicts,
+      duplicates,
+      mcSummary,
+      mods: modsDetail,
+      ok: isHealthy,
+      note: !isHealthy
+        ? 'Issues detected in installed mods. Review "issues", "missingDeps", or "conflicts".'
+        : (mcSummary.crossPatch > 0
+            ? `All ${metas.length} mods compatible. Note: ${mcSummary.crossPatch} mod(s) use cross-patch compatibility (e.g. 1.16.4 on 1.16.5) and run safely.`
+            : `All ${metas.length} mods compatible with server loader (${server.loader}) and Minecraft (${server.mc || 'any'}).`)
+    }
+  };
 }
 // 2.3.0: dedicated crash-report reader (path confined to crash-reports/) so the AI does not have to
 // route through the general file reader, which is rooted at the project, not the server folder.
@@ -1266,7 +1340,7 @@ const TOOLS = [
   { name: 'check_updates', risk: 'read', description: 'Check the install manifest against the registry for newer builds of installed plugins/mods. Read-only.', inputSchema: S(), handler: tCheckUpdates },
   { name: 'update_content', risk: 'write', description: 'Install newer builds over installed plugins/mods (backs up the replaced file). Pass names[] to limit to specific files; omit to update everything with an update. Pass version to also move to a new Minecraft version. One confirmation for the batch.', inputSchema: S({ names: { type: 'array', items: { type: 'string' }, description: 'file names to update (optional, default all)' }, version: STR('target Minecraft version, e.g. 1.21.4 (optional; default = the version each item was installed for)') }), handler: tUpdateContent },
   { name: 'rollback_content_update', risk: 'write', description: 'Roll back the most recent content update batch (or a specific sessionId) using the automated backups. Refuses while the server runs.', inputSchema: S({ sessionId: STR('update session id to roll back (optional; default = the most recent pending or active update session)') }), handler: tRollbackContentUpdate },
-  { name: 'check_mod_compat', risk: 'read', description: 'Pre-start scan of mods/: reports jars for the wrong loader, client-only mods, MISSING required dependencies (read from each jar metadata, incl. non-registry deps), and CONFLICTS (a declared type="incompatible" mod that is installed). Run before start_server to catch the crash chain early.', inputSchema: S(), handler: tCheckModCompat },
+  { name: 'check_mod_compat', risk: 'read', description: 'Pre-start scan of mods/: reports wrong-loader jars, Minecraft version incompatibilities (evaluating authoritative metadata and cross-patch bridges), duplicate modIds, client-only mods, MISSING required dependencies, and CONFLICTS. Run before start_server to catch crashes early.', inputSchema: S(), handler: tCheckModCompat },
   { name: 'read_crash_report', risk: 'read', description: 'Read a crash-report from crash-reports/ (default newest; pass name). Path is confined to the server folder (unlike read_file, which is rooted at the project).', inputSchema: S({ name: STR('crash report file name (optional, default newest)') }), handler: tReadCrashReport },
   { name: 'get_properties', risk: 'read', description: 'Parsed server.properties.', inputSchema: S(), handler: tGetProperties },
   { name: 'get_raw_properties', risk: 'read', description: 'Raw velocity.toml content.', inputSchema: S(), handler: tGetRawProperties },
