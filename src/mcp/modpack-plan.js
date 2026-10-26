@@ -11,6 +11,7 @@ const path = require('path');
 // LOADER_FAMILY is defined ONCE in server-compat.js (the single source of truth for loader/MC
 // rules) and re-exported here so the two copies cannot drift (gotcha #20).
 const { LOADER_FAMILY } = require('../main/server-compat.js');
+const { areMcVersionsCompatible } = require('../main/mc-compat.js');
 
 // Where a given kind installs, relative to the server root. Mirrors the mapping the GUI
 // (marketplace.js market:install) and the MCP install tools already use, so nothing drifts.
@@ -28,8 +29,10 @@ function itemCompat(item, server) {
   const warnings = [];
   const srv = server || {};
   const it = item || {};
-  // MC version mismatch: only when BOTH sides are known (unknown is not a warning).
-  if (srv.mc && Array.isArray(it.gameVersions) && it.gameVersions.length && !it.gameVersions.includes(srv.mc)) warnings.push('mc');
+  // MC version mismatch: only when BOTH sides are known (evaluates direct match + cross-patch bridges).
+  if (srv.mc && Array.isArray(it.gameVersions) && it.gameVersions.length) {
+    if (!areMcVersionsCompatible(srv.mc, it.gameVersions)) warnings.push('mc');
+  }
   // Loader mismatch: only meaningful for mod-like kinds and a known server loader.
   const fam = LOADER_FAMILY[srv.loader];
   if (fam && Array.isArray(it.loaders) && it.loaders.length) {

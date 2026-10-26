@@ -80,6 +80,8 @@ function parseTomlModInfo(toml) {
   const pick = re => { const m = text.match(re); return m ? m[1].replace(/^["']|["']$/g, '').trim() : null; };
   out.modId = pick(/modId\s*=\s*["']([^"']+)["']/i);
   out.version = pick(/version\s*=\s*["']([^"']+)["']/i);
+  // v6.1.6: ignore unexpanded Gradle tokens like "${file.jarVersion}" so version resolves from manifest/filename.
+  if (out.version && /^\$\{.*\}$/.test(out.version)) out.version = null;
   out.name = pick(/displayName\s*=\s*["']([^"']+)["']/i);
   return out;
 }
@@ -97,12 +99,49 @@ function parsePluginYml(yml) {
 }
 // CB3: Implementation-Title / Implementation-Version from a MANIFEST.MF.
 function parseManifestMf(mf) {
-  const out = { name: null, version: null };
+  const out = { name: null, version: null, mcVersionRange: null };
   const text = String(mf || '');
   const t = text.match(/^Implementation-Title\s*:\s*(.+)$/im);
   const v = text.match(/^Implementation-Version\s*:\s*(.+)$/im);
+  const mc = text.match(/^(?:Minecraft-Version|Specification-Version)\s*:\s*(.+)$/im);
   if (t) out.name = t[1].trim();
-  if (v) out.version = v[1].trim();
+  if (v) {
+    const val = v[1].trim();
+    if (!/^\$\{.*\}$/.test(val)) out.version = val;
+  }
+  if (mc) {
+    const mcv = mc[1].trim();
+    if (/\b1\.\d+/.test(mcv)) out.mcVersionRange = mcv;
+  }
+  return out;
+}
+
+// v6.1.6: Forge 1.7.10 - 1.12.2 legacy mod descriptor (mcmod.info JSON array or object).
+function parseMcModInfo(content) {
+  const out = { modId: null, name: null, version: null, mcVersionRange: null, dependencies: [] };
+  if (!content) return out;
+  try {
+    const data = typeof content === 'object' ? content : JSON.parse(content);
+    const list = Array.isArray(data) ? data : (Array.isArray(data.modList) ? data.modList : [data]);
+    const first = list[0] || {};
+    out.modId = first.modid || first.modId || null;
+    out.name = first.name || null;
+    let v = first.version || null;
+    if (v && /^\$\{.*\}$/.test(v)) v = null;
+    out.version = v;
+    out.mcVersionRange = first.mcversion || null;
+    const req = first.requiredMods || first.dependencies || [];
+    if (Array.isArray(req)) {
+      for (const r of req) {
+        if (typeof r === 'string') {
+          const id = r.replace(/@.*$/, '').trim();
+          if (id && !['minecraft', 'forge'].includes(id.toLowerCase())) {
+            out.dependencies.push({ modId: id, mandatory: true, versionRange: '*' });
+          }
+        }
+      }
+    }
+  } catch {}
   return out;
 }
 
@@ -168,9 +207,9 @@ function loaderFromFilename(name) {
 
 // Classify a jar by reading the entries it MIGHT have. `read` is a function (name) -> { ok, content }.
 // `fileName` (optional) is used only to derive a modId when the descriptor is unreadable/missing.
-// Returns { loader, env, modId, dependencies:[{modId, mandatory, versionRange}] } — loader null if unknown.
+// Returns { loader, env, modId, name, version, mcVersionRange, mcHint, mcSource, dependencies:[{modId, mandatory, versionRange}] }.
 function classifyJar(read, fileName) {
-  const out = { loader: null, env: null, envHint: null, modId: null, name: null, version: null, dependencies: [] };
+  const out = { loader: null, env: null, envHint: null, modId: null, name: null, version: null, mcVersionRange: null, mcHint: null, mcSource: null, dependencies: [] };
   const finish = () => {
     if (!out.modId) out.modId = modIdFromFilename(fileName);
     // loader from the FILE NAME is a guess (a jar may be multi-loader or misnamed), so flag it —
@@ -182,10 +221,20 @@ function classifyJar(read, fileName) {
       const yml = read('plugin.yml');
       if (yml && yml.ok) { const p = parsePluginYml(yml.content); out.name = out.name || p.name; out.version = out.version || p.version; }
     }
-    if (!out.version || !out.name) {
+    if (!out.version || !out.name || !out.mcVersionRange) {
       const mf = read('META-INF/MANIFEST.MF');
-      if (mf && mf.ok) { const p = parseManifestMf(mf.content); out.name = out.name || p.name; out.version = out.version || p.version; }
+      if (mf && mf.ok) {
+        const p = parseManifestMf(mf.content);
+        out.name = out.name || p.name;
+        out.version = out.version || p.version;
+        if (!out.mcVersionRange && p.mcVersionRange) out.mcVersionRange = p.mcVersionRange;
+      }
     }
+    // Filename hint as secondary fallback when jar metadata carries no explicit Minecraft version
+    const { mcFromName } = require('./server-compat.js');
+    const hint = mcFromName(fileName);
+    if (hint) out.mcHint = hint;
+    out.mcSource = out.mcVersionRange ? 'metadata' : (out.mcHint ? 'filename' : null);
     return out;
   };
   const neo = read('META-INF/neoforge.mods.toml');
@@ -197,6 +246,8 @@ function classifyJar(read, fileName) {
     if (ni.modId) out.modId = ni.modId;
     out.name = ni.name || null; out.version = ni.version || null;
     out.dependencies = parseTomlDependencies(neo.content);
+    const mcDep = out.dependencies.find(d => String(d.modId || '').toLowerCase() === 'minecraft');
+    if (mcDep && mcDep.versionRange) out.mcVersionRange = mcDep.versionRange;
     // displayTest is a WEAK side hint (it primarily controls the version-mismatch warning):
     //   IGNORE_SERVER_VERSION / IGNORE_ALL_VERSION -> the mod does not need to be on the server.
     // Stored as `envHint` (NOT authoritative `env`) so a real Modrinth/Fabric value always wins.
@@ -213,6 +264,8 @@ function classifyJar(read, fileName) {
     if (fi.modId) out.modId = fi.modId;
     out.name = fi.name || null; out.version = fi.version || null;
     out.dependencies = parseTomlDependencies(forge.content);
+    const mcDep = out.dependencies.find(d => String(d.modId || '').toLowerCase() === 'minecraft');
+    if (mcDep && mcDep.versionRange) out.mcVersionRange = mcDep.versionRange;
     return finish();
   }
   const fab = read('fabric.mod.json');
@@ -224,13 +277,31 @@ function classifyJar(read, fileName) {
       out.name = j.name || null; out.version = j.version || null;
       out.env = normalizeEnv(null, fabricEnv(j));
       out.dependencies = parseFabricDependencies(j);
+      if (j.depends && j.depends.minecraft) {
+        const mc = j.depends.minecraft;
+        out.mcVersionRange = Array.isArray(mc) ? mc.join(', ') : String(mc);
+      }
     } catch { /* malformed json -> keep empty deps */ }
     return finish();
   }
   // Quilt uses quilt.mod.json and is Fabric-compatible.
   const quilt = read('quilt.mod.json');
   if (quilt && quilt.ok) { out.loader = 'quilt'; return finish(); }
+
+  // v6.1.6: Forge 1.7.10 - 1.12.2 legacy mod descriptor (mcmod.info)
+  const mcinfo = read('mcmod.info');
+  if (mcinfo && mcinfo.ok) {
+    out.loader = 'forge';
+    const parsed = parseMcModInfo(mcinfo.content);
+    if (parsed.modId) out.modId = parsed.modId;
+    if (parsed.name) out.name = parsed.name;
+    if (parsed.version) out.version = parsed.version;
+    if (parsed.mcVersionRange) out.mcVersionRange = parsed.mcVersionRange;
+    if (parsed.dependencies.length) out.dependencies = parsed.dependencies;
+    return finish();
+  }
+
   return finish();
 }
 
-module.exports = { parseTomlDependencies, parseFabricDependencies, classifyJar, fabricEnv, normalizeEnv, modIdFromFilename, loaderFromFilename, parseTomlModInfo, parsePluginYml, parseManifestMf };
+module.exports = { parseTomlDependencies, parseFabricDependencies, classifyJar, fabricEnv, normalizeEnv, modIdFromFilename, loaderFromFilename, parseTomlModInfo, parsePluginYml, parseManifestMf, parseMcModInfo };

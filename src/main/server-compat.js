@@ -9,9 +9,15 @@ const fs = require('fs');
 const path = require('path');
 const { detectForgeMcVersion } = require('./server-java.js');
 
-// mcFromJar: pull a Minecraft version out of a jar/script filename (same shape modpacks.js used).
+// mcFromName: pull a Minecraft version out of a jar/script filename (same shape modpacks.js used).
 function mcFromName(name) {
-  const m = String(name || '').match(/\b(1\.\d{1,2}(?:\.\d{1,2})?|26\.\d{1,2})\b/);
+  const str = String(name || '');
+  // Explicit mc prefix first (e.g. "mod-mc1.16.4-1.0.jar" or "foo_mc1.21.1.jar")
+  const mcPrefixed = str.match(/(?:^|[^0-9a-z])mc[-_]?([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:[^0-9]|$)/i);
+  if (mcPrefixed) return mcPrefixed[1];
+  // Standard delimiter-bounded MC versions for modding are 1.7 through 1.29 (or 26.x NeoForge).
+  // Sub-1.7 versions (e.g. 1.0, 1.2, 1.5) in modern filenames are mod build numbers (e.g. "cloth-config-1.0.jar").
+  const m = str.match(/(?:^|[^0-9])(1\.(?:[7-9]|[1-2]\d)(?:\.\d{1,2})?|26\.\d{1,2})(?:[^0-9]|$)/);
   return m ? m[1] : null;
 }
 
@@ -61,12 +67,16 @@ const LOADER_FAMILY = {
   fabric: ['fabric', 'quilt'],
   quilt: ['fabric', 'quilt'],
 };
+const { areMcVersionsCompatible } = require('./mc-compat.js');
+
 function versionMatchesServer(dl, server) {
   const srv = server || {};
   const item = dl || {};
-  // MC mismatch (both known).
-  if (srv.mc && Array.isArray(item.gameVersions) && item.gameVersions.length && !item.gameVersions.includes(srv.mc)) {
-    return { ok: false, reason: 'mc' };
+  // MC mismatch (both known): evaluates direct match + cross-patch bridges (v6.1.6).
+  if (srv.mc && Array.isArray(item.gameVersions) && item.gameVersions.length) {
+    if (!areMcVersionsCompatible(srv.mc, item.gameVersions)) {
+      return { ok: false, reason: 'mc' };
+    }
   }
   // Loader mismatch: only mod-like loaders with a known family.
   const fam = LOADER_FAMILY[srv.loader];
