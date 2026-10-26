@@ -2,21 +2,27 @@
 
 User-facing release notes for each version of ObserverLauncher are published with every release and archived under the `docs/` directory.
 
-- Current Release: [ObserverLauncher 6.1.5](docs/release-6.1.5.md)
+- Current Release: [ObserverLauncher 6.1.6](docs/release-6.1.6.md)
 - Developer Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-## ObserverLauncher 6.1.5 (Latest)
+## ObserverLauncher 6.1.6 (Latest)
 
-ObserverLauncher 6.1.5 brings a major overhaul to the Player Inspector with cross-version save parsing (from legacy 1.12.2 up to modern 1.21+), an EULA-compliant hybrid texture pipeline, visual enchantment and durability indicators, inventory layout fixes, smart active server locking with visual build cards in the Marketplace, and optimized multi-version chunk caching on the World Map.
+ObserverLauncher 6.1.6 brings a deep upgrade to the Model Context Protocol (MCP) modpack inspection and conflict engine. It eliminates false-positive incompatibility reports on mods whose filenames indicate older versions (e.g. 1.16.4 on a 1.16.5 server) through cross-patch compatibility bridges, authoritative descriptor parsing (`mods.toml`, `fabric.mod.json`, and legacy `mcmod.info`), Maven and Semver range evaluation, and startup-critical duplicate `modId` detection.
 
 ### Key Highlights
 
-1. **Player Inspector Across All Versions:** Full compatibility with 1.12.2 legacy numeric IDs and NBT compounds up to modern 1.20.5+ item components.
-2. **EULA-Compliant Hybrid Texture Pipeline:** 4-tier resolution (local cache -> mod jars -> local client installation -> CDN fallback) with candidate mappings for blocks without 2D icons (pumpkins, buttons, crafting tables, stairs, etc.).
-3. **Equipment & Inventory Layout Polish:** Clean square tiles (48x48px), zero text overlap, no clipped lines, uniform 9-column inventory grid.
-4. **Marketplace Active Server Lock & Build Picker:** Automatic locking to active server loader/version, visual build cards with release channels (Release/Beta/Alpha), compatibility warnings, and content category filters.
-5. **World Map Caching & Multi-Version Terrain:** In-memory explored chunk caching with `mtime` invalidation for smooth panning, plus support for legacy 1.12, 1.16, and modern 1.18+ negative Y terrain and modded biomes.
+1. **Cross-Patch Compatibility Bridges:** Seamless evaluation of binary and network compatible sub-patches (1.16.4 <-> 1.16.5, 1.20 <-> 1.20.1, 1.19.1 <-> 1.19.2, etc.).
+2. **Authoritative Descriptor Extraction:** Reads true Minecraft compatibility ranges from `mods.toml`, `fabric.mod.json`, and legacy `mcmod.info` instead of relying on naive filename guesses.
+3. **Maven & Semver Range Support:** Full evaluation of interval brackets (`[1.16.4, 1.16.5]`, `[1.16.4, 1.17)`), semver (`>=1.16.4 <=1.16.5`, `~1.16.4`), and wildcards.
+4. **Enhanced MCP Tools (`check_mod_compat`, `list_content`):** Returns structured diagnostics (`mcSummary`, `mcStatus`, and explicit `note` explanations) so AI assistants never misdiagnose compatible mods.
+5. **Duplicate Mod Detection:** Scans for multiple jars sharing the same `modId` to catch startup crash loops before launch.
 
-For full release notes, please see [docs/release-6.1.5.md](docs/release-6.1.5.md).
+For full release notes, please see [docs/release-6.1.6.md](docs/release-6.1.6.md).
+
+---
+
+## Previous Releases
+
+- [ObserverLauncher 6.1.5](docs/release-6.1.5.md) — Cross-version Player Inspector (1.8–1.21+), EULA-compliant hybrid texture pipeline, layout fixes, marketplace active server lock, world map caching.

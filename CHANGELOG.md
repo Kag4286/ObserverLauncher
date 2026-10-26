@@ -10,6 +10,51 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.1.6] — 2026-10-26
+
+**Deep MCP modpack conflict & mod compatibility engine upgrade, cross-patch compatibility bridges (1.16.4/1.16.5, 1.20/1.20.1), authoritative descriptor parsing (mods.toml, fabric.mod.json, mcmod.info), and duplicate modId detection.**
+
+### Added: Minecraft Version Compatibility Engine (`src/main/mc-compat.js`)
+
+- Implemented cross-patch binary and network compatibility bridges (`MC_COMPAT_GROUPS`):
+  - `1.16.4` <-> `1.16.5` (zero protocol/bytecode changes; Forge loads 1.16.4 mods on 1.16.5 seamlessly).
+  - `1.20` <-> `1.20.1` (sub-patch compatibility).
+  - `1.19.1` <-> `1.19.2`, `1.18` <-> `1.18.1`, `1.15.1` <-> `1.15.2`, and `1.21` <-> `1.21.1`.
+- Built universal range parsing and evaluation (`testMcVersionAgainstRange`):
+  - Forge/Maven intervals: `[min, max]`, `[min, max)`, `[min,)`, `(,max]`, `[exact]`, and bare versions.
+  - Fabric/NPM semver: `>=min <=max`, `~version`, `^version`, and `*`.
+  - Multi-version lists and arrays.
+- Structured compatibility diagnostics (`checkMcCompat`):
+  - Returns `{ compatible: boolean, status: 'exact'|'range'|'cross-patch'|'incompatible'|'unknown', declaredRange, serverMc, note }`.
+  - Explicit human- and AI-readable notes explaining why a mod is compatible (e.g. `Mod declares range [1.16.4, 1.16.5]; server 1.16.5 satisfies declared range` or `1.16.4 is binary/network compatible with server 1.16.5`).
+
+### Upgraded: Mod Metadata Extraction (`src/main/mod-metadata.js`, `src/main/server-compat.js`)
+
+- Extracted authoritative Minecraft dependency ranges from descriptors:
+  - Forge/NeoForge `mods.toml`: parsed from `[[dependencies.<modId>]]` where `modId = "minecraft"`.
+  - Fabric `fabric.mod.json`: parsed from `depends.minecraft`.
+  - Legacy Forge 1.7.10–1.12.2: added `parseMcModInfo()` to read `mcmod.info` JSON (`modid`, `name`, `version`, `mcversion`, `requiredMods`).
+  - Added `mcSource` indicator (`'metadata'` vs `'filename'`) to distinguish authoritative jar descriptors from filename guesses.
+- Fixed unexpanded Gradle template tokens: `parseTomlModInfo()` now ignores `${file.jarVersion}` or `${version}`, allowing versions to resolve cleanly from `META-INF/MANIFEST.MF` or filenames.
+- Refined `mcFromName()` in `server-compat.js` to prioritize explicit `mc`-prefixed versions (e.g. `mod-mc1.16.4-1.0.jar` over build numbers like `1.0`), preventing mod versions from being misclassified as Minecraft 1.0.
+
+### Upgraded: MCP Tools for Modpack & Mod Inspection (`src/mcp/tools.js`, `src/mcp/modpack-plan.js`, `src/main/content-conflicts.js`)
+
+- **`list_content`:**
+  - Enriched mod items with `modId`, `mcVersionRange`, `mcSource`, `mcCompatible`, `mcStatus`, and `mcNote`.
+  - Exposes authoritative metadata directly to AI clients, eliminating hallucinations caused by mismatched filename tags.
+- **`check_mod_compat`:**
+  - Added Minecraft version compatibility verification against server target.
+  - Added duplicate `modId` detection (crashes Forge on startup) reported in `duplicates` and `issues`.
+  - Returns `mcSummary` (`scanned`, `compatible`, `crossPatch`, `incompatible`, `unknown`) and detailed per-mod `mods` breakdown.
+  - Clear top-level guidance note reassuring users and AI when cross-patch mods are safely active.
+- **`plan_modpack` & `versionMatchesServer`:**
+  - Upgraded from strict `includes()` to `areMcVersionsCompatible()`, allowing cross-patch compatible builds (e.g. 1.16.4 on 1.16.5) to be planned and installed without false rejection.
+- **`scanContentConflicts`:**
+  - Evaluates Minecraft version compatibility using authoritative metadata (`mcSource === 'metadata'`), preventing false conflict reports on benign filename differences.
+- **`prompts.js`:**
+  - Updated `audit_mods` prompt instructions to explicitly guide AI assistants to inspect `mcRange`, `mcStatus`, and `mcNote` instead of relying on filenames.
+
 ## [6.1.5] — 2026-10-25
 
 **Cross-version Player Inspector overhaul (1.8–1.21+), EULA-compliant 4-tier hybrid texture engine, inventory & equipment layout fix, marketplace active server locking, and world map optimizations.**
