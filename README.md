@@ -7,10 +7,17 @@
 **Host your own Minecraft: Java Edition server on Windows or Linux.**  
 No terminal, no monthly cloud bills, no accounts. Pick a folder, select a version, and press Start.
 
-[![Release](https://img.shields.io/github/v/release/Kag4286/ObserverLauncher?label=release)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
-[![Tests](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml/badge.svg)](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Kag4286/ObserverLauncher?style=flat-square&logo=github&color=347d39)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+[![Build & Tests](https://img.shields.io/github/actions/workflow/status/Kag4286/ObserverLauncher/test.yml?branch=main&label=tests&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/actions/workflows/test.yml)
+[![Status](https://img.shields.io/badge/status-active-success?style=flat-square&logo=git&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/pulse)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square&logo=apache)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows_%7C_Linux-2ea44f?style=flat-square&logo=windows&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+<br>
+[![Minecraft Support](https://img.shields.io/badge/Minecraft-1.8_%E2%86%92_26.x-brightgreen?style=flat-square&logo=minecraft&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
+[![Java Runtimes](https://img.shields.io/badge/Java-8_%7C_17_%7C_21_%7C_25-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
+[![MCP Ready](https://img.shields.io/badge/MCP-78_Tools_Ready-8A2BE2?style=flat-square&logo=anthropic&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#mcp--ai-integration)
+[![Zero Cloud](https://img.shields.io/badge/hosting-100%25_Local_%7C_No_Cloud-informational?style=flat-square)](https://github.com/Kag4286/ObserverLauncher)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-orange?style=flat-square&logo=github)](CONTRIBUTING.md)
 
 [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) &nbsp;·&nbsp; [Changelog](CHANGELOG.md) &nbsp;·&nbsp; [Contributing](CONTRIBUTING.md) &nbsp;·&nbsp; [Documentation](docs/)
 
