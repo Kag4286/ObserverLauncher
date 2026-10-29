@@ -27,9 +27,46 @@ jobs:
       - run: npm ci
 
       - name: Build and publish
-        run: npx electron-builder --publish always
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: "--no-network-family-autoselection"
+        run: |
+          success=0
+          for attempt in 1 2 3; do
+            echo "::group::Attempt $attempt: electron-builder --publish always"
+            if npx electron-builder --publish always; then
+              echo "electron-builder published successfully on attempt $attempt."
+              success=1
+              echo "::endgroup::"
+              break
+            else
+              echo "Attempt $attempt failed with exit code $?."
+              echo "::endgroup::"
+              if [ $attempt -lt 3 ]; then
+                echo "Waiting 15 seconds before retrying..."
+                sleep 15
+              fi
+            fi
+          done
+
+          if [ $success -ne 1 ]; then
+            echo "electron-builder publish failed. Checking if artifacts were built for fallback upload..."
+            shopt -s nullglob
+            files=(dist/ObserverLauncher*.* dist/latest*.yml)
+            if [ ${#files[@]} -gt 0 ]; then
+              echo "Artifacts found on disk: ${files[*]}"
+              echo "Ensuring draft release exists..."
+              gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
+                gh release create "${GITHUB_REF_NAME}" --draft --title "ObserverLauncher ${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" || true
+              echo "Uploading artifacts via gh release upload..."
+              gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --repo "${GITHUB_REPOSITORY}" --clobber
+              echo "Fallback upload succeeded."
+            else
+              echo "Error: electron-builder failed and no artifacts were generated in dist/."
+              exit 1
+            fi
+          fi
 
   # Attach the modpack artifact to the SAME release, AFTER the installers exist. This is a separate
   # job in the SAME workflow on purpose: a second workflow that also published on the tag raced

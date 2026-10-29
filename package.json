@@ -43,7 +43,8 @@
       {
         "provider": "github",
         "owner": "Kag4286",
-        "repo": "ObserverLauncher"
+        "repo": "ObserverLauncher",
+        "timeout": 600000
       }
     ],
     "win": {
