@@ -75,12 +75,13 @@ async function extractDatapack(root, name, opts) {
   const raw = String(name || '');
   if (!raw || path.basename(raw) !== raw) return { ok: false, error: 'Invalid file name.' };
   if (!/\.zip$/i.test(raw)) return { ok: false, error: 'Only a .zip datapack can be extracted.' };
+  const destName = raw.replace(/\.zip$/i, '');
+  if (!destName) return { ok: false, error: 'Invalid datapack name.' };
   let levelName = 'world';
   try { levelName = require('./server-files.js').serverFiles(root).properties['level-name'] || 'world'; } catch {}
   const folder = contentFolder('datapack', levelName);
   const zipAbs = safeTarget(root, path.join(folder, raw));
   if (!zipAbs || !fs.existsSync(zipAbs)) return { ok: false, error: 'Datapack .zip not found.' };
-  const destName = raw.replace(/\.zip$/i, '');
   const destAbs = safeTarget(root, path.join(folder, destName));
   if (!destAbs) return { ok: false, error: 'Unsafe destination path.' };
   if (fs.existsSync(destAbs)) return { ok: false, error: `A folder named ${destName} already exists.` };

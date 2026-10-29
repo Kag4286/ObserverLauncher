@@ -385,23 +385,289 @@ function renderPdEffects(effects){
   list.innerHTML=arr.map((e,i)=>`<div class="inv-row" style="animation-delay:${i*18}ms"><span class="slot">${esc((e.name||'?').replace(/^minecraft:/,''))}</span><span class="item-name">${esc(e.name||'')}</span><span class="count">${e.amplifier!==undefined?`Lv ${(e.amplifier||0)+1}`:''}${e.duration?` · ${Math.round(e.duration/20)}s`:''}</span></div>`).join('');
 }
 // v4.0.0: Stats tab — pulled from the world save stats (see backend). Hidden-friendly when missing.
-// v4.0.0: Stats tab. The saved stats JSON is {stats:{ 'minecraft:custom':{ 'minecraft:deaths':N, ... }}}.
-// We surface the 'custom' category (the human-interest numbers) as labelled rows; unknown keys get a
-// cleaned-up label. Playtime/deaths/kills/walk are highlighted first.
-const STAT_ORDER=['minecraft:play_time','minecraft:walk_one_cm','minecraft:deaths','minecraft:mob_kills','minecraft:player_kills','minecraft:jump','minecraft:damage_dealt','minecraft:blocks_mined'];
-function statLabel(k){return String(k).replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
-function fmtStat(k,v){
-  if(k==='minecraft:play_time'||k==='minecraft:play_one_minute') return `${Math.round((v/20)/60)} min`;
-  if(k==='minecraft:walk_one_cm'||k.endsWith('_one_cm')) return `${(v/100).toFixed(0)} m`;
+// v6.1.7: Stats tab rework — friendly labels, ticks/distance/damage formatters, category filtering & Hero KPIs.
+const STAT_FRIENDLY_NAMES = {
+  'minecraft:play_time': 'Total Playtime',
+  'minecraft:play_one_minute': 'Total Playtime',
+  'minecraft:total_world_time': 'Total World Time',
+  'minecraft:deaths': 'Deaths',
+  'minecraft:time_since_death': 'Time Since Death',
+  'minecraft:time_since_rest': 'Time Since Rest',
+  'minecraft:sleep_in_bed': 'Slept in Bed',
+  'minecraft:leave_game': 'Sessions Left',
+  'minecraft:eat_cake_slice': 'Cake Slices Eaten',
+  'minecraft:mob_kills': 'Mob Kills',
+  'minecraft:player_kills': 'Player Kills',
+  'minecraft:damage_dealt': 'Damage Dealt',
+  'minecraft:damage_taken': 'Damage Taken',
+  'minecraft:damage_blocked_by_shield': 'Damage Blocked (Shield)',
+  'minecraft:damage_resisted': 'Damage Resisted',
+  'minecraft:damage_absorbed': 'Damage Absorbed',
+  'minecraft:damage_dealt_absorbed': 'Damage Dealt (Absorbed)',
+  'minecraft:damage_dealt_resisted': 'Damage Dealt (Resisted)',
+  'minecraft:raid_trigger': 'Raids Triggered',
+  'minecraft:raid_win': 'Raids Won',
+  'minecraft:target_hit': 'Targets Hit',
+  'minecraft:walk_one_cm': 'Walking Distance',
+  'minecraft:sprint_one_cm': 'Sprinting Distance',
+  'minecraft:fly_one_cm': 'Flying Distance',
+  'minecraft:climb_one_cm': 'Climbing Distance',
+  'minecraft:crouch_one_cm': 'Crouching Distance',
+  'minecraft:swim_one_cm': 'Swimming Distance',
+  'minecraft:fall_one_cm': 'Fall Distance',
+  'minecraft:jump': 'Jumps',
+  'minecraft:sneak_time': 'Sneak Time',
+  'minecraft:boat_one_cm': 'Boat Distance',
+  'minecraft:horse_one_cm': 'Horse Distance',
+  'minecraft:aviate_one_cm': 'Elytra Distance',
+  'minecraft:pig_one_cm': 'Pig Distance',
+  'minecraft:strider_one_cm': 'Strider Distance',
+  'minecraft:minecart_one_cm': 'Minecart Distance',
+  'minecraft:walk_on_water_one_cm': 'Water Walk Distance',
+  'minecraft:walk_under_water_one_cm': 'Underwater Walk',
+  'minecraft:open_chest': 'Chests Opened',
+  'minecraft:open_enderchest': 'Ender Chests Opened',
+  'minecraft:open_shulker_box': 'Shulker Boxes Opened',
+  'minecraft:open_barrel': 'Barrels Opened',
+  'minecraft:interact_with_crafting_table': 'Crafting Table Used',
+  'minecraft:interact_with_furnace': 'Furnace Used',
+  'minecraft:interact_with_blast_furnace': 'Blast Furnace Used',
+  'minecraft:interact_with_smoker': 'Smoker Used',
+  'minecraft:interact_with_anvil': 'Anvil Used',
+  'minecraft:interact_with_grindstone': 'Grindstone Used',
+  'minecraft:interact_with_smithing_table': 'Smithing Table Used',
+  'minecraft:interact_with_loom': 'Loom Used',
+  'minecraft:interact_with_stonecutter': 'Stonecutter Used',
+  'minecraft:interact_with_brewingstand': 'Brewing Stand Used',
+  'minecraft:interact_with_beacon': 'Beacon Used',
+  'minecraft:interact_with_lectern': 'Lectern Used',
+  'minecraft:interact_with_campfire': 'Campfire Used',
+  'minecraft:talked_to_villager': 'Talked to Villagers',
+  'minecraft:traded_with_villager': 'Traded with Villagers',
+  'minecraft:drop': 'Items Dropped',
+  'minecraft:bell_ring': 'Bells Rung',
+  'minecraft:inspect_dispenser': 'Dispensers Inspected',
+  'minecraft:inspect_dropper': 'Droppers Inspected',
+  'minecraft:inspect_hopper': 'Hoppers Inspected',
+  'minecraft:play_record': 'Music Discs Played',
+  'minecraft:play_noteblock': 'Note Blocks Played',
+  'minecraft:tune_noteblock': 'Note Blocks Tuned',
+  'minecraft:pot_flower': 'Plants Potted',
+  'minecraft:trigger_trapped_chest': 'Trapped Chests Triggered',
+  'minecraft:clean_armor': 'Armor Washed',
+  'minecraft:clean_banner': 'Banners Washed',
+  'minecraft:clean_shulker_box': 'Shulker Boxes Washed',
+  'minecraft:waystone_activated': 'Waystones Activated'
+};
+
+const STAT_ORDER = [
+  'minecraft:play_time', 'minecraft:play_one_minute',
+  'minecraft:deaths', 'minecraft:mob_kills', 'minecraft:player_kills',
+  'minecraft:damage_dealt', 'minecraft:damage_taken', 'minecraft:damage_blocked_by_shield',
+  'minecraft:walk_one_cm', 'minecraft:sprint_one_cm', 'minecraft:fly_one_cm', 'minecraft:jump',
+  'minecraft:open_chest', 'minecraft:blocks_mined'
+];
+
+let currentPdStats = null;
+let pdStatsCat = 'all';
+let pdStatsSearchQuery = '';
+
+function friendlyStatName(k) {
+  if (STAT_FRIENDLY_NAMES[k]) return STAT_FRIENDLY_NAMES[k];
+  return String(k).replace(/^[a-z0-9_-]+:/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+function statLabel(k) { return friendlyStatName(k); }
+
+function getStatCategory(k) {
+  const raw = String(k).replace(/^[a-z0-9_-]+:/i, '');
+  if (/^(play_time|play_one_minute|total_world_time|deaths|time_since_death|time_since_rest|sleep_in_bed|leave_game|eat_cake_slice)$/.test(raw)) {
+    return 'survival';
+  }
+  if (/^(mob_kills|player_kills|damage_|killed_|raid_|target_hit)/.test(raw)) {
+    return 'combat';
+  }
+  if (/(_one_cm|jump|sneak_time|time_since_sneak|walk_|sprint_|fly_|swim_|climb_|fall_|crouch_|boat_|horse_|aviate_)/.test(raw)) {
+    return 'movement';
+  }
+  return 'interaction';
+}
+
+function formatTicks(ticks) {
+  if (typeof ticks !== 'number' || isNaN(ticks) || ticks < 0) return '0s';
+  const totalSec = Math.floor(ticks / 20);
+  if (totalSec < 60) return `${totalSec}s`;
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  if (mins < 60) return `${mins}m ${secs}s`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return `${hours}h ${remMins}m`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h`;
+}
+
+function formatDistance(cm) {
+  const m = (Number(cm) || 0) / 100;
+  if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
+  return `${Math.round(m).toLocaleString()} m`;
+}
+
+function fmtStat(k, v) {
+  const raw = String(k).replace(/^[a-z0-9_-]+:/i, '');
+  if (/^(play_time|play_one_minute|total_world_time|time_since_death|time_since_rest|sneak_time|time_since_sneak)$/.test(raw)) {
+    return formatTicks(v);
+  }
+  if (raw.endsWith('_one_cm')) {
+    return formatDistance(v);
+  }
+  if (typeof v === 'number') {
+    return v.toLocaleString();
+  }
   return String(v);
 }
-function renderPdStats(stats){
-  const g=$('#pdStatsGrid');if(!g)return;
-  const custom=(stats&&stats.stats&&stats.stats['minecraft:custom'])||null;
-  if(!custom||!Object.keys(custom).length){g.innerHTML=`<div class="inv-empty"><b>${esc(t('pd.noStats'))}</b><span>${esc(t('pd.noStatsSub'))}</span></div>`;return}
-  const keys=Object.keys(custom);
-  const ordered=[...STAT_ORDER.filter(k=>k in custom),...keys.filter(k=>!STAT_ORDER.includes(k))].slice(0,24);
-  g.innerHTML=ordered.map((k,i)=>`<div class="pd-stat" style="animation-delay:${i*20}ms"><span>${esc(statLabel(k))}</span><b>${esc(fmtStat(k,custom[k]))}</b></div>`).join('');
+
+function renderPdHeroKpis(custom) {
+  const heroEl = $('#pdStatsHero');
+  if (!heroEl) return;
+  if (!custom || !Object.keys(custom).length) {
+    heroEl.hidden = true;
+    return;
+  }
+  heroEl.hidden = false;
+
+  // 1. Playtime
+  const playTicks = custom['minecraft:play_time'] ?? custom['minecraft:play_one_minute'] ?? 0;
+  const sessions = custom['minecraft:leave_game'] || 0;
+  const ptEl = $('#pdHeroPlaytime'); if (ptEl) ptEl.textContent = formatTicks(playTicks);
+  const ptSub = $('#pdHeroPlaytimeSub'); if (ptSub) ptSub.textContent = `${sessions.toLocaleString()} ${sessions === 1 ? 'session' : 'sessions'}`;
+
+  // 2. Combat & K/D
+  const mobKills = custom['minecraft:mob_kills'] || 0;
+  const playerKills = custom['minecraft:player_kills'] || 0;
+  const totalKills = mobKills + playerKills;
+  const deaths = custom['minecraft:deaths'] || 0;
+  const kd = deaths === 0 ? (totalKills > 0 ? '∞' : '0.0') : (totalKills / deaths).toFixed(1);
+  const kdEl = $('#pdHeroKd'); if (kdEl) kdEl.textContent = `K/D ${kd}`;
+  const kdSub = $('#pdHeroCombatSub'); if (kdSub) kdSub.textContent = `${totalKills.toLocaleString()} kills · ${deaths.toLocaleString()} deaths`;
+
+  // 3. Travel
+  let travelCm = 0;
+  for (const [k, v] of Object.entries(custom)) {
+    if (k.endsWith('_one_cm') && typeof v === 'number') travelCm += v;
+  }
+  const walkCm = custom['minecraft:walk_one_cm'] || 0;
+  const sprintCm = custom['minecraft:sprint_one_cm'] || 0;
+  const trEl = $('#pdHeroTravel'); if (trEl) trEl.textContent = formatDistance(travelCm);
+  const trSub = $('#pdHeroTravelSub'); if (trSub) trSub.textContent = `${formatDistance(walkCm)} walk · ${formatDistance(sprintCm)} sprint`;
+
+  // 4. Damage
+  const dealt = custom['minecraft:damage_dealt'] || 0;
+  const taken = custom['minecraft:damage_taken'] || 0;
+  const blocked = custom['minecraft:damage_blocked_by_shield'] || 0;
+  const dmgEl = $('#pdHeroDamage'); if (dmgEl) dmgEl.textContent = dealt.toLocaleString();
+  const dmgSub = $('#pdHeroDamageSub'); if (dmgSub) dmgSub.textContent = `${taken.toLocaleString()} taken · ${blocked.toLocaleString()} blocked`;
+}
+
+function filterAndRenderStatsGrid() {
+  const g = $('#pdStatsGrid');
+  const toolbar = $('#pdStatsToolbar');
+  if (!g) return;
+
+  const custom = (currentPdStats && currentPdStats.stats && currentPdStats.stats['minecraft:custom']) || null;
+  if (!custom || !Object.keys(custom).length) {
+    if (toolbar) toolbar.hidden = true;
+    g.innerHTML = `<div class="inv-empty"><b>${esc(t('pd.noStats'))}</b><span>${esc(t('pd.noStatsSub'))}</span></div>`;
+    return;
+  }
+  if (toolbar) toolbar.hidden = false;
+
+  const allKeys = Object.keys(custom);
+  
+  // Category counts
+  const counts = { all: allKeys.length, survival: 0, combat: 0, movement: 0, interaction: 0 };
+  for (const k of allKeys) {
+    const cat = getStatCategory(k);
+    if (counts[cat] !== undefined) counts[cat]++;
+  }
+  const cAll = $('#pdCatCountAll'); if (cAll) cAll.textContent = counts.all;
+  const cSurv = $('#pdCatCountSurvival'); if (cSurv) cSurv.textContent = counts.survival;
+  const cComb = $('#pdCatCountCombat'); if (cComb) cComb.textContent = counts.combat;
+  const cMove = $('#pdCatCountMovement'); if (cMove) cMove.textContent = counts.movement;
+  const cInt = $('#pdCatCountInteraction'); if (cInt) cInt.textContent = counts.interaction;
+
+  // Filter by category
+  let filtered = allKeys;
+  if (pdStatsCat !== 'all') {
+    filtered = filtered.filter(k => getStatCategory(k) === pdStatsCat);
+  }
+
+  // Filter by search query
+  if (pdStatsSearchQuery) {
+    filtered = filtered.filter(k => {
+      const friendly = friendlyStatName(k).toLowerCase();
+      const raw = k.toLowerCase();
+      return friendly.includes(pdStatsSearchQuery) || raw.includes(pdStatsSearchQuery);
+    });
+  }
+
+  // Update counter
+  const cntEl = $('#pdStatsCount');
+  if (cntEl) {
+    if (filtered.length === allKeys.length) {
+      cntEl.textContent = t('pd.statsShowingCount', { n: allKeys.length });
+    } else {
+      cntEl.textContent = t('pd.statsShowingFiltered', { m: filtered.length, n: allKeys.length });
+    }
+  }
+
+  if (!filtered.length) {
+    g.innerHTML = `<div class="inv-empty"><b>${esc(t('pd.noStatsMatch'))}</b><span>${esc(t('pd.noStatsMatchSub'))}</span></div>`;
+    return;
+  }
+
+  // Sort: priority first, then alphabetically
+  filtered.sort((a, b) => {
+    const ia = STAT_ORDER.indexOf(a);
+    const ib = STAT_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return friendlyStatName(a).localeCompare(friendlyStatName(b));
+  });
+
+  g.innerHTML = filtered.map((k, i) => {
+    const v = custom[k];
+    const cat = getStatCategory(k);
+    const raw = String(k).replace(/^[a-z0-9_-]+:/i, '');
+    const isTime = /^(play_time|play_one_minute|total_world_time|time_since_death|time_since_rest|sneak_time|time_since_sneak)$/.test(raw);
+    const isDist = raw.endsWith('_one_cm');
+    const isDmg = raw.startsWith('damage_');
+    const extra = (isDmg && typeof v === 'number')
+      ? `<span class="pd-stat-extra"><svg class="pd-stat-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${(v / 2).toFixed(1)}</span>`
+      : '';
+    let tip = '';
+    if (isTime && typeof v === 'number') tip = `${v.toLocaleString()} ticks (${(v / 20).toFixed(1)}s)`;
+    else if (isDist && typeof v === 'number') tip = `${Math.round(v / 100).toLocaleString()} m (${v.toLocaleString()} cm)`;
+    else if (typeof v === 'number') tip = `${k}: ${v.toLocaleString()}`;
+
+    return `<div class="pd-stat cat-${cat}" style="animation-delay:${Math.min(i * 16, 280)}ms"${tip ? ` data-tip="${esc(tip)}"` : ''}>` +
+      `<div class="pd-stat-top">` +
+        `<span class="pd-stat-label">${esc(friendlyStatName(k))}</span>` +
+        `<span class="pd-stat-badge">${esc(cat.toUpperCase())}</span>` +
+      `</div>` +
+      `<div class="pd-stat-val-row">` +
+        `<b class="pd-stat-val">${esc(fmtStat(k, v))}</b>${extra}` +
+      `</div>` +
+    `</div>`;
+  }).join('');
+}
+
+function renderPdStats(stats) {
+  currentPdStats = stats;
+  const custom = (stats && stats.stats && stats.stats['minecraft:custom']) || null;
+  renderPdHeroKpis(custom);
+  filterAndRenderStatsGrid();
 }
 async function pdLiveAction(action){
   const name=selectedPlayer?.name;if(!name)return;
@@ -425,6 +691,17 @@ $('#pdPanelInventory')?.addEventListener('click',e=>{
   const item=(lastInspectData?.inventory||[]).find(x=>x.slot===slotNum)||
              (lastInspectData?.enderChest||[]).find(x=>x.slot===slotNum);
   if(item)showInvItemDetail(item);
+});
+$('#pdStatsChips')?.addEventListener('click', e => {
+  const chip = e.target.closest('.pd-stat-chip');
+  if (!chip || !chip.dataset.cat) return;
+  pdStatsCat = chip.dataset.cat;
+  $$('.pd-stat-chip').forEach(c => c.classList.toggle('is-active', c === chip));
+  filterAndRenderStatsGrid();
+});
+$('#pdStatsSearch')?.addEventListener('input', e => {
+  pdStatsSearchQuery = (e.target.value || '').trim().toLowerCase();
+  filterAndRenderStatsGrid();
 });
 
 // Build (or rebuild) the 3D model in the inspector. Extracted from openPlayerInspector so the
@@ -488,19 +765,18 @@ async function openPlayerInspector(uuid,name){
   const d=r.data;
   if(!d){$('#playerDataError').textContent=t('ply.corrupt');return}
 
-  // v6.0.0 Track B: Render 3D Player
-  let _skinDataUri = null;
-  _skinDataUri=await renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),uuid,name,d.armor);
-
   invSearchQuery='';ecSearchQuery='';invShowEmpty=true;ecShowEmpty=true;invSortBy='slot';ecSortBy='slot';
+  pdStatsCat='all';pdStatsSearchQuery='';
   const invS=$('#invSearch');if(invS)invS.value='';const ecS=$('#ecSearch');if(ecS)ecS.value='';
+  const pdS=$('#pdStatsSearch');if(pdS)pdS.value='';
+  $$('.pd-stat-chip').forEach(c=>c.classList.toggle('is-active',c.dataset.cat==='all'));
   const invCb=$('#invShowEmpty');if(invCb)invCb.checked=true;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=true;
   const invSel=$('#invSort');if(invSel)invSel.value='slot';const ecSel=$('#ecSort');if(ecSel)ecSel.value='slot';
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
   // BUGFIX: the header avatar used an external mc-heads.net URL, which shows a broken image when
   // offline or when that request is slow. Reuse the 8x8 face we already cached for the roster, then
   // the full skin data URI, then the local placeholder, so the header never shows a broken image.
-  $('#inspectAvatar').src = headAvatarCache[uuid] || _skinDataUri || playerInitialsAvatar(name);
+  $('#inspectAvatar').src = headAvatarCache[uuid] || playerInitialsAvatar(name);
   $('#inspectName').textContent=name;$('#inspectDim').textContent=d.dimension||t('ply.unknownDim');
   renderPdBadges(name);
   const posEl=$('#inspectPos');
@@ -513,6 +789,11 @@ async function openPlayerInspector(uuid,name){
   renderItemGrid('#hotbarList',d.inventory);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);
   renderPdEffects(d.effects);
   renderPdStats(d.stats);
+
+  // v6.0.0 Track B: Render 3D Player non-blockingly so slow skin fetches never stall data inspection
+  renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),uuid,name,d.armor).then(uri => {
+    if (uri && !headAvatarCache[uuid]) $('#inspectAvatar').src = uri;
+  }).catch(() => {});
 }
 // v6.0.0 Track B - B2: Leaderboard toggle
 // BUGFIX: the toggle added `primary` on top of `secondary`. Both rules have the same specificity

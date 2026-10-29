@@ -162,7 +162,7 @@ function serverFiles(root) {
 function detectSoftware(info) {
   const name = String(info.jar || info.launchScript || '');
   if (/velocity|bungee|waterfall/i.test(name)) return 'proxy';
-  if (/paper|purpur|leaf|folia/i.test(name)) return 'paper-like';
+  if (/paper|purpur|leaf|folia|spigot|bukkit|craftbukkit/i.test(name)) return 'paper-like';
   if (info.hasSpigotConfig) return 'paper-like';
   if (/forge|neoforge/i.test(name) || info.launchScript) return 'forge';
   if (/fabric|quilt/i.test(name)) return 'fabric';

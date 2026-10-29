@@ -185,6 +185,18 @@ async function scanContentConflicts(root, options = {}) {
     });
   }
 
+  const metadata = {};
+  for (const item of scanned) {
+    if (item.cls) {
+      metadata[item.name] = {
+        name: item.cls.name || null,
+        version: item.cls.version || null,
+        loader: item.cls.loader || null,
+        modId: item.cls.modId || null
+      };
+    }
+  }
+
   return {
     ok: issues.length === 0,
     server: { mc: server.mc, loader: server.loader },
@@ -192,7 +204,8 @@ async function scanContentConflicts(root, options = {}) {
     issues,
     duplicates,
     missingDependencies: missing,
-    conflicts
+    conflicts,
+    metadata
   };
 }
 

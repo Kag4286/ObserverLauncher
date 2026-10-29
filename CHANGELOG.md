@@ -10,9 +10,43 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
-## [6.1.7] — 2026-10-26
+## [6.1.7] — 2026-10-29
 
-**Smart JVM optimization engine for Java 21/25 and modded workloads, Java version mismatch doctor (class file version 69.0 / Java 25 detection), fail-closed Windows archive security, space-safe launch scripts, and marketplace progress polish.**
+**Full Settings & Content GUI/UX modernization, SSRF vulnerability mitigation & IPv6 defense-in-depth, Spigot/Bukkit loader auto-detection, Smart JVM optimization engine for Java 21/25, Java version mismatch doctor, animation flicker elimination, and hardened Windows archive security.**
+
+### Security: SSRF Hardening for Webhooks & Downloads (`src/main/validate.js`)
+- Hardened `isSafeDownloadUrl` against SSRF bypasses via IPv6 literals:
+  - Blocks unspecified IPv6 (`[::]`) and expanded loopback variants (`[0:0:0:0:0:0:0:1]`).
+  - Blocks IPv4-mapped IPv6 literals (`[::ffff:127.0.0.1]`, `[::ffff:192.168.1.1]`) and NAT64 (`64:ff9b::`).
+  - Blocks IPv6 Link-Local (`fe80::/10`), Unique Local Addresses (`fc00::/7` - `fc` & `fd`), and Multicast (`ff00::/8`).
+  - Blocks IPv4 Multicast (`224.0.0.0/4`) and Reserved (`240.0.0.0/4`).
+- Directly protects Discord/generic webhooks (`webhook.js`), modpack downloads (`modpacks.js`, `modpack-build.js`), Marketplace assets (`marketplace.js`), tunnels (`tunnel.js`), and MCP tools (`mcp/tools.js`).
+- Added 26 dedicated SSRF and public URL test cases in `tests/validate.test.js`.
+
+### Fixed: Server Loader Detection for Spigot & Bukkit (`src/main/server-compat.js`, `src/main/server-files.js`)
+- Added `spigot`, `bukkit`, and `craftbukkit` to filename regex parsing in `detectServerTarget` and `detectSoftware`.
+- Ensures newly added server jars (e.g. `spigot-1.20.4.jar`, `craftbukkit-1.16.5.jar`) are immediately identified as loader `paper` (the Bukkit/Spigot plugin family) before first launch, instead of erroneously defaulting to `vanilla`.
+- Added unit tests in `tests/server-compat.test.js`.
+
+### Fixed: Datapack Extraction Validation (`src/main/content-ops.js`)
+- Added early validation in `extractDatapack` to reject filenames that reduce to empty string (such as `.zip`), preventing path calculation from pointing directly to `world/datapacks/`.
+- Added regression test in `tests/content-datapack.test.js`.
+
+### Reworked: Content Tab GUI/UX (`src/renderer/js/01-content.js`, `src/renderer/css/05-market.css`)
+- Redesigned the Content Library layout: eliminated excessive card nesting and padding clutter.
+- Streamlined header with integrated search bar, item count badges (`Plugins (x)`, `Mods (y)`, `Datapacks (z)`), and action buttons.
+- Modernized item rows with accurate mod loader badges (`Forge`, `Fabric`, `NeoForge`), compact metadata chips, and action buttons (`Disable/Enable`, `Delete`, `Edit config`).
+- Fixed version badge text truncation issues with responsive sizing and proper text ellipsis.
+
+### Reworked: Settings GUI/UX (Anti-Card-Slop) (`src/renderer/index.html`, `src/renderer/css/06-modals.css`)
+- Rebuilt all 6 Settings panels (Setup, Personal, Automation, Integrations, AI, Advanced) replacing fragmented, scattered cards with cohesive `.set-group-card` surfaces.
+- Introduced structured 2-column setting rows (`.set-item-row`) with distinct label/description columns and aligned control columns.
+- Separated sub-features with subtle hairline dividers (`.set-item-divider`), delivering a clean, professional, and readable layout.
+- Fully preserved all 593 i18n keys with 0 dead keys across 7 supported languages.
+
+### Fixed: Animation Flickering & Repeated Render Glitches (`src/renderer/css/08-motion.css`, `src/renderer/js/01-content.js`)
+- Scoped row and panel entrance animations (`rowIn`, `panelIn`) strictly to initial tab transitions (`.tab-enter-fwd`, `.tab-enter-back`).
+- Added signature verification (`node._renderedHtml === html`) during background polling to eliminate DOM destruction and repeated fade-in animation flashing.
 
 ### Added: Smart JVM Tuning Engine (`src/renderer/js/00-core.js`, `src/renderer/js/08-shell.js`)
 - Added `shenandoahFlags` preset for ultra-low pause garbage collection on modded servers.
@@ -27,7 +61,6 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - Hardened `extractArchive` in `src/main/platform/win32.js` to fail-closed on corrupt or unreadable archives, eliminating parity gaps with Linux Zip-Slip validation.
 - Wrapped `info.launchScript` in `src/main/server-lifecycle.js` with quotes when running under Windows `cmd.exe /d /c` to support paths with whitespace.
 - Polished single file download progress feedback in `src/renderer/js/05-marketplace.js` when Content-Length is chunked or undefined.
-- Synchronized all 5 new localization keys across 7 locale files (1290 keys complete).
 
 ## [6.1.6] — 2026-10-26
 

@@ -155,7 +155,7 @@ function zgcFlags(minGB,maxGB,javaVersion){
   return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseZGC${gen} -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -Dfile.encoding=UTF-8`;
 }
 function shenandoahFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseShenandoahGC -XX:+AlwaysPreTouch -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -Dfile.encoding=UTF-8`}
-function g1TunedFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=50 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=15 -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -Dfile.encoding=UTF-8`}
+function g1TunedFlags(minGB,maxGB){return `-Xms${minGB}G -Xmx${maxGB}G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions -XX:MaxGCPauseMillis=100 -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=50 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=15 -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -Dfile.encoding=UTF-8`}
 const JVM_PRESETS={ aikar:aikarFlags, zgc:zgcFlags, shenandoah:shenandoahFlags, g1:g1TunedFlags };
 function recommendJvmPreset(opts){
   const o=opts||{};

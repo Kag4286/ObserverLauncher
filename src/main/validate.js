@@ -77,7 +77,14 @@ function isSafeDownloadUrl(url) {
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false;
-  if (host === '::1') return false;
+  // IPv6 loopback / unspecified
+  if (host === '::1' || host === '::') return false;
+  // IPv6 link-local (fe80::/10), unique-local (fc00::/7), multicast (ff00::/8)
+  if (/^fe[89ab][0-9a-f]?::?/i.test(host)) return false;
+  if (/^f[cd][0-9a-f]{2}:/i.test(host)) return false;
+  if (host.startsWith('ff')) return false;
+  // IPv4-mapped IPv6 (::ffff:...) and NAT64 (64:ff9b::)
+  if (host.startsWith('::ffff:') || host.startsWith('64:ff9b::')) return false;
   // CurseForge CDN (used for the download URLs its API returns) is a legitimate public host.
   // (The API itself is api.curseforge.com; files live on forgecdn.net.)
   if (host === 'forgecdn.net' || host.endsWith('.forgecdn.net')) return true;
@@ -90,6 +97,7 @@ function isSafeDownloadUrl(url) {
     if (a === 172 && b >= 16 && b <= 31) return false;
     if (a === 192 && b === 168) return false;
     if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a >= 224) return false;
   }
   return true;
 }

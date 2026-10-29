@@ -10,6 +10,7 @@ const {
   isSafeWorldName,
   isSafeUuid,
   hostFromHeader,
+  isSafeDownloadUrl,
 } = require('../src/main/validate.js');
 
 let passed = 0;
@@ -91,5 +92,33 @@ ok('host: ipv6 literal no port', hostFromHeader('[::1]') === '::1');
 ok('host: hostname', hostFromHeader('evil.example.com') === 'evil.example.com');
 ok('host: empty', hostFromHeader('') === '');
 ok('host: null -> empty', hostFromHeader(null) === '');
+
+// isSafeDownloadUrl: SSRF guards (IPv4 & IPv6 loopback, private, link-local, multicast)
+ok('download: public https ok', isSafeDownloadUrl('https://cdn.modrinth.com/data/xyz') === true);
+ok('download: forgecdn ok', isSafeDownloadUrl('https://mediafilez.forgecdn.net/files/123/mod.jar') === true);
+ok('download: github releases ok', isSafeDownloadUrl('https://github.com/user/repo/releases/download/v1/mod.jar') === true);
+ok('download: public ipv4 ok', isSafeDownloadUrl('http://8.8.8.8/file.jar') === true);
+ok('download: localhost rejected', isSafeDownloadUrl('http://localhost/x') === false);
+ok('download: .localhost rejected', isSafeDownloadUrl('http://api.localhost/x') === false);
+ok('download: .local rejected', isSafeDownloadUrl('http://router.local/x') === false);
+ok('download: 127.0.0.1 rejected', isSafeDownloadUrl('http://127.0.0.1/x') === false);
+ok('download: 10.x rejected', isSafeDownloadUrl('http://10.0.0.1/x') === false);
+ok('download: 192.168.x rejected', isSafeDownloadUrl('http://192.168.1.1/x') === false);
+ok('download: 172.16.x rejected', isSafeDownloadUrl('http://172.16.0.1/x') === false);
+ok('download: link-local 169.254.x rejected', isSafeDownloadUrl('http://169.254.169.254/latest') === false);
+ok('download: 0.0.0.0 rejected', isSafeDownloadUrl('http://0.0.0.0/') === false);
+ok('download: ipv4 multicast rejected', isSafeDownloadUrl('http://224.0.0.1/') === false);
+ok('download: ipv4 reserved rejected', isSafeDownloadUrl('http://240.0.0.1/') === false);
+ok('download: ipv6 loopback [::1] rejected', isSafeDownloadUrl('http://[::1]/') === false);
+ok('download: ipv6 unspecified [::] rejected', isSafeDownloadUrl('http://[::]/') === false);
+ok('download: ipv6 expanded loopback rejected', isSafeDownloadUrl('http://[0:0:0:0:0:0:0:1]/') === false);
+ok('download: ipv6 link-local [fe80::1] rejected', isSafeDownloadUrl('http://[fe80::1]/') === false);
+ok('download: ipv6 unique-local [fc00::1] rejected', isSafeDownloadUrl('http://[fc00::1]/') === false);
+ok('download: ipv6 unique-local [fd12::1] rejected', isSafeDownloadUrl('http://[fd12:3456:789a::1]/') === false);
+ok('download: ipv6 multicast [ff02::1] rejected', isSafeDownloadUrl('http://[ff02::1]/') === false);
+ok('download: ipv4-mapped loopback rejected', isSafeDownloadUrl('http://[::ffff:127.0.0.1]/') === false);
+ok('download: ipv4-mapped private rejected', isSafeDownloadUrl('http://[::ffff:192.168.1.1]/') === false);
+ok('download: file:// rejected', isSafeDownloadUrl('file:///etc/passwd') === false);
+ok('download: invalid url rejected', isSafeDownloadUrl('not a url') === false);
 
 console.log(`\n${passed} passed, 0 failed`);

@@ -34,9 +34,16 @@ async function loadContentConflicts(){
   if(!window.observer.contentConflicts)return;
   try{
     const r=await window.observer.contentConflicts();
-    state.contentConflicts=(r&&r.ok===false)?r:null;
+    state.contentConflicts=r||null;
   }catch{state.contentConflicts=null}
   renderContentConflicts();
+  updateContentToolbarState();
+  if(state.files){
+    const f=state.files;
+    renderFiles('#pluginsList',f.plugins||[],'plugin');
+    renderFiles('#modsList',f.mods||[],'mod');
+    renderFiles('#datapacksList',f.datapacks||[],'datapack');
+  }
 }
 function renderContentConflicts(){
   const box=$('#contentConflictsBanner'),title=$('#ccbTitle'),list=$('#ccbList'),toggle=$('#ccbToggle');
@@ -188,58 +195,447 @@ async function renderDatapackOrder(force){
 }
 // Hide rows in the ACTIVE list that don't contain the query (case-insensitive). Empty-state rows
 // (no data-name) stay visible so the friendly message is never hidden by a stray filter.
-function filterContentList(){
-  const q=($('#contentFilter')?.value||'').trim().toLowerCase();
-  const list=$(contentKind==='plugin'?'#pluginsList':contentKind==='mod'?'#modsList':'#datapacksList');
-  if(!list)return;
-  list.querySelectorAll('li[data-name]').forEach(li=>{
-    li.hidden=!!q&&!li.dataset.name.toLowerCase().includes(q);
-  });
+
+let contentQuickFilter = 'all';
+
+function cleanModTitle(fileName, metaName) {
+  if (metaName && typeof metaName === 'string' && metaName.trim() && metaName !== fileName) {
+    return metaName.trim();
+  }
+  let s = String(fileName || '')
+    .replace(/\.disabled$/i, '')
+    .replace(/\.(jar|zip)$/i, '');
+  s = s.replace(/[-_+]\s*(?:forge|fabric|neoforge|quilt|bukkit|spigot|paper)\b/gi, ' ');
+  s = s.replace(/\b(?:forge|fabric|neoforge|quilt|bukkit|spigot|paper)\b/gi, ' ');
+  s = s.replace(/\+(?:mc)?\d+[\d.\-_+a-z]*/gi, ' ');
+  s = s.replace(/[-_+](?:mc)?1\.\d+(\.\d+)?/gi, ' ');
+  s = s.replace(/[-_+](?:v|r)?\d+[\d.\-_+a-z]*/gi, ' ');
+  s = s.replace(/\b(?:v|r)?\d+[\d.]*\b/gi, ' ');
+  s = s.replace(/[-_]+/g, ' ').trim();
+  s = s.replace(/([a-z])([A-Z])/g, '$1 $2');
+  s = s.replace(/(?:^|\s)[a-z]/g, c => c.toUpperCase());
+  s = s.replace(/'S\b/g, "'s");
+  return s.trim() || fileName;
 }
-function renderFiles(id,files,kind){const node=$(id);if(!node) return;
-  if(!files.length){
-    const [tk,sk]=CONTENT_HINTS[kind]||['cnt.emptyPT','cnt.emptyPS'];
-    const importLabel=kind==='datapack'?t('cnt.importZip'):t('cnt.importJar');
-    node.innerHTML=`<li class="empty"><div><b>${esc(t(tk))}</b><span>${esc(t(sk))}</span></div><div class="empty-actions"><button class="btn sm primary" data-empty-import="${esc(kind)}">${esc(importLabel)}</button><button class="text-btn" data-market-jump="${esc(kind)}">${esc(t('cnt.market'))}</button></div></li>`;
-    if(kind){
-      node.querySelectorAll('[data-empty-import]').forEach(b=>b.onclick=async()=>{if(state.running&&!await confirmDialog({title:t('cnt.importJar'),body:t('cnt.confirmRunningImport'),ok:t('cnt.import')}))return;window.observer.importContent(kind).then(r=>{ if(r.ok){state.files=r.files;refreshUI();toast(t('toast.imported'),'success')}else if(!r.cancelled) toast(r.error,'error'); })});
-      node.querySelectorAll('[data-market-jump]').forEach(b=>b.onclick=()=>jumpToMarket(b.dataset.marketJump));
+
+function syncContentKindAuto() {
+  const f = state.files || {};
+  const pCount = (f.plugins || []).length;
+  const mCount = (f.mods || []).length;
+  const dCount = (f.datapacks || []).length;
+
+  if (contentKind === 'plugin' && pCount === 0 && mCount > 0) {
+    setContentKind('mod');
+  } else if (contentKind === 'mod' && mCount === 0 && pCount > 0) {
+    setContentKind('plugin');
+  } else if (contentKind === 'datapack' && dCount === 0) {
+    if (mCount > 0) setContentKind('mod');
+    else if (pCount > 0) setContentKind('plugin');
+  }
+}
+
+function glyphProps(name) {
+  const clean = String(name || '').trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  let text = 'M';
+  if (words.length >= 2) {
+    text = (words[0][0] + words[1][0]).toUpperCase();
+  } else if (clean.length > 0) {
+    text = clean.slice(0, Math.min(2, clean.length)).toUpperCase();
+  }
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) hash = (hash << 5) - hash + clean.charCodeAt(i);
+  const hue = Math.abs(hash) % 360;
+  return {
+    text,
+    bg: `hsl(${hue}, 42%, 18%)`,
+    border: `hsl(${hue}, 46%, 28%)`,
+    color: `hsl(${hue}, 80%, 75%)`
+  };
+}
+
+async function jumpToModConfig(fileName, kind) {
+  try {
+    const meta = (state.contentConflicts && state.contentConflicts.metadata && state.contentConflicts.metadata[fileName]) || {};
+    const modId = (meta.modId || '').toLowerCase();
+    const rawBase = fileName.replace(/\.disabled$/i, '').replace(/\.(jar|zip)$/i, '');
+    const clean = rawBase.replace(/[-_+](?:forge|fabric|neoforge|quilt|bukkit|spigot|paper)[-_+]?/gi, '')
+                         .replace(/[-_+](?:mc)?1\.\d+(\.\d+)?/gi, '')
+                         .replace(/[-_+](?:v|r)?\d+[\d.\-_+a-z]*$/i, '')
+                         .toLowerCase()
+                         .replace(/[-_]/g, '');
+
+    const r = await window.observer.editorList();
+    if (!r || !r.ok || !r.files || !r.files.length) {
+      if (typeof openFileBrowser === 'function') openFileBrowser();
+      return;
     }
+
+    const configFiles = r.files.filter(f => {
+      const p = f.path.toLowerCase();
+      return p.startsWith('config/') || p.startsWith('defaultconfigs/') || p.startsWith('plugins/');
+    });
+
+    let match = null;
+    if (modId) {
+      match = configFiles.find(f => {
+        const base = f.path.split('/').pop().toLowerCase();
+        return base.startsWith(modId + '.') || base.startsWith(modId + '-') || base.startsWith(modId + '_');
+      });
+    }
+    if (!match && clean.length >= 3) {
+      match = configFiles.find(f => {
+        const p = f.path.toLowerCase().replace(/[-_]/g, '');
+        return p.includes(clean);
+      });
+    }
+
+    if (match) {
+      if (typeof openEd === 'function') {
+        openEd(match.path, 'bays');
+        toast(t('cnt.jumpConfig') + ': ' + match.path, 'info');
+      }
+    } else {
+      if (typeof openFileBrowser === 'function') {
+        openFileBrowser();
+        const searchBox = $('#fbFilter');
+        if (searchBox && (modId || clean)) {
+          searchBox.value = modId || clean;
+          searchBox.dispatchEvent(new Event('input'));
+        }
+      }
+    }
+  } catch {
+    if (typeof openFileBrowser === 'function') openFileBrowser();
+  }
+}
+
+function updateContentToolbarState() {
+  const kind = contentKind || 'plugin';
+  const f = state.files || {};
+  const files = (kind === 'plugin' ? f.plugins : kind === 'mod' ? f.mods : f.datapacks) || [];
+  const total = files.length;
+  const enabled = files.filter(x => !/\.disabled$/i.test(x)).length;
+  const disabled = total - enabled;
+
+  const upd = (state.contentUpdates && state.contentUpdates.byFile) || {};
+  const updates = files.filter(x => upd[x] && upd[x].status === 'update' && !/\.disabled$/i.test(x)).length;
+
+  const conflictList = (state.contentConflicts && state.contentConflicts.issues) || [];
+  const issues = files.filter(x => conflictList.some(iss => String(iss.fileName || iss.neededBy).toLowerCase() === String(x).toLowerCase())).length;
+
+  const chipAll = $('#chipAllCount'); if (chipAll) chipAll.textContent = String(total);
+  const chipEn = $('#chipEnabledCount'); if (chipEn) chipEn.textContent = String(enabled);
+  const chipDis = $('#chipDisabledCount'); if (chipDis) chipDis.textContent = String(disabled);
+  const chipUpd = $('#chipUpdatesCount'); if (chipUpd) chipUpd.textContent = String(updates);
+  const chipIss = $('#chipIssuesCount'); if (chipIss) chipIss.textContent = String(issues);
+
+  const chipUpdBtn = $('[data-qfilter="updates"]');
+  if (chipUpdBtn) chipUpdBtn.hidden = updates <= 0;
+  const chipIssBtn = $('[data-qfilter="issues"]');
+  if (chipIssBtn) chipIssBtn.hidden = issues <= 0;
+
+  if ((contentQuickFilter === 'updates' && updates === 0) || (contentQuickFilter === 'issues' && issues === 0)) {
+    contentQuickFilter = 'all';
+    $$('#contentFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.qfilter === 'all'));
+  }
+
+  const sumPill = $('#contentSummaryPill');
+  if (sumPill) {
+    sumPill.textContent = t('cnt.summary', { n: total }) + (disabled > 0 ? ` (${enabled} on, ${disabled} off)` : '');
+  }
+}
+
+function filterContentList() {
+  const q = ($('#contentFilter')?.value || '').trim().toLowerCase();
+  const clearBtn = $('#contentFilterClear');
+  if (clearBtn) clearBtn.hidden = !q;
+
+  const list = $(contentKind === 'plugin' ? '#pluginsList' : contentKind === 'mod' ? '#modsList' : '#datapacksList');
+  if (!list) return;
+
+  let visibleCount = 0;
+  const rows = list.querySelectorAll('.content-row');
+  rows.forEach(li => {
+    const name = (li.dataset.name || '').toLowerCase();
+    const title = (li.dataset.title || '').toLowerCase();
+    const matchesQuery = !q || name.includes(q) || title.includes(q);
+
+    let matchesFilter = true;
+    if (contentQuickFilter === 'enabled') matchesFilter = li.dataset.off === '0';
+    else if (contentQuickFilter === 'disabled') matchesFilter = li.dataset.off === '1';
+    else if (contentQuickFilter === 'updates') matchesFilter = li.dataset.hasUpdate === '1';
+    else if (contentQuickFilter === 'issues') matchesFilter = li.dataset.hasIssue === '1';
+
+    const show = matchesQuery && matchesFilter;
+    li.hidden = !show;
+    if (show) visibleCount++;
+  });
+
+  let emptyMsg = list.querySelector('.cr-empty-search');
+  if (rows.length > 0 && visibleCount === 0) {
+    if (!emptyMsg) {
+      emptyMsg = document.createElement('li');
+      emptyMsg.className = 'cr-empty-search';
+      emptyMsg.innerHTML = `<span class="empty-icon">⌕</span><b>${esc(t('cnt.noMatches'))}</b><button type="button" class="btn xs secondary" id="crClearFilterBtn">${esc(t('cnt.filterAll'))}</button>`;
+      list.appendChild(emptyMsg);
+      emptyMsg.querySelector('#crClearFilterBtn').onclick = () => {
+        const inp = $('#contentFilter'); if (inp) inp.value = '';
+        contentQuickFilter = 'all';
+        $$('#contentFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.qfilter === 'all'));
+        filterContentList();
+      };
+    }
+    emptyMsg.hidden = false;
+  } else if (emptyMsg) {
+    emptyMsg.hidden = true;
+  }
+}
+
+function renderFiles(id, files, kind) {
+  const node = $(id);
+  if (!node) return;
+  if (!files.length) {
+    node._renderedHtml = '';
+    const [tk, sk] = CONTENT_HINTS[kind] || ['cnt.emptyPT', 'cnt.emptyPS'];
+    const importLabel = kind === 'datapack' ? t('cnt.importZip') : t('cnt.importJar');
+    node.innerHTML = `<li class="empty"><div><b>${esc(t(tk))}</b><span>${esc(t(sk))}</span></div><div class="empty-actions"><button class="btn sm primary" data-empty-import="${esc(kind)}">${esc(importLabel)}</button><button class="text-btn" data-market-jump="${esc(kind)}">${esc(t('cnt.market'))}</button></div></li>`;
+    if (kind) {
+      node.querySelectorAll('[data-empty-import]').forEach(b => b.onclick = async () => {
+        if (state.running && !await confirmDialog({ title: t('cnt.importJar'), body: t('cnt.confirmRunningImport'), ok: t('cnt.import') })) return;
+        window.observer.importContent(kind).then(r => {
+          if (r.ok) {
+            state.files = r.files;
+            refreshUI();
+            toast(t('toast.imported'), 'success');
+          } else if (!r.cancelled) toast(r.error, 'error');
+        });
+      });
+      node.querySelectorAll('[data-market-jump]').forEach(b => b.onclick = () => jumpToMarket(b.dataset.marketJump));
+    }
+    updateContentToolbarState();
     return;
   }
-  const upd=(state.contentUpdates&&state.contentUpdates.byFile)||{};
-  const conflictList=(state.contentConflicts&&state.contentConflicts.issues)||[];
-  node.innerHTML=files.map(x=>{
-    const off=/\.disabled$/i.test(x);
-    const info=upd[x]||null;
-    // version badge: shows the installed version, and "-> latest" when an update is available.
-    const ver=info&&info.version?`<span class="file-ver mono">${esc(info.version)}${info.status==='update'&&info.latestNumber?' → '+esc(info.latestNumber):''}</span>`:'';
-    const upBtn=(info&&info.status==='update'&&!off)?`<button class="text-btn" data-update-content="${esc(kind)}" data-update-file="${esc(x)}">${esc(t('cnt.update'))}</button>`:'';
-    const fileConflict=conflictList.find(iss=>String(iss.fileName||iss.neededBy).toLowerCase()===String(x).toLowerCase());
-    const conflictBadge=fileConflict?`<span class="file-badge warn" title="${esc(fileConflict.detail)}">⚠ ${esc(t('cnt.conflictBadge'))}</span>`:'';
-    // v6.0.0 C5: datapack-only actions. Check validates pack_format against the server MC version;
-    // Extract turns a .zip datapack into a folder (disabled for a folder already, and for `.disabled`).
-    let dpBtns='';
-    if(kind==='datapack' && !off){
-      dpBtns+='<button class="text-btn" data-validate-dp="'+esc(x)+'">'+esc(t('cnt.validate'))+'</button>';
-      if(/\.zip$/i.test(x)) dpBtns+='<button class="text-btn" data-extract-dp="'+esc(x)+'">'+esc(t('cnt.extract'))+'</button>';
+
+  const upd = (state.contentUpdates && state.contentUpdates.byFile) || {};
+  const conflictList = (state.contentConflicts && state.contentConflicts.issues) || [];
+  const metaMap = (state.contentConflicts && state.contentConflicts.metadata) || {};
+
+  const html = files.map(x => {
+    const off = /\.disabled$/i.test(x);
+    const info = upd[x] || null;
+    const fileMeta = metaMap[x] || null;
+    const cleanTitle = cleanModTitle(x, fileMeta && fileMeta.name);
+    const glyph = glyphProps(cleanTitle);
+
+    let loaderName = (fileMeta && fileMeta.loader) || '';
+    if (!loaderName && kind === 'mod') {
+      loaderName = (state.files?.target?.loader) || (state.contentConflicts?.server?.loader) || '';
+      if (loaderName === 'unknown') loaderName = '';
     }
-    return `<li data-name="${esc(x)}" class="${off?'is-disabled':''}" title="${esc(x)}"><span class="file-name">${esc(x)}</span>${ver}${conflictBadge}${dpBtns}<button class="text-btn" data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}">${esc(t(off?'cnt.enable':'cnt.disable'))}</button>${upBtn}<button class="text-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}">${esc(t('cnt.delete'))}</button></li>`}).join('');
-  // CB6 (v3.3.0): enable/disable a content file (rename <name> <-> <name>.disabled). Cheap + reversible.
-  if(kind==='datapack') { try{ renderDatapackOrder(); }catch{} }
-  node.querySelectorAll('[data-toggle-content]').forEach(b=>b.onclick=async()=>{const r=await window.observer.toggleContent({kind,fileName:b.dataset.toggleFile});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();loadContentConflicts()});
-  // CB5 (v3.3.0): update one file to its newer build (backup first). Refused while the server runs.
-  node.querySelectorAll('[data-update-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.updateFile;if(!await confirmDialog({title:t('cnt.update'),body:t('cnt.confirmUpdate',{n:file}),ok:t('cnt.update')}))return;const r=await window.observer.contentUpdate({names:[file]});if(!r||!r.ok)return toast((r&&r.error)||t('toast.updateFailed',{n:file}),'error');state.files=r.files||state.files;await loadContentUpdates();toast(t('toast.updated',{n:file}),'success',{label:t('toast.undo'),fn:()=>rollbackLastContentUpdate(r.sessionId)})});
-  node.querySelectorAll('[data-delete-content]').forEach(b=>b.onclick=async()=>{const file=b.dataset.deleteFile;if(!await confirmDialog({title:t('cnt.delete'),body:t('toast.confirmDelete',{n:file}),ok:t('cnt.delete'),danger:true}))return;if(state.running&&!await confirmDialog({title:t('cnt.delete'),body:t('cnt.confirmRunningDelete'),ok:t('cnt.delete'),danger:true}))return;const r=await window.observer.deleteContent({kind,fileName:file});if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();loadContentConflicts();toast(t('toast.deleted',{n:file}),'success')});
-  // v6.0.0 C5a: validate a datapack's pack_format against the server's MC version. Read-only; the
-  // toast shape matches the level the backend reports (ok / warn / unknown).
-  node.querySelectorAll('[data-validate-dp]').forEach(b=>b.onclick=async()=>{const file=b.dataset.validateDp;b.disabled=true;let r;try{ r=await window.observer.contentValidateDatapack(file); }catch(e){ b.disabled=false; return toast(e?.message||'Validate failed.','error'); }b.disabled=false;if(!r||!r.ok)return toast((r&&r.error)||'Validate failed.','error');const lvl=r.result&&r.result.level;const note=r.result&&r.result.note||'';toast(note,lvl==='ok'?'success':lvl==='warn'?'error':undefined)});
-  // v6.0.0 C5b: extract a .zip datapack into a folder (zip-slip guarded, single-top-folder flatten).
-  node.querySelectorAll('[data-extract-dp]').forEach(b=>b.onclick=async()=>{const file=b.dataset.extractDp;if(!await confirmDialog({title:t('cnt.extract'),body:t('cnt.extractConfirm',{n:file}),ok:t('cnt.extract')}))return;let r;try{ r=await window.observer.contentExtractDatapack(file); }catch(e){ return toast(e?.message||'Extract failed.','error'); }if(!r||!r.ok)return toast((r&&r.error)||'Extract failed.','error');state.files=r.files||state.files;refreshUI();toast(t('toast.extracted',{n:r.folder}),'success')});
+    if (loaderName) {
+      loaderName = loaderName.toLowerCase() === 'neoforge' ? 'NeoForge' : (loaderName[0].toUpperCase() + loaderName.slice(1).toLowerCase());
+    }
+    const loaderClass = loaderName ? 'loader-' + loaderName.toLowerCase() : '';
+    const loaderBadge = loaderName ? `<span class="cr-badge ${loaderClass}">${esc(loaderName)}</span>` : '';
+
+    const verStr = (info && info.version) || (fileMeta && fileMeta.version) || '';
+    const verBadge = verStr ? `<span class="cr-badge ver mono">${esc(verStr)}</span>` : '';
+
+    const hasUpdate = info && info.status === 'update' && !off;
+    const upBtn = hasUpdate ? `<button type="button" class="cr-badge update" data-update-content="${esc(kind)}" data-update-file="${esc(x)}" title="${esc(t('cnt.confirmUpdate', { n: x }))}">↳ ${esc(info.latestNumber || '')} ⚡</button>` : '';
+
+    const fileConflict = conflictList.find(iss => String(iss.fileName || iss.neededBy).toLowerCase() === String(x).toLowerCase());
+    let conflictBadge = '';
+    if (fileConflict) {
+      let badgeText = t('cnt.conflictBadge');
+      if (fileConflict.type === 'duplicate') badgeText = t('cnt.issue_duplicate');
+      else if (fileConflict.type === 'loader-mismatch') badgeText = t('cnt.issue_loader_mismatch');
+      else if (fileConflict.type === 'missing-dep') badgeText = t('cnt.issue_missing_dep');
+      else if (fileConflict.type === 'conflict') badgeText = t('cnt.issue_conflict');
+      else if (fileConflict.type === 'client-only') badgeText = t('cnt.issue_client_only');
+      conflictBadge = `<span class="cr-badge issue" title="${esc(fileConflict.detail)}">⚠ ${esc(badgeText)}</span>`;
+    }
+
+    let dpBtns = '';
+    if (kind === 'datapack' && !off) {
+      dpBtns += '<button class="text-btn sm" data-validate-dp="' + esc(x) + '">' + esc(t('cnt.validate')) + '</button>';
+      if (/\.zip$/i.test(x)) dpBtns += '<button class="text-btn sm" data-extract-dp="' + esc(x) + '">' + esc(t('cnt.extract')) + '</button>';
+    }
+
+    return `<li data-name="${esc(x)}" data-title="${esc(cleanTitle)}" data-off="${off ? '1' : '0'}" data-has-update="${hasUpdate ? '1' : '0'}" data-has-issue="${fileConflict ? '1' : '0'}" class="content-row ${off ? 'is-disabled' : ''}" title="${esc(x)}">
+      <div class="cr-left">
+        <div class="cr-glyph" style="background:${glyph.bg};border:1px solid ${glyph.border};color:${glyph.color};" aria-hidden="true">${glyph.text}</div>
+        <div class="cr-info">
+          <div class="cr-title-row">
+            <span class="cr-title">${esc(cleanTitle)}</span>
+            ${off ? `<span class="cr-state-badge off">${esc(t('cnt.filterDisabled'))}</span>` : ''}
+          </div>
+          <div class="cr-filename mono">${esc(x)}</div>
+        </div>
+      </div>
+      <div class="cr-meta">
+        ${loaderBadge}
+        ${verBadge}
+        ${conflictBadge}
+        ${dpBtns}
+      </div>
+      <div class="cr-actions">
+        <button type="button" class="cr-btn cr-btn-config" data-config-file="${esc(x)}" title="${esc(t('cnt.jumpConfig'))}" aria-label="${esc(t('cnt.jumpConfig'))}">
+          <span>{&nbsp;}</span>
+        </button>
+        ${upBtn}
+        <label class="switch sm" title="${esc(t(off ? 'cnt.enable' : 'cnt.disable'))}">
+          <input type="checkbox" ${off ? '' : 'checked'} data-toggle-content="${esc(kind)}" data-toggle-file="${esc(x)}" aria-label="${esc(t(off ? 'cnt.enable' : 'cnt.disable'))}">
+          <span class="slider"></span>
+        </label>
+        <button type="button" class="cr-btn danger" data-delete-content="${esc(kind)}" data-delete-file="${esc(x)}" aria-label="${esc(t('cnt.delete'))} ${esc(x)}" title="${esc(t('cnt.delete'))}">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M2.5 4h11v1.5h-1v9a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 3.5 14.5v-9h-1V4zm2 1.5v9a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-9h-7zM6 2h4a1 1 0 0 1 1 1v1H5V3a1 1 0 0 1 1-1z"/></svg>
+        </button>
+      </div>
+    </li>`;
+  }).join('');
+
+  if (node._renderedHtml === html) {
+    updateContentToolbarState();
+    filterContentList();
+    return;
+  }
+  node._renderedHtml = html;
+  node.innerHTML = html;
+
+  if (kind === 'datapack') { try { renderDatapackOrder(); } catch {} }
+
+  node.querySelectorAll('input[data-toggle-content]').forEach(input => {
+    input.onchange = async () => {
+      const file = input.dataset.toggleFile;
+      const k = input.dataset.toggleContent;
+      const r = await window.observer.toggleContent({ kind: k, fileName: file });
+      if (!r || !r.ok) {
+        input.checked = !input.checked;
+        return toast((r && r.error) || 'Toggle failed', 'error');
+      }
+      state.files = r.files;
+      refreshUI();
+      loadContentConflicts();
+    };
+  });
+
+  node.querySelectorAll('[data-config-file]').forEach(b => {
+    b.onclick = () => jumpToModConfig(b.dataset.configFile, kind);
+  });
+
+  node.querySelectorAll('[data-update-content]').forEach(b => {
+    b.onclick = async () => {
+      const file = b.dataset.updateFile;
+      if (!await confirmDialog({
+        title: t('cnt.update'),
+        body: t('cnt.confirmUpdate', { n: file }),
+        ok: t('cnt.update')
+      })) return;
+      const r = await window.observer.contentUpdate({ names: [file] });
+      if (!r || !r.ok) return toast((r && r.error) || t('toast.updateFailed', { n: file }), 'error');
+      state.files = r.files || state.files;
+      await loadContentUpdates();
+      toast(t('toast.updated', { n: file }), 'success', {
+        label: t('toast.undo'),
+        fn: () => rollbackLastContentUpdate(r.sessionId)
+      });
+    };
+  });
+
+  node.querySelectorAll('[data-delete-content]').forEach(b => {
+    b.onclick = async () => {
+      const file = b.dataset.deleteFile;
+      if (!await confirmDialog({
+        title: t('cnt.delete'),
+        body: t('toast.confirmDelete', { n: file }),
+        ok: t('cnt.delete'),
+        danger: true
+      })) return;
+      if (state.running && !await confirmDialog({
+        title: t('cnt.delete'),
+        body: t('cnt.confirmRunningDelete'),
+        ok: t('cnt.delete'),
+        danger: true
+      })) return;
+      const r = await window.observer.deleteContent({ kind, fileName: file });
+      if (!r || !r.ok) return toast((r && r.error) || 'Delete failed', 'error');
+      state.files = r.files;
+      refreshUI();
+      loadContentConflicts();
+      toast(t('toast.deleted', { n: file }), 'success');
+    };
+  });
+
+  node.querySelectorAll('[data-validate-dp]').forEach(b => {
+    b.onclick = async () => {
+      const file = b.dataset.validateDp;
+      b.disabled = true;
+      let r;
+      try { r = await window.observer.contentValidateDatapack(file); } catch (e) {
+        b.disabled = false;
+        return toast(e?.message || 'Validate failed.', 'error');
+      }
+      b.disabled = false;
+      if (!r || !r.ok) return toast((r && r.error) || 'Validate failed.', 'error');
+      const lvl = r.result && r.result.level;
+      const note = (r.result && r.result.note) || '';
+      toast(note, lvl === 'ok' ? 'success' : lvl === 'warn' ? 'error' : undefined);
+    };
+  });
+
+  node.querySelectorAll('[data-extract-dp]').forEach(b => {
+    b.onclick = async () => {
+      const file = b.dataset.extractDp;
+      if (!await confirmDialog({
+        title: t('cnt.extract'),
+        body: t('cnt.extractConfirm', { n: file }),
+        ok: t('cnt.extract')
+      })) return;
+      let r;
+      try { r = await window.observer.contentExtractDatapack(file); } catch (e) {
+        return toast(e?.message || 'Extract failed.', 'error');
+      }
+      if (!r || !r.ok) return toast((r && r.error) || 'Extract failed.', 'error');
+      state.files = r.files || state.files;
+      refreshUI();
+      toast(t('toast.extracted', { n: r.folder }), 'success');
+    };
+  });
+
+  updateContentToolbarState();
+  filterContentList();
 }
+
 // Wire the segmented switch + filter once (delegation-free: elements are static in index.html).
 $$('#contentSeg .seg').forEach(b=>b.onclick=()=>setContentKind(b.dataset.ckind));
 $('#contentFilter')?.addEventListener('input',filterContentList);
+
+// Wire quick filter chips & clear button
+$$('#contentFilterChips .filter-chip').forEach(btn => {
+  btn.onclick = () => {
+    contentQuickFilter = btn.dataset.qfilter || 'all';
+    $$('#contentFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c === btn));
+    filterContentList();
+  };
+});
+$('#contentFilterClear')?.addEventListener('click', () => {
+  const inp = $('#contentFilter');
+  if (inp) { inp.value = ''; inp.focus(); }
+  filterContentList();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab && activeTab.id === 'content') {
+      e.preventDefault();
+      const inp = $('#contentFilter');
+      if (inp) { inp.focus(); inp.select(); }
+    }
+  }
+});
+
 $('#contentCheckUpdates')?.addEventListener('click',e=>loadContentUpdates(e.currentTarget));
 $('#contentUpdateAll')?.addEventListener('click',async()=>{
   const n=state.contentUpdates?state.contentUpdates.updates:0;
@@ -325,6 +721,7 @@ function openContentMenu(x,y,p,li){
   // (confirm dialogs, running-server checks) stays in ONE place — never re-implemented here.
   const entries=[
     [t('cnt.reveal'),()=>window.observer.revealFiles(p.rel),''],
+    [t('cnt.jumpConfig'),()=>jumpToModConfig(p.name,p.kind),''],
     hasUpdate?[t('cnt.update'),()=>li.querySelector('[data-update-content]')?.click(),'']:null,
     [t(off?'cnt.enable':'cnt.disable'),()=>li.querySelector('[data-toggle-content]')?.click(),''],
     [t('cnt.delete'),()=>li.querySelector('[data-delete-content]')?.click(),'danger'],

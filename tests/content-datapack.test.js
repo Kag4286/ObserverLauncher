@@ -33,6 +33,9 @@ const ck = (n, c) => c ? (pass++, console.log('PASS', n)) : (fail++, console.log
     // a file still deletes fine
     const r2 = await del.handler({ currentServerPath: root }, { kind: 'datapack', name: 'pack.zip' });
     ck('delete file datapack -> ok', r2 && r2.ok === true);
+    const { extractDatapack } = require('../src/main/content-ops.js');
+    const rBad = await extractDatapack(root, '.zip');
+    ck('extractDatapack .zip rejected', rBad && rBad.ok === false && rBad.error === 'Invalid datapack name.');
   }
 
   try { fs.rmSync(root, { recursive: true, force: true }); } catch {}

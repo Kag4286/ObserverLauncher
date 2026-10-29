@@ -42,10 +42,12 @@ ok('zgc uses ZGC + generational (legacy/default)', zgcFlags(8, 16).includes('-XX
 ok('zgc omits -XX:+ZGenerational on Java 25+', zgcFlags(8, 16, 25).includes('-XX:+UseZGC') && !zgcFlags(8, 16, 25).includes('-XX:+ZGenerational'));
 ok('shenandoah uses ShenandoahGC', shenandoahFlags(6, 12).includes('-XX:+UseShenandoahGC'));
 ok('g1 tuned uses G1 + 100ms pause', g1TunedFlags(2, 4).includes('-XX:+UseG1GC') && g1TunedFlags(2, 4).includes('MaxGCPauseMillis=100'));
+ok('g1 tuned includes -XX:+UnlockExperimentalVMOptions for Java 8 compatibility', g1TunedFlags(2, 4).includes('-XX:+UnlockExperimentalVMOptions'));
 
 // recommendJvmPreset checks
 ok('recommend zgc for Java 21/25 + high RAM', recommendJvmPreset({ maxGB: 12, javaVersion: 25 }) === 'zgc');
-ok('recommend shenandoah for modded + 8GB', recommendJvmPreset({ maxGB: 8, javaVersion: 21, isModded: true }) === 'shenandoah');
+ok('recommend shenandoah for modded + 8GB on Java 21', recommendJvmPreset({ maxGB: 8, javaVersion: 21, isModded: true }) === 'shenandoah');
+ok('recommend aikar for modded on Java 8 (shenandoah unsupported)', recommendJvmPreset({ maxGB: 8, javaVersion: 8, isModded: true }) === 'aikar');
 ok('recommend g1 for low RAM (<4GB)', recommendJvmPreset({ maxGB: 2, javaVersion: 17 }) === 'g1');
 ok('recommend aikar by default', recommendJvmPreset({ maxGB: 6, javaVersion: 17 }) === 'aikar');
 

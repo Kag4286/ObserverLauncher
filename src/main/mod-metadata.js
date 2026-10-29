@@ -103,7 +103,7 @@ function parseManifestMf(mf) {
   const text = String(mf || '');
   const t = text.match(/^Implementation-Title\s*:\s*(.+)$/im);
   const v = text.match(/^Implementation-Version\s*:\s*(.+)$/im);
-  const mc = text.match(/^(?:Minecraft-Version|Specification-Version)\s*:\s*(.+)$/im);
+  const mc = text.match(/^Minecraft-Version\s*:\s*(.+)$/im);
   if (t) out.name = t[1].trim();
   if (v) {
     const val = v[1].trim();

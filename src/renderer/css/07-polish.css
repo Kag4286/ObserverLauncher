@@ -188,7 +188,8 @@ html.motion-lite .ol-tip{animation:none}
 .remote-addr code{font:500 11px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 4.3.0: token row — masked field + Reveal/Copy/Regenerate. Mono so the hex is readable. */
 .remote-token-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.remote-token-row .remote-token-input{flex:1;min-width:0;font:500 11px var(--font-mono);letter-spacing:.04em}
+.remote-token-row .remote-token-input{flex:1;min-width:0;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font:500 12px var(--font-mono);letter-spacing:.04em;outline:0;transition:border-color var(--dur-micro),box-shadow var(--dur-micro)}
+.remote-token-row .remote-token-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
 .remote-token-row .btn{flex:0 0 auto;white-space:nowrap}
 @media(max-width:900px){.wm-mini{display:none}}
 @media(max-width:900px){.wm-main{grid-template-columns:1fr}.wm-panel{border-left:0;border-top:1px solid var(--border)}}
@@ -264,12 +265,78 @@ html.motion-lite .ol-tip{animation:none}
 /* v4.0.0 inspector: header badges + coords + stats grid. */
 .inspect-badges{display:inline-flex;gap:5px;flex-wrap:wrap}
 .inspect-pos{font:600 11.5px var(--font-mono);color:var(--brand);letter-spacing:.02em}
-.pd-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-.inspect-panel.active>.pd-stats-grid{animation:sectionIn .35s var(--ease) .06s both}
+/* ============ STATS TAB REWORK (v6.1.7) ============ */
+.pd-stats-hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;margin-bottom:12px;animation:sectionIn .32s var(--ease) .04s both}
+@media (max-width:760px){.pd-stats-hero{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.pd-stats-hero{animation:none}}
+
+.pd-hero-stat{display:flex;gap:12px;align-items:center;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);position:relative;overflow:hidden;transition:transform var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.pd-hero-stat:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--shadow-sm)}
+
+.pd-hero-playtime{background:linear-gradient(135deg,rgba(155,140,255,.09) 0%,var(--surface-2) 65%)}
+.pd-hero-playtime:hover{border-color:rgba(155,140,255,.35)}
+.pd-hero-playtime .pd-hero-icon{background:rgba(155,140,255,.15);color:var(--violet)}
+
+.pd-hero-combat{background:linear-gradient(135deg,rgba(255,102,125,.09) 0%,var(--surface-2) 65%)}
+.pd-hero-combat:hover{border-color:rgba(255,102,125,.35)}
+.pd-hero-combat .pd-hero-icon{background:rgba(255,102,125,.15);color:var(--danger)}
+
+.pd-hero-travel{background:linear-gradient(135deg,rgba(114,230,166,.09) 0%,var(--surface-2) 65%)}
+.pd-hero-travel:hover{border-color:rgba(114,230,166,.35)}
+.pd-hero-travel .pd-hero-icon{background:rgba(114,230,166,.15);color:var(--success)}
+
+.pd-hero-damage{background:linear-gradient(135deg,rgba(255,200,87,.09) 0%,var(--surface-2) 65%)}
+.pd-hero-damage:hover{border-color:rgba(255,200,87,.35)}
+.pd-hero-damage .pd-hero-icon{background:rgba(255,200,87,.15);color:var(--warning)}
+
+.pd-hero-icon{width:36px;height:36px;border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pd-hero-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;flex-shrink:0;display:block}
+.pd-hero-body{display:flex;flex-direction:column;min-width:0;flex:1}
+.pd-hero-label{font:700 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.pd-hero-val{font:700 18px var(--font-ui);color:var(--text);line-height:1.2;margin:2px 0 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-hero-sub{font:500 11px var(--font-ui);color:var(--text-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Toolbar: category chips + live search */
+.pd-stats-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;animation:sectionIn .32s var(--ease) .06s both}
+@media (prefers-reduced-motion:reduce){.pd-stats-toolbar{animation:none}}
+.pd-stats-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pd-stat-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);font:600 12px var(--font-ui);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
+.pd-stat-chip:hover{background:var(--surface-3);color:var(--text);border-color:var(--border-strong)}
+.pd-stat-chip.is-active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+.pd-stat-chip .chip-count{font:700 10px var(--font-mono);background:rgba(255,255,255,.07);padding:1px 6px;border-radius:999px;font-style:normal;color:inherit}
+.pd-stat-chip.is-active .chip-count{background:rgba(34,197,94,.18)}
+
+.pd-stats-search-wrap{position:relative;display:flex;align-items:center;gap:8px;flex:1;min-width:180px;max-width:280px;margin-left:auto}
+.pd-stats-search-input{width:100%;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 11px;font:500 12px var(--font-ui);color:var(--text);outline:none;transition:border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.pd-stats-search-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.pd-stats-search-count{font:600 11px var(--font-mono);color:var(--text-4);white-space:nowrap;flex-shrink:0}
+
+/* Stats grid & cards */
+.pd-stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.inspect-panel.active>.pd-stats-grid{animation:sectionIn .35s var(--ease) .08s both}
 @media (prefers-reduced-motion:reduce){.inspect-panel.active>.pd-stats-grid{animation:none}}
-.pd-stat{display:flex;flex-direction:column;gap:3px;background:var(--field);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;min-width:0;animation:rowIn .25s var(--ease) both}
-.pd-stat>span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pd-stat>b{font:600 15px var(--font-mono);color:var(--text);overflow-wrap:anywhere}
+
+.pd-stat{display:flex;flex-direction:column;justify-content:space-between;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px 10px 14px;min-width:0;min-height:78px;position:relative;overflow:hidden;transition:transform var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out);animation:rowIn .25s var(--ease) both}
+.pd-stat::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--border-strong)}
+.pd-stat.cat-survival::before{background:var(--success)}
+.pd-stat.cat-combat::before{background:var(--danger)}
+.pd-stat.cat-movement::before{background:var(--blue)}
+.pd-stat.cat-interaction::before{background:var(--warning)}
+
+.pd-stat:hover{transform:translateY(-2px);background:var(--surface-3);border-color:var(--border-strong);box-shadow:var(--shadow-sm)}
+
+.pd-stat-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+.pd-stat-label{font:600 11.5px var(--font-ui);color:var(--text-2);line-height:1.35;word-break:break-word}
+.pd-stat-badge{font:700 9px var(--font-mono);letter-spacing:.04em;text-transform:uppercase;padding:2px 5px;border-radius:4px;flex-shrink:0;background:var(--surface-3);color:var(--text-4);border:1px solid rgba(255,255,255,.05)}
+.cat-survival .pd-stat-badge{background:var(--success-weak);color:var(--success)}
+.cat-combat .pd-stat-badge{background:var(--danger-weak);color:var(--danger)}
+.cat-movement .pd-stat-badge{background:rgba(110,168,254,.12);color:var(--blue)}
+.cat-interaction .pd-stat-badge{background:var(--warning-weak);color:var(--warning)}
+
+.pd-stat-val-row{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:auto}
+.pd-stat-val{font:700 17px var(--font-mono);color:var(--text);letter-spacing:-.01em;overflow-wrap:anywhere}
+.pd-stat-extra{display:inline-flex;align-items:center;gap:3px;font:600 11px var(--font-mono);color:var(--text-3)}
+.pd-stat-heart{width:10px;height:10px;fill:var(--danger);flex-shrink:0;display:inline-block;vertical-align:-1px}
 /* Two-column layout: left = stats + clear + equipment, right = inventory + ender chest.
    Collapses to a single column on narrow windows. minmax(0,...) + min-width:0 let the inner
    lists shrink instead of forcing the grid wider than the modal. */

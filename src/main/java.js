@@ -69,15 +69,24 @@ function validateStart(settings, javaInfo, serverFilesFn, requiredJavaFn) {
   const required = requiredJavaFn ? requiredJavaFn(settings.serverPath, serverFilesFn) : requiredJavaForJar(info.jar || '');
   const actual = javaMajor(javaInfo.version);
   if (required && actual && actual < required) return `${info.jar || info.launchScript} needs Java ${required}+; detected Java ${actual}.`;
+  const customArgs = String(settings.jvmArgs || '').trim();
+  if (customArgs) {
+    if (actual && actual < 17 && /-XX:\+UseShenandoahGC\b/i.test(customArgs)) {
+      return `Detected Java ${actual}, which does not support Shenandoah GC (-XX:+UseShenandoahGC). Switch to Aikar's flags or G1 tuned preset in Settings.`;
+    }
+    if (actual && actual < 17 && /-XX:\+UseZGC\b/i.test(customArgs)) {
+      return `Detected Java ${actual}, which does not support ZGC (-XX:+UseZGC). Switch to Aikar's flags or G1 tuned preset in Settings.`;
+    }
+  }
   // FEATURE: 32-bit Java realistically cannot honor a large -Xmx (it errors out or silently clamps
   // depending on the build) — catch this before spawning instead of letting the process fail with a
   // JVM error that doesn't explain WHY. Custom JVM args are checked for an explicit -Xmx; otherwise the
   // Maximum memory (GB) field is used, matching what startServerInternal actually launches with.
   if (javaInfo.arch === '32-bit') {
-    const customArgs = String(settings.jvmArgs || '').trim();
     const xmxMatch = customArgs.match(/-Xmx(\d+)([mMgG])/);
     const requestedGB = xmxMatch ? (Number(xmxMatch[1]) / (xmxMatch[2].toLowerCase() === 'g' ? 1 : 1024)) : Number(settings.memoryMax || 6);
     if (requestedGB > 2) return `Detected 32-bit Java, which cannot reliably allocate more than ~2GB of RAM (requested ${requestedGB}GB). Install 64-bit Java, or lower Maximum memory / your -Xmx to 2GB or less.`;
+    if (customArgs && /-XX:\+UseZGC\b/i.test(customArgs)) return "ZGC requires 64-bit Java. Switch to Aikar's flags or install 64-bit Java in Settings.";
   }
   return null;
 }

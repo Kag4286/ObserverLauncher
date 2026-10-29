@@ -70,6 +70,7 @@ function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale
    renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');renderWorlds(f.worlds||[]);renderBackups(f.backups||[]);
    const wc=$('#worldsCountPill'), bc=$('#backupsCountPill'), be=$('#backupEmpty'); if(wc) wc.textContent=String((f.worlds||[]).length); if(bc) bc.textContent=String((f.backups||[]).length); if(be) be.hidden=(f.backups||[]).length>0;
    const cpc=$('#contentPluginsCount'), cmc=$('#contentModsCount'), cdc=$('#contentDatapacksCount'); if(cpc) cpc.textContent=String((f.plugins||[]).length); if(cmc) cmc.textContent=String((f.mods||[]).length); if(cdc) cdc.textContent=String((f.datapacks||[]).length);
+   if(typeof syncContentKindAuto==='function')syncContentKindAuto();if(typeof updateContentToolbarState==='function')updateContentToolbarState();
    const abs=$('#autoBackupStatus');if(abs){const mins=s.autoBackupMinutes||0;abs.innerHTML=mins>0?t('wld.autoOn',{n:mins})+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.configure')+'</button>':t('wld.autoOff')+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.turnOn')+'</button>';abs.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump))}
   renderPlayers();renderPerfDiagnostics();const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
 // 2.2.0 (C): show the Java the current server's jar NEEDS vs what is detected, and offer the

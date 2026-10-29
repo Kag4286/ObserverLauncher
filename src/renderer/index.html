@@ -285,35 +285,45 @@
     <section id="content" class="tab">
       <header class="tab-head">
         <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/funnel.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.contentBay">CONTENT BAY</p><h2 data-i18n="cnt.title">Content library</h2><p class="sub" data-i18n="cnt.sub">Plugins, mods and datapacks — files live inside your server folder.</p></div></div>
+        <div class="tab-head-actions">
+          <span class="stat-pill" id="contentSummaryPill">0 items</span>
+          <span class="stat-pill" id="contentUpdatesPill" hidden></span>
+          <button class="btn sm edit-files-btn" id="edBrowse" data-i18n-title="ed.entryT" title="Edit config &amp; text files"><span class="ef-icon">{&nbsp;}</span> <span data-i18n="cnt.editFiles">Edit files</span></button>
+          <div class="menu" id="addMenu">
+            <button type="button" class="btn sm primary menu-summary" aria-expanded="false" data-i18n="cnt.add">+ Add</button>
+            <div class="menu-body" hidden>
+              <button type="button" id="contentImport" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button>
+              <button type="button" id="contentMarket" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button>
+            </div>
+          </div>
+          <div class="menu" id="moreMenu">
+            <button type="button" class="btn sm secondary menu-summary" aria-expanded="false" aria-label="More" data-i18n-title="cnt.more" title="More">⋯</button>
+            <div class="menu-body" hidden>
+              <button type="button" id="contentCheckUpdates" data-i18n="cnt.checkUpdates">Check updates</button>
+              <button type="button" id="contentUpdateAll" hidden data-i18n="cnt.updateAll">Update all</button>
+              <button type="button" id="contentRollbackUpdate" hidden data-i18n="cnt.rollbackUpdate">Roll back update</button>
+              <button type="button" id="contentOpen" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button>
+              <button type="button" data-open="." data-i18n="cnt.openServer">Open server folder ↗</button>
+            </div>
+          </div>
+        </div>
       </header>
       <div class="flat-wrap" id="contentBays">
         <div class="content-toolbar">
-          <div class="content-seg" id="contentSeg" role="tablist" aria-label="Content type">
-            <button type="button" class="seg active" data-ckind="plugin"><span data-i18n="cnt.plugins">Plugins</span><b class="seg-count" id="contentPluginsCount">0</b></button>
-            <button type="button" class="seg" data-ckind="mod"><span data-i18n="cnt.mods">Mods</span><b class="seg-count" id="contentModsCount">0</b></button>
-            <button type="button" class="seg" data-ckind="datapack"><span data-i18n="cnt.datapacks">Datapacks</span><b class="seg-count" id="contentDatapacksCount">0</b></button>
+          <div class="content-toolbar-main">
+            <div class="content-seg" id="contentSeg" role="tablist" aria-label="Content type">
+              <button type="button" class="seg active" data-ckind="plugin"><span data-i18n="cnt.plugins">Plugins</span><b class="seg-count" id="contentPluginsCount">0</b></button>
+              <button type="button" class="seg" data-ckind="mod"><span data-i18n="cnt.mods">Mods</span><b class="seg-count" id="contentModsCount">0</b></button>
+              <button type="button" class="seg" data-ckind="datapack"><span data-i18n="cnt.datapacks">Datapacks</span><b class="seg-count" id="contentDatapacksCount">0</b></button>
+            </div>
+            <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…"><button type="button" class="search-clear" id="contentFilterClear" hidden aria-label="Clear filter">×</button></div>
           </div>
-          <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…"></div>
-          <div class="content-toolbar-actions">
-            <span class="stat-pill" id="contentUpdatesPill" hidden></span>
-            <button class="btn sm edit-files-btn" id="edBrowse" data-i18n-title="ed.entryT" title="Edit config &amp; text files"><span class="ef-icon">{&nbsp;}</span> <span data-i18n="cnt.editFiles">Edit files</span></button>
-            <div class="menu" id="addMenu">
-              <button type="button" class="btn sm primary menu-summary" aria-expanded="false" data-i18n="cnt.add">+ Add</button>
-              <div class="menu-body" hidden>
-                <button type="button" id="contentImport" data-import="plugin" data-i18n="cnt.importJar">Import .jar</button>
-                <button type="button" id="contentMarket" data-market-jump="plugin" data-i18n="cnt.market">Browse Marketplace →</button>
-              </div>
-            </div>
-            <div class="menu" id="moreMenu">
-              <button type="button" class="btn sm secondary menu-summary" aria-expanded="false" aria-label="More" data-i18n-title="cnt.more" title="More">⋯</button>
-              <div class="menu-body" hidden>
-                <button type="button" id="contentCheckUpdates" data-i18n="cnt.checkUpdates">Check updates</button>
-                <button type="button" id="contentUpdateAll" hidden data-i18n="cnt.updateAll">Update all</button>
-                <button type="button" id="contentRollbackUpdate" hidden data-i18n="cnt.rollbackUpdate">Roll back update</button>
-                <button type="button" id="contentOpen" data-open="plugins" data-i18n="cnt.open">Open folder ↗</button>
-                <button type="button" data-open="." data-i18n="cnt.openServer">Open server folder ↗</button>
-              </div>
-            </div>
+          <div class="content-filter-chips" id="contentFilterChips" role="group" aria-label="Content quick filters">
+            <button type="button" class="filter-chip active" data-qfilter="all"><span data-i18n="cnt.filterAll">All</span> <b class="chip-count" id="chipAllCount">0</b></button>
+            <button type="button" class="filter-chip" data-qfilter="enabled"><span data-i18n="cnt.filterEnabled">Enabled</span> <b class="chip-count" id="chipEnabledCount">0</b></button>
+            <button type="button" class="filter-chip" data-qfilter="disabled"><span data-i18n="cnt.filterDisabled">Disabled</span> <b class="chip-count" id="chipDisabledCount">0</b></button>
+            <button type="button" class="filter-chip chip-updates" data-qfilter="updates" hidden><span data-i18n="cnt.filterUpdates">Updates</span> <b class="chip-count" id="chipUpdatesCount">0</b></button>
+            <button type="button" class="filter-chip chip-issues" data-qfilter="issues" hidden><span data-i18n="cnt.filterIssues">Issues</span> <b class="chip-count" id="chipIssuesCount">0</b></button>
           </div>
         </div>
         <div class="content-conflicts-banner" id="contentConflictsBanner" hidden>
@@ -555,202 +565,590 @@
             <button type="button" class="seg-switch-btn" data-set-view="advanced" role="tab" aria-selected="false" data-i18n="set.catAdvanced">Advanced</button>
           </nav>
           <div class="settings-content">
+          <!-- Pane 1: Setup -->
           <div class="set-pane" data-set-pane="setup">
-          <!-- Server folder -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.folderT">Server folder</h3><small data-i18n="set.folderD">the one directory this launcher manages</small></div>
-            <div class="set-row-input"><input id="serverFolderInput" data-i18n-placeholder="set.folderPh" placeholder="Choose your server directory — e.g. Documents\ObserverLauncher Servers" aria-label="Server folder"><button class="btn secondary" id="browseBtn" data-i18n="set.browse">Choose &amp; load</button></div>
-            <small id="folderStatus" class="field-hint folder-status"></small>
-            <label class="set-check"><input type="checkbox" id="autoEulaInput" checked><span data-i18n="set.eula">Accept Minecraft EULA automatically on first start</span></label>
-          </section>
-          <!-- Java runtime -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/gem.svg" alt=""><h3 data-i18n="set.javaT">Java runtime</h3><small data-i18n="set.javaD">detection &amp; one-click install</small></div>
-            <div id="javaNotice" class="java-notice"></div>
-            <label class="set-field" id="javaPickRow" hidden><span data-i18n="set.javaPick">Installed runtimes</span><select id="javaPickSelect" class="launcher-select ol-select"></select></label>
-            <label class="set-field"><span data-i18n="set.javaPath">Executable path</span><input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false"></label>
-            <button type="button" class="btn primary wide" id="javaAutoInstall" hidden data-i18n="set.autoInstallJava">Install Java automatically (no admin rights needed)</button>
-            <div id="javaProgress" class="set-progress" hidden><div class="set-progress-track"><div class="set-progress-fill" id="javaProgressFill"></div></div><div class="set-progress-label" id="javaProgressLabel">Starting download…</div></div>
-          </section>
-          </div>
-          <div class="set-pane" data-set-pane="personal" hidden>
-          <!-- Preferences -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/person.svg" alt=""><h3 data-i18n="set.prefT">Preferences</h3><small data-i18n="set.prefD">personal, per-PC</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.language">Language</b><small data-i18n="set.languageSub">Interface language — applies immediately.</small></div><select id="languageSelect" class="launcher-select ol-select"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
-            <hr class="set-hr">
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.motion">Interface animation</b><small data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</small></div><select id="motionLevelSelect" class="launcher-select ol-select"><option value="full" data-i18n="set.motionFull">Full (default)</option><option value="lite" data-i18n="set.motionLite">Lite (less motion)</option></select></div>
-            <hr class="set-hr">
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.beginner">Beginner mode</b><small data-i18n="set.beginnerSub">Shows only the essentials: Overview, Console, Players and Settings. Turn off to see every tool.</small></div><label class="switch"><input type="checkbox" id="beginnerModeInput"><span class="slider"></span></label></div>
-            <hr class="set-hr">
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.guide">Welcome guide</b><small data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</small></div><button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button></div>
-          </section>
-          <!-- 4.5.0 instance appearance: accent + avatar art for the ACTIVE instance (DESIGN.md 3.5 / 13.3). -->
-          <section class="flat-cell" id="instAppearanceSection">
-            <div class="sec-head"><img src="./assets/icons/ui/grid.svg" alt=""><h3 data-i18n="set.appearT">Instance appearance</h3><small data-i18n="set.appearD">accent colour and avatar art for this server</small></div>
-            <div class="inst-appear">
-              <span class="inst-appear-preview" id="instAccentPreview"></span>
-              <div class="inst-appear-body">
-                <div class="inst-appear-label" data-i18n="set.appearAccent">Accent colour</div>
-                <div class="accent-swatches" id="instAccentRow" role="radiogroup" aria-label="Accent colour"></div>
-                <button type="button" class="btn secondary sm" id="instShuffleArt" data-i18n="set.appearShuffle">Shuffle avatar art</button>
+            <div class="set-group-card">
+              <!-- Topic 1: Server folder & EULA -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/funnel.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.folderT">Server folder</h3>
+                    <small data-i18n="set.folderD">the one directory this launcher manages</small>
+                  </div>
+                </div>
+                <div class="set-input-box">
+                  <input id="serverFolderInput" data-i18n-placeholder="set.folderPh" placeholder="Choose your server directory — e.g. Documents\ObserverLauncher Servers" aria-label="Server folder">
+                  <button class="btn secondary" id="browseBtn" data-i18n="set.browse">Choose &amp; load</button>
+                </div>
+                <small id="folderStatus" class="field-hint folder-status"></small>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.eula">Accept Minecraft EULA automatically on first start</div>
+                    <div class="sir-desc">Agrees to Mojang's End User License Agreement so the server can boot directly.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="autoEulaInput" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <!-- Topic 2: Java runtime -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/gem.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.javaT">Java runtime</h3>
+                    <small data-i18n="set.javaD">detection &amp; one-click install</small>
+                  </div>
+                </div>
+                <div id="javaNotice" class="java-notice"></div>
+                <div class="set-item-row" id="javaPickRow" hidden>
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.javaPick">Installed runtimes</div>
+                    <div class="sir-desc">Switch between detected local JRE/JDK installations.</div>
+                  </div>
+                  <div class="sir-control">
+                    <select id="javaPickSelect" class="launcher-select ol-select"></select>
+                  </div>
+                </div>
+                <div class="set-item-row col">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.javaPath">Executable path</div>
+                    <div class="sir-desc">Leave empty or 'java' to auto-detect from system PATH, or specify a custom java.exe.</div>
+                  </div>
+                  <div class="set-input-box">
+                    <input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false">
+                  </div>
+                </div>
+                <button type="button" class="btn primary wide" id="javaAutoInstall" hidden data-i18n="set.autoInstallJava">Install Java automatically (no admin rights needed)</button>
+                <div id="javaProgress" class="set-progress" hidden>
+                  <div class="set-progress-track"><div class="set-progress-fill" id="javaProgressFill"></div></div>
+                  <div class="set-progress-label" id="javaProgressLabel">Starting download…</div>
+                </div>
               </div>
             </div>
-          </section>
           </div>
-          <div class="set-pane" data-set-pane="automation" hidden>
-          <!-- Reliability -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/shield.svg" alt=""><h3 data-i18n="set.relT">Reliability</h3><small data-i18n="set.relD">auto-restart on crash • scheduled backups</small></div>
-            <div class="rel-grid">
-              <div>
-                <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoRestart">Auto-restart on crash</b><small data-i18n="set.autoRestartSub">Restarts when the server exits with an error — for unattended hosting.</small></div><label class="switch"><input type="checkbox" id="autoRestartInput"><span class="slider"></span></label></div>
-                <div id="autoRestartFields" class="restart-grid" hidden><label>Max restarts in a row<input id="autoRestartMaxAttemptsInput" type="number" min="1" max="20" value="3"><small data-i18n="set.maxRestartsSub">1–20 · resets after a successful start</small></label><label>Delay before restart (s)<input id="autoRestartDelaySecondsInput" type="number" min="1" max="300" value="5"><small data-i18n="set.restartDelaySub">Wait between attempts</small></label></div>
+
+          <!-- Pane 2: Personal -->
+          <div class="set-pane" data-set-pane="personal" hidden>
+            <div class="set-group-card">
+              <!-- Topic 1: Preferences -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/person.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.prefT">Preferences</h3>
+                    <small data-i18n="set.prefD">personal, per-PC</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.language">Language</div>
+                    <div class="sir-desc" data-i18n="set.languageSub">Interface language — applies immediately.</div>
+                  </div>
+                  <div class="sir-control">
+                    <select id="languageSelect" class="launcher-select ol-select">
+                      <option value="en">English</option>
+                      <option value="vi">Tiếng Việt</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.motion">Interface animation</div>
+                    <div class="sir-desc" data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</div>
+                  </div>
+                  <div class="sir-control">
+                    <select id="motionLevelSelect" class="launcher-select ol-select">
+                      <option value="full" data-i18n="set.motionFull">Full (default)</option>
+                      <option value="lite" data-i18n="set.motionLite">Lite (less motion)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.beginner">Beginner mode</div>
+                    <div class="sir-desc" data-i18n="set.beginnerSub">Shows only the essentials: Overview, Console, Players and Settings. Turn off to see every tool.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="beginnerModeInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.guide">Welcome guide</div>
+                    <div class="sir-desc" data-i18n="set.guideSub">Replay the first-run walkthrough anytime.</div>
+                  </div>
+                  <div class="sir-control">
+                    <button type="button" class="btn secondary sm" id="showWelcomeAgain" data-i18n="set.guideBtn">Show guide</button>
+                  </div>
+                </div>
               </div>
-              <div class="auto-backup">
-                <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoBackup">Auto-backup</b><small data-i18n-html="set.autoBackupSub">ZIP snapshots of world folders on a schedule (<code>save-off</code> safe).</small></div></div>
-                <div class="ab-row">
-                  <span class="ab-label" data-i18n="set.bkInterval">Interval</span>
-                  <div class="backup-chip-row ab-chips"><button type="button" class="filter-chip ab-chip" data-backup-mins="0" data-i18n="set.chipOff">Off</button><button type="button" class="filter-chip ab-chip" data-backup-mins="15" data-i18n="set.chip15">15m</button><button type="button" class="filter-chip ab-chip" data-backup-mins="30" data-i18n="set.chip30">30m</button><button type="button" class="filter-chip ab-chip" data-backup-mins="60" data-i18n="set.chip1h">1h</button><button type="button" class="filter-chip ab-chip" id="backupCustomChip" data-backup-mins="custom" data-i18n="set.chipCustom">Custom</button><input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden></div>
+              <!-- Topic 2: Instance appearance -->
+              <div class="set-topic" id="instAppearanceSection">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/grid.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.appearT">Instance appearance</h3>
+                    <small data-i18n="set.appearD">accent colour and avatar art for this server</small>
+                  </div>
+                </div>
+                <div class="inst-appear">
+                  <span class="inst-appear-preview" id="instAccentPreview"></span>
+                  <div class="inst-appear-body">
+                    <div class="inst-appear-label" data-i18n="set.appearAccent">Accent colour</div>
+                    <div class="accent-swatches" id="instAccentRow" role="radiogroup" aria-label="Accent colour"></div>
+                    <button type="button" class="btn secondary sm" id="instShuffleArt" data-i18n="set.appearShuffle">Shuffle avatar art</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 3: Automation -->
+          <div class="set-pane" data-set-pane="automation" hidden>
+            <div class="set-group-card">
+              <!-- Topic 1: Crash Recovery -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/shield.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.relT">Reliability</h3>
+                    <small data-i18n="set.relD">auto-restart on crash • scheduled backups</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.autoRestart">Auto-restart on crash</div>
+                    <div class="sir-desc" data-i18n="set.autoRestartSub">Restarts when the server exits with an error — for unattended hosting.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="autoRestartInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div id="autoRestartFields" class="restart-grid" hidden>
+                  <label>Max restarts in a row<input id="autoRestartMaxAttemptsInput" type="number" min="1" max="20" value="3"><small data-i18n="set.maxRestartsSub">1–20 · resets after a successful start</small></label>
+                  <label>Delay before restart (s)<input id="autoRestartDelaySecondsInput" type="number" min="1" max="300" value="5"><small data-i18n="set.restartDelaySub">Wait between attempts</small></label>
+                </div>
+              </div>
+              <!-- Topic 2: Auto-backup -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/cube.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.autoBackup">Auto-backup</h3>
+                    <small data-i18n-html="set.autoBackupSub">ZIP snapshots of world folders on a schedule (<code>save-off</code> safe).</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.bkInterval">Interval</div>
+                    <div class="sir-desc">Choose how often full world backups are created.</div>
+                  </div>
+                  <div class="sir-control">
+                    <div class="backup-chip-row ab-chips">
+                      <button type="button" class="filter-chip ab-chip" data-backup-mins="0" data-i18n="set.chipOff">Off</button>
+                      <button type="button" class="filter-chip ab-chip" data-backup-mins="15" data-i18n="set.chip15">15m</button>
+                      <button type="button" class="filter-chip ab-chip" data-backup-mins="30" data-i18n="set.chip30">30m</button>
+                      <button type="button" class="filter-chip ab-chip" data-backup-mins="60" data-i18n="set.chip1h">1h</button>
+                      <button type="button" class="filter-chip ab-chip" id="backupCustomChip" data-backup-mins="custom" data-i18n="set.chipCustom">Custom</button>
+                      <input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden>
+                    </div>
+                  </div>
                 </div>
                 <div class="ab-row ab-custom" id="backupCustomRow" hidden>
                   <span class="ab-label" data-i18n="set.bkEvery">Every</span>
                   <input id="autoBackupCustomInput" type="number" min="1" placeholder="45">
                   <span class="ab-hint" data-i18n="set.bkMin">minutes</span>
                 </div>
-                <div class="ab-row" id="backupRetentionRow">
-                  <span class="ab-label" data-i18n="set.retention">Keep</span>
-                  <input id="backupRetentionInput" type="number" min="1" max="100" value="10">
-                  <span class="ab-hint" data-i18n="set.retentionHint">newest on disk · manual backups are never deleted</span>
+                <div class="set-item-row" id="backupRetentionRow">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.retention">Keep</div>
+                    <div class="sir-desc" data-i18n="set.retentionHint">newest on disk · manual backups are never deleted</div>
+                  </div>
+                  <div class="sir-control">
+                    <input id="backupRetentionInput" type="number" min="1" max="100" value="10" style="width:70px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 10px;color:var(--text);font:12px var(--font-mono)">
+                  </div>
+                </div>
+              </div>
+              <!-- Topic 3: Schedule -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/clock.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="sch.title">Schedule</h3>
+                    <small data-i18n="sch.sub">Start and stop the server automatically at set times</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="sch.enable">Enable scheduler</div>
+                    <div class="sir-desc" data-i18n="sch.enableSub">Uses this PC's local clock. If the computer is asleep at the scheduled time, the action is skipped.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="scheduleEnabledInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div id="scheduleFields" class="restart-grid" hidden>
+                  <label><span data-i18n="sch.startT">Start at</span><input id="scheduleStartInput" type="time"><small data-i18n="sch.startSub">Leave empty to disable auto-start</small></label>
+                  <label><span data-i18n="sch.stopT">Stop at</span><input id="scheduleStopInput" type="time"><small data-i18n="sch.stopSub">Leave empty to disable auto-stop</small></label>
+                </div>
+                <div id="scheduleDaysRow" class="schedule-days-row set-chips" hidden>
+                  <span class="hint" data-i18n="sch.days">Days</span>
+                  <button type="button" class="filter-chip" data-day="1" data-i18n="sch.day1">Mon</button>
+                  <button type="button" class="filter-chip" data-day="2" data-i18n="sch.day2">Tue</button>
+                  <button type="button" class="filter-chip" data-day="3" data-i18n="sch.day3">Wed</button>
+                  <button type="button" class="filter-chip" data-day="4" data-i18n="sch.day4">Thu</button>
+                  <button type="button" class="filter-chip" data-day="5" data-i18n="sch.day5">Fri</button>
+                  <button type="button" class="filter-chip" data-day="6" data-i18n="sch.day6">Sat</button>
+                  <button type="button" class="filter-chip" data-day="0" data-i18n="sch.day0">Sun</button>
+                </div>
+                <div id="scheduleNext" class="field-hint" hidden></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 4: Integrations -->
+          <div class="set-pane" data-set-pane="integrations" hidden>
+            <p class="set-group-head" data-i18n="set.grpShare">Share your server</p>
+            <div class="set-group-card">
+              <!-- Topic 1: Internet Tunnel -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/terminal.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.tunnelT">Internet tunnel</h3>
+                    <small data-i18n="set.tunnelD">share your server online with Playit</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.autoTunnel">Auto-start tunnel with the server</div>
+                    <div class="sir-desc" data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="autoTunnelInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <details class="set-fold">
+                  <summary><span data-i18n="set.adv">Advanced</span><span class="set-chevron">▸</span></summary>
+                  <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
+                  <label class="set-field"><span data-i18n="set.pinggyPath">SSH client path (optional)</span><div class="set-path-row"><input id="pinggyPathInput" placeholder="ssh (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="pinggyBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
+                </details>
+                <div id="tunnelOverviewSection" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+                  <small class="field-hint" data-i18n="tun.ovD" style="display:block;margin-bottom:8px">your public addresses, one row per server</small>
+                  <div id="tunnelOverview" class="tun-ov"></div>
+                </div>
+              </div>
+              <!-- Topic 2: Remote Access -->
+              <div class="set-topic remote-section">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/terminal.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="remote.title">Remote access</h3>
+                    <small data-i18n="remote.sub">Check on this server from another device — no port forwarding.</small>
+                  </div>
+                  <div class="sth-spacer">
+                    <span class="mcp-pill" id="remotePill" data-i18n="remote.stopped">Stopped</span>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="remote.enable">Enable remote access</div>
+                    <div class="sir-desc" data-i18n="remote.enableSub">Starts a loopback-only server with a long-lived token. Reads only; never installs or deletes.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="remoteEnabledInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="remote.readOnly">Read-only</div>
+                    <div class="sir-desc" data-i18n="remote.readOnlySub">Block the one action endpoint. The API can only read.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="remoteReadOnlyInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row col">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="remote.tokenLabel">Token</div>
+                    <div class="sir-desc">Masked security token for remote client authorization.</div>
+                  </div>
+                  <div class="remote-token-row set-input-box">
+                    <input id="remoteTokenInput" class="remote-token-input" type="text" readonly value="" placeholder="••••••••••••" spellcheck="false" autocomplete="off">
+                    <button type="button" class="btn secondary sm" id="remoteTokenReveal" data-i18n="remote.tokenReveal">Reveal</button>
+                    <button type="button" class="btn secondary sm" id="remoteTokenCopy" data-i18n="remote.tokenCopy">Copy</button>
+                    <button type="button" class="btn secondary sm" id="remoteTokenRotate" data-i18n="remote.tokenRotate">Regenerate</button>
+                  </div>
+                </div>
+                <details class="set-fold">
+                  <summary><span data-i18n="set.netAdv">Advanced network</span><span class="set-chevron">▸</span></summary>
+                  <label class="set-field"><span data-i18n="remote.allow">Allowed IPs</span><input id="remoteAllowInput" placeholder="10.0.0.5, 192.168.1.*" spellcheck="false"><small class="field-hint" data-i18n="remote.allowSub"></small></label>
+                  <label class="set-field"><span data-i18n="remote.port">Port</span><input id="remotePortInput" type="number" min="0" max="65535" value="0"><small class="field-hint" data-i18n="remote.portSub"></small></label>
+                  <label class="set-field"><span data-i18n="remote.bind">Bind address</span><input id="remoteBindInput" placeholder="127.0.0.1" spellcheck="false"><small class="field-hint" data-i18n="remote.bindSub"></small></label>
+                </details>
+                <div class="input-row"><span class="hint" id="remoteStatus" data-i18n="remote.stopped">Stopped</span><button type="button" class="btn secondary sm" id="remoteOpenDoc" style="margin-left:auto" data-i18n="remote.doc">How to reach it from anywhere (Tailscale) →</button></div>
+                <div id="remoteAddresses" class="remote-addresses"></div>
+                <p class="proxy-notice" id="remoteWildWarn" hidden data-i18n="remote.wildWarn">The bind address is not 127.0.0.1 and the IP allowlist is empty — any device on this network can reach the remote API (only the token protects it). Set an allowlist, or bind 127.0.0.1 and use Tailscale.</p>
+              </div>
+            </div>
+            <p class="set-group-head" data-i18n="set.grpTools" style="margin-top:var(--space-4)">Connect tools</p>
+            <div class="set-group-card">
+              <!-- Topic 3: CurseForge API -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/funnel.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.cfT">CurseForge</h3>
+                    <small data-i18n="set.cfD">search the CurseForge catalogue (optional)</small>
+                  </div>
+                </div>
+                <div class="set-item-row col">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.cfKey">CurseForge API key</div>
+                    <div class="sir-desc" data-i18n="set.cfKeySub">Stored only on this PC and sent only to api.curseforge.com. The launcher does not bundle a key. Mods whose author blocks third-party downloads can't be auto-installed — open their page instead.</div>
+                  </div>
+                  <div class="set-path-row set-input-box">
+                    <input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off">
+                    <button type="button" class="btn secondary sm" id="cfKeyGet" data-i18n="set.cfKeyGet">Get a key</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </section>
-          <!-- Schedule moved into Automation -->
-          <details class="flat-cell set-advanced">
-            <summary><img src="./assets/icons/ui/clock.svg" alt=""><h3 data-i18n="sch.title">Schedule</h3><small data-i18n="sch.sub">Start and stop the server automatically at set times</small><span class="set-chevron">▸</span></summary>
-            <div class="set-adv-body">
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="sch.enable">Enable scheduler</b><small data-i18n="sch.enableSub">Uses this PC's local clock. If the computer is asleep at the scheduled time, the action is skipped.</small></div><label class="switch"><input type="checkbox" id="scheduleEnabledInput"><span class="slider"></span></label></div>
-            <div id="scheduleFields" class="restart-grid" hidden>
-              <label><span data-i18n="sch.startT">Start at</span><input id="scheduleStartInput" type="time"><small data-i18n="sch.startSub">Leave empty to disable auto-start</small></label>
-              <label><span data-i18n="sch.stopT">Stop at</span><input id="scheduleStopInput" type="time"><small data-i18n="sch.stopSub">Leave empty to disable auto-stop</small></label>
-            </div>
-            <div id="scheduleDaysRow" class="schedule-days-row set-chips" hidden>
-              <span class="hint" data-i18n="sch.days">Days</span>
-              <button type="button" class="filter-chip" data-day="1" data-i18n="sch.day1">Mon</button><button type="button" class="filter-chip" data-day="2" data-i18n="sch.day2">Tue</button><button type="button" class="filter-chip" data-day="3" data-i18n="sch.day3">Wed</button><button type="button" class="filter-chip" data-day="4" data-i18n="sch.day4">Thu</button><button type="button" class="filter-chip" data-day="5" data-i18n="sch.day5">Fri</button><button type="button" class="filter-chip" data-day="6" data-i18n="sch.day6">Sat</button><button type="button" class="filter-chip" data-day="0" data-i18n="sch.day0">Sun</button>
-            </div>
-            <div id="scheduleNext" class="field-hint" hidden></div>
-            </div>
-          </details>
           </div>
-          <div class="set-pane" data-set-pane="integrations" hidden>
-          <!-- v4.0.0: Integrations split into 2 labelled groups (Share / Connect); advanced
-               fields folded into <details> so the pane reads as 4 calm switches for beginners. -->
-          <p class="set-group-head" data-i18n="set.grpShare">Share your server</p>
-          <!-- Internet tunnel (path/host settings are for power users) -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="set.tunnelT">Internet tunnel</h3><small data-i18n="set.tunnelD">share your server online with Playit</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="set.autoTunnel">Auto-start tunnel with the server</b><small data-i18n="set.autoTunnelSub">When the server starts, also start the Playit service (so your address is live). Turn off to manage it yourself.</small></div><label class="switch"><input type="checkbox" id="autoTunnelInput"><span class="slider"></span></label></div>
-            <details class="set-fold">
-              <summary><span data-i18n="set.adv">Advanced</span><span class="set-chevron">▸</span></summary>
-              <label class="set-field"><span data-i18n="set.playitPath">Playit agent path (optional)</span><div class="set-path-row"><input id="playitPathInput" placeholder="playit (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="playitBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
-              <label class="set-field"><span data-i18n="set.pinggyPath">SSH client path (optional)</span><div class="set-path-row"><input id="pinggyPathInput" placeholder="ssh (auto-detect from PATH)" spellcheck="false"><button type="button" class="btn secondary sm" id="pinggyBrowse" data-i18n="set.browseFile">Browse…</button></div></label>
-            </details>
-            <!-- v4.0.0: tunnel overview folded into this card (was a separate 5th card) — hidden until 2+ instances. -->
-            <div id="tunnelOverviewSection" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-              <small class="field-hint" data-i18n="tun.ovD" style="display:block;margin-bottom:8px">your public addresses, one row per server</small>
-              <div id="tunnelOverview" class="tun-ov"></div>
-            </div>
-          </section>
-          <!-- Remote access (3.3.0): a loopback-only API for another device. Off by default. -->
-          <section class="flat-cell flat-span2 remote-section">
-            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="remote.title">Remote access</h3><small data-i18n="remote.sub">Check on this server from another device — no port forwarding.</small><span class="mcp-pill" id="remotePill" data-i18n="remote.stopped">Stopped</span></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="remote.enable">Enable remote access</b><small data-i18n="remote.enableSub">Starts a loopback-only server with a long-lived token. Reads only; never installs or deletes.</small></div><label class="switch"><input type="checkbox" id="remoteEnabledInput"><span class="slider"></span></label></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="remote.readOnly">Read-only</b><small data-i18n="remote.readOnlySub">Block the one action endpoint. The API can only read.</small></div><label class="switch"><input type="checkbox" id="remoteReadOnlyInput"><span class="slider"></span></label></div>
-            <details class="set-fold">
-              <summary><span data-i18n="set.netAdv">Advanced network</span><span class="set-chevron">▸</span></summary>
-              <label class="set-field"><span data-i18n="remote.allow">Allowed IPs</span><input id="remoteAllowInput" placeholder="10.0.0.5, 192.168.1.*" spellcheck="false"><small class="field-hint" data-i18n="remote.allowSub"></small></label>
-              <label class="set-field"><span data-i18n="remote.port">Port</span><input id="remotePortInput" type="number" min="0" max="65535" value="0"><small class="field-hint" data-i18n="remote.portSub"></small></label>
-              <label class="set-field"><span data-i18n="remote.bind">Bind address</span><input id="remoteBindInput" placeholder="127.0.0.1" spellcheck="false"><small class="field-hint" data-i18n="remote.bindSub"></small></label>
-            </details>
-            <div class="input-row"><span class="hint" id="remoteStatus" data-i18n="remote.stopped">Stopped</span><button type="button" class="btn secondary sm" id="remoteOpenDoc" style="margin-left:auto" data-i18n="remote.doc">How to reach it from anywhere (Tailscale) →</button></div>
-            <div id="remoteAddresses" class="remote-addresses"></div>
-            <!-- 4.3.0: the long-lived token. Masked by default; Reveal fetches it on demand (never
-                 stored in renderer state), Regenerate mints a new one and drops old clients. -->
-            <label class="set-field"><span data-i18n="remote.tokenLabel">Token</span>
-              <div class="remote-token-row">
-                <input id="remoteTokenInput" class="remote-token-input" type="text" readonly value="" placeholder="••••••••••••" spellcheck="false" autocomplete="off">
-                <button type="button" class="btn secondary sm" id="remoteTokenReveal" data-i18n="remote.tokenReveal">Reveal</button>
-                <button type="button" class="btn secondary sm" id="remoteTokenCopy" data-i18n="remote.tokenCopy">Copy</button>
-                <button type="button" class="btn secondary sm" id="remoteTokenRotate" data-i18n="remote.tokenRotate">Regenerate</button>
-              </div>
-            </label>
-            <!-- v4.0.0: warn when the remote API is bound off-loopback with NO IP allowlist, so any
-                 host on the network can reach it (token-only). -->
-            <p class="proxy-notice" id="remoteWildWarn" hidden data-i18n="remote.wildWarn">The bind address is not 127.0.0.1 and the IP allowlist is empty — any device on this network can reach the remote API (only the token protects it). Set an allowlist, or bind 127.0.0.1 and use Tailscale.</p>
-          </section>
-          <p class="set-group-head" data-i18n="set.grpTools">Connect tools</p>
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/funnel.svg" alt=""><h3 data-i18n="set.cfT">CurseForge</h3><small data-i18n="set.cfD">search the CurseForge catalogue (optional)</small></div>
-            <label class="set-field"><span data-i18n="set.cfKey">CurseForge API key</span><div class="set-path-row"><input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off"><button type="button" class="btn secondary sm" id="cfKeyGet" data-i18n="set.cfKeyGet">Get a key</button></div></label>
-            <small class="field-hint" data-i18n="set.cfKeySub">Stored only on this PC and sent only to api.curseforge.com. The launcher does not bundle a key. Mods whose author blocks third-party downloads can't be auto-installed — open their page instead.</small>
-          </section>
-          </div>
-          <!-- v4.0.0: MCP / AI gets its own Settings category (the launcher's headline feature). -->
+
+          <!-- Pane 5: AI -->
           <div class="set-pane" data-set-pane="ai" hidden>
-          <section class="flat-cell mcp-section">
-            <div class="sec-head"><img src="./assets/icons/ui/terminal.svg" alt=""><h3 data-i18n="mcp.title">MCP / AI integration</h3><small data-i18n="mcp.sub">Let an MCP client read and control your server</small><span class="mcp-pill" id="mcpPill" data-i18n="mcp.stopped">Stopped</span></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.enable">Enable MCP server</b><small data-i18n="mcp.enableSub">Starts a local-only (127.0.0.1) server with a fresh token each launch. The app must stay open.</small></div><label class="switch"><input type="checkbox" id="mcpEnabledInput"><span class="slider"></span></label></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.autoWrite">Auto-allow write tools</b><small data-i18n="mcp.autoWriteSub">Skip the confirmation for write tools. Destructive tools always ask.</small></div><label class="switch"><input type="checkbox" id="mcpAutoWriteInput"><span class="slider"></span></label></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="mcp.readOnly">Read-only mode</b><small data-i18n="mcp.readOnlySub">Block all write and destructive tools — the AI can only inspect, never change, your server.</small></div><label class="switch"><input type="checkbox" id="mcpReadOnlyInput"><span class="slider"></span></label></div>
-            <div class="input-row"><span class="hint" id="mcpStatus" data-i18n="mcp.stopped">Stopped</span><button type="button" class="btn secondary sm" id="mcpCopyConfig" style="margin-left:auto" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
-          </section>
-          <!-- How to connect (end-user guide) -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/book.svg" alt=""><h3 data-i18n="mcp.guideT">Connect an AI client</h3><small data-i18n="mcp.guideD">3 steps</small></div>
-            <ol class="mcp-steps">
-              <li data-i18n="mcp.step1">Turn on the MCP server above — a fresh local address is created each launch.</li>
-              <li data-i18n="mcp.step2">Click "Copy MCP config" — this JSON belongs in your AI client's MCP settings.</li>
-              <li data-i18n="mcp.step3">Paste it into Claude Desktop, Cursor, or any MCP client, then restart that app.</li>
-            </ol>
-            <div class="mcp-cfg"><pre id="mcpConfigPreview" class="mcp-cfg-pre"></pre><button type="button" class="btn secondary sm" id="mcpCopyConfig2" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
-          </section>
-          <!-- What the AI can do (advanced/dev) -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/shield.svg" alt=""><h3 data-i18n="mcp.capT">What the AI can do</h3><small data-i18n="mcp.capD">three permission tiers</small></div>
-            <div class="mcp-tier"><span class="badge ok" data-i18n="mcp.riskRead">read</span><div class="mcp-tier-info"><b data-i18n="mcp.capRead">Read — always allowed</b><small data-i18n="mcp.capReadD">Server status, console, players, worlds and metrics.</small></div></div>
-            <div class="mcp-tier"><span class="badge warn" data-i18n="mcp.riskWrite">write</span><div class="mcp-tier-info"><b data-i18n="mcp.capWrite">Write — asked once</b><small data-i18n="mcp.capWriteD">Install content, edit files, send console commands. Skipped when auto-allow is on.</small></div></div>
-            <div class="mcp-tier"><span class="badge bad" data-i18n="mcp.riskDestroy">destroy</span><div class="mcp-tier-info"><b data-i18n="mcp.capDestroy">Destructive — always asks</b><small data-i18n="mcp.capDestroyD">Delete backups/content, stop the server. Can never be auto-allowed.</small></div></div>
-          </section>
+            <div class="set-group-card">
+              <!-- Topic 1: MCP Server Engine -->
+              <div class="set-topic mcp-section">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/terminal.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="mcp.title">MCP / AI integration</h3>
+                    <small data-i18n="mcp.sub">Let an MCP client read and control your server</small>
+                  </div>
+                  <div class="sth-spacer">
+                    <span class="mcp-pill" id="mcpPill" data-i18n="mcp.stopped">Stopped</span>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="mcp.enable">Enable MCP server</div>
+                    <div class="sir-desc" data-i18n="mcp.enableSub">Starts a local-only (127.0.0.1) server with a fresh token each launch. The app must stay open.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="mcpEnabledInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="mcp.autoWrite">Auto-allow write tools</div>
+                    <div class="sir-desc" data-i18n="mcp.autoWriteSub">Skip the confirmation for write tools. Destructive tools always ask.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="mcpAutoWriteInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="mcp.readOnly">Read-only mode</div>
+                    <div class="sir-desc" data-i18n="mcp.readOnlySub">Block all write and destructive tools — the AI can only inspect, never change, your server.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="mcpReadOnlyInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="input-row"><span class="hint" id="mcpStatus" data-i18n="mcp.stopped">Stopped</span><button type="button" class="btn secondary sm" id="mcpCopyConfig" style="margin-left:auto" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
+              </div>
+              <!-- Topic 2: Connect Guide -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/book.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="mcp.guideT">Connect an AI client</h3>
+                    <small data-i18n="mcp.guideD">3 steps</small>
+                  </div>
+                </div>
+                <ol class="mcp-steps">
+                  <li data-i18n="mcp.step1">Turn on the MCP server above — a fresh local address is created each launch.</li>
+                  <li data-i18n="mcp.step2">Click "Copy MCP config" — this JSON belongs in your AI client's MCP settings.</li>
+                  <li data-i18n="mcp.step3">Paste it into Claude Desktop, Cursor, or any MCP client, then restart that app.</li>
+                </ol>
+                <div class="mcp-cfg"><pre id="mcpConfigPreview" class="mcp-cfg-pre"></pre><button type="button" class="btn secondary sm" id="mcpCopyConfig2" data-i18n="mcp.copyConfig">Copy MCP config</button></div>
+              </div>
+              <!-- Topic 3: Permission Tiers -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/shield.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="mcp.capT">What the AI can do</h3>
+                    <small data-i18n="mcp.capD">three permission tiers</small>
+                  </div>
+                </div>
+                <div class="mcp-tier"><span class="badge ok" data-i18n="mcp.riskRead">read</span><div class="mcp-tier-info"><b data-i18n="mcp.capRead">Read — always allowed</b><small data-i18n="mcp.capReadD">Server status, console, players, worlds and metrics.</small></div></div>
+                <div class="mcp-tier"><span class="badge warn" data-i18n="mcp.riskWrite">write</span><div class="mcp-tier-info"><b data-i18n="mcp.capWrite">Write — asked once</b><small data-i18n="mcp.capWriteD">Install content, edit files, send console commands. Skipped when auto-allow is on.</small></div></div>
+                <div class="mcp-tier"><span class="badge bad" data-i18n="mcp.riskDestroy">destroy</span><div class="mcp-tier-info"><b data-i18n="mcp.capDestroy">Destructive — always asks</b><small data-i18n="mcp.capDestroyD">Delete backups/content, stop the server. Can never be auto-allowed.</small></div></div>
+              </div>
+            </div>
           </div>
+
+          <!-- Pane 6: Advanced -->
           <div class="set-pane" data-set-pane="advanced" hidden>
-          <!-- v6.0.0 F1: webhook notifications (Discord-compatible). -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/bolt.svg" alt=""><h3 data-i18n="wh.title">Notifications</h3><small data-i18n="wh.sub">Post a message to a Discord webhook when something happens.</small></div>
-            <label class="set-field"><span data-i18n="wh.url">Webhook URL</span><input id="webhookUrlInput" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off"><small class="field-hint" data-i18n="wh.urlSub">Paste a Discord webhook URL (Server Settings > Integrations > Webhooks). Leave empty to disable.</small></label>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="wh.events">Events</b><small data-i18n="wh.eventsSub">Which events send a message.</small></div><div class="wh-events" id="webhookEvents"><label class="filter-chip"><input type="checkbox" data-wh-event="start"> <span data-i18n="wh.ev.start">Start</span></label><label class="filter-chip"><input type="checkbox" data-wh-event="stop"> <span data-i18n="wh.ev.stop">Stop</span></label><label class="filter-chip"><input type="checkbox" data-wh-event="crash"> <span data-i18n="wh.ev.crash">Crash</span></label><label class="filter-chip"><input type="checkbox" data-wh-event="player_join"> <span data-i18n="wh.ev.join">Player joins</span></label></div></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="wh.format">Payload format</b><small data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</small></div><select class="ol-select" id="webhookFormatSelect" style="max-width:220px"><option value="discord" data-i18n="wh.formatDiscord">Discord</option><option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option></select></div>
-            <div class="input-row"><span class="hint" data-i18n="wh.hint">Sent only on your machine; a bad URL is ignored silently.</span><button type="button" class="btn secondary sm" id="webhookTestBtn" style="margin-left:auto" data-i18n="wh.test">Send test</button></div>
-          </section>
-          <!-- v6.0.0 I2: Docker export. Generates the Dockerfile/compose for the active server. -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/cube.svg" alt=""><h3 data-i18n="dock.title">Export as Docker</h3><small data-i18n="dock.sub">Generate a Dockerfile + docker-compose.yml for this server.</small></div>
-            <p class="cell-sub" data-i18n="dock.desc">Runs the same headless backend in a container on any Linux VPS. Bakes a JRE, mounts ./server and ./data, and sets up a healthcheck. Perfect for moving a server to the cloud.</p>
-            <button type="button" class="btn secondary sm" id="exportDockerBtn" data-i18n="dock.btn">Export files…</button>
-          </section>
-          <!-- v6.0.0 F4: Prometheus /metrics endpoint for a Grafana scrape. Loopback only. -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/gauge.svg" alt=""><h3 data-i18n="prom.title">Prometheus metrics</h3><small data-i18n="prom.sub">Let Grafana scrape server metrics from a local endpoint.</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="prom.enable">Enable /metrics endpoint</b><small data-i18n="prom.enableSub">Loopback only. Scrape <code>http://127.0.0.1:&lt;port&gt;/metrics</code>.</small></div><label class="switch"><input type="checkbox" id="prometheusEnabledInput"><span class="slider"></span></label></div>
-            <label class="set-field"><span data-i18n="prom.port">Port (0 = random free port)</span><input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" style="max-width:160px"></label>
-            <div class="input-row" style="margin-top:8px"><p class="hint" id="promStatusLine" hidden style="margin:0"></p><button type="button" class="btn secondary sm" id="promCopyUrl" hidden style="margin-left:auto" data-i18n="prom.copy">Copy URL</button></div>
-          </section>
-          <!-- Updates (v4.0.0: flat card — the old <details> left the row visually unbalanced) -->
-          <section class="flat-cell">
-            <div class="sec-head"><img src="./assets/icons/ui/gear.svg" alt=""><h3 data-i18n="upd.title">Updates</h3><small data-i18n="upd.sub">Check for and install new versions automatically</small></div>
-            <div class="set-toggle"><div class="set-toggle-info"><b data-i18n="upd.mode">Update policy</b><small data-i18n="upd.modeSub">How the app handles new versions. The manual button always works.</small></div><select class="ol-select" id="updatePolicySelect" style="max-width:220px"><option value="auto" data-i18n="upd.modeAuto">Automatic</option><option value="ask" data-i18n="upd.modeAsk">Ask me first</option><option value="off" data-i18n="upd.modeOff">Off</option></select></div>
-            <div class="input-row"><span class="hint" id="updateStatus"></span><button type="button" class="btn secondary sm" id="checkUpdateBtn" style="margin-left:auto" data-i18n="upd.check">Check for updates</button></div>
-          </section>
+            <div class="set-group-card">
+              <!-- Topic 1: Notifications -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="wh.title">Notifications</h3>
+                    <small data-i18n="wh.sub">Post a message to a Discord webhook when something happens.</small>
+                  </div>
+                </div>
+                <div class="set-item-row col">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="wh.url">Webhook URL</div>
+                    <div class="sir-desc" data-i18n="wh.urlSub">Paste a Discord webhook URL (Server Settings > Integrations > Webhooks). Leave empty to disable.</div>
+                  </div>
+                  <div class="set-input-box">
+                    <input id="webhookUrlInput" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off">
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="wh.events">Events</div>
+                    <div class="sir-desc" data-i18n="wh.eventsSub">Which events send a message.</div>
+                  </div>
+                  <div class="sir-control">
+                    <div class="wh-events" id="webhookEvents">
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="start"> <span data-i18n="wh.ev.start">Start</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="stop"> <span data-i18n="wh.ev.stop">Stop</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="crash"> <span data-i18n="wh.ev.crash">Crash</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="player_join"> <span data-i18n="wh.ev.join">Player joins</span></label>
+                    </div>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="wh.format">Payload format</div>
+                    <div class="sir-desc" data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</div>
+                  </div>
+                  <div class="sir-control">
+                    <select class="ol-select" id="webhookFormatSelect" style="max-width:220px">
+                      <option value="discord" data-i18n="wh.formatDiscord">Discord</option>
+                      <option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="input-row"><span class="hint" data-i18n="wh.hint">Sent only on your machine; a bad URL is ignored silently.</span><button type="button" class="btn secondary sm" id="webhookTestBtn" style="margin-left:auto" data-i18n="wh.test">Send test</button></div>
+              </div>
+              <!-- Topic 2: Docker Export -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/cube.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="dock.title">Export as Docker</h3>
+                    <small data-i18n="dock.sub">Generate a Dockerfile + docker-compose.yml for this server.</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title">Containerized deployment</div>
+                    <div class="sir-desc" data-i18n="dock.desc">Runs the same headless backend in a container on any Linux VPS. Bakes a JRE, mounts ./server and ./data, and sets up a healthcheck. Perfect for moving a server to the cloud.</div>
+                  </div>
+                  <div class="sir-control">
+                    <button type="button" class="btn secondary sm" id="exportDockerBtn" data-i18n="dock.btn">Export files…</button>
+                  </div>
+                </div>
+              </div>
+              <!-- Topic 3: Prometheus Metrics -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/gauge.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="prom.title">Prometheus metrics</h3>
+                    <small data-i18n="prom.sub">Let Grafana scrape server metrics from a local endpoint.</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="prom.enable">Enable /metrics endpoint</div>
+                    <div class="sir-desc" data-i18n="prom.enableSub">Loopback only. Scrape <code>http://127.0.0.1:&lt;port&gt;/metrics</code>.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="prometheusEnabledInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="prom.port">Port (0 = random free port)</div>
+                    <div class="sir-desc">Port number to bind the metrics scraper.</div>
+                  </div>
+                  <div class="sir-control">
+                    <input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" style="max-width:120px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 10px;color:var(--text);font:12px var(--font-mono)">
+                  </div>
+                </div>
+                <div class="input-row" style="margin-top:4px"><p class="hint" id="promStatusLine" hidden style="margin:0"></p><button type="button" class="btn secondary sm" id="promCopyUrl" hidden style="margin-left:auto" data-i18n="prom.copy">Copy URL</button></div>
+              </div>
+              <!-- Topic 4: Launcher Updates -->
+              <div class="set-topic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/gear.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="upd.title">Updates</h3>
+                    <small data-i18n="upd.sub">Check for and install new versions automatically</small>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="upd.mode">Update policy</div>
+                    <div class="sir-desc" data-i18n="upd.modeSub">How the app handles new versions. The manual button always works.</div>
+                  </div>
+                  <div class="sir-control">
+                    <select class="ol-select" id="updatePolicySelect" style="max-width:200px">
+                      <option value="auto" data-i18n="upd.modeAuto">Automatic</option>
+                      <option value="ask" data-i18n="upd.modeAsk">Ask me first</option>
+                      <option value="off" data-i18n="upd.modeOff">Off</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="input-row"><span class="hint" id="updateStatus"></span><button type="button" class="btn secondary sm" id="checkUpdateBtn" style="margin-left:auto" data-i18n="upd.check">Check for updates</button></div>
+              </div>
+            </div>
           </div>
           </div>
         </div>
@@ -801,8 +1199,80 @@
         <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="inv-grid"></div></div>
         </div>
         <div class="inspect-panel" id="pdPanelStats">
-        <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>
-        <div class="pd-stats-grid" id="pdStatsGrid"><div class="inv-empty"><b data-i18n="pd.loadingStats">Loading stats…</b><span data-i18n="pd.loadingStatsSub">Reading the player's saved statistics.</span></div></div>
+          <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>
+          <div class="pd-stats-hero" id="pdStatsHero" hidden>
+            <div class="pd-hero-stat pd-hero-playtime">
+              <div class="pd-hero-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9"/>
+                  <path d="M12 7v5l3.5 2"/>
+                </svg>
+              </div>
+              <div class="pd-hero-body">
+                <span class="pd-hero-label" data-i18n="pd.heroPlaytime">Playtime</span>
+                <b class="pd-hero-val" id="pdHeroPlaytime">—</b>
+                <span class="pd-hero-sub" id="pdHeroPlaytimeSub">0 sessions</span>
+              </div>
+            </div>
+            <div class="pd-hero-stat pd-hero-combat">
+              <div class="pd-hero-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/>
+                  <line x1="13" y1="19" x2="19" y2="13"/>
+                  <line x1="16" y1="16" x2="20" y2="20"/>
+                  <line x1="19" y1="21" x2="21" y2="19"/>
+                  <polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/>
+                  <line x1="5" y1="14" x2="9" y2="18"/>
+                  <line x1="7" y1="17" x2="4" y2="20"/>
+                  <line x1="3" y1="19" x2="5" y2="21"/>
+                </svg>
+              </div>
+              <div class="pd-hero-body">
+                <span class="pd-hero-label" data-i18n="pd.heroCombat">Combat & K/D</span>
+                <b class="pd-hero-val" id="pdHeroKd">—</b>
+                <span class="pd-hero-sub" id="pdHeroCombatSub">0 kills · 0 deaths</span>
+              </div>
+            </div>
+            <div class="pd-hero-stat pd-hero-travel">
+              <div class="pd-hero-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+                </svg>
+              </div>
+              <div class="pd-hero-body">
+                <span class="pd-hero-label" data-i18n="pd.heroTravel">Total Travel</span>
+                <b class="pd-hero-val" id="pdHeroTravel">—</b>
+                <span class="pd-hero-sub" id="pdHeroTravelSub">walk + sprint + fly</span>
+              </div>
+            </div>
+            <div class="pd-hero-stat pd-hero-damage">
+              <div class="pd-hero-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M13 2L4 14h6l-1 8 9-12h-6z"/>
+                </svg>
+              </div>
+              <div class="pd-hero-body">
+                <span class="pd-hero-label" data-i18n="pd.heroDamage">Damage</span>
+                <b class="pd-hero-val" id="pdHeroDamage">—</b>
+                <span class="pd-hero-sub" id="pdHeroDamageSub">dealt / taken</span>
+              </div>
+            </div>
+          </div>
+          <div class="pd-stats-toolbar" id="pdStatsToolbar" hidden>
+            <div class="pd-stats-chips" id="pdStatsChips" role="tablist">
+              <button type="button" class="pd-stat-chip is-active" data-cat="all"><span data-i18n="pd.statCatAll">All</span><i id="pdCatCountAll" class="chip-count">0</i></button>
+              <button type="button" class="pd-stat-chip" data-cat="survival"><span data-i18n="pd.statCatSurvival">Survival</span><i id="pdCatCountSurvival" class="chip-count">0</i></button>
+              <button type="button" class="pd-stat-chip" data-cat="combat"><span data-i18n="pd.statCatCombat">Combat</span><i id="pdCatCountCombat" class="chip-count">0</i></button>
+              <button type="button" class="pd-stat-chip" data-cat="movement"><span data-i18n="pd.statCatMovement">Movement</span><i id="pdCatCountMovement" class="chip-count">0</i></button>
+              <button type="button" class="pd-stat-chip" data-cat="interaction"><span data-i18n="pd.statCatInteraction">Interactions</span><i id="pdCatCountInteraction" class="chip-count">0</i></button>
+            </div>
+            <div class="pd-stats-search-wrap">
+              <input type="search" id="pdStatsSearch" class="pd-stats-search-input" placeholder="Search stats…" data-i18n-placeholder="pd.searchStatsPh" aria-label="Search statistics">
+              <span class="pd-stats-search-count" id="pdStatsCount"></span>
+            </div>
+          </div>
+          <div class="pd-stats-grid" id="pdStatsGrid"><div class="inv-empty"><b data-i18n="pd.loadingStats">Loading stats…</b><span data-i18n="pd.loadingStatsSub">Reading the player's saved statistics.</span></div></div>
         </div>
         <div class="inspect-panel" id="pdPanelLive">
           <div class="inspect-note" data-i18n="pd.liveNote">Live actions run as server commands and work while the server is running — the player must be online.</div>

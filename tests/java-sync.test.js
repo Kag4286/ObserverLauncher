@@ -51,6 +51,15 @@ fs.writeFileSync(path.join(tmp, 'server-1.17.1.jar'), 'x');
 const files17 = () => ({ jar: 'server-1.17.1.jar', launchScript: null });
 const msg8bad = validateStart({ serverPath: tmp, jvmArgs: '', memoryMax: 6 }, { ok: true, version: '1.8.0_292', arch: '64-bit', path: 'java' }, files17);
 check('Java 8 + 1.17.1 blocked (needs 16)', typeof msg8bad === 'string' && msg8bad.includes('needs Java 16'));
+
+// JVM option compatibility checks
+const msgShenandoahJava8 = validateStart({ serverPath: tmp, jvmArgs: '-XX:+UseShenandoahGC', memoryMax: 6 }, { ok: true, version: '1.8.0_292', arch: '64-bit', path: 'java' }, files16);
+check('Shenandoah blocked on Java 8', typeof msgShenandoahJava8 === 'string' && msgShenandoahJava8.includes('does not support Shenandoah GC'));
+const msgZgcJava8 = validateStart({ serverPath: tmp, jvmArgs: '-XX:+UseZGC', memoryMax: 6 }, { ok: true, version: '1.8.0_292', arch: '64-bit', path: 'java' }, files16);
+check('ZGC blocked on Java 8', typeof msgZgcJava8 === 'string' && msgZgcJava8.includes('does not support ZGC'));
+const msgShenandoahJava17 = validateStart({ serverPath: tmp, jvmArgs: '-XX:+UseShenandoahGC', memoryMax: 6 }, { ok: true, version: '17.0.2', arch: '64-bit', path: 'java' }, files16);
+check('Shenandoah allowed on Java 17', msgShenandoahJava17 === null || !msgShenandoahJava17.includes('does not support Shenandoah'));
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

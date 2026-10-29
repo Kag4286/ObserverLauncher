@@ -162,7 +162,7 @@ html.motion-lite .hero.is-running{animation:none;box-shadow:0 0 0 1px var(--inst
 .tunnel-help>summary::-webkit-details-marker{display:none}
 .tunnel-help>summary::before{content:'? '}
 .tunnel-help .tunnel-steps{margin:10px 0 4px}
-.set-path-row{display:flex;gap:8px;align-items:center}.set-path-row input{flex:1;min-width:0}.set-path-row .btn{flex:0 0 auto;white-space:nowrap}
+.set-path-row{display:flex;gap:8px;align-items:center;width:100%}.set-path-row input{flex:1;min-width:0;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font:500 12.5px var(--font-mono);outline:0;transition:border-color var(--dur-micro),box-shadow var(--dur-micro)}.set-path-row input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}.set-path-row .btn{flex:0 0 auto;white-space:nowrap}
 .chart-wrap{position:relative}
 .chart-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:13px;color:var(--text-dim);background:var(--panel);border-radius:var(--r);pointer-events:none}
 .chart-empty-overlay[hidden]{display:none}

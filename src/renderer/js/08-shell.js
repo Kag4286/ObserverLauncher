@@ -179,7 +179,7 @@ function switchTab(tab){
   // hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
   if(tab==='overview'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));}
   if(tab==='players')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
-  if(tab==='content'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates()}
+  if(tab==='content'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI();if(typeof syncContentKindAuto==='function')syncContentKindAuto();}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates();if(typeof loadContentConflicts==='function')loadContentConflicts();}
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
   // hook switchTab itself: it evaluates before this file, so capturing
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
@@ -797,10 +797,15 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
 // v6.0.0 G3: the preset builders (aikarFlags / zgcFlags / g1TunedFlags / JVM_PRESETS) live in
 // 00-core.js so they are unit-tested without the DOM; this file only wires them to the input.
 function applyJvmPreset(name){
-  const fn=JVM_PRESETS[String(name||'').toLowerCase()];
+  const lower=String(name||'').toLowerCase();
+  const fn=JVM_PRESETS[lower];
   if(typeof fn!=='function'||!$('#jvmArgsInput'))return false;
   const min=Number($('#memoryMinInput')?.value)||2, max=Number($('#memoryMaxInput')?.value)||6;
   const jv=state.java?.major||state.javaRequired||17;
+  if((lower==='shenandoah'||lower==='zgc') && jv<17){
+    toast(t('set.presetUnsupportedJava',{preset:t('set.preset.'+lower),v:jv}),'error');
+    return false;
+  }
   $('#jvmArgsInput').value=fn(min,max,jv);
   try{ renderJvmPreview(); }catch{}
   return true;
@@ -808,8 +813,8 @@ function applyJvmPreset(name){
 $('#jvmPresetRow')?.addEventListener('click',e=>{
   const b=e.target.closest('[data-jvm-preset]');
   if(b){
-    applyJvmPreset(b.dataset.jvmPreset);
-    toast(t('set.presetFilled',{n:t('set.preset.'+b.dataset.jvmPreset)}));
+    const ok=applyJvmPreset(b.dataset.jvmPreset);
+    if(ok) toast(t('set.presetFilled',{n:t('set.preset.'+b.dataset.jvmPreset)}));
     return;
   }
   const smart=e.target.closest('#smartJvmBtn');

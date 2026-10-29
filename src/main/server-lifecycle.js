@@ -460,7 +460,15 @@ async function startServerInternal(ctx, settings) {
     });
   }));
   ctx.serverProcess.stderr.on('data', inInst(d => {
-    d.toString().split(/\r?\n/).filter(Boolean).forEach(x => { ctx.appendLog(x, 'error'); parseServerLine(x, ctx.live, ctx.send); });
+    d.toString().split(/\r?\n/).filter(Boolean).forEach(x => {
+      ctx.appendLog(x, 'error');
+      parseServerLine(x, ctx.live, ctx.send);
+      const unrec = x.match(/Unrecognized VM option '([^']+)'/i);
+      if (unrec) {
+        ctx.hasJvmOptionError = true;
+        ctx.appendLog(`JVM startup failure: The option '${unrec[1]}' is not recognized by this Java runtime. Open Settings > Memory & JVM and switch to Aikar's flags or G1 tuned.`, 'error');
+      }
+    });
   }));
   ctx.serverProcess.on('exit', inInst((code, signal) => {
     if (!ctx.serverProcess) return;
@@ -477,7 +485,7 @@ async function startServerInternal(ctx, settings) {
       // 4.4.0: a user-requested Stop is 'manual' — it must not count as an unstable run, and it
       // must not re-log the rollback warning (the streak is preserved on disk for a later real crash).
       const rec = st.noteExit(ctx.runtimeInstanceId || instId, { code, manual: wasManual });
-      if (!wasManual) {
+      if (!wasManual && !ctx.hasJvmOptionError) {
         const d = st.decideRollback(rec);
         if (d.rollback) ctx.appendLog(`Stability: ${d.reason} - rollback recommended.`, 'error');
       }

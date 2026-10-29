@@ -176,5 +176,25 @@ check('legacy version is 7.0.72.847', legacyClassified.version === '7.0.72.847')
 check('legacy mcVersionRange is 1.12.2', legacyClassified.mcVersionRange === '1.12.2');
 check('legacy mcSource is metadata', legacyClassified.mcSource === 'metadata');
 
+// --- 10. Compound Maven bracket ranges (smallships case) ---
+const compoundRange = '[1.16.5],[1.16.4],[1.16.3],[1.16.2],[1.16.1],[1.16]';
+check('compound range satisfies 1.16.5', testMcVersionAgainstRange('1.16.5', compoundRange));
+check('compound range satisfies 1.16.4', testMcVersionAgainstRange('1.16.4', compoundRange));
+check('compound range satisfies 1.16', testMcVersionAgainstRange('1.16', compoundRange));
+check('compound range rejects 1.17', !testMcVersionAgainstRange('1.17', compoundRange));
+check('compound range areMcVersionsCompatible with 1.16.5', areMcVersionsCompatible('1.16.5', compoundRange));
+
+const compoundWithSpaces = '[1.16.4, 1.16.5], [1.17]';
+check('compound with spaces satisfies 1.16.5', testMcVersionAgainstRange('1.16.5', compoundWithSpaces));
+check('compound with spaces satisfies 1.17', testMcVersionAgainstRange('1.17', compoundWithSpaces));
+check('compound with spaces rejects 1.18', !testMcVersionAgainstRange('1.18', compoundWithSpaces));
+
+// --- 11. MANIFEST.MF Specification-Version vs Minecraft-Version ---
+const { parseManifestMf } = require('../src/main/mod-metadata.js');
+check('parseManifestMf ignores Specification-Version 1.0', parseManifestMf('Specification-Title: travelerstitles\nSpecification-Version: 1.0\n').mcVersionRange === null);
+check('parseManifestMf ignores Specification-Version 2.1.13', parseManifestMf('Specification-Title: iceandfire\nSpecification-Version: 2.1.13\n').mcVersionRange === null);
+check('parseManifestMf ignores Specification-Version 1.11.0', parseManifestMf('Specification-Title: alexsmobs\nSpecification-Version: 1.11.0\n').mcVersionRange === null);
+check('parseManifestMf parses Minecraft-Version: 1.16.5', parseManifestMf('Minecraft-Version: 1.16.5\n').mcVersionRange === '1.16.5');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

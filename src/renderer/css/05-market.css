@@ -28,7 +28,7 @@
 .file-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 10px;border-bottom:1px solid var(--border);font:500 12px var(--font-mono);background:transparent}
 .file-list li:last-child{border-bottom:0}
 .file-list li:hover{background:var(--panel-raised)}
-.file-list li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.file-list:not(.content-list) li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .file-list .empty{padding:18px 12px;text-align:center;color:var(--text-muted);font:500 11px var(--font-ui);border-bottom:0;display:flex;flex-direction:column;gap:8px;align-items:center}
 .file-list .empty div{display:grid;gap:4px}
 .file-list .empty b{color:var(--text);font:700 12px var(--font-ui)}
@@ -372,9 +372,9 @@
 .market-item .mi-foot .btn{margin-left:auto;padding:8px 16px}
 @media(max-width:700px){.market-item{grid-template-columns:48px 1fr}.market-item .market-icon{width:48px;height:48px}.market-item .mi-foot .btn{margin-left:0;width:100%}}
 
-/* ============ CONTENT TAB REDESIGN (0.7.0) ============ */
-.content-toolbar{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-3)}
-/* v4.0.0: the kind switch carries the per-kind COUNT, so the flat-stats block is gone. */
+/* ============ CONTENT TAB REDESIGN ============ */
+.content-toolbar{display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-3)}
+.content-toolbar-main{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap}
 .content-seg{display:inline-flex;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px;gap:2px}
 .content-seg .seg{display:inline-flex;align-items:center;gap:7px;font:600 12.5px var(--font-ui);padding:7px 14px;border:0;border-radius:var(--r-xs);background:transparent;color:var(--text-muted);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
 .content-seg .seg:hover{color:var(--text)}
@@ -385,6 +385,20 @@
 .content-search:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .content-search .search-icon{color:var(--text-dim);font-size:14px}
 .content-search input{flex:1;background:transparent;border:0;color:var(--text);font:12px var(--font-ui);outline:0;padding:9px 6px;min-width:0}
+.content-search .search-clear{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:0 4px;line-height:1;display:flex;align-items:center;justify-content:center}
+.content-search .search-clear:hover{color:var(--text)}
+
+/* Quick Filter Chips */
+.content-filter-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.content-filter-chips .filter-chip{display:inline-flex;align-items:center;gap:6px;font:600 11.5px var(--font-ui);padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--text-muted);cursor:pointer;transition:all var(--dur-micro) var(--ease-out)}
+.content-filter-chips .filter-chip:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface-3)}
+.content-filter-chips .filter-chip.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
+.content-filter-chips .filter-chip .chip-count{font:700 10.5px var(--font-mono);opacity:.85}
+.content-filter-chips .filter-chip.chip-updates{color:var(--brand);border-color:rgba(0,229,160,.3)}
+.content-filter-chips .filter-chip.chip-updates.active{background:rgba(0,229,160,.12);border-color:var(--brand);color:var(--brand)}
+.content-filter-chips .filter-chip.chip-issues{color:var(--warn);border-color:rgba(245,158,11,.3)}
+.content-filter-chips .filter-chip.chip-issues.active{background:rgba(245,158,11,.15);border-color:var(--warn);color:var(--warn)}
+
 .content-toolbar-actions{display:flex;gap:var(--space-2);align-items:center;margin-left:auto;flex-wrap:wrap}
 /* Small dropdown menus (v4.0.0: "+ Add" and "More"). */
 .menu{position:relative}
@@ -409,15 +423,82 @@
 .ctx-menu button.danger{color:var(--danger)}
 .ctx-menu button.danger:hover{background:var(--danger-weak)}
 @media (prefers-reduced-motion:reduce){.ctx-menu{animation:none}}
-/* One tall list — grows with the viewport, no per-column scroll. */
+/* One tall list — rows styling */
 .content-listwrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .content-list{list-style:none;margin:0;padding:0;max-height:none;border:0;border-radius:0;background:transparent;overflow:auto;min-height:120px}
-.content-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);font:500 12.5px var(--font-mono);background:transparent;transition:background var(--dur-micro) var(--ease-out)}
-.content-list li:last-child{border-bottom:0}
-.content-list li:hover{background:var(--surface-3)}
-.content-list li[hidden]{display:none!important}
-.content-list li.is-disabled .file-name{opacity:.5;text-decoration:line-through}
-.content-list li .file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.content-list li{background:transparent}
+.content-list .content-row{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:var(--space-3);padding:9px 14px;min-height:48px;
+  border-bottom:1px solid var(--border);background:transparent;
+  transition:background var(--dur-micro) var(--ease-out);
+}
+.content-list .content-row:last-child{border-bottom:0}
+.content-list .content-row:hover{background:var(--surface-2)}
+.content-list .content-row.is-disabled{opacity:.6}
+.content-list .content-row.is-disabled .cr-title{color:var(--text-muted)}
+.content-list .content-row[hidden]{display:none!important}
+
+/* Left: Avatar + Title + Filename */
+.cr-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.cr-glyph{
+  width:32px;height:32px;border-radius:var(--r-xs);
+  display:flex;align-items:center;justify-content:center;
+  font:700 12px var(--font-mono);letter-spacing:-.02em;
+  flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.1);
+}
+.cr-info{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.cr-title-row{display:flex;align-items:center;gap:8px;min-width:0}
+.cr-title{font:600 13px var(--font-ui);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.cr-state-badge{font:700 9px var(--font-mono);letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:999px;border:1px solid var(--border);color:var(--text-dim);flex-shrink:0}
+.cr-state-badge.off{border-color:rgba(255,255,255,.12);color:var(--text-dim);background:var(--surface-3)}
+.cr-filename{font:500 11px var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+
+/* Meta: Badges */
+.cr-meta{display:flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap}
+.cr-badge,
+.content-list .content-row .cr-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  font:700 9.5px var(--font-mono);letter-spacing:.02em;
+  padding:2px 7px;border-radius:var(--r-xs);
+  border:1px solid var(--border);color:var(--text-muted);background:var(--field);
+  white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;
+  flex:none!important;max-width:none!important;
+}
+.cr-badge.loader-forge{border-color:rgba(59,130,246,.35);color:#60a5fa;background:rgba(59,130,246,.08)}
+.cr-badge.loader-fabric{border-color:rgba(20,184,166,.35);color:#2dd4bf;background:rgba(20,184,166,.08)}
+.cr-badge.loader-neoforge{border-color:rgba(249,115,22,.35);color:#fb923c;background:rgba(249,115,22,.08)}
+.cr-badge.loader-bukkit{border-color:rgba(234,179,8,.35);color:#facc15;background:rgba(234,179,8,.08)}
+.cr-badge.ver{color:var(--text-muted);border-color:var(--border)}
+.cr-badge.update{border-color:rgba(0,229,160,.4);color:var(--brand);background:var(--brand-soft);cursor:pointer}
+.cr-badge.issue{border-color:rgba(245,158,11,.4);color:var(--warn);background:rgba(245,158,11,.1)}
+
+/* Actions */
+.cr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.cr-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid transparent;border-radius:var(--r-xs);
+  color:var(--text-dim);cursor:pointer;padding:4px 6px;font:600 11px var(--font-ui);
+  transition:all var(--dur-micro) var(--ease-out);
+}
+.cr-btn:hover{color:var(--text);background:var(--surface-3);border-color:var(--border)}
+.cr-btn.cr-btn-config{font-family:var(--font-mono);font-size:12px;padding:3px 6px;color:var(--text-muted)}
+.cr-btn.cr-btn-config:hover{color:var(--brand);border-color:rgba(0,229,160,.3);background:var(--brand-soft)}
+.cr-btn.danger:hover{color:var(--danger);background:var(--danger-weak);border-color:transparent}
+
+/* Mini Switch */
+.switch.sm{width:32px;height:18px;margin:0}
+.switch.sm .slider:before{width:12px;height:12px;left:2px;top:2px}
+.switch.sm input:checked + .slider:before{transform:translateX(14px)}
+
+/* Empty search state */
+.cr-empty-search{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:32px 16px;color:var(--text-muted);text-align:center;
+}
+.cr-empty-search .empty-icon{font-size:24px;color:var(--text-dim)}
+.cr-empty-search b{font-size:13px;color:var(--text)}
+
 /* Modpack tools (v4.0.0): the import/export .mrpack pair moved into a collapsed, but prominent, strip. */
 .modpack-tools{margin-top:var(--space-4);border:1px solid var(--border);border-radius:var(--r);background:var(--surface);overflow:hidden;interpolate-size:allow-keywords}
 .modpack-tools::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}

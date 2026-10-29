@@ -73,9 +73,31 @@ function testSimpleConstraint(targetMc, op, bound) {
   return cmp === 0 || tNorm === bNorm;
 }
 
+// Split compound Maven / comma-separated range expressions, e.g.:
+// "[1.16.5],[1.16.4],[1.16.3]" or "[1.16.4, 1.16.5], [1.17]"
+function splitRangeClauses(rangeStr) {
+  const clauses = [];
+  let depth = 0;
+  let current = '';
+  for (let i = 0; i < rangeStr.length; i++) {
+    const ch = rangeStr[i];
+    if (ch === '[' || ch === '(') depth++;
+    else if (ch === ']' || ch === ')') depth--;
+
+    if (ch === ',' && depth === 0) {
+      if (current.trim()) clauses.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) clauses.push(current.trim());
+  return clauses;
+}
+
 // Test whether a single Minecraft version strictly satisfies a declared range string.
 // Range formats supported:
-//   - Maven / Forge: "[1.16.4, 1.16.5]", "[1.16.4, 1.17)", "[1.16.4,)", "(,1.16.5]", "[1.16.4]"
+//   - Maven / Forge: "[1.16.4, 1.16.5]", "[1.16.4, 1.17)", "[1.16.4,)", "(,1.16.5]", "[1.16.4]", "[1.16.5],[1.16.4]"
 //   - NPM / Fabric: ">=1.16.4 <=1.16.5", ">=1.16.4", "~1.16.4", "^1.16.4", "*"
 //   - Bare version: "1.16.4"
 function testMcVersionAgainstRange(targetMc, rangeStr) {
@@ -84,6 +106,12 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
 
   const raw = String(rangeStr).trim();
   if (!raw) return true;
+
+  // Multiple comma-separated clauses outside brackets (e.g. "[1.16.5],[1.16.4]" or "[1.16.4, 1.16.5], [1.17]")
+  const clauses = splitRangeClauses(raw);
+  if (clauses.length > 1) {
+    return clauses.some(c => testMcVersionAgainstRange(targetMc, c));
+  }
 
   // 1. Maven / Forge interval bracket syntax: [min, max], [min, max), [min,), (,max]
   const mavenMatch = raw.match(/^([\[\(])\s*([^,\]\)]*)\s*,\s*([^,\]\)]*)\s*([\]\)])$/);

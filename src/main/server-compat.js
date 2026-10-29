@@ -40,7 +40,7 @@ function detectServerTarget(root, files) {
   if (/forge/.test(name)) return { mc: mcFromName(name) || detectForgeMcVersion(root), loader: 'forge' };
   if (/quilt/.test(name)) return { mc: mcFromName(name), loader: 'quilt' };
   if (/fabric/.test(name)) return { mc: mcFromName(name), loader: 'fabric' };
-  if (/paper|purpur|leaf|folia/.test(name) || f.hasSpigotConfig) return { mc: mcFromName(name), loader: 'paper' };
+  if (/paper|purpur|leaf|folia|spigot|bukkit|craftbukkit/i.test(name) || f.hasSpigotConfig) return { mc: mcFromName(name), loader: 'paper' };
   // jar-less Forge/NeoForge (run.bat): read libraries/ for the MC version + loader.
   if (f.launchScript || root) {
     const libRoot = path.join(String(root || ''), 'libraries', 'net');

@@ -27,6 +27,10 @@ check('mcFromName run.bat -> null', mcFromName('run.bat') === null);
 // detectServerTarget: explicit filenames
 const paper = makeServer({ jar: 'paper-1.21.1.jar' });
 check('paper -> paper/1.21.1', JSON.stringify(detectServerTarget(paper, serverFiles(paper))) === JSON.stringify({ mc: '1.21.1', loader: 'paper' }));
+const spig = makeServer({ jar: 'spigot-1.20.4.jar' });
+check('spigot -> paper/1.20.4', JSON.stringify(detectServerTarget(spig, serverFiles(spig))) === JSON.stringify({ mc: '1.20.4', loader: 'paper' }));
+const cb = makeServer({ jar: 'craftbukkit-1.16.5.jar' });
+check('craftbukkit -> paper/1.16.5', JSON.stringify(detectServerTarget(cb, serverFiles(cb))) === JSON.stringify({ mc: '1.16.5', loader: 'paper' }));
 const fab = makeServer({ jar: 'fabric-server-mc.1.20.1.jar' });
 check('fabric -> fabric/1.20.1', detectServerTarget(fab, serverFiles(fab)).loader === 'fabric');
 const vel = makeServer({ jar: 'velocity-3.3.0.jar' });
@@ -51,6 +55,6 @@ check('unknown MC not rejected', versionMatchesServer({ loaders: ['neoforge'] },
 check('neoforge also valid on forge server', versionMatchesServer({ gameVersions: ['1.16.5'], loaders: ['forge'] }, ot).ok === true);
 
 // cleanup
-for (const r of [paper, fab, vel, neo, of]) { try { fs.rmSync(r, { recursive: true, force: true }); } catch {} }
+for (const r of [paper, spig, cb, fab, vel, neo, of]) { try { fs.rmSync(r, { recursive: true, force: true }); } catch {} }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;
