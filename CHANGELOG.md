@@ -10,6 +10,22 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [6.1.8] — 2026-10-30
+
+**Chrome DevTools Performance & Memory Leak Optimization in Renderer: Elimination of Layout Thrashing (Forced Reflow) on Metrics Ticks, Background IPC Idle Sleep, Event Delegation for Content Lists, and Batched Console Truncation via DOM Range.**
+
+### Performance & Memory Leak Optimizations:
+- **Cached CSS Theme Variables (src/renderer/js/00-core.js):**
+  - Replaced repetitive per-tick getComputedStyle(document.documentElement) queries inside metricChart() with cached getChartThemeColors(). Eliminates heavy style recalculation and forced synchronous layouts on every TPS/MSPT metric poll.
+- **Overview Sparkline Tab Guard (src/renderer/js/08-shell.js):**
+  - Added visibility check to drawOvSpark() ensuring canvas rendering and layout measurements (getBoundingClientRect()) only execute when the #overview tab is active.
+- **Sleep Mode for Background Tunnel Polling (src/renderer/js/08-shell.js):**
+  - Guarded the 15-second refreshTunnelUI timer to skip unnecessary IPC tunnelGet() invocations unless the tunnel details box is open or the Overview tab is visible.
+- **Event Delegation on Content Lists (src/renderer/js/01-content.js):**
+  - Replaced hundreds of per-row closure event listeners (input.onchange, button onclick) with single delegated event listeners on #pluginsList, #modsList, and #datapacksList. Drastically reduces heap memory footprint and eliminates GC churn during content list updates.
+- **Batched Console Log Pruning (src/renderer/js/08-shell.js):**
+  - Optimized the 2000-line console buffer capping: replaced iterative while (o.children.length > 2000) o.removeChild(o.firstChild) with a single document.createRange().deleteContents() call, preventing DOM thrashing during rapid log streaming.
+
 ## [6.1.7] — 2026-10-29
 
 **Full Settings & Content GUI/UX modernization, SSRF vulnerability mitigation & IPv6 defense-in-depth, Spigot/Bukkit loader auto-detection, Smart JVM optimization engine for Java 21/25, Java version mismatch doctor, animation flicker elimination, and hardened Windows archive security.**

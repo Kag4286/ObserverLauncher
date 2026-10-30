@@ -404,7 +404,26 @@ function detectMemoryLeak(samples,opts){
   if(ratePct<minRatePct)return null;
   return { from:+med[0].toFixed(1), to:+med[2].toFixed(1), growthPerHour:+ratePct.toFixed(2), hours:+spanH.toFixed(1) };
 }
-function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;const ctx=canvas.getContext('2d');const r=canvas.getBoundingClientRect();if(!r.width||!r.height) return;const d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);const w=r.width,h=r.height,p=expanded?30:13;const cs=getComputedStyle(document.documentElement);const cAccent=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';const cWarn=cs.getPropertyValue('--chart-cpu').trim()||'#d6a24a';const cSuccess=cs.getPropertyValue('--chart-ram').trim()||'#2fd0a0';const cDanger=cs.getPropertyValue('--danger').trim()||'#e5566a';const cMuted=cs.getPropertyValue('--text-dim').trim()||'#5c6470';const cFont=cs.getPropertyValue('--font-ui').trim()||'Space Grotesk, sans-serif';ctx.clearRect(0,0,w,h);
+let _cachedChartTheme = null;
+function getChartThemeColors(){
+  if (_cachedChartTheme) return _cachedChartTheme;
+  try {
+    const cs = getComputedStyle(document.documentElement);
+    _cachedChartTheme = {
+      cAccent: cs.getPropertyValue('--chart-tps').trim() || '#00e5ff',
+      cWarn: cs.getPropertyValue('--chart-cpu').trim() || '#d6a24a',
+      cSuccess: cs.getPropertyValue('--chart-ram').trim() || '#2fd0a0',
+      cDanger: cs.getPropertyValue('--danger').trim() || '#e5566a',
+      cMuted: cs.getPropertyValue('--text-dim').trim() || '#5c6470',
+      cFont: cs.getPropertyValue('--font-ui').trim() || 'Space Grotesk, sans-serif'
+    };
+  } catch {
+    _cachedChartTheme = { cAccent: '#00e5ff', cWarn: '#d6a24a', cSuccess: '#2fd0a0', cDanger: '#e5566a', cMuted: '#5c6470', cFont: 'Space Grotesk, sans-serif' };
+  }
+  return _cachedChartTheme;
+}
+function invalidateChartTheme() { _cachedChartTheme = null; }
+function metricChart(canvas,expanded=false,mode='combined'){if(!canvas)return;const ctx=canvas.getContext('2d');const r=canvas.getBoundingClientRect();if(!r.width||!r.height) return;const d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);const w=r.width,h=r.height,p=expanded?30:13;const { cAccent, cWarn, cSuccess, cDanger, cMuted, cFont } = getChartThemeColors();ctx.clearRect(0,0,w,h);
   if(mode==='tick'){
     // Danger band: bottom 25% of the chart (roughly under ~15 TPS / over ~25ms MSPT) tinted red,
     // so a dip reads as "into the red zone" at a glance instead of needing to read the numbers.

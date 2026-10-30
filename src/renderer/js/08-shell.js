@@ -44,7 +44,7 @@ function flushLogs(){
   const empty=$('#logEmpty'); if(empty) empty.hidden=true;
   // If a search/filter is active, a freshly-added line may be hidden — keep the hint honest.
   if(logQuery||logFilter!=='all') updateLogHint();
-  while(o.children.length>2000) o.removeChild(o.firstChild);
+  const excess = o.children.length - 2000; if(excess > 0){ const r = document.createRange(); r.setStartBefore(o.firstChild); r.setEndAfter(o.children[excess - 1]); r.deleteContents(); }
   if(wasAtBottom && !logPaused) o.scrollTop=o.scrollHeight;
   else if(lastVisible && !lastVisible.hidden){ const j=$('#logJump'); if(j) j.hidden=false; }
   if(logQueue.length) requestAnimationFrame(flushLogs); else logFlushScheduled=false;
@@ -710,15 +710,15 @@ function applyLiveToUI(live){
 // Reads the shared `samples` ring (defined in 00-core.js). Guards a hidden/0-size canvas (the
 // Overview may be display:none when this runs) — draw nothing rather than a broken axis.
 function drawOvSpark(){
+  const tab = document.getElementById('overview');
+  if (!tab || !tab.classList.contains('active')) return;
   const cv=$('#ovSpark'); if(!cv) return;
   const r=cv.getBoundingClientRect(); if(!r.width||!r.height) return;
   const d=devicePixelRatio||1;
   if(cv.width!==Math.round(r.width*d)||cv.height!==Math.round(r.height*d)){cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d)}
   const ctx=cv.getContext('2d'); ctx.setTransform(d,0,0,d,0,0);
   const w=r.width,h=r.height; ctx.clearRect(0,0,w,h);
-  const cs=getComputedStyle(document.documentElement);
-  const cTps=cs.getPropertyValue('--chart-tps').trim()||'#00e5ff';
-  const cCpu=cs.getPropertyValue('--chart-cpu').trim()||'#ffd23f';
+  const { cAccent: cTps, cWarn: cCpu } = getChartThemeColors();
   const data=samples.slice(-60); const n=data.length; if(!n) return;
   const line=(key,color,max)=>{const pts=data.map((s,i)=>({i,v:s[key]})).filter(p=>p.v!=null);if(pts.length<2)return;ctx.beginPath();pts.forEach((p,j)=>{const x=(p.i/(n-1))*w, y=h-2-(Math.min(p.v,max)/max)*(h-4);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke()};
   line('cpu',cCpu,100); line('tps',cTps,20);
@@ -906,7 +906,7 @@ function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelSta
   if(msg){if(st==='installing'){msg.hidden=false;msg.textContent=t('tun.downloading')}else if(st==='error'){msg.hidden=false;msg.textContent=t('tun.serviceError')}else{msg.hidden=true;msg.textContent=''}}}
 window.observer.onTunnelStatus(applyTunnelStatus);
 refreshTunnelUI();
-setInterval(refreshTunnelUI,15000);
+setInterval(()=>{ try{ const tBox=$('#tunnelBox'), ov=$('#overview'); if((tBox && tBox.open) || (ov && ov.classList.contains('active'))) refreshTunnelUI(); }catch{} }, 15000);
 $('#playitBrowse')?.addEventListener('click',async()=>{const f=await window.observer.pickPlayitFile();if(f){const inp=$('#playitPathInput');inp.value=f;inp.dispatchEvent(new Event('input',{bubbles:true}))}});
 $('#pinggyBrowse')?.addEventListener('click',async()=>{const f=await window.observer.pickSshFile();if(f){const inp=$('#pinggyPathInput');inp.value=f;inp.dispatchEvent(new Event('input',{bubbles:true}))}});
 $('#refreshConnectInfo').onclick=loadConnectInfo;

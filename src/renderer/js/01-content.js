@@ -506,104 +506,6 @@ function renderFiles(id, files, kind) {
 
   if (kind === 'datapack') { try { renderDatapackOrder(); } catch {} }
 
-  node.querySelectorAll('input[data-toggle-content]').forEach(input => {
-    input.onchange = async () => {
-      const file = input.dataset.toggleFile;
-      const k = input.dataset.toggleContent;
-      const r = await window.observer.toggleContent({ kind: k, fileName: file });
-      if (!r || !r.ok) {
-        input.checked = !input.checked;
-        return toast((r && r.error) || 'Toggle failed', 'error');
-      }
-      state.files = r.files;
-      refreshUI();
-      loadContentConflicts();
-    };
-  });
-
-  node.querySelectorAll('[data-config-file]').forEach(b => {
-    b.onclick = () => jumpToModConfig(b.dataset.configFile, kind);
-  });
-
-  node.querySelectorAll('[data-update-content]').forEach(b => {
-    b.onclick = async () => {
-      const file = b.dataset.updateFile;
-      if (!await confirmDialog({
-        title: t('cnt.update'),
-        body: t('cnt.confirmUpdate', { n: file }),
-        ok: t('cnt.update')
-      })) return;
-      const r = await window.observer.contentUpdate({ names: [file] });
-      if (!r || !r.ok) return toast((r && r.error) || t('toast.updateFailed', { n: file }), 'error');
-      state.files = r.files || state.files;
-      await loadContentUpdates();
-      toast(t('toast.updated', { n: file }), 'success', {
-        label: t('toast.undo'),
-        fn: () => rollbackLastContentUpdate(r.sessionId)
-      });
-    };
-  });
-
-  node.querySelectorAll('[data-delete-content]').forEach(b => {
-    b.onclick = async () => {
-      const file = b.dataset.deleteFile;
-      if (!await confirmDialog({
-        title: t('cnt.delete'),
-        body: t('toast.confirmDelete', { n: file }),
-        ok: t('cnt.delete'),
-        danger: true
-      })) return;
-      if (state.running && !await confirmDialog({
-        title: t('cnt.delete'),
-        body: t('cnt.confirmRunningDelete'),
-        ok: t('cnt.delete'),
-        danger: true
-      })) return;
-      const r = await window.observer.deleteContent({ kind, fileName: file });
-      if (!r || !r.ok) return toast((r && r.error) || 'Delete failed', 'error');
-      state.files = r.files;
-      refreshUI();
-      loadContentConflicts();
-      toast(t('toast.deleted', { n: file }), 'success');
-    };
-  });
-
-  node.querySelectorAll('[data-validate-dp]').forEach(b => {
-    b.onclick = async () => {
-      const file = b.dataset.validateDp;
-      b.disabled = true;
-      let r;
-      try { r = await window.observer.contentValidateDatapack(file); } catch (e) {
-        b.disabled = false;
-        return toast(e?.message || 'Validate failed.', 'error');
-      }
-      b.disabled = false;
-      if (!r || !r.ok) return toast((r && r.error) || 'Validate failed.', 'error');
-      const lvl = r.result && r.result.level;
-      const note = (r.result && r.result.note) || '';
-      toast(note, lvl === 'ok' ? 'success' : lvl === 'warn' ? 'error' : undefined);
-    };
-  });
-
-  node.querySelectorAll('[data-extract-dp]').forEach(b => {
-    b.onclick = async () => {
-      const file = b.dataset.extractDp;
-      if (!await confirmDialog({
-        title: t('cnt.extract'),
-        body: t('cnt.extractConfirm', { n: file }),
-        ok: t('cnt.extract')
-      })) return;
-      let r;
-      try { r = await window.observer.contentExtractDatapack(file); } catch (e) {
-        return toast(e?.message || 'Extract failed.', 'error');
-      }
-      if (!r || !r.ok) return toast((r && r.error) || 'Extract failed.', 'error');
-      state.files = r.files || state.files;
-      refreshUI();
-      toast(t('toast.extracted', { n: r.folder }), 'success');
-    };
-  });
-
   updateContentToolbarState();
   filterContentList();
 }
@@ -785,3 +687,110 @@ document.addEventListener('pointerdown',e=>{ if(!e.target.closest('.menu') && !e
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeMenus(null); });
 window.addEventListener('resize',()=>closeMenus(null));
 window.addEventListener('scroll',()=>closeMenus(null),true);
+// Memory & Performance Optimization: Event Delegation for content lists.
+// Replaces hundreds of per-element closures with single listeners on the parent container.
+$$(CONTENT_LIST_SEL).forEach(list => {
+  const kind = list.id === 'pluginsList' ? 'plugin' : list.id === 'modsList' ? 'mod' : 'datapack';
+
+  list.addEventListener('change', async e => {
+    const input = e.target.closest('input[data-toggle-content]');
+    if (!input) return;
+    const file = input.dataset.toggleFile;
+    const k = input.dataset.toggleContent || kind;
+    const r = await window.observer.toggleContent({ kind: k, fileName: file });
+    if (!r || !r.ok) {
+      input.checked = !input.checked;
+      return toast((r && r.error) || 'Toggle failed', 'error');
+    }
+    state.files = r.files;
+    refreshUI();
+    loadContentConflicts();
+  });
+
+  list.addEventListener('click', async e => {
+    const cfgBtn = e.target.closest('[data-config-file]');
+    if (cfgBtn) {
+      jumpToModConfig(cfgBtn.dataset.configFile, kind);
+      return;
+    }
+
+    const upBtn = e.target.closest('[data-update-content]');
+    if (upBtn) {
+      const file = upBtn.dataset.updateFile;
+      if (!await confirmDialog({
+        title: t('cnt.update'),
+        body: t('cnt.confirmUpdate', { n: file }),
+        ok: t('cnt.update')
+      })) return;
+      const r = await window.observer.contentUpdate({ names: [file] });
+      if (!r || !r.ok) return toast((r && r.error) || t('toast.updateFailed', { n: file }), 'error');
+      state.files = r.files || state.files;
+      await loadContentUpdates();
+      toast(t('toast.updated', { n: file }), 'success', {
+        label: t('toast.undo'),
+        fn: () => rollbackLastContentUpdate(r.sessionId)
+      });
+      return;
+    }
+
+    const delBtn = e.target.closest('[data-delete-content]');
+    if (delBtn) {
+      const file = delBtn.dataset.deleteFile;
+      if (!await confirmDialog({
+        title: t('cnt.delete'),
+        body: t('toast.confirmDelete', { n: file }),
+        ok: t('cnt.delete'),
+        danger: true
+      })) return;
+      if (state.running && !await confirmDialog({
+        title: t('cnt.delete'),
+        body: t('cnt.confirmRunningDelete'),
+        ok: t('cnt.delete'),
+        danger: true
+      })) return;
+      const r = await window.observer.deleteContent({ kind, fileName: file });
+      if (!r || !r.ok) return toast((r && r.error) || 'Delete failed', 'error');
+      state.files = r.files;
+      refreshUI();
+      loadContentConflicts();
+      toast(t('toast.deleted', { n: file }), 'success');
+      return;
+    }
+
+    const valBtn = e.target.closest('[data-validate-dp]');
+    if (valBtn) {
+      const file = valBtn.dataset.validateDp;
+      valBtn.disabled = true;
+      let r;
+      try { r = await window.observer.contentValidateDatapack(file); } catch (err) {
+        valBtn.disabled = false;
+        return toast(err?.message || 'Validate failed.', 'error');
+      }
+      valBtn.disabled = false;
+      if (!r || !r.ok) return toast((r && r.error) || 'Validate failed.', 'error');
+      const lvl = r.result && r.result.level;
+      const note = (r.result && r.result.note) || '';
+      toast(note, lvl === 'ok' ? 'success' : lvl === 'warn' ? 'error' : undefined);
+      return;
+    }
+
+    const extBtn = e.target.closest('[data-extract-dp]');
+    if (extBtn) {
+      const file = extBtn.dataset.extractDp;
+      if (!await confirmDialog({
+        title: t('cnt.extract'),
+        body: t('cnt.extractConfirm', { n: file }),
+        ok: t('cnt.extract')
+      })) return;
+      let r;
+      try { r = await window.observer.contentExtractDatapack(file); } catch (err) {
+        return toast(err?.message || 'Extract failed.', 'error');
+      }
+      if (!r || !r.ok) return toast((r && r.error) || 'Extract failed.', 'error');
+      state.files = r.files || state.files;
+      refreshUI();
+      toast(t('toast.extracted', { n: r.folder }), 'success');
+      return;
+    }
+  });
+});
