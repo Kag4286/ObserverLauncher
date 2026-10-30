@@ -16,6 +16,7 @@ No terminal, no monthly cloud bills, no accounts. Pick a folder, select a versio
 <br>
 [![Minecraft Support](https://img.shields.io/badge/Minecraft-1.8_%E2%86%92_26.x-brightgreen?style=flat-square&logo=minecraft&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
 [![Java Runtimes](https://img.shields.io/badge/Java-8_%7C_17_%7C_21_%7C_25-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
+[![Languages](https://img.shields.io/badge/languages-7_supported-informational?style=flat-square&logo=translate&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#supported-languages)
 [![MCP Ready](https://img.shields.io/badge/MCP-78_Tools_Ready-8A2BE2?style=flat-square&logo=anthropic&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#mcp--ai-integration)
 [![Remote API](https://img.shields.io/badge/Remote_API-HTTP_%2B_Bearer-blueviolet?style=flat-square)](https://github.com/Kag4286/ObserverLauncher#remote-management--api)
 [![Zero Cloud](https://img.shields.io/badge/hosting-100%25_Local_%7C_No_Cloud-informational?style=flat-square)](https://github.com/Kag4286/ObserverLauncher)
@@ -31,41 +32,58 @@ No terminal, no monthly cloud bills, no accounts. Pick a folder, select a versio
 
 ## What is ObserverLauncher?
 
-ObserverLauncher is a **server hosting application** designed to run on your local machine. It handles the setup that usually requires terminal commands and wikis: downloading server jars, matching the required Java version, configuring network tunnels, pre-flight mod compatibility checking, and taking safe world backups.
+ObserverLauncher is a **server hosting application** designed to run directly on your own computer. It replaces confusing terminal commands and wikis with a simple, friendly interface: downloading server files, finding the right Java version, letting friends join over the internet, warning you if mods conflict, and taking automatic world backups.
 
-Everything runs locally on your PC. There are no proprietary accounts, no paid tiers, and zero telemetry.
+Everything runs locally on your PC. There are no paid subscriptions, no account signups, and zero tracking.
 
 ---
 
 ## Quick Start
 
 1. **Download & Install:** Grab the installer for Windows (`.exe`) or Linux (`.AppImage`) from [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest).
-2. **Create Server:** Click **Create new server**, pick your server software (Paper, Fabric, Forge, NeoForge, Purpur, Leaf, Spigot, Vanilla, etc.), and select your Minecraft version.
-3. **Start:** Click **Start**. The app checks your Java runtime, accepts the EULA, and launches the server.
-4. **Invite Friends:** Share your local IP if on the same network, or click **Share to internet** (built-in Playit.gg and Pinggy integration) for an instant public address without router port forwarding.
+2. **Create Server:** Click **Create new server**, choose what kind of server you want (Paper, Fabric, Forge, NeoForge, Spigot, Vanilla, etc.), and pick your Minecraft version.
+3. **Start Playing:** Click **Start**. The launcher makes sure the right Java is installed, handles the Minecraft EULA agreement, and turns on your server.
+4. **Invite Friends:** If friends are on your home Wi-Fi, share your local address. If they are playing from anywhere else, turn on the built-in internet tunnel (Playit.gg / Pinggy) for an instant link—**no router port forwarding needed**.
 
 ---
 
 ## Key Features
 
-### For Everyday Server Hosts
+### Simple & Friendly for Everyday Use
 
-- **One-Click Server Setup:** Supports Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, and Velocity. New versions appear automatically without app updates.
-- **Java Auto-Detection & Smart JVM Tuning:** Automatically matches your server's Minecraft version with the required Java runtime (Java 8, 17, 21, or 25) with 1-click automatic JVM flags recommendation (Shenandoah GC, ZGC modern tuning, Aikar flags).
-- **Player Inspector & 3D Skins:** View connected and offline players, examine full inventories and equipment with real 2D item textures, inspect enchantments and durability, and preview rotatable 3D player skins.
-- **Integrated Marketplace & Content Library:** Search and install mods, plugins, and datapacks directly from Modrinth, Hangar, and SpigotMC with active loader compatibility checks, update alerts, and batch rollback guards.
-- **Pre-flight Mod Conflict Engine:** Analyzes mod metadata (`mods.toml`, `fabric.mod.json`, `mcmod.info`) before boot to detect duplicate modIds, missing dependencies, wrong loaders, and incompatible Minecraft versions.
-- **Safe World Backups:** Create ZIP snapshots of your worlds on demand or on a daily schedule. Worlds are temporarily paused (`save-off`) during archive creation to prevent corruption.
-- **Interactive World Map:** View your explored chunks, terrain elevation, surface biomes, and custom waypoints directly from world save files.
-- **Plain-language Crash Doctor:** Instant bytecode diagnosis for Java version mismatches (e.g. `class file version 69.0` -> Java 25 required) with 1-click action buttons and automatic rollback suggestions.
-- **Server Properties History & Game Rules:** Automatic version snapshots for `server.properties` with visual diffs (+/-) and 1-click restore, plus a visual editor for world `level.dat` gamerules.
-- **Discord & Webhook Alerts:** Real-time event notifications (Server Start, Stop, Crash summary, Player Join) posted to your Discord webhook with built-in SSRF protection.
+- **1-Click Server Creation:** Choose from Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
+- **Automatic Java Setup:** Never worry about which Java to install. The launcher automatically detects what Java version your server needs (Java 8, 17, 21, or 25) and downloads it for you with 1 click.
+- **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.
+- **Built-in Mod & Plugin Store:** Browse and install mods, plugins, and datapacks directly from Modrinth, Hangar, and SpigotMC. The app checks if mods match your server before installing and lets you rollback updates with one click.
+- **Automatic Mod Conflict Checks:** Warns you before your server starts if mods are missing required dependencies, duplicate, built for the wrong mod loader, or made for an incompatible Minecraft version.
+- **Player Inspector & 3D Skins:** View online and offline players, browse player inventories and equipment with real game icons, and preview interactive 3D skins.
+- **Safe World Backups:** Back up your worlds to ZIP files anytime or on an automatic schedule. Backups pause world saving for a split second so your saves never get corrupted.
+- **Live World Map:** Explore your generated world terrain, surface biomes, and custom waypoints in real-time.
+- **Friendly Crash Explanations:** If your server crashes due to a wrong Java version, the launcher explains the problem in plain English (e.g. *"This server requires Java 21, but Java 17 is selected"*) and gives you a button to fix it immediately.
+- **Safety History for Settings:** If you make a mistake editing server properties, easily restore previous versions with a 1-click history rewind.
+- **Discord Alerts:** Send messages to your Discord channel whenever your server starts, stops, crashes, or when players join.
 
 <p align="center">
   <img src="docs/screenshot-player-inspector.png" width="48%" alt="Player Inspector">
   &nbsp;
   <img src="docs/screenshot-worldmap.png" width="48%" alt="World Map">
 </p>
+
+---
+
+## Supported Languages
+
+ObserverLauncher comes with full, native translations for **7 languages** across all menus, tools, and error messages:
+
+- 🇬🇧 **English** (`en`)
+- 🇻🇳 **Tiếng Việt** (`vi`)
+- 🇪🇸 **Español** (`es`)
+- 🇧🇷 **Português (Brasil)** (`pt-BR`)
+- 🇩🇪 **Deutsch** (`de`)
+- 🇷🇺 **Русский** (`ru`)
+- 🇨🇳 **简体中文** (`zh-CN`)
+
+You can switch languages anytime from **Launcher settings &rarr; Personal &rarr; Language**.
 
 ---
 
