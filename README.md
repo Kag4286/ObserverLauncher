@@ -16,6 +16,7 @@ No terminal, no monthly cloud bills, no accounts. Pick a folder, select a versio
 <br>
 [![Minecraft Support](https://img.shields.io/badge/Minecraft-1.8_%E2%86%92_26.x-brightgreen?style=flat-square&logo=minecraft&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
 [![Java Runtimes](https://img.shields.io/badge/Java-8_%7C_17_%7C_21_%7C_25-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
+[![Native Engine](https://img.shields.io/badge/Native_Engine-Horizon_(Rust)-dea584?style=flat-square&logo=rust&logoColor=white)](https://github.com/horizon-rust/horizon)
 [![Languages](https://img.shields.io/badge/languages-7_supported-informational?style=flat-square&logo=translate&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#supported-languages)
 [![MCP Ready](https://img.shields.io/badge/MCP-78_Tools_Ready-8A2BE2?style=flat-square&logo=anthropic&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#mcp--ai-integration)
 [![Remote API](https://img.shields.io/badge/Remote_API-HTTP_%2B_Bearer-blueviolet?style=flat-square)](https://github.com/Kag4286/ObserverLauncher#remote-management--api)
@@ -32,7 +33,7 @@ No terminal, no monthly cloud bills, no accounts. Pick a folder, select a versio
 
 ## What is ObserverLauncher?
 
-ObserverLauncher is a **server hosting application** designed to run directly on your own computer. It replaces confusing terminal commands and wikis with a simple, friendly interface: downloading server files, finding the right Java version, letting friends join over the internet, warning you if mods conflict, and taking automatic world backups.
+ObserverLauncher is a **local Minecraft server hosting application** for Windows and Linux. It replaces confusing terminal commands and wikis with a simple, friendly interface: downloading server files, finding the right Java runtime, offering native Rust server support as the first app to integrate [Horizon](https://github.com/horizon-rust/horizon), letting friends join over the internet without port forwarding, warning you if mods conflict, and taking automatic world backups.
 
 Everything runs locally on your PC. There are no paid subscriptions, no account signups, and zero tracking.
 
@@ -41,7 +42,7 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 ## Quick Start
 
 1. **Download & Install:** Grab the installer for Windows (`.exe`) or Linux (`.AppImage`) from [Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest).
-2. **Create Server:** Click **Create new server**, choose what kind of server you want (Paper, Fabric, Forge, NeoForge, Spigot, Vanilla, etc.), and pick your Minecraft version.
+2. **Create Server:** Click **Create new server**, choose what kind of server you want (Horizon Rust native, Paper, Fabric, Forge, NeoForge, Spigot, Vanilla, etc.), and pick your Minecraft version.
 3. **Start Playing:** Click **Start**. The launcher makes sure the right Java is installed, handles the Minecraft EULA agreement, and turns on your server.
 4. **Invite Friends:** If friends are on your home Wi-Fi, share your local address. If they are playing from anywhere else, turn on the built-in internet tunnel (Playit.gg / Pinggy) for an instant link—**no router port forwarding needed**.
 
@@ -51,7 +52,7 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 
 ### Simple & Friendly for Everyday Use
 
-- **First-Ever Horizon Dedicated Server Integration:** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) out of the box—a ground-up clean-room Minecraft 26.3 server written in Rust. Experience ultra-low memory consumption (~600MB dynamic working set), zero Java GC pauses, multi-threaded ECS chunk processing, and standalone native binary execution without needing a Java runtime.
+- **Pioneering Horizon Dedicated Server Integration:** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) out of the box—a clean-room Minecraft 26.3 server built in Rust. It offers ultra-low RAM usage (~600MB dynamic working set) and zero Java GC pauses, providing a fast native alternative alongside your favorite Paper, Fabric, and Forge setups.
 - **1-Click Server Creation:** Choose from Horizon (Rust Native), Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
 - **Automatic Java Setup:** Never worry about which Java to install. The launcher automatically detects what Java version your server needs (Java 8, 17, 21, or 25) and downloads it for you with 1 click.
 - **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.
@@ -134,7 +135,7 @@ ObserverLauncher provides robust infrastructure for experienced server operators
 - **Operating System:** Windows 10/11 (64-bit) or modern 64-bit Linux distribution.
 - **Memory:** 4 GB RAM minimum (8 GB+ recommended for modded servers).
 - **Disk:** ~1 GB for launcher and dependencies; additional space for world saves.
-- **Java:** Any Java 8–25 runtime. The app detects existing installations and can automatically download OpenJDK runtimes.
+- **Java:** Any Java 8–25 runtime for Java servers (the app detects existing installations and can automatically download OpenJDK runtimes). Horizon native instances require no Java.
 
 ---
 
