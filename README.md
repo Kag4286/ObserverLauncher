@@ -65,9 +65,14 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 - **Discord Alerts:** Send messages to your Discord channel whenever your server starts, stops, crashes, or when players join.
 
 <p align="center">
-  <img src="docs/screenshot-player-inspector.png" width="48%" alt="Player Inspector">
+  <img src="docs/screenshot-player-inspector.png" width="48%" alt="Player Inspector 3D Preview">
   &nbsp;
+  <img src="docs/screenshot-inventory.png" width="48%" alt="Player Inventory">
+</p>
+<p align="center">
   <img src="docs/screenshot-worldmap.png" width="48%" alt="World Map">
+  &nbsp;
+  <img src="docs/screenshot-MCP.png" width="48%" alt="MCP / AI Integration">
 </p>
 
 ---
