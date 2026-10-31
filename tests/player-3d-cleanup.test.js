@@ -28,6 +28,8 @@ function createMockCanvas() {
     createBuffer: () => { const b = { id: Math.random() }; glResources.buffers.push(b); return b; },
     createTexture: () => { const t = { id: Math.random() }; glResources.textures.push(t); return t; },
     bindTexture: () => {},
+    bindBuffer: () => {},
+    bufferData: () => {},
     texParameteri: () => {},
     texImage2D: () => {},
     deleteBuffer: (b) => { glResources.buffers = glResources.buffers.filter(x => x !== b); },
@@ -70,9 +72,21 @@ function createMockCanvas() {
   return canvas;
 }
 
+const loadedUrls = [];
 const sandbox = {
   console, Math, Float32Array, Image: function () {
-    this.addEventListener = (ev, cb) => { if (ev === 'load') setTimeout(cb, 0); };
+    this.naturalWidth = 64;
+    this.naturalHeight = 64;
+    this.addEventListener = (ev, cb) => { if (ev === 'load') cb(); };
+    let _src = '';
+    Object.defineProperty(this, 'src', {
+      set(val) {
+        _src = val;
+        loadedUrls.push(val);
+        if (typeof this.onload === 'function') this.onload();
+      },
+      get() { return _src; }
+    });
   },
 };
 sandbox.globalThis = sandbox;
@@ -105,5 +119,20 @@ ok('r3 replaced r2 without listener accumulation', canvas._listeners.pointerdown
 ok('canvas points to r3', canvas._playerRenderer === r3);
 r3.destroy();
 ok('clean after r3 destroy', canvas._listeners.pointerdown.length === 0);
+
+// 4. Mixed armor material support (Diamond Helmet + Netherite Chestplate)
+const mixedEquip = {
+  helmet: { id: 'minecraft:diamond_helmet' },
+  chest: { id: 'minecraft:netherite_chestplate' },
+  legs: { id: 'minecraft:netherite_leggings' },
+  boots: { id: 'minecraft:diamond_boots' }
+};
+const r4 = createPlayerRenderer(canvas, 'data:image/png;base64,dummy', false, mixedEquip);
+ok('r4 created with mixed armor', !!r4);
+ok('diamond armor texture requested for helmet', loadedUrls.some(u => u.includes('armor/diamond.png')));
+ok('netherite chest armor texture requested', loadedUrls.some(u => u.includes('armor/netherite.png')));
+ok('netherite legs armor texture requested', loadedUrls.some(u => u.includes('armorlegs/netherite.png')));
+r4.destroy();
+ok('clean after r4 destroy', canvas._listeners.pointerdown.length === 0);
 
 console.log(`\n${pass} passed, 0 failed`);

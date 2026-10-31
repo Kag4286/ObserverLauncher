@@ -146,7 +146,7 @@ function renderEquipment(armor,offhand){
   const order=['Helmet','Chestplate','Leggings','Boots','Offhand'];
   n.innerHTML=order.map(label=>{
     const it=slots.find(x=>x.slot===label);
-    let cell='–';
+    let cell='';
     const isEnch=it&&(it.enchantments?.length||it.storedEnchantments?.length);
     const enchCls=isEnch?' enchanted':'';
     let dur='';
@@ -203,6 +203,21 @@ const pendingHeadFetches = new Set();
 // A colored square with the player's initial, used whenever no Mojang skin is available
 // (offline UUID, failed fetch). This replaces the faint generic person icon so the roster
 // and inspector header always show a stable, visible face.
+function cropPlayerHead(dataUri, onHeadReady){
+  if(!dataUri) return;
+  const img = new Image();
+  img.onload = () => {
+    const s = (img.naturalWidth || img.width || 64) / 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 8 * s, 8 * s, 8 * s, 8 * s, 0, 0, 64, 64);
+    ctx.drawImage(img, 40 * s, 8 * s, 8 * s, 8 * s, 0, 0, 64, 64);
+    onHeadReady(canvas.toDataURL('image/png'));
+  };
+  img.src = dataUri;
+}
 function playerInitialsAvatar(name) {
   const initial = String(name || '?').trim().charAt(0).toUpperCase() || '?';
   let hash = 0;
@@ -221,19 +236,13 @@ function getHeadAvatarHtml(uuid, name) {
     pendingHeadFetches.add(uuid);
     window.observer.playerSkin(uuid).then(res => {
       if (res && res.ok && res.dataUri) {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 8; canvas.height = 8;
-          const ctx = canvas.getContext('2d');
-          // Draw face (8x8 at 8,8)
-          ctx.drawImage(img, 8, 8, 8, 8, 0, 0, 8, 8);
-          // Draw hat layer (8x8 at 40,8)
-          ctx.drawImage(img, 40, 8, 8, 8, 0, 0, 8, 8);
-          headAvatarCache[uuid] = canvas.toDataURL('image/png');
+        cropPlayerHead(res.dataUri, headUri => {
+          headAvatarCache[uuid] = headUri;
+          if (selectedPlayer && (selectedPlayer.uuid === uuid || selectedPlayer.name === uuid)) {
+            const el = $('#inspectAvatar'); if (el) el.src = headUri;
+          }
           try { renderPlayers(); } catch {}
-        };
-        img.src = res.dataUri;
+        });
       } else {
         // Transient failure (network, timeout): allow the next render to retry.
         pendingHeadFetches.delete(uuid);
@@ -776,7 +785,19 @@ async function openPlayerInspector(uuid,name){
   // BUGFIX: the header avatar used an external mc-heads.net URL, which shows a broken image when
   // offline or when that request is slow. Reuse the 8x8 face we already cached for the roster, then
   // the full skin data URI, then the local placeholder, so the header never shows a broken image.
-  $('#inspectAvatar').src = headAvatarCache[uuid] || playerInitialsAvatar(name);
+  $('#inspectAvatar').src = (uuid && headAvatarCache[uuid]) || (name && headAvatarCache[name]) || playerInitialsAvatar(name);
+  if ((!uuid || !headAvatarCache[uuid]) && (!name || !headAvatarCache[name])) {
+    window.observer.playerSkin(uuid || name).then(res => {
+      if (res && res.ok && res.dataUri) {
+        cropPlayerHead(res.dataUri, headUri => {
+          if (uuid) headAvatarCache[uuid] = headUri;
+          if (name) headAvatarCache[name] = headUri;
+          const el = $('#inspectAvatar'); if (el) el.src = headUri;
+          try { renderPlayers(); } catch {}
+        });
+      }
+    }).catch(() => {});
+  }
   $('#inspectName').textContent=name;$('#inspectDim').textContent=d.dimension||t('ply.unknownDim');
   renderPdBadges(name);
   const posEl=$('#inspectPos');
@@ -792,7 +813,12 @@ async function openPlayerInspector(uuid,name){
 
   // v6.0.0 Track B: Render 3D Player non-blockingly so slow skin fetches never stall data inspection
   renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),uuid,name,d.armor).then(uri => {
-    if (uri && !headAvatarCache[uuid]) $('#inspectAvatar').src = uri;
+    if (uri && !headAvatarCache[uuid]) {
+      cropPlayerHead(uri, headUri => {
+        headAvatarCache[uuid] = headUri;
+        const el = $('#inspectAvatar'); if (el) el.src = headUri;
+      });
+    }
   }).catch(() => {});
 }
 // v6.0.0 Track B - B2: Leaderboard toggle

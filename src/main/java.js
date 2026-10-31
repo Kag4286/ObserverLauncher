@@ -61,7 +61,14 @@ function javaBinName(osName = javaRuntimeOs()) { return osName === 'windows' ? '
 // on its own.
 function validateStart(settings, javaInfo, serverFilesFn, requiredJavaFn) {
   if (!settings.serverPath || !require('fs').existsSync(settings.serverPath)) return 'Choose a valid server folder first.';
-  const info = serverFilesFn(settings.serverPath); if (!info.jar && !info.launchScript) return 'No runnable server .jar or run.bat was found in the selected folder.';
+  const info = serverFilesFn(settings.serverPath);
+  if (info.engineType === 'native' || info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript)) {
+    if (info.nativeBinary && !require('fs').existsSync(require('path').join(settings.serverPath, info.nativeBinary))) {
+      return `Native executable "${info.nativeBinary}" not found in server folder.`;
+    }
+    return null;
+  }
+  if (!info.jar && !info.launchScript) return 'No runnable server .jar or run.bat was found in the selected folder.';
   if (!javaInfo?.ok) return 'Java was not detected. Set a valid Java path in Settings.';
   // 2.2.0 (Java gap): requiredJavaFn lets the caller resolve the requirement for a jar-less
   // NeoForge/Forge run.bat server (via libraries/); injected to avoid a circular require between

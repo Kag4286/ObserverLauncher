@@ -495,7 +495,13 @@
             <div class="wm-main">
               <canvas id="wmCanvas" width="800" height="520" tabindex="0" role="application" aria-label="World map - arrow keys pan, +/- zoom, 0 fits spawn"></canvas>
               <aside class="wm-panel">
-                <div class="sec-head" style="margin-bottom:8px"><h3 data-i18n="wm.waypoints">Waypoints</h3><span class="spacer"></span><span class="prop-count" id="wmWpCount">0</span></div>
+                <div class="sec-head" style="margin-bottom:8px">
+                  <h3 data-i18n="wm.waypoints">Waypoints</h3>
+                  <span class="spacer"></span>
+                  <button type="button" class="btn sm secondary" id="wmWpImport" data-i18n-title="wm.wpImportTitle" title="Import waypoints" style="padding:2px 6px;font-size:11px">⬇</button>
+                  <button type="button" class="btn sm secondary" id="wmWpExport" data-i18n-title="wm.wpExportTitle" title="Export waypoints" style="padding:2px 6px;font-size:11px">⬆</button>
+                  <span class="prop-count" id="wmWpCount">0</span>
+                </div>
                 <div id="wmWpList" class="wm-wplist"></div>
                 <p class="field-hint" data-i18n="wm.wpHint">Click “+ Waypoint”, then click the map to place it. Click a row to jump.</p>
               </aside>
@@ -552,7 +558,7 @@
     <section id="settings" class="tab">
       <div class="flat-wrap">
         <header class="tab-head" id="settingsHead">
-          <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" data-i18n="set.sub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
+          <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" id="settingsHeadSub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
           <div class="settings-apply"><span class="apply-dirty-hint" id="applyDirtyHint" hidden data-i18n="set.unsaved">Unsaved changes</span><button class="btn primary" id="saveSettings" data-i18n="set.apply">Apply settings</button></div>
         </header>
         <div class="settings-layout">
@@ -582,7 +588,7 @@
                   <button class="btn secondary" id="browseBtn" data-i18n="set.browse">Choose &amp; load</button>
                 </div>
                 <small id="folderStatus" class="field-hint folder-status"></small>
-                <div class="set-item-row">
+                <div class="set-item-row" id="autoEulaRow">
                   <div class="sir-info">
                     <div class="sir-title" data-i18n="set.eula">Accept Minecraft EULA automatically on first start</div>
                     <div class="sir-desc">Agrees to Mojang's End User License Agreement so the server can boot directly.</div>
@@ -596,7 +602,7 @@
                 </div>
               </div>
               <!-- Topic 2: Java runtime -->
-              <div class="set-topic">
+              <div class="set-topic" id="setJavaTopic">
                 <div class="set-topic-head">
                   <div class="sth-icon"><img src="./assets/icons/ui/gem.svg" alt=""></div>
                   <div class="sth-text">
@@ -629,6 +635,35 @@
                   <div class="set-progress-label" id="javaProgressLabel">Starting download…</div>
                 </div>
               </div>
+              <!-- Topic 2b: Native engine (Horizon) -->
+              <div class="set-topic" id="setNativeTopic" hidden>
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/cube.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="set.nativeEngineT">Native engine (Horizon)</h3>
+                    <small data-i18n="set.nativeEngineD">Rust executable • no JVM required</small>
+                  </div>
+                </div>
+                <div class="java-notice ok" id="nativeNotice" data-i18n="set.nativeNotice">Horizon Dedicated Server runs as a compiled native binary. Java runtime, JVM arguments, and memory heap allocation are not required.</div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.nativeExecutable">Native executable</div>
+                    <div class="sir-desc" data-i18n="set.nativeExecutableDesc">Standalone server binary running directly on the host operating system.</div>
+                  </div>
+                  <div class="sir-control">
+                    <span class="badge ok" id="nativeBinBadge">horizon-server.exe</span>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.nativeMemory">Memory management</div>
+                    <div class="sir-desc" data-i18n="set.nativeMemoryDesc">Direct physical system RAM without synthetic heap allocation.</div>
+                  </div>
+                  <div class="sir-control">
+                    <span class="badge" data-i18n="set.nativeDirectRam">Direct System RAM</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -656,7 +691,18 @@
                     </select>
                   </div>
                 </div>
-                <div class="set-item-row">
+                                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.resourcePack">Custom Resource Pack</div>
+                    <div class="sir-desc" id="rpDesc" data-i18n="set.resourcePackSub">Override textures for 3D player models, inventory icons, and world map.</div>
+                  </div>
+                  <div class="sir-control" style="display:flex;align-items:center;gap:8px">
+                    <span id="rpActiveName" class="badge" style="max-width:140px;overflow:hidden;text-overflow:ellipsis" data-i18n="set.rpNone">None (Vanilla)</span>
+                    <button type="button" class="btn sm secondary" id="rpChooseBtn" data-i18n="set.rpChoose">Choose ZIP</button>
+                    <button type="button" class="btn sm danger-ghost" id="rpClearBtn" data-i18n="set.rpClear" hidden>Clear</button>
+                  </div>
+                </div>
+<div class="set-item-row">
                   <div class="sir-info">
                     <div class="sir-title" data-i18n="set.motion">Interface animation</div>
                     <div class="sir-desc" data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</div>
@@ -1359,12 +1405,24 @@
             <button type="button" class="btn secondary" id="nswChooseFolder" data-i18n="nsw.chooseFolder">Choose folder…</button>
             <span class="nsw-folder-path" id="nswFolderPath">—</span>
           </div>
+          <div class="nsw-subfolder-wrap" id="nswSubfolderWrap">
+            <label class="field-label" for="nswSubfolderInput" data-i18n="nsw.serverName">Server name (creates subfolder)</label>
+            <input type="text" id="nswSubfolderInput" class="input" placeholder="my-server">
+            <small class="field-hint" id="nswResolvedFolderHint"></small>
+          </div>
         </div>
 
         <!-- STEP 2 · SOFTWARE -->
         <div class="nsw-step" data-step="2">
           <h2 data-i18n="nsw.softwareT">What kind of server?</h2>
           <p class="text-muted nsw2-lead" data-i18n-html="nsw.softwareLead">Beginners: <b>Vanilla</b> (simplest) or <b>Paper</b> (plugins). The rest are for mods, proxies or big servers.</p>
+          <div class="nsw-filters" id="nswSoftwareFilters">
+            <button type="button" class="nsw-filter-chip active" data-filter="all" data-i18n="nsw.filterAll">All</button>
+            <button type="button" class="nsw-filter-chip" data-filter="featured" data-i18n="nsw.filterFeatured">Featured</button>
+            <button type="button" class="nsw-filter-chip" data-filter="plugin" data-i18n="nsw.filterPlugins">Plugins</button>
+            <button type="button" class="nsw-filter-chip" data-filter="modded" data-i18n="nsw.filterModded">Modded</button>
+            <button type="button" class="nsw-filter-chip" data-filter="native-proxy" data-i18n="nsw.filterNativeProxy">Native & Proxy</button>
+          </div>
           <div class="nsw2-templates" id="nswTemplates" hidden>
             <p class="eyebrow nsw2-group" data-i18n="nsw.tplTitle">Start from a template</p>
             <div class="nsw2-grid" id="nswTemplateChips"></div>
@@ -1373,25 +1431,26 @@
             <small class="nsw2-hintbar" data-i18n="nsw.pickHint">New here? Pick <b>Vanilla</b> for plain survival or <b>Paper</b> if you want plugins. Tap the ⓘ on any card to learn what it is.</small>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpStart">Start here</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap"><button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="vanilla" aria-label="About Vanilla">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent" data-i18n="nsw.popular">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="featured"><button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="vanilla" aria-label="About Vanilla">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="featured plugin"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent" data-i18n="nsw.popular">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
+              <div class="nsw2-cardwrap" data-software-wrap="horizon" data-groups="featured native-proxy"><button class="nsw2-row" data-software="horizon"><img src="./assets/software/horizon.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Horizon <em class="nsw2-tag horizon" data-i18n="nsw.badgeNative">Rust Native • Breakthrough Tech</em></b><span data-i18n="nsw.desc.horizon">Breakthrough Minecraft 26.3 in Rust. Ultra performance, ~600MB RAM, zero Java required.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="horizon" aria-label="About Horizon">i</button></div>
+              <div class="nsw2-cardwrap" data-software-wrap="leaf" data-groups="featured plugin"><button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Leaf <em class="nsw2-tag leaf" data-i18n="nsw.badgeLeaf">Paper Fork • Max Perf</em></b><span data-i18n="nsw.desc.leaf">Paper fork tuned for maximum tick performance and low latency.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="leaf" aria-label="About Leaf">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpPlugin">Plugin servers</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="purpur" aria-label="About Purpur">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Leaf</b><span data-i18n="nsw.desc.leaf">Paper fork focused on tick speed while keeping vanilla behaviour.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="leaf" aria-label="About Leaf">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="folia" aria-label="About Folia">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button><button type="button" class="nsw-info" data-info="spigot" aria-label="About Spigot">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="purpur" aria-label="About Purpur">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="folia" aria-label="About Folia">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button><button type="button" class="nsw-info" data-info="spigot" aria-label="About Spigot">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpModded">Modded servers</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="fabric" aria-label="About Fabric">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="neoforge" aria-label="About NeoForge">i</button></div>
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="forge" aria-label="About Forge">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="fabric" aria-label="About Fabric">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="neoforge" aria-label="About NeoForge">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="forge" aria-label="About Forge">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpProxy">Proxy (advanced)</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap"><button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="velocity" aria-label="About Velocity">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="native-proxy"><button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="velocity" aria-label="About Velocity">i</button></div>
             </div>
           </div>
           <div id="nswInfoPop" class="nsw-info-pop" hidden role="dialog" aria-label="Software details"></div>
@@ -1416,20 +1475,34 @@
 
         <!-- STEP 4 · MEMORY -->
         <div class="nsw-step" data-step="4">
-          <h2 data-i18n="nsw.memoryT">How much memory?</h2>
-          <p class="text-muted nsw2-lead" id="nswRamHint" data-i18n="nsw.ramHint">Beginners: 2–4 GB is plenty for friends. Large worlds/modpacks need more.</p>
-          <div class="nsw2-memory-head">
-            <div class="nsw2-memory-num"><b id="nswMemoryValue">4</b><span>GB</span></div>
-            <div class="nsw2-memory-desc ok" id="nswRamDesc">Good for 5-10 players</div>
+          <div id="nswJavaMemoryWrap">
+            <h2 id="nswMemoryTitle" data-i18n="nsw.memoryT">How much memory?</h2>
+            <p class="text-muted nsw2-lead" id="nswRamHint" data-i18n="nsw.ramHint">Beginners: 2–4 GB is plenty for friends. Large worlds/modpacks need more.</p>
+            <div class="nsw2-memory-head">
+              <div class="nsw2-memory-num"><b id="nswMemoryValue">4</b><span>GB</span></div>
+              <div class="nsw2-memory-desc ok" id="nswRamDesc">Good for 5-10 players</div>
+            </div>
+            <div class="nsw2-mempresets">
+              <button type="button" class="filter-chip" data-mem="2">2 GB</button>
+              <button type="button" class="filter-chip active" data-mem="4">4 GB</button>
+              <button type="button" class="filter-chip" data-mem="6">6 GB</button>
+              <button type="button" class="filter-chip" data-mem="8">8 GB</button>
+              <button type="button" class="filter-chip" data-mem="12">12 GB</button>
+            </div>
+            <input id="nswMemorySlider" type="range" min="1" max="16" value="4" step="1">
           </div>
-          <div class="nsw2-mempresets">
-            <button type="button" class="filter-chip" data-mem="2">2 GB</button>
-            <button type="button" class="filter-chip active" data-mem="4">4 GB</button>
-            <button type="button" class="filter-chip" data-mem="6">6 GB</button>
-            <button type="button" class="filter-chip" data-mem="8">8 GB</button>
-            <button type="button" class="filter-chip" data-mem="12">12 GB</button>
+          <div id="nswNativeMemoryWrap" hidden>
+            <h2 id="nswNativeMemTitle" data-i18n="nsw.nativeMemT">Direct System Memory</h2>
+            <p class="text-muted nsw2-lead" id="nswNativeMemLead" data-i18n="nsw.nativeMemLead">Native Rust executable without JVM heap limits.</p>
+            <div class="nsw2-memory-head">
+              <div class="nsw2-memory-num"><b>~600</b><span>MB</span></div>
+              <div class="nsw2-memory-desc ok" data-i18n="nsw.noJvmNeeded">No JVM Required</div>
+            </div>
+            <div class="nsw-native-box">
+              <div class="nsw2-native-stat-sub" data-i18n="nsw.dynamicWorkingSet">Dynamic working set</div>
+              <p class="nsw2-native-explain" data-i18n="nsw.nativeMemExplain">Horizon manages memory directly from the operating system with zero Java Garbage Collection pauses. It scales dynamically with player count without pre-allocating gigabytes of RAM.</p>
+            </div>
           </div>
-          <input id="nswMemorySlider" type="range" min="1" max="16" value="4" step="1">
         </div>
 
         <!-- STEP 5 · REVIEW -->

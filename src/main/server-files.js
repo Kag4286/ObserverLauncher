@@ -38,7 +38,7 @@ function findPlayerDataFile(root, properties, uuid, name) {
   return null;
 }
 function emptyServerFiles() {
-  return { jar: null, launchScript: null, target: { mc: null, loader: 'unknown', software: 'unknown' }, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {}, geyser: false };
+  return { jar: null, launchScript: null, nativeBinary: null, hasHorizonConfig: false, engineType: 'java', target: { mc: null, loader: 'unknown', software: 'unknown', engineType: 'java' }, plugins: [], mods: [], datapacks: [], datapackFolder: null, worlds: [], backups: [], knownPlayers: [], whitelist: [], banned: [], ops: [], hasSpigotConfig: false, properties: {}, geyser: false };
 }
 // server.properties is read by Java's java.util.Properties, which decodes a backslash escape
 // before the game ever sees the value. The most common one by far is \uXXXX, used for the
@@ -96,12 +96,17 @@ function serverFiles(root) {
   const names = list(root).filter(x => x.isFile() && /\.jar$/i.test(x.name)).map(x => x.name);
   const runnable = names.filter(x => !/(installer|universal|shim|buildtools)/i.test(x)); const launchScript = list(root).find(x => x.isFile() && /^run\.(bat|sh)$/i.test(x.name))?.name || null;
   const jar = runnable.find(x => /spigot/i.test(x)) || runnable.find(x => /(purpur|paper|leaf|folia|velocity|craftbukkit|forge|fabric|server)/i.test(x)) || runnable[0] || null;
+  const nativeBinary = list(root).find(x => x.isFile() && /^horizon-server(\.exe)?$/i.test(x.name))?.name || null;
+  const hasHorizonConfig = fs.existsSync(path.join(root, 'server.toml'));
   const fileNames = folder => list(path.join(root, folder)).filter(x => x.isFile()).map(x => x.name);
   const dirNames = folder => list(path.join(root, folder)).filter(x => x.isDirectory()).map(x => x.name);
   let properties = {};
+
   // The values are decoded the way Java's Properties would, so the grid and the MOTD preview
   // show what the server actually gets (a colour-coded MOTD, not the escape text).
   try { for (const line of fs.readFileSync(path.join(root, 'server.properties'), 'utf8').split(/\r?\n/)) { const i = line.indexOf('='); if (i > 0 && !line.startsWith('#')) properties[line.slice(0, i)] = decodePropertiesValue(line.slice(i + 1)); } } catch {}
+  // For native Horizon servers, server.toml takes precedence over legacy server.properties.
+  if (hasHorizonConfig) { try { const { syncTomlToProperties } = require('./horizon-config.js'); Object.assign(properties, syncTomlToProperties(fs.readFileSync(path.join(root, 'server.toml'), 'utf8'))); } catch {} }
   let knownPlayers = [];
   try { const cache = JSON.parse(fs.readFileSync(path.join(root, 'usercache.json'), 'utf8')); knownPlayers = cache.map(x => ({ name: x.name, uuid: x.uuid, hasData: !!findPlayerDataFile(root, properties, x.uuid, x.name) })).filter(x => x.name); } catch {}
   const hasSpigotConfig = fs.existsSync(path.join(root, 'spigot.yml')) || fs.existsSync(path.join(root, 'bukkit.yml'));
@@ -146,21 +151,25 @@ function serverFiles(root) {
   let target = { mc: null, loader: 'unknown', software: 'unknown' };
   try {
     const { detectServerTarget } = require('./server-compat.js');
-    const dt = detectServerTarget(root, { jar, launchScript, hasSpigotConfig });
+    const dt = detectServerTarget(root, { jar, launchScript, nativeBinary, hasHorizonConfig, hasSpigotConfig });
     let soft = dt.loader;
-    const name = String(jar || launchScript || '').toLowerCase();
+    const name = String(jar || launchScript || nativeBinary || '').toLowerCase();
+    if (/horizon/.test(name) || dt.loader === 'horizon' || nativeBinary || (hasHorizonConfig && !jar && !launchScript)) soft = 'horizon';
     if (/purpur/.test(name)) soft = 'purpur';
     else if (/leaf/.test(name)) soft = 'leaf';
     else if (/folia/.test(name)) soft = 'folia';
     else if (/paper/.test(name)) soft = 'paper';
     else if (/spigot/.test(name) || hasSpigotConfig) soft = 'spigot';
     else if (/velocity|bungee|waterfall/.test(name)) soft = 'velocity';
-    target = { mc: dt.mc || null, loader: dt.loader || 'unknown', software: soft || dt.loader || 'unknown' };
+    target = { mc: dt.mc || (soft === 'horizon' ? '26.3' : null), loader: dt.loader || (soft === 'horizon' ? 'horizon' : 'unknown'), software: soft || dt.loader || 'unknown', engineType: (soft === 'horizon' || nativeBinary) ? 'native' : (dt.engineType || 'java') };
   } catch {}
-  return { jar, launchScript, target, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
+  const isNative = (target.software === 'horizon' || !!nativeBinary || (hasHorizonConfig && !jar && !launchScript));
+  const engineType = isNative ? 'native' : 'java';
+  return { jar: isNative ? null : jar, launchScript: isNative ? null : launchScript, nativeBinary, hasHorizonConfig, engineType, target, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
 }
 function detectSoftware(info) {
-  const name = String(info.jar || info.launchScript || '');
+  const name = String(info.jar || info.launchScript || info.nativeBinary || '');
+  if (/horizon/i.test(name) || info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript)) return 'horizon';
   if (/velocity|bungee|waterfall/i.test(name)) return 'proxy';
   if (/paper|purpur|leaf|folia|spigot|bukkit|craftbukkit/i.test(name)) return 'paper-like';
   if (info.hasSpigotConfig) return 'paper-like';

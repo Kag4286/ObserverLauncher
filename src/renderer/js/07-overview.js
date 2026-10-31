@@ -1,3 +1,20 @@
+async function refreshResourcePackUI() {
+  try {
+    const r = await window.observer.resourcepackGet();
+    const badge = $('#rpActiveName');
+    const clearBtn = $('#rpClearBtn');
+    const desc = $('#rpDesc');
+    if (r && r.active && r.info && r.info.ok) {
+      if (badge) badge.textContent = r.info.name;
+      if (clearBtn) clearBtn.hidden = false;
+      if (desc && r.info.description) desc.textContent = r.info.description;
+    } else {
+      if (badge) badge.textContent = t('set.rpNone');
+      if (clearBtn) clearBtn.hidden = true;
+      if (desc) desc.textContent = t('set.resourcePackSub');
+    }
+  } catch {}
+}
 // js/07-overview.js — split from app.js (lines 999-1126); classic script, load in numeric order.
 // Overview + Performance + Settings panels rendering.
 let uptimeStart=null;
@@ -46,7 +63,7 @@ function renderPerfDiagnostics(){
   n.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>command(b.dataset.command));
   n.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));
 }
-function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';$('#pinggyPathInput').value=s.pinggyPath||'';const cfk=$('#cfKeyInput');if(cfk)cfk.value=s.curseforgeApiKey||'';if($('#autoTunnelInput'))$('#autoTunnelInput').checked=!!s.autoTunnel;const ml=$('#motionLevelSelect');if(ml)ml.value=s.motionLevel||'full';applyMotionLevel(s.motionLevel||'full');if($('#beginnerModeInput'))$('#beginnerModeInput').checked=!!s.beginnerMode;if(typeof applyBeginnerMode==='function')applyBeginnerMode(s.beginnerMode);if($('#updatePolicySelect'))$('#updatePolicySelect').value=(s.updatePolicy||(s.autoCheckUpdates===false?'off':'ask'));
+function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';$('#pinggyPathInput').value=s.pinggyPath||'';const cfk=$('#cfKeyInput');if(cfk)cfk.value=s.curseforgeApiKey||'';if($('#autoTunnelInput'))$('#autoTunnelInput').checked=!!s.autoTunnel;const ml=$('#motionLevelSelect');if(ml)ml.value=s.motionLevel||'full';applyMotionLevel(s.motionLevel||'full');if($('#beginnerModeInput'))$('#beginnerModeInput').checked=!!s.beginnerMode;if(typeof applyBeginnerMode==='function')applyBeginnerMode(s.beginnerMode);if($('#updatePolicySelect'))$('#updatePolicySelect').value=(s.updatePolicy||(s.autoCheckUpdates===false?'off':'ask'));
   if($('#webhookUrlInput'))$('#webhookUrlInput').value=s.webhookUrl||'';
   if($('#webhookFormatSelect'))$('#webhookFormatSelect').value=s.webhookFormat||'discord';
   // v6.0.0 F4: Prometheus toggle + port + live status line.
@@ -56,23 +73,24 @@ function refreshUI(){const s=state.settings,f=state.files;currentLocale=s.locale
   // state once it has one. Reading the toggle (not just state.prometheus) means the line shows the
   // moment the user enables it, without waiting for an Apply, and it cannot vanish when a later
   // refreshUI drops state.prometheus.
-  updatePromStatus();
+  updatePromStatus();refreshResourcePackUI();
   {const evs=Array.isArray(s.webhookEvents)?s.webhookEvents:['start','stop','crash'];$$('#webhookEvents input[data-wh-event]').forEach(x=>{x.checked=evs.includes(x.dataset.whEvent)})}if($('#autoTunnelQuick'))$('#autoTunnelQuick').checked=!!s.autoTunnel;$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;if($('#backupRetentionInput'))$('#backupRetentionInput').value=s.backupRetention??10;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);syncRemoteFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=t('ov.systemRam',{n:state.systemMemoryGB});
   // v6.0.0 G1: disable a RAM preset that exceeds the machine's RAM, and reflect the current max.
-  {const sys=state.systemMemoryGB||0;$$('#ramPresets .ram-preset').forEach(b=>{const gb=Number(b.dataset.ram)||0;b.disabled=sys>0&&gb>sys;b.classList.toggle('active',Number($('#memoryMaxInput')?.value)===gb&&Number($('#memoryMinInput')?.value)===gb)})}$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():t('ov.defaultName');$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):t('ov.hintNone')))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
+  {const sys=state.systemMemoryGB||0;$$('#ramPresets .ram-preset').forEach(b=>{const gb=Number(b.dataset.ram)||0;b.disabled=sys>0&&gb>sys;b.classList.toggle('active',Number($('#memoryMaxInput')?.value)===gb&&Number($('#memoryMinInput')?.value)===gb)})}$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():t('ov.defaultName');$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||f.nativeBinary||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||f.nativeBinary||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):(f.nativeBinary?t('ov.hintReady',{n:f.nativeBinary}):t('ov.hintNone'))))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
   if(typeof applyBeginnerMode==='function')applyBeginnerMode(state.settings&&state.settings.beginnerMode);
   const proxy=isProxyServer();$('#eulaStatus').textContent=proxy?t('ov.eulaProxy'):(state.eulaAccepted?t('set.eulaOk').replace('✓ ',''):t('ov.eulaPending'));
   $('#worldsProxyNotice').hidden=!proxy;$('#playersProxyNotice').hidden=!proxy;
   $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
   const pt=$('.prop-toolbar');if(pt)pt.hidden=proxy;
   $('#propertiesTitle').textContent=proxy?t('prop.proxyTitle'):t('prop.title');$('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
-  if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{});
-   renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');renderWorlds(f.worlds||[]);renderBackups(f.backups||[]);
+  try{ if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{}); }catch(e){console.warn('props render error:',e)}
+  try{ renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');renderWorlds(f.worlds||[]);renderBackups(f.backups||[]); }catch(e){console.warn('files render error:',e)}
    const wc=$('#worldsCountPill'), bc=$('#backupsCountPill'), be=$('#backupEmpty'); if(wc) wc.textContent=String((f.worlds||[]).length); if(bc) bc.textContent=String((f.backups||[]).length); if(be) be.hidden=(f.backups||[]).length>0;
    const cpc=$('#contentPluginsCount'), cmc=$('#contentModsCount'), cdc=$('#contentDatapacksCount'); if(cpc) cpc.textContent=String((f.plugins||[]).length); if(cmc) cmc.textContent=String((f.mods||[]).length); if(cdc) cdc.textContent=String((f.datapacks||[]).length);
    if(typeof syncContentKindAuto==='function')syncContentKindAuto();if(typeof updateContentToolbarState==='function')updateContentToolbarState();
    const abs=$('#autoBackupStatus');if(abs){const mins=s.autoBackupMinutes||0;abs.innerHTML=mins>0?t('wld.autoOn',{n:mins})+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.configure')+'</button>':t('wld.autoOff')+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.turnOn')+'</button>';abs.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump))}
-  renderPlayers();renderPerfDiagnostics();const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
+  try{ renderPlayers(); }catch(e){console.warn('players render error:',e)}
+  try{ renderPerfDiagnostics(); }catch(e){console.warn('perf diag render error:',e)}const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
 // 2.2.0 (C): show the Java the current server's jar NEEDS vs what is detected, and offer the
 // one-click install whenever the detected Java is missing OR the wrong version (not just missing).
 // 2.2.0 (Java gap): prefer the Java requirement resolved in the main process (it also handles a
@@ -93,25 +111,38 @@ else n.textContent=t('set.javaOk',{v:j.version,p:j.path});
 // Show Install when Java is missing, mismatched/too-new, OR still coming from PATH (no managed
 // javaPath set) - so a run.bat server with no jar can still pin a specific runtime.
 const javaPathSet=!!((s.javaPath||'').trim());
-$('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
-  populateJavaPicker(j);
+const isNatSetting=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+$('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
+  if(!isNatSetting) populateJavaPicker(j);
+  else { const jpRow=$('#javaPickRow'); if(jpRow) jpRow.hidden=true; }
+  const jt=$('#setJavaTopic'); if(jt) jt.hidden=isNatSetting;
+  const nt=$('#setNativeTopic');
+  if(nt){
+    nt.hidden=!isNatSetting;
+    const nbb=$('#nativeBinBadge');
+    if(nbb) nbb.textContent=f.nativeBinary||'horizon-server.exe';
+  }
+  const shSub=$('#settingsHeadSub');
+  if(shSub) shSub.textContent=isNatSetting?t('set.subNative'):t('set.sub');
+
   // Launcher settings extras: folder health line + effective launch command preview.
   const fsEl=$('#folderStatus');
   if(fsEl){
     if(!s.serverPath){fsEl.textContent=t('set.folderNone');fsEl.className='field-hint folder-status'}
     else{
-      const parts=[f.jar?tf('set.jarOk',{n:f.jar}):f.launchScript?tf('set.jarOk',{n:f.launchScript}):t('set.noJar'),state.eulaAccepted?t('set.eulaOk'):t('set.eulaPending')];
+      const parts=[f.jar?tf('set.jarOk',{n:f.jar}):f.launchScript?tf('set.jarOk',{n:f.launchScript}):f.nativeBinary?tf('set.jarOk',{n:f.nativeBinary}):t('set.noJar'),state.eulaAccepted?t('set.eulaOk'):t('set.eulaPending')];
       fsEl.textContent=parts.join(' · ');
-      fsEl.className='field-hint folder-status '+((f.jar||f.launchScript)?'ok':'');
+      fsEl.className='field-hint folder-status '+((f.jar||f.launchScript||f.nativeBinary)?'ok':'');
     }
   }
   renderJvmPreview();renderSetupSteps();
   // Java compatibility banner — proactive warning + one-click fix
   const jw=$('#javaWarnBanner');
   if(jw){
-    const need=state.javaRequired||null;
+    const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+    const need=isNat?null:(state.javaRequired||null);
     const have=(j.ok&&j.version)?(javaMajorOf(j.version)):null;
-    const mismatch=need&&have&&have<need;
+    const mismatch=!isNat&&need&&have&&have<need;
     jw.hidden=!mismatch;
     if(mismatch){
       $('#javaWarnText').textContent=t('ov.javaMismatch',{need,have});
@@ -129,12 +160,13 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   // console live dot
   const cd=$('#consoleLiveDot'), cl=$('#consoleLiveLabel'); if(cd&&cl){ cd.className='live-dot'+(state.status==='running'?' on':state.status==='starting'||state.status==='stopping'?' busy':''); cl.textContent={starting:t('top.starting'),running:t('con.live'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||'stopped']||t('top.offline'); }
   // P0.1: disable Start when no folder / no runnable jar, highlight welcome card
-  const hasFolder=!!s.serverPath; const hasJar=!!(f.jar||f.launchScript); const startBtn=$('#startBtn'), stopBtn=$('#stopBtn'), welcomeCard=$('#welcomeCard');
+  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+  const hasFolder=!!s.serverPath; const hasJar=!!(f.jar||f.launchScript||isNat); const startBtn=$('#startBtn'), stopBtn=$('#stopBtn'), welcomeCard=$('#welcomeCard');
   // 5.4.0: if the ACTIVE instance's folder is gone, Start is blocked with a specific hint.
   const activeInst=(Array.isArray(state.instances)?state.instances:[]).find(i=>i.id===state.activeInstanceId);
   const folderMissing=!!(activeInst&&activeInst.missing);
-  const canStart=hasFolder && hasJar && !!j.ok && state.status==='stopped' && !folderMissing;
-  if(startBtn){startBtn.disabled=!canStart; if(folderMissing) startBtn.title=t('inst.missingTip'); else if(!hasFolder||!hasJar) startBtn.title=!hasFolder?t('top.startTipFolder'):!j.ok?t('top.startTipJava'):t('top.startTipNoJar'); else if(state.status!=='stopped') startBtn.title={starting:t('top.startTipStarting'), stopping:t('top.startTipStopping'), running:t('top.startTipRunning')}[state.status]||''; else startBtn.title='';}
+  const canStart=hasFolder && hasJar && (isNat||!!j.ok) && state.status==='stopped' && !folderMissing;
+  if(startBtn){startBtn.disabled=!canStart; if(folderMissing) startBtn.title=t('inst.missingTip'); else if(!hasFolder||!hasJar) startBtn.title=!hasFolder?t('top.startTipFolder'):(!isNat&&!j.ok)?t('top.startTipJava'):t('top.startTipNoJar'); else if(state.status!=='stopped') startBtn.title={starting:t('top.startTipStarting'), stopping:t('top.startTipStopping'), running:t('top.startTipRunning')}[state.status]||''; else startBtn.title='';}
   if(stopBtn) stopBtn.disabled=state.status==='stopped';
   // Restart is offered only while the server is fully running. While it is starting or stopping a
   // restart would race the in-flight transition, so we hide the button instead.
@@ -159,6 +191,7 @@ $('#javaAutoInstall').hidden=!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   // panels are hidden until a server folder exists, so an empty first screen never
   // looks broken or overwhelming. All elements stay in the DOM (JS keeps working).
   const overviewSec=$('#overview'); if(overviewSec) overviewSec.classList.toggle('has-server', hasFolder);
+  const ovAdv=$('#ovAdvanced'); if(ovAdv) ovAdv.hidden=isNat;
   // Performance tab: single offline banner + dimmed numbers while stopped.
   const perfSec=$('#performance'); if(perfSec) perfSec.classList.toggle('is-live', state.status==='running');
   const perfStatus=$('#perfStatus'); if(perfStatus) perfStatus.hidden = state.status!=='stopped';
@@ -201,13 +234,14 @@ function renderSetupSteps(){
   const card=$('#welcomeCard');if(card)card.classList.toggle('is-running',!!state.running);
   const s=state.settings||{},f=state.files||{},j=state.java||{};
   const base=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():'';
-  const jar=f.jar||f.launchScript;
+  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+  const jar=f.jar||f.launchScript||f.nativeBinary;
   const jm=j.ok&&j.version?javaMajorOf(j.version):null;
   const steps=[
     {t:base||t('top.noServer'),c:s.serverPath?'ok':'bad',title:s.serverPath||t('set.folderNone')},
     {t:jar||t('set.noJar'),c:jar?'ok':'bad',title:jar?tf('set.jarOk',{n:jar}):t('set.noJar')},
-    j.ok
-      ? {t:'Java '+(jm||j.version),c:'ok',title:tf('set.javaOk',{v:j.version,p:j.path})}
+    (isNat||j.ok)
+      ? {t:isNat?t('nsw.nativeEngine'):('Java '+(jm||j.version)),c:'ok',title:isNat?'Native Horizon engine':tf('set.javaOk',{v:j.version,p:j.path})}
       : {t:t('ov.fixJava'),c:'bad',title:t('set.javaBad',{m:j.message||''}),tab:'settings'},
     state.eulaAccepted
       ? {t:'EULA ✓',c:'ok',title:t('set.eulaOk')}
@@ -399,8 +433,9 @@ async function populateJavaPicker(j){
 function renderJvmPreview(){
   const el=$('#jvmPreview');if(!el)return;
   const s=state.settings||{},f=state.files||{};
-  const jar=f.jar||f.launchScript;
-  if(!jar){el.hidden=true;return}
+  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+  const jar=f.jar||f.launchScript||f.nativeBinary;
+  if(isNat||!jar){el.hidden=true;return}
   const custom=String(s.jvmArgs||'').trim();
   const args=custom?custom:`-Xms${s.memoryMin||2}G -Xmx${s.memoryMax||6}G`;
   el.hidden=false;

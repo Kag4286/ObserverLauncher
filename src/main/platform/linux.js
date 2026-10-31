@@ -67,26 +67,21 @@ function collectJavaPids(rootPid, isJava, getChildren) {
   return found;
 }
 
-// Walk /proc to find java descendant, or use ps
-async function findJavaDescendant(rootPid) {
-  // Try reading /proc
+// Walk /proc to find matching descendant, or use ps
+async function findLinuxDescendant(rootPid, filterFn) {
   try {
     const all = fs.readdirSync('/proc').filter(n => /^\d+$/.test(n)).map(n => Number(n));
-    const map = new Map(); // pid -> {ppid, comm}
+    const map = new Map();
     for (const pid of all) {
       try {
         const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-        // stat format: pid (comm) state ppid ...
         const m = stat.match(/^\d+ \((.+)\) \S (\d+)/);
         if (m) map.set(pid, { comm: m[1], ppid: Number(m[2]) });
       } catch {}
     }
-    // BFS from root (/proc map)
-    const isJava = (pid) => { const n = map.get(pid); return !!(n && /^java$/.test(n.comm)); };
     const childrenOf = (pid) => { const a = []; for (const [p, info] of map.entries()) if (info.ppid === pid) a.push(p); return a; };
-    const candidates = collectJavaPids(rootPid, isJava, childrenOf);
+    const candidates = collectJavaPids(rootPid, pid => { const n = map.get(pid); return !!(n && filterFn(n.comm)); }, childrenOf);
     if (candidates.length) {
-      // pick one with largest rss
       let best = candidates[0], bestRss = 0;
       for (const pid of candidates) {
         try {
@@ -99,7 +94,6 @@ async function findJavaDescendant(rootPid) {
       return best;
     }
   } catch {}
-  // Fallback to ps
   const r = await exec('ps', ['-eo', 'pid,ppid,comm', '--no-headers']);
   if (!r.ok) return null;
   const lines = r.stdout.trim().split('\n').map(l => {
@@ -107,10 +101,17 @@ async function findJavaDescendant(rootPid) {
     return m ? { pid: Number(m[1]), ppid: Number(m[2]), comm: m[3] } : null;
   }).filter(Boolean);
   const map = new Map(lines.map(n => [n.pid, n]));
-  const isJava = (pid) => { const n = map.get(pid); return !!(n && /^java$/.test(n.comm)); };
   const childrenOf = (pid) => { const a = []; for (const n of lines) if (n.ppid === pid) a.push(n.pid); return a; };
-  const cands = collectJavaPids(rootPid, isJava, childrenOf);
+  const cands = collectJavaPids(rootPid, pid => { const n = map.get(pid); return !!(n && filterFn(n.comm)); }, childrenOf);
   return cands[0] || null;
+}
+
+function findJavaDescendant(rootPid) {
+  return findLinuxDescendant(rootPid, comm => /^java$/.test(comm));
+}
+
+function findServerDescendant(rootPid) {
+  return findLinuxDescendant(rootPid, () => true).then(id => id || Number(rootPid));
 }
 
 // Process identity for orphan cleanup (v2.0.0). /proc/<pid>/stat field 22 is the
@@ -238,7 +239,7 @@ async function allowFirewall(port) {
   };
 }
 
-module.exports = { findJavaDescendant, getProcessInfo, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries, extractArchive, createArchive };
+module.exports = { findJavaDescendant, findServerDescendant, getProcessInfo, getProcessMetrics, createBackup, restoreBackup, allowFirewall, listArchiveEntries, extractArchive, createArchive };
 
 // Cross-platform archive helpers (Linux side). .zip -> unzip, .tar.gz/.tgz -> tar.
 async function extractArchive(archivePath, destDir) {

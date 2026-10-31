@@ -199,16 +199,26 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  let armorTex1 = null, armorTex2 = null;
-  let mat1 = null, mat2 = null;
-  if (equipment) {
-    const helmetMat = getMaterial(equipment.helmet?.id);
-    const chestMat = getMaterial(equipment.chest?.id);
-    const bootsMat = getMaterial(equipment.boots?.id);
-    const legsMat = getMaterial(equipment.legs?.id);
-    mat1 = helmetMat || chestMat || bootsMat;
-    mat2 = legsMat;
-  }
+  let texHelmet = null, texChest = null, texBoots = null, texLegs = null;
+  const helmetMat = equipment ? getMaterial(equipment.helmet?.id) : null;
+  const chestMat = equipment ? getMaterial(equipment.chest?.id) : null;
+  const bootsMat = equipment ? getMaterial(equipment.boots?.id) : null;
+  const legsMat = equipment ? getMaterial(equipment.legs?.id) : null;
+  const armorTexCache = new Map();
+  const allCreatedTextures = [tex];
+  const fetchArmor = (kind, mat, cb) => {
+    if (!mat) return;
+    const key = kind + ':' + mat;
+    if (armorTexCache.has(key)) {
+      cb(armorTexCache.get(key));
+      return;
+    }
+    loadArmor(kind, mat, t => {
+      armorTexCache.set(key, t);
+      allCreatedTextures.push(t);
+      cb(t);
+    });
+  };
 
   // Upload a texture, but only if it is real. tex:// answers a cache miss with a 1x1 transparent
   // PNG rather than a 404 (to avoid console spam), so a 1px image means "not downloaded yet".
@@ -276,15 +286,12 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
       cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.rightPants, SKIN, SKIN));
     }
 
-    if (mat1) {
-      loadArmor('armor', mat1, t => { armorTex1 = t; draw(); });
-    }
-    if (mat2) {
-      loadArmor('armorlegs', mat2, t => { armorTex2 = t; draw(); });
-    }
+    if (helmetMat) fetchArmor('armor', helmetMat, t => { texHelmet = t; draw(); });
+    if (chestMat) fetchArmor('armor', chestMat, t => { texChest = t; draw(); });
+    if (bootsMat) fetchArmor('armor', bootsMat, t => { texBoots = t; draw(); });
+    if (legsMat) fetchArmor('armorlegs', legsMat, t => { texLegs = t; draw(); });
     draw();
   };
-  img.src = skinUrl;
 
   const armW = isSlim ? 3 : 4;
   // Skin UVs live on a 64x64 grid. Worn-armor textures are 64x32 (verified against the live
@@ -425,26 +432,26 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     drawPart(cLArm, p('armL').x, p('armL').y, 0);
     drawPart(cLSleeve, p('armL').x, p('armL').y, 0);
 
-    if (armorTex1) {
-      gl.bindTexture(gl.TEXTURE_2D, armorTex1);
-      if (equipment.helmet) drawPart(cHelmet, p('head').x, p('head').y, 0);
-      if (equipment.chest) {
-        drawPart(cChestplate, p('body').x, p('body').y, 0);
-        drawPart(cRightArmArmor, p('armR').x, p('armR').y, 0);
-        drawPart(cLeftArmArmor, p('armL').x, p('armL').y, 0);
-      }
-      if (equipment.boots) {
-        drawPart(cRightBoot, p('legR').x, p('legR').y, 0);
-        drawPart(cLeftBoot, p('legL').x, p('legL').y, 0);
-      }
+    if (texHelmet && equipment.helmet) {
+      gl.bindTexture(gl.TEXTURE_2D, texHelmet);
+      drawPart(cHelmet, p('head').x, p('head').y, 0);
     }
-    if (armorTex2) {
-      gl.bindTexture(gl.TEXTURE_2D, armorTex2);
-      if (equipment.legs) {
-        drawPart(cLeggings, p('body').x, p('body').y, 0);
-        drawPart(cRightLeggings, p('legR').x, p('legR').y, 0);
-        drawPart(cLeftLeggings, p('legL').x, p('legL').y, 0);
-      }
+    if (texChest && equipment.chest) {
+      gl.bindTexture(gl.TEXTURE_2D, texChest);
+      drawPart(cChestplate, p('body').x, p('body').y, 0);
+      drawPart(cRightArmArmor, p('armR').x, p('armR').y, 0);
+      drawPart(cLeftArmArmor, p('armL').x, p('armL').y, 0);
+    }
+    if (texBoots && equipment.boots) {
+      gl.bindTexture(gl.TEXTURE_2D, texBoots);
+      drawPart(cRightBoot, p('legR').x, p('legR').y, 0);
+      drawPart(cLeftBoot, p('legL').x, p('legL').y, 0);
+    }
+    if (texLegs && equipment.legs) {
+      gl.bindTexture(gl.TEXTURE_2D, texLegs);
+      drawPart(cLeggings, p('body').x, p('body').y, 0);
+      drawPart(cRightLeggings, p('legR').x, p('legR').y, 0);
+      drawPart(cLeftLeggings, p('legL').x, p('legL').y, 0);
     }
   }
 
@@ -457,8 +464,9 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
       if (bufPos) gl.deleteBuffer(bufPos);
       if (bufTex) gl.deleteBuffer(bufTex);
       if (tex) gl.deleteTexture(tex);
-      if (armorTex1) gl.deleteTexture(armorTex1);
-      if (armorTex2) gl.deleteTexture(armorTex2);
+      for (const t of allCreatedTextures) {
+        if (t) gl.deleteTexture(t);
+      }
       if (prog) gl.deleteProgram(prog);
     } catch {}
     if (canvas._playerRenderer === handle) {
@@ -466,6 +474,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     }
   }
 
+  img.src = skinUrl;
   const handle = { draw, destroy };
   canvas._playerRenderer = handle;
   return handle;

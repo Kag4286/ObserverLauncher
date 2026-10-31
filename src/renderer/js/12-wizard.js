@@ -4,7 +4,17 @@
 // folder and runs the download there. It never overwrites another instance's settings. Calls
 // getSettings/toast/switchTab/debounce/esc/t/formatBytes (defined in 08-shell.js or earlier) at
 // click time, so loading after 08 is safe.
-let nsw={step:1,software:'vanilla',folder:''};
+let nsw={step:1,software:'vanilla',folder:'',baseFolder:'',subfolder:''};
+function nswResolveFolder(){
+  const sub=($('#nswSubfolderInput')?.value||'').trim();
+  nsw.subfolder=sub;
+  if(!nsw.baseFolder){nsw.folder='';return}
+  if(!sub){nsw.folder=nsw.baseFolder;return}
+  const sep=nsw.baseFolder.includes('/')?'/':'\\';
+  const cleanBase=nsw.baseFolder.replace(/[\\/]+$/,'');
+  const cleanSub=sub.replace(/^[\\/]+/,'');
+  nsw.folder=cleanBase+sep+cleanSub;
+}
 // Real-time version data for the wizard — loaded live from each software's official API
 // (wizard:versions IPC) instead of hardcoded chips that drifted out of date.
 let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
@@ -12,7 +22,7 @@ let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,faile
 let nswMc=null;   // chosen Minecraft version for forge/neoforge
 const NSW_MC_FIRST={forge:true,neoforge:true};
 const isMcFirst=()=>!!NSW_MC_FIRST[nsw.software];
-const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity'};
+const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity',horizon:'Horizon'};
 // D3 (v3.0.0): server templates. A template pre-fills the wizard (software + memory); its plugin and
 // config steps are shown as a plan the user can act on after creation. Loaded once from the main
 // process (templates:list) and cached. Degrades silently when the IPC is unavailable.
@@ -144,7 +154,11 @@ function renderNswChips(filter){
   box.innerHTML=list.map((v,i)=>{
     const st=statusMap.get(v);
     const soft=st&&st.stable===false;
-    const tag=soft?` <em class="nsw2-tag warn">${esc((st.channel||'beta').toLowerCase())}</em>`:(st&&st.stable?'':'');
+    let tag=soft?` <em class="nsw2-tag warn">${esc((st.channel||'beta').toLowerCase())}</em>`:(st&&st.stable?'':'');
+    if(nsw.software==='horizon'){
+      const isNightly=/nightly|dev/i.test(v);
+      tag=isNightly?` <em class="nsw2-tag warn">${esc(t('nsw.tagNightly'))}</em>`:` <em class="nsw2-tag accent">${esc(t('nsw.tagStable'))}</em>`;
+    }
     return `<button class="version-chip"${chipDelay(i)} data-version="${esc(v)}"${soft?' data-soft="1"':''}>${esc(v)}${tag}</button>`;
   }).join('');
 }
@@ -227,7 +241,7 @@ function nswRender(){
   const fp=$('#nswFolderPath'); if(fp)fp.textContent=nsw.folder||t('nsw.noFolder');
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
-  $('#nswRailSub3').textContent=`${$('#nswMemorySlider').value} GB`;
+  $('#nswRailSub3').textContent=nsw.software==='horizon'?'~600 MB':`${$('#nswMemorySlider').value} GB`;
   if(nsw.step===2){loadNswTemplates()}
   if(nsw.step===3){
     loadNswVersions(nsw.software);
@@ -244,8 +258,15 @@ function nswRender(){
     if(!nswVersions.loading) renderNswChips($('#nswVersionInput')?.value.trim()||'');
   }
   if(nsw.step===4){
-    if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=t('nsw.ramHint',{n:state.systemMemoryGB})}
-    nswUpdateMemory();
+    const isNat=nsw.software==='horizon';
+    const jWrap=$('#nswJavaMemoryWrap');
+    const nWrap=$('#nswNativeMemoryWrap');
+    if(jWrap) jWrap.hidden=isNat;
+    if(nWrap) nWrap.hidden=!isNat;
+    if(!isNat){
+      if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=t('nsw.ramHint',{n:state.systemMemoryGB})}
+      nswUpdateMemory();
+    }
   }
   if(nsw.step===5){
     // v4.0.0: show a template banner + it also carries the plan step count (plugins/mod config).
@@ -254,19 +275,21 @@ function nswRender(){
     const memory=$('#nswMemorySlider').value;
     // P2d (2.2.0): the review shows the download source + where it lands + Java readiness, so the
     // user knows what is about to happen before pressing Create.
-    const srcMap={vanilla:t('nsw.srcVanilla'),paper:t('nsw.srcPaper'),purpur:t('nsw.srcPurpur'),leaf:t('nsw.srcLeaf'),fabric:t('nsw.srcFabric'),forge:t('nsw.srcForge'),neoforge:t('nsw.srcForge'),folia:t('nsw.srcPaper'),spigot:t('nsw.srcSpigot'),velocity:t('nsw.srcPaper')};
+    const srcMap={vanilla:t('nsw.srcVanilla'),paper:t('nsw.srcPaper'),purpur:t('nsw.srcPurpur'),leaf:t('nsw.srcLeaf'),fabric:t('nsw.srcFabric'),forge:t('nsw.srcForge'),neoforge:t('nsw.srcForge'),folia:t('nsw.srcPaper'),spigot:t('nsw.srcSpigot'),velocity:t('nsw.srcPaper'),horizon:t('nsw.srcHorizon')};
     const src=srcMap[nsw.software]||'';
     const jm=state.java&&state.java.ok?javaMajorOf(state.java.version):null;
     const javaNeed=nswJava.java;
     const javaBad=javaNeed&&jm!=null&&jm<javaNeed;
-    const javaRow=javaNeed?`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${`Java ${javaNeed}${nswJava.exact?' (verified)':'+'}`}</b></div>`:`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>—</b></div>`;
+    const javaRow=nsw.software==='horizon'?`<div class="nsw2-kv"><span>${t('nsw.engine')}</span><b>${t('nsw.nativeEngine')}</b></div>`:(javaNeed?`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${`Java ${javaNeed}${nswJava.exact?' (verified)':'+'}`}</b></div>`:`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>—</b></div>`);
     const rows=[
       `<div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(nsw.folder||'—')}</b></div>`,
       `<div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div>`,
       `<div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div>`,
       src?`<div class="nsw2-kv"><span>${t('nsw.sumSource')}</span><b>${esc(src)}</b></div>`:'',
       javaRow,
-      `<div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div>`,
+      nsw.software==='horizon'
+        ? `<div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(t('nsw.nativeDirectRam'))}</b></div>`
+        : `<div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div>`,
     ].join('');
     const warn=javaBad?`<p class="proxy-notice">${esc(t('nsw.javaTooOld',{v:jm}))}</p>`:'';
     $('#nswSummary').innerHTML=rows+warn;
@@ -300,6 +323,7 @@ const NSW_INFO={
   neoforge:{url:'https://neoforged.net/',for:'nsw.inf.neoforge',b:['nsw.inf.neoforge.b1','nsw.inf.neoforge.b2']},
   forge:{url:'https://files.minecraftforge.net/',for:'nsw.inf.forge',b:['nsw.inf.forge.b1','nsw.inf.forge.b2']},
   velocity:{url:'https://papermc.io/software/velocity',for:'nsw.inf.velocity',b:['nsw.inf.velocity.b1','nsw.inf.velocity.b2']},
+  horizon:{url:'https://github.com/horizon-rust/horizon',for:'nsw.inf.horizon',b:['nsw.inf.horizon.b1','nsw.inf.horizon.b2']},
 };
 function nswCloseInfo(){const pop=$('#nswInfoPop');if(pop)pop.hidden=true;_nswInfoAnchor=null}
 // A position:fixed popover drifts when the wizard body scrolls — close it instead.
@@ -395,7 +419,11 @@ function nswUpdateMemory(){
   $('#nswMemoryValue').textContent=v;
   s.style.setProperty('--p',Math.round((v-min)/(max-min)*100)+'%');
   const desc=$('#nswRamDesc');
-  if(desc){desc.textContent=t('nsw.mem'+(v<=2?1:v<=4?2:v<=8?3:4));desc.className='nsw2-memory-desc '+(v<=4?'ok':v<=8?'warn':'bad')}
+  if(desc){
+    const memDesc=v<=2?t('nsw.mem1'):v<=4?t('nsw.mem2'):v<=8?t('nsw.mem3'):t('nsw.mem4');
+    desc.textContent=memDesc;
+    desc.className='nsw2-memory-desc '+(v<=4?'ok':v<=8?'warn':'bad');
+  }
   $$('.nsw2-mempresets .filter-chip').forEach(c=>c.classList.toggle('active',Number(c.dataset.mem)===v));
   $('#nswRailSub3').textContent=`${v} GB`;
 }
@@ -534,7 +562,9 @@ $('#nswNext').onclick=async()=>{
 };
 // The Add-instance flow (also used by the welcome / onboarding "Create a new server" buttons).
 function openNewServerWizard(folder){
-  nsw={step:1,software:'vanilla',folder:folder||''};
+  nsw={step:1,software:'vanilla',folder:folder||'',baseFolder:folder||'',subfolder:''};
+  const subIn=$('#nswSubfolderInput'); if(subIn) subIn.value='';
+  const resHint=$('#nswResolvedFolderHint'); if(resHint) resHint.textContent=folder||'';
   nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
   nswMc=null;
   nswTplBanner=null;
@@ -550,6 +580,9 @@ function openNewServerWizard(folder){
   $('#nswLatestLabel').textContent=t('nsw.resolvingLatest');
   $('#nswMemorySlider').value=4;$('#nswMemoryValue').textContent='4';
   $('#nswProgress').hidden=true;
+  $$('#nswSoftwareFilters .nsw-filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.filter==='all'));
+  $$('#nswCards .nsw2-cardwrap').forEach(w=>{ w.hidden=false; });
+  $$('#nswCards .nsw2-group').forEach(g=>{ g.hidden=false; });
   nswRender();const _m=$('#newServerModal');_m.hidden=false;trapFocus(_m);
 }
 // Step 1: pick the folder for the new instance. Uses pickFolder directly (NOT chooseFolder),
@@ -571,7 +604,51 @@ $('#nswChooseFolder')?.addEventListener('click',async()=>{
       return;
     }
   }
-  nsw.folder=f;nswRender();
+  nsw.baseFolder=f;
+  nswResolveFolder();
+  const resHint=$('#nswResolvedFolderHint'); if(resHint) resHint.textContent=nsw.folder;
+  nswRender();
+});
+
+// Step 1: Subfolder input
+$('#nswSubfolderInput')?.addEventListener('input',()=>{
+  nswResolveFolder();
+  const resHint=$('#nswResolvedFolderHint'); if(resHint) resHint.textContent=nsw.folder;
+  const fp=$('#nswFolderPath'); if(fp) fp.textContent=nsw.folder||t('nsw.noFolder');
+  const folderName=nsw.folder?nsw.folder.split(/[\\/]/).filter(Boolean).pop():t('nsw.noFolder');
+  const folderSub=$('#nswRailFolderSub'); if(folderSub) folderSub.textContent=folderName;
+});
+
+// Rail clickable completed steps
+$$('.nsw2-step').forEach(d=>{
+  d.addEventListener('click',()=>{
+    const n=Number(d.dataset.dot);
+    if(n<nsw.step){ nsw.step=n; nswRender(); }
+  });
+});
+
+// Step 2: Software category filters
+$('#nswSoftwareFilters')?.addEventListener('click',e=>{
+  const chip=e.target.closest('.nsw-filter-chip');
+  if(!chip)return;
+  $$('#nswSoftwareFilters .nsw-filter-chip').forEach(c=>c.classList.toggle('active',c===chip));
+  const filter=chip.dataset.filter||'all';
+  const cards=$$('#nswCards .nsw2-cardwrap');
+  cards.forEach(wrap=>{
+    if(filter==='all'){
+      wrap.hidden=false;
+    }else{
+      const groups=(wrap.dataset.groups||'').split(/\s+/);
+      wrap.hidden=!groups.includes(filter);
+    }
+  });
+  $$('#nswCards .nsw2-group').forEach(grp=>{
+    const grid=grp.nextElementSibling;
+    if(grid&&grid.classList.contains('nsw2-grid')){
+      const hasVisible=[...grid.querySelectorAll('.nsw2-cardwrap')].some(w=>!w.hidden);
+      grp.hidden=!hasVisible;
+    }
+  });
 });
 // 5.4.0: the rail now has ONE "Add server" button that opens a choice modal (see 08-shell.js);
 // the 'create new' choice calls openNewServerWizard() from there.

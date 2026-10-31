@@ -86,6 +86,14 @@ const freshSt = () => ({ consecutiveMisses: 0, lastMetrics: { serverMemory: 0, c
     ok('good read pushes serverMemory', st.lastMetrics.serverMemory === 512);
   }
 
+  {
+    const ctx = makeCtx({ serverProcess: { pid: 9999 }, currentSoftware: 'horizon' });
+    const st = freshSt();
+    metricsResult = { memoryMB: 450, cpuTime: 12.0 };
+    await metricsTick(ctx, st);
+    ok('native: assigns monitoredPid on first tick', ctx.monitoredPid === 9999);
+    ok('native: good read pushes serverMemory', st.lastMetrics.serverMemory === 450);
+  }
   console.log(`\n${passed} passed, 0 failed`);
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });

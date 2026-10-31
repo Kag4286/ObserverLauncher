@@ -169,7 +169,9 @@ function switchTab(tab){
     // Retriggerable enter animation (motion lives in css/08-motion.css).
     panel.classList.remove('tab-enter-fwd','tab-enter-back'); void panel.offsetWidth;
     panel.classList.add(dir<0?'tab-enter-back':'tab-enter-fwd');
-    panel.onanimationend=e=>{if(e.target===panel)panel.classList.remove('tab-enter-fwd','tab-enter-back')};
+    const onTabEnd=e=>{if(e.target===panel){panel.classList.remove('tab-enter-fwd','tab-enter-back');panel.removeEventListener('animationend',onTabEnd);}};
+    panel.addEventListener('animationend',onTabEnd);
+    setTimeout(()=>{panel.classList.remove('tab-enter-fwd','tab-enter-back');panel.removeEventListener('animationend',onTabEnd);},200);
   }
   if(tab==='marketplace'&&!$('#marketResults').innerHTML)$('#marketSearch').click();
   if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource');}catch{}})}); }
@@ -212,7 +214,12 @@ let lastTunOvSig='';
 function renderInstanceList(){
   const wrap=$('#instanceList'),host=$('#instanceItems');
   if(!wrap||!host)return;
-  const list=Array.isArray(state.instances)?state.instances:[];
+  let list=Array.isArray(state.instances)?state.instances:[];
+  if(list.length===0 && state.settings?.serverPath){
+    const p=state.settings.serverPath;
+    const name=p.split(/[\\/]/).filter(Boolean).pop()||'Server 1';
+    list=[{id:state.activeInstanceId||'default',name,serverPath:p,accent:'',artSeed:0,missing:false,group:''}];
+  }
   wrap.hidden=list.length===0;
   if(list.length===0)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
@@ -530,7 +537,7 @@ async function command(c){if(!c.trim())return;if(/[\r\n]/.test(c))return toast(t
 let cmdHistory=[],cmdHistoryIdx=-1;
 function pushCmdHistory(c){c=c.trim();if(!c)return;cmdHistory=cmdHistory.filter(x=>x!==c);cmdHistory.unshift(c);if(cmdHistory.length>8)cmdHistory.length=8;cmdHistoryIdx=-1;renderRecentCommands()}
 function renderRecentCommands(){const wrap=$('#recentCommands'),group=$('#recentCommandsGroup');if(!wrap||!group)return;if(!cmdHistory.length){group.hidden=true;return}group.hidden=false;wrap.innerHTML='';cmdHistory.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.title=c;b.onclick=()=>command(c);wrap.append(b)})}
-async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
+async function chooseFolder(opts){const f=await window.observer.pickFolder(opts);if(f){const next={...getSettings(),serverPath:f};const r=await window.observer.saveSettings(next);if(!r.ok){toast(friendlyError(r.error),'error');return null}state={...state,settings:r.settings||next,instances:r.instances||state.instances,activeInstanceId:r.activeInstanceId||state.activeInstanceId,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();loadConnectInfo();toast(t('toast.folderSaved'))}return f}
 $$('.nav-item').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $('#nav')?.addEventListener('keydown', e=>{
   const items=[...$$('.nav-item')]; const idx=items.indexOf(document.activeElement);
@@ -587,18 +594,19 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   // settings like language/motion must still save, so fall through. The backend already skips its
   // serverPath check when the value is empty, so this stays consistent.
   if(!next.serverPath && state.settings.serverPath){ if(folderInput){ folderInput.style.borderColor='var(--danger)'; folderInput.focus(); } return toast(t('set.errFolderReq'),'error'); }
-  if(next.memoryMax < next.memoryMin) return toast(t('set.errMemOrder'),'error');
-  if(next.memoryMax>32) return toast(t('set.errMemHigh'),'error');
-  if(next.memoryMin<1) return toast(t('set.errMemMin'),'error');
-  if(next.jvmArgs && next.jvmArgs.length>2000) return toast(t('set.errJvmLong'),'error');
-  if(next.jvmArgs && /["'<>|]/.test(next.jvmArgs)) return toast(t('set.errJvmChars'),'error');
-  if(state.java?.arch==='32-bit' && next.memoryMax>2) return toast(t('set.errJava32'),'error');
+  const isNatSave=state.files?.engineType==='native'||!!state.files?.nativeBinary||(state.files?.target&&state.files?.target.software==='horizon');
+  if(!isNatSave && next.memoryMax < next.memoryMin) return toast(t('set.errMemOrder'),'error');
+  if(!isNatSave && next.memoryMax>32) return toast(t('set.errMemHigh'),'error');
+  if(!isNatSave && next.memoryMin<1) return toast(t('set.errMemMin'),'error');
+  if(!isNatSave && next.jvmArgs && next.jvmArgs.length>2000) return toast(t('set.errJvmLong'),'error');
+  if(!isNatSave && next.jvmArgs && /["'<>|]/.test(next.jvmArgs)) return toast(t('set.errJvmChars'),'error');
+  if(!isNatSave && state.java?.arch==='32-bit' && next.memoryMax>2) return toast(t('set.errJava32'),'error');
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
-  if(!r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
+  if(!isNatSave && !r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
   state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
-  toast(r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
+  toast(isNatSave?t('toast.settingsSaved'):r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });
 // v6.0.0 G1: RAM presets. A click sets min=max=preset and marks the buttons active; the user still
 // presses Apply (we do not auto-save). A preset above the system RAM is disabled (cannot allocate it).
@@ -749,12 +757,12 @@ function renderAnomalies(){
 }
 window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const key=(v.players||[]).slice().sort().join(',');if(key!==lastLivePlayersKey){lastLivePlayersKey=key;try{renderPlayers()}catch{}}
-});window.observer.onMetrics(v=>{lastMetrics=v; state.live = {...state.live, tps:v.tps??state.live?.tps??null, mspt:v.mspt??state.live?.mspt??null, players:v.players??state.live?.players??[]}; const displayTps = v.tps ?? state.live?.tps ?? null; const displayMspt = v.mspt ?? state.live?.mspt ?? null; const limitGB=state.settings.memoryMax||6;const usedGB=(v.serverMemory||0)/1024;const ram=v.running?Math.min(100,Math.round((v.serverMemory||0)/Math.max(1,limitGB*1024)*100)):null;samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}];
+});window.observer.onMetrics(v=>{lastMetrics=v; const isNat=state.files?.engineType==='native'||!!state.files?.nativeBinary||(state.files?.target&&state.files.target.software==='horizon')||state.currentSoftware==='horizon'; state.live = {...state.live, tps:isNat?null:(v.tps??state.live?.tps??null), mspt:isNat?null:(v.mspt??state.live?.mspt??null), players:v.players??state.live?.players??[]}; const displayTps = isNat ? null : (v.tps ?? state.live?.tps ?? null); const displayMspt = isNat ? null : (v.mspt ?? state.live?.mspt ?? null); const sysTotalMB=(state.systemMemoryGB||16)*1024; const limitGB=state.settings?.memoryMax||6; const usedMB=v.serverMemory||0; const usedGB=usedMB/1024; const ram=v.running?(isNat?Math.min(100,Math.round(usedMB/Math.max(1,sysTotalMB)*100)):Math.min(100,Math.round(usedMB/Math.max(1,limitGB*1024)*100))):null; samples=[...samples.slice(1),{tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}];
   // v5.3.0: mirror into the coarse 10s ring so the 1h/6h ranges keep filling live (not only on the
   // initial state snapshot). computeChartSamples() then re-derives chartSamples for the active range.
   const _nowMs=Date.now(), _lastLong=samplesLong[samplesLong.length-1];
   if(!_lastLong||(_nowMs-_lastLong.t)>=PERF_LONG_MS){ samplesLong.push({t:_nowMs,tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}); if(samplesLong.length>PERF_LONG_CAP)samplesLong.splice(0,samplesLong.length-PERF_LONG_CAP); }
-  computeChartSamples(); try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?`${usedGB.toFixed(1)} / ${limitGB} GB`:'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
+  computeChartSamples(); try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?(isNat?(usedMB<1024?`${Math.round(usedMB)} MB`:`${usedGB.toFixed(2)} GB`):`${usedGB.toFixed(1)} / ${limitGB} GB`):'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
   const tpsFmt=x=>x.toFixed(2);
   try{const c=$('#tps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{} try{const c=$('#perfTps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{}
   const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—'}
@@ -778,19 +786,25 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   setBadge('#perfCpuBadge', v.cpu, 40, 70); // lower is better, so invert logic: we treat high as bad
   const perfCpuBadge=$('#perfCpuBadge'); if(perfCpuBadge && v.cpu!=null){ perfCpuBadge.className='kpi-badge '+(v.cpu<60?'ok':v.cpu<85?'warn':'bad'); perfCpuBadge.textContent=v.cpu<60?t('perf.badgeGood'):v.cpu<85?t('perf.badgeHigh'):t('perf.badgeCritical'); }
   setBadge('#perfRamBadge', ram, 30, 60); // placeholder, will override below
-  const ramBadge=$('#perfRamBadge'); if(ramBadge && ram!=null){ ramBadge.className='kpi-badge '+(ram<75?'ok':ram<90?'warn':'bad'); ramBadge.textContent=ram<75?t('perf.badgeGood'):ram<90?t('perf.badgeHigh'):t('perf.badgeCritical'); } else if(ramBadge && ram==null){ ramBadge.className='kpi-badge'; ramBadge.textContent='—'; }
+  const ramBadge=$('#perfRamBadge'); if(ramBadge && ram!=null){ if(isNat){ ramBadge.className='kpi-badge '+(usedMB<2048?'ok':usedMB<4096?'warn':'bad'); ramBadge.textContent=usedMB<2048?t('perf.badgeGood'):usedMB<4096?t('perf.badgeHigh'):t('perf.badgeCritical'); } else { ramBadge.className='kpi-badge '+(ram<75?'ok':ram<90?'warn':'bad'); ramBadge.textContent=ram<75?t('perf.badgeGood'):ram<90?t('perf.badgeHigh'):t('perf.badgeCritical'); } } else if(ramBadge && ram==null){ ramBadge.className='kpi-badge'; ramBadge.textContent='—'; }
   const bar=(id,pct)=>{const el=$(id); if(el) el.style.width=(pct==null?0:Math.max(4,Math.min(100,pct)))+'%';};
   bar('#perfTpsBar', displayTps!=null? (displayTps/20*100):null); bar('#perfMsptBar', displayMspt!=null? Math.min(100, displayMspt/100*100):null); bar('#perfCpuBar', v.cpu); bar('#perfRamBar', ram);
   const liveDot=$('#perfLiveDot'), liveText=$('#perfLiveText'), uptimeEl=$('#perfUptime'); if(liveDot){ liveDot.className='live-dot'+(v.running?' on':''); } if(liveText) liveText.textContent=v.running?`${t('con.live')} • ${t('top.running')}`:t('top.offline'); if(uptimeEl) uptimeEl.textContent=uptimeStart? document.getElementById('heroUptime')?.textContent || '—' : '—';
   const launcherMem=$('#perfLauncherMem'); if(launcherMem) launcherMem.textContent=t('perf.ramLauncher',{n:v.appMemory||0});
   const tickEmpty=$('#tickChartEmpty'), resEmpty=$('#resourceChartEmpty');
-  if(tickEmpty) tickEmpty.hidden=!!(displayTps!=null || displayMspt!=null);
+  if(tickEmpty){
+    tickEmpty.hidden=!!(displayTps!=null || displayMspt!=null);
+    if(isNat && v.running){
+      const b=tickEmpty.querySelector('b');
+      if(b) b.textContent='Tick telemetry not supported on native engines';
+    }
+  }
   if(resEmpty) resEmpty.hidden=!!(v.cpu!=null || ram!=null);
   const liveBadge=$('#resourceLiveBadge'); if(liveBadge){ liveBadge.textContent=v.running?t('perf.live'):t('perf.offlineBadge'); liveBadge.style.color=v.running?'var(--success)':'var(--text-dim)'; liveBadge.style.borderColor=v.running?'rgba(0,229,160,.25)':'var(--border)'; }
   metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource'); try{renderAnomalies();}catch{}});
  // Fallback: if the main process is slow or misses a push, keep the UI in sync from
  // lastMetrics/live every 2s.
- setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const displayTps=v.tps??state.live?.tps??null; const displayMspt=v.mspt??state.live?.mspt??null; if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
+ setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const isNat=state.files?.engineType==='native'||!!state.files?.nativeBinary||(state.files?.target&&state.files.target.software==='horizon')||state.currentSoftware==='horizon'; const displayTps=isNat?null:(v.tps??state.live?.tps??null); const displayMspt=isNat?null:(v.mspt??state.live?.mspt??null); if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
  // Periodically redraw charts while the Performance tab is open (fixes a 0x0 canvas when the tab
  // was hidden as metrics arrived).
  setInterval(()=>{ try{ if(document.getElementById('performance')?.classList.contains('active')){ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); } }catch{} }, 2000);
@@ -1278,3 +1292,18 @@ $('#instShuffleArt')?.addEventListener('click',()=>{ setInstanceAppearance({artS
   };
   document.addEventListener('pointermove',e=>{ lastX=e.clientX; lastY=e.clientY; if(!raf) raf=requestAnimationFrame(apply); },{passive:true});
 })();
+
+// v7.0.0Z Track 2: Resource Pack actions
+$('#rpChooseBtn')?.addEventListener('click', async () => {
+  const b = await window.observer.resourcepackBrowse();
+  if (b.canceled || !b.path) return;
+  const s = await window.observer.resourcepackSet(b.path);
+  if (!s.ok) return toast(s.error || 'Failed');
+  toast(t('set.rpSetSuccess'));
+  if (typeof refreshResourcePackUI === 'function') refreshResourcePackUI();
+});
+$('#rpClearBtn')?.addEventListener('click', async () => {
+  await window.observer.resourcepackClear();
+  toast(t('set.rpCleared'));
+  if (typeof refreshResourcePackUI === 'function') refreshResourcePackUI();
+});

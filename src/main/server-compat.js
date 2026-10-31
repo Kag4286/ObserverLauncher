@@ -32,7 +32,8 @@ function anyFile(folder, re) {
 // proxy|vanilla.
 function detectServerTarget(root, files) {
   const f = files || {};
-  const name = String(f.jar || f.launchScript || '').toLowerCase();
+  const name = String(f.jar || f.launchScript || f.nativeBinary || '').toLowerCase();
+  if (/horizon/.test(name) || f.nativeBinary || (f.hasHorizonConfig && !f.jar && !f.launchScript)) return { mc: '26.3', loader: 'horizon', engineType: 'native' };
   // Proxy first (a Velocity server has no worlds/mods of its own).
   if (/velocity|bungee|waterfall/.test(name)) return { mc: mcFromName(name), loader: 'proxy' };
   // Explicit loader in the filename wins.
@@ -66,6 +67,7 @@ const LOADER_FAMILY = {
   neoforge: ['neoforge'],
   fabric: ['fabric', 'quilt'],
   quilt: ['fabric', 'quilt'],
+  horizon: ['horizon'],
 };
 const { areMcVersionsCompatible } = require('./mc-compat.js');
 

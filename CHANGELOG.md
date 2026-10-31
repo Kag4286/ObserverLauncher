@@ -10,6 +10,66 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [7.0.0Z] — 2026-10-31
+
+**The Multi-Engine Era & Horizon Dedicated Server Integration: First Local Hosting App with Native Rust Server Support (Horizon for MC 26.3), New Server Wizard Rework with Software Category Chips & Prominent Spotlights for Leaf and Horizon, Safe World Operations (Rename, Seed Edit, Purge Dimension with Backup, Clone), Custom Resource Pack ZIP Overrides, 3D Player Inspector Armor Decoupling, and Brand DMCA Icon Replacement.**
+
+### Multi-Engine Core & Horizon Dedicated Server:
+- **First Local Hosting Integration for Horizon (https://github.com/horizon-rust/horizon):**
+  - Integrated ground-up clean-room Minecraft 26.3 server written in Rust, delivering ~600MB dynamic working set RAM and zero Java GC pauses.
+- **Native Engine Polymorphism (`engineType: 'native' | 'java'`):**
+  - Server lifecycle cleanly branches based on engine type. Native binaries (`horizon-server.exe` / `horizon-server`) bypass JVM memory allocation checks, GC arguments, heap arguments, and JRE requirements.
+  - Fixed ZIP extraction security with fail-closed `safeTarget` directory containment against Zip Slip vulnerabilities.
+  - Added automated `chmod 0o755` permissions for POSIX binaries on Linux and macOS.
+  - Updated orphan process classification in `src/main/orphan.js` to track native PIDs alongside Java.
+- **Zero-Dependency TOML Engine (`src/main/horizon-config.js`):**
+  - Pure typed parser and serializer for Horizon's `server.toml`.
+  - Implemented bidirectional bridge synchronizing `server.toml` and `server.properties`, persisting port, motd, max-players, and online-mode across editor saves and snapshot restorations.
+- **Tailored Native UI & Telemetry Normalization:**
+  - Overview and Launcher settings automatically hide irrelevant Java topics, memory sliders, and Mojang EULA checkboxes when a native Horizon instance is selected.
+  - Configured `tpsUnsupported = isNative` in `server-lifecycle.js` and `server-poll.js` to eliminate noisy "Unknown command" errors from Spigot `tps` or Forge commands on native engines.
+
+### New Server Wizard GUI/UX Rework:
+- **Prominent Spotlights for Leaf & Horizon:**
+  - Moved Horizon and Leaf into the top "Start here" section in Step 2.
+  - Horizon features a cyan-emerald neon glow border with the "Rust Native • Breakthrough Tech" badge.
+  - Leaf features an emerald neon glow border with the "Paper Fork • Max Perf" badge.
+- **Category Filter Chips:**
+  - Added 5 filter chips (`All`, `Featured`, `Plugins`, `Modded`, `Native & Proxy`) with instant card filtering and automated empty group header hiding.
+- **Smart Subfolder Creation (Step 1):**
+  - Added `#nswSubfolderInput` resolving subfolder directories in real-time with full dark surface tokens adhering strictly to `DESIGN.md`.
+- **Direct Rail Navigation:**
+  - Enabled one-click jump-back to completed steps (`.nsw2-step.done`) on the rail.
+- **Direct System RAM UI (Step 4 & 5):**
+  - Dynamically replaces the JVM RAM slider with a Direct System Memory status card (~600MB dynamic working set, No JVM Required).
+
+### 3D Player Inspector Fixes:
+- **Slot-Independent Armor Textures:**
+  - Decoupled armor textures per slot (`texHelmet`, `texChest`, `texBoots`, `texLegs`) with an in-memory `armorTexCache`, eliminating texture bleed between mismatched materials (e.g. Diamond helmet + Netherite chestplate).
+  - All WebGL textures are registered and cleaned up on canvas teardown.
+- **Equipment Label Wrapping:**
+  - Updated `.pd-equip-name` with 2-line word wrapping and centered alignment, preventing label truncation.
+
+### Brand Identity & DMCA Protection:
+- **Vector Geometric Mark:**
+  - Replaced legacy Mojang observer block graphic across `build/icon.png`, `build/icon.ico` (16–256px mipmaps), and `src/renderer/assets/icons/observer.png` with a proprietary geometric cube mark.
+
+### Safe World Operations & Custom Resource Packs:
+- **Safe World Operations (`src/main/world-ops.js`):**
+  - Atomic world renaming with collision guards and `level.dat` LevelName sync.
+  - Live seed editor writing 64-bit BigInt seeds safely to `level.dat`.
+  - Single-dimension deletion with automated pre-operation ZIP backup.
+  - Inter-instance world cloning.
+- **Waypoint Synchronization (`src/main/waypoint-sync.js`):**
+  - Bidirectional import/export supporting Xaero's Minimap text format and JourneyMap JSON format with coordinate deduplication.
+- **Custom Resource Pack Overrides (`src/main/resource-pack.js`):**
+  - Dynamic on-demand texture streaming from user-selected `.zip` Resource Packs via `tex://` with zero disk extraction.
+
+### Architecture & Quality:
+- **160/160 automated test suites passing (0 failures).**
+- **Full 7-language i18n parity (1377 keys) with 0 missing, 0 extra, 0 dead keys.**
+- **Zero duplicated blocks across all source files.**
+
 ## [6.1.8] — 2026-10-30
 
 **Chrome DevTools Performance & Memory Leak Optimization in Renderer: Elimination of Layout Thrashing (Forced Reflow) on Metrics Ticks, Background IPC Idle Sleep, Event Delegation for Content Lists, and Batched Console Truncation via DOM Range.**

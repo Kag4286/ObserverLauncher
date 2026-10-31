@@ -8,6 +8,9 @@ const { requiredJavaForServer } = require('./server-java.js');
 const { writeFileAtomic, safeTarget } = require('./fs-utils.js');
 const editor = require('./editor.js');
 const worldmap = require('./worldmap.js');
+const resourcePack = require('./resource-pack.js');
+const worldOps = require('./world-ops.js');
+const waypointSync = require('./waypoint-sync.js');
 
 function registerContent(ipcMain, ctx) {
   ipcMain.handle('files:get', async () => {
@@ -52,6 +55,7 @@ function registerContent(ipcMain, ctx) {
     // v6.0.0 G2: snapshot the CURRENT file before overwriting, so every save is reversible.
     try { const cur = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8'); require('./properties-history.js').recordSnapshot(typeof ctx.inst === 'function' ? ctx.inst() : 'default', cur); } catch {}
     writeFileAtomic(path.join(ctx.currentServerPath, 'server.properties'), buildPropertiesContent(ctx.currentServerPath, props));
+    syncHorizonToml(ctx.currentServerPath, props);
     return { ok: true };
   });
 
@@ -84,6 +88,12 @@ function registerContent(ipcMain, ctx) {
       // Snapshot the CURRENT file first so the restore itself is reversible.
       try { const cur = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8'); r.h.recordSnapshot(r.id, cur); } catch {}
       writeFileAtomic(path.join(ctx.currentServerPath, 'server.properties'), r.snap.content);
+      const restoredProps = {};
+      for (const line of r.snap.content.split(/\r?\n/)) {
+        const i = line.indexOf('=');
+        if (i > 0 && !line.startsWith('#')) restoredProps[line.slice(0, i)] = line.slice(i + 1);
+      }
+      syncHorizonToml(ctx.currentServerPath, restoredProps);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || 'Could not restore.' }; }
   });
@@ -377,6 +387,80 @@ function registerContent(ipcMain, ctx) {
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not read biome data.', biomes: [] };
     }
+  });
+
+  // v7.0.0Z Track 2: Resource pack handlers
+  ipcMain.handle('resourcepack:get', async () => {
+    try {
+      const { loadSettings } = require('./settings.js');
+      const p = loadSettings().resourcePackPath || null;
+      if (!p) return { active: null, info: null };
+      return { active: p, info: resourcePack.inspectResourcePack(p) };
+    } catch { return { active: null, info: null }; }
+  });
+  ipcMain.handle('resourcepack:set', async (_, zipPath) => {
+    if (!zipPath || typeof zipPath !== 'string') return { ok: false, error: 'Invalid file path.' };
+    const info = resourcePack.inspectResourcePack(zipPath);
+    if (!info.ok) return info;
+    const { loadSettings, saveSettings } = require('./settings.js');
+    const s = loadSettings();
+    s.resourcePackPath = zipPath;
+    saveSettings(s);
+    resourcePack.clearPackCache();
+    const { setActiveResourcePackPath } = require('./textures.js');
+    setActiveResourcePackPath(zipPath);
+    return { ok: true, info };
+  });
+  ipcMain.handle('resourcepack:clear', async () => {
+    const { loadSettings, saveSettings } = require('./settings.js');
+    const s = loadSettings();
+    s.resourcePackPath = '';
+    saveSettings(s);
+    resourcePack.clearPackCache();
+    const { setActiveResourcePackPath } = require('./textures.js');
+    setActiveResourcePackPath(null);
+    return { ok: true };
+  });
+  ipcMain.handle('resourcepack:browse', async () => {
+    const { dialog } = require('electron');
+    const r = await dialog.showOpenDialog(ctx.win, {
+      title: 'Select Resource Pack (.zip)',
+      properties: ['openFile'],
+      filters: [{ name: 'Minecraft Resource Pack', extensions: ['zip', 'jar'] }],
+    });
+    if (r.canceled || !r.filePaths.length) return { canceled: true };
+    return { canceled: false, path: r.filePaths[0] };
+  });
+
+  // v7.0.0Z Track 2: Safe World Operations
+  ipcMain.handle('world:rename', async (_, { currentName, newName }) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverStatus !== 'stopped') return { ok: false, error: 'Stop the server before renaming the world.' };
+    return await worldOps.renameWorld(ctx.currentServerPath, currentName, newName);
+  });
+  ipcMain.handle('world:set-seed', async (_, { worldName, seed }) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverStatus !== 'stopped') return { ok: false, error: 'Stop the server before editing the seed.' };
+    return await worldOps.setWorldSeed(ctx.currentServerPath, worldName, seed);
+  });
+  ipcMain.handle('world:delete-dimension', async (_, { worldName, dimension }) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    if (ctx.serverStatus !== 'stopped') return { ok: false, error: 'Stop the server before resetting a dimension.' };
+    return await worldOps.deleteDimension(ctx.currentServerPath, worldName, dimension);
+  });
+  ipcMain.handle('world:clone', async (_, { worldName, targetServerPath, targetWorldName }) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    return await worldOps.cloneWorld(ctx.currentServerPath, worldName, targetServerPath, targetWorldName);
+  });
+
+  // v7.0.0Z Track 2: Waypoint synchronization
+  ipcMain.handle('waypoints:import', async (_, args) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    return await waypointSync.importWaypoints(ctx.currentServerPath, args || {});
+  });
+  ipcMain.handle('waypoints:export', async (_, args) => {
+    if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
+    return await waypointSync.exportWaypoints(ctx.currentServerPath, args || {});
   });
 }
 

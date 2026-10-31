@@ -51,7 +51,8 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 
 ### Simple & Friendly for Everyday Use
 
-- **1-Click Server Creation:** Choose from Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
+- **First-Ever Horizon Dedicated Server Integration:** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) out of the box—a ground-up clean-room Minecraft 26.3 server written in Rust. Experience ultra-low memory consumption (~600MB dynamic working set), zero Java GC pauses, multi-threaded ECS chunk processing, and standalone native binary execution without needing a Java runtime.
+- **1-Click Server Creation:** Choose from Horizon (Rust Native), Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
 - **Automatic Java Setup:** Never worry about which Java to install. The launcher automatically detects what Java version your server needs (Java 8, 17, 21, or 25) and downloads it for you with 1 click.
 - **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.
 - **Built-in Mod & Plugin Store:** Browse and install mods, plugins, and datapacks directly from Modrinth, Hangar, and SpigotMC. The app checks if mods match your server before installing and lets you rollback updates with one click.
@@ -113,6 +114,7 @@ ObserverLauncher provides robust infrastructure for experienced server operators
 
 | Software | Mod/Plugin Support | Live TPS / MSPT | Pre-flight Scan |
 |---|---|---|---|
+| **Horizon** (Rust Native) | Rust Native MC 26.3 • Clean-room | Process telemetry | Native TOML validation |
 | **Paper / Purpur / Leaf / Folia** | Bukkit / Spigot / Paper plugins | Yes | Plugin conflicts |
 | **Fabric / Quilt** | Fabric mods | Player count | Mod & Dep scan |
 | **Forge / NeoForge** | Forge / NeoForge mods | Yes | Mod & Dep scan |
@@ -146,7 +148,7 @@ npm install
 # Run the app in development mode
 npm start
 
-# Run unit and integration tests (154 test suites)
+# Run unit and integration tests (160 test suites)
 npm test
 
 # Run end-to-end tests

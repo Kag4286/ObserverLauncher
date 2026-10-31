@@ -20,6 +20,8 @@ const PER_INSTANCE_KEYS = [
   // v6.0.0 E3: per-instance group label ('' = ungrouped). Free-form; sanitised to [A-Za-z0-9 _-]{0,32}
   // by settings.sanitizeGroup before it ever reaches the store.
   'group',
+  // v7.0.0Z Track 2: custom resource pack ZIP path
+  'resourcePackPath',
 ];
 
 const migrations = [

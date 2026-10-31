@@ -45,6 +45,7 @@ function defaultInstanceFields() {
     accent: '', artSeed: 0,
     // v6.0.0 E3: rail group label ('' = ungrouped). Free-form, sanitised by sanitizeGroup.
     group: '',
+    resourcePackPath: '',
   };
 }
 

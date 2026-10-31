@@ -37,7 +37,8 @@
 .nsw2-step small{display:block;font:500 10px var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
 .nsw2-step.active{border-left-color:var(--accent);color:var(--text);background:var(--panel-hover)}
 .nsw2-step.active i{border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px var(--accent-weak)}
-.nsw2-step.done{color:var(--text-muted)}
+.nsw2-step.done{color:var(--text-muted);cursor:pointer}
+.nsw2-step.done:hover{background:var(--panel-hover);color:var(--text)}
 .nsw2-step.done i{background:var(--success-weak);border-color:rgba(0,229,160,.4);color:var(--success)}
 .nsw2-main{background:var(--panel);padding:18px 20px;min-width:0;max-height:min(620px,72vh);overflow:auto}
 .nsw2-steplabel{margin-bottom:8px}
@@ -139,7 +140,7 @@ html.motion-lite .ol-tip{animation:none}
 .nsw2-review-note{display:block;margin-top:10px}
 /* Keep crisp pixels ONLY for genuine raster pixel-art (avatars, tex:// item icons, brand mark).
      UI line-icons are SVG and must render smoothly. */
-.brand-mark img,.player-avatar,.inspect-avatar,.item-cell .item-icon{image-rendering:pixelated}
+.player-avatar,.inspect-avatar,.item-cell .item-icon{image-rendering:pixelated}
 
 /* ---------- WORLD MAP ---------- */
 .wm-toolbar{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);background:var(--surface)}
@@ -428,11 +429,11 @@ html.motion-lite .pd-more::details-content{transition:none}
 
 /* Equipment tiles: real icons, one row, fixed slot order. Reuses .inv-cell so the icon sizing and
    the durability bar are shared with the inventory grid instead of a second implementation. */
-.pd-equipment{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--space-2);max-width:540px}
+.pd-equipment{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--space-2);max-width:580px}
 .pd-equip{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;text-align:center}
 .pd-equip .inv-cell{width:48px;height:48px;aspect-ratio:1;cursor:default;color:var(--text-4);font:600 13px var(--font-mono);flex-shrink:0;margin:0 auto}
 .pd-equip-slot{font:600 9px/1.2 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;flex-shrink:0;margin-top:2px}
-.pd-equip-name{font:600 11px/1.3 var(--font-ui);color:var(--text);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;flex-shrink:0}
+.pd-equip-name{font:600 11px/1.25 var(--font-ui);color:var(--text);text-align:center;white-space:normal;overflow-wrap:break-word;word-break:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;flex-shrink:0}
 .pd-equip-ench-list{display:flex;flex-direction:column;gap:2px;align-items:center;width:100%;flex-shrink:0;margin-top:2px}
 .pd-ench-pill{font:600 9.5px/1.2 var(--font-ui);color:#c4b5fd;background:rgba(139,92,246,0.16);border:1px solid rgba(139,92,246,0.32);padding:1.5px 6px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;box-sizing:border-box;flex-shrink:0;display:inline-block}
 .inspect-panel.active .inspect-section{animation:sectionIn .35s var(--ease) both}
@@ -486,3 +487,33 @@ html.motion-lite .inspect-panel.active .inspect-section{animation:none}
 /* v4.0.0 FIX: b/span were inline -> title and subtitle collided ("Inventory is emptyNo items…"). */
 .inv-empty b{display:block;font-size:13px;color:var(--text)}
 .inv-empty span{display:block;margin-top:4px;font:500 11px var(--font-ui);color:var(--text-muted)}
+
+/* v7.0.0Z: Wizard UI/UX polish & effects for Leaf & Horizon */
+.nsw-filters{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.nsw-filter-chip{padding:5px 12px;background:var(--field);border:1px solid var(--border);border-radius:999px;font:600 11.5px var(--font-ui);color:var(--text-muted);cursor:pointer;transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
+.nsw-filter-chip:hover{background:var(--panel-hover);color:var(--text)}
+.nsw-filter-chip.active{background:var(--accent-weak);border-color:var(--accent);color:var(--accent)}
+
+.nsw2-cardwrap[data-software-wrap="leaf"] .nsw2-row{border-color:rgba(46,204,113,.35);background:linear-gradient(135deg,var(--panel),rgba(46,204,113,.04))}
+.nsw2-cardwrap[data-software-wrap="leaf"] .nsw2-row:hover{border-color:#2ecc71;box-shadow:0 0 14px rgba(46,204,113,.25),0 0 0 1px #2ecc71 inset}
+.nsw2-cardwrap[data-software-wrap="leaf"] .nsw2-row.active{border-color:#2ecc71;background:rgba(46,204,113,.12);box-shadow:0 0 18px rgba(46,204,113,.3),0 0 0 1px #2ecc71 inset}
+.nsw2-tag.leaf{color:#2ecc71;border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.15)}
+
+.nsw2-cardwrap[data-software-wrap="horizon"] .nsw2-row{border-color:rgba(59,203,141,.4);background:linear-gradient(135deg,var(--panel),rgba(59,203,141,.06))}
+.nsw2-cardwrap[data-software-wrap="horizon"] .nsw2-row:hover{border-color:#3bcb8d;box-shadow:0 0 16px rgba(59,203,141,.3),0 0 0 1px #3bcb8d inset}
+.nsw2-cardwrap[data-software-wrap="horizon"] .nsw2-row.active{border-color:#3bcb8d;background:rgba(59,203,141,.14);box-shadow:0 0 20px rgba(59,203,141,.35),0 0 0 1px #3bcb8d inset}
+.nsw2-tag.horizon{color:#3bcb8d;border-color:rgba(59,203,141,.5);background:linear-gradient(135deg,rgba(59,203,141,.2),rgba(0,210,255,.15))}
+
+.nsw2-cardwrap[hidden]{display:none !important}
+.nsw2-cards .nsw2-group[hidden]{display:none !important}
+
+.nsw-subfolder-wrap{margin-top:14px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r)}
+.nsw-subfolder-wrap .field-label{display:block;margin-bottom:8px;font:600 12px var(--font-ui);color:var(--text)}
+.nsw-subfolder-wrap input{width:100%;box-sizing:border-box;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font:500 12.5px var(--font-ui);outline:0;transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.nsw-subfolder-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
+.nsw-subfolder-wrap input::placeholder{color:var(--text-dim)}
+.nsw-subfolder-wrap .field-hint{display:block;margin-top:8px;font:500 11px var(--font-mono);color:var(--text-dim);word-break:break-all}
+
+.nsw-native-box{margin-top:14px;padding:14px 16px;background:var(--field);border:1px solid var(--border);border-radius:var(--r)}
+.nsw2-native-stat-sub{font:700 12px var(--font-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.nsw2-native-explain{margin:0;font:500 12px/1.55 var(--font-ui);color:var(--text-muted)}

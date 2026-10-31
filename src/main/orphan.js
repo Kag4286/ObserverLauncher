@@ -23,8 +23,8 @@ function classifyOrphan(stored, procInfo, opts) {
     return { tier: 3, action: 'forget', reason: `pid ${stored.pid} was reused by another process (start time differs)` };
   }
   const name = String(procInfo.name || '');
-  const isJava = /java/i.test(name) || /java/i.test(path.basename(String(stored.serverPath || '')));
-  if (!isJava) return { tier: 3, action: 'forget', reason: `pid ${stored.pid} is now "${name || 'unknown'}", not java` };
+  const isServer = /java|horizon(-server|-client)?/i.test(name) || /java|horizon/i.test(path.basename(String(stored.serverPath || '')));
+  if (!isServer) return { tier: 3, action: 'forget', reason: `pid ${stored.pid} is now "${name || 'unknown'}", not java` };
   const status = String(stored.status || opts.assumedStatus || 'stopped');
   if (status === 'running' || status === 'starting' || status === 'stopping') {
     return { tier: 2, action: 'ask', reason: `a java server (pid ${stored.pid}) is still running` };

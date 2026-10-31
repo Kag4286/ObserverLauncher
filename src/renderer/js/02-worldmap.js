@@ -112,10 +112,11 @@ function mixHex(a,b,t){
 // a column reads as grass / sand / stone / snow / water. Without this a desert cell and a plains
 // cell at the same height differed only by biome hue. Keys are the bare block name (no namespace).
 const BLOCK_COLORS={
+  coal_ore:'#2B2B2B',deepslate_coal_ore:'#242424',iron_ore:'#D8AF93',deepslate_iron_ore:'#B88F73',copper_ore:'#C06C4E',deepslate_copper_ore:'#9E583E',gold_ore:'#FCEE4B',deepslate_gold_ore:'#D4B830',redstone_ore:'#E02210',deepslate_redstone_ore:'#A8180A',lapis_ore:'#1C4D9C',deepslate_lapis_ore:'#143B7A',diamond_ore:'#5DECF5',deepslate_diamond_ore:'#3CBCC5',emerald_ore:'#17DD62',deepslate_emerald_ore:'#10A848',amethyst_block:'#9A5CC6',glow_lichen:'#788A75',cave_air:'#0A0D12',
   grass_block:'#6B9E44',podzol:'#5B4330',mycelium:'#6E636B',moss_block:'#4E7A3A',
   dirt:'#79553A',coarse_dirt:'#75553B',rooted_dirt:'#906E4E',mud:'#3A3A44',muddy_mangrove_roots:'#40404A',
   sand:'#D9CF97',red_sand:'#BF6B36',gravel:'#7A7370',clay:'#9AA2AA',
-  stone:'#7E7E7E',andesite:'#8A8A8A',diorite:'#BCBCBC',granite:'#9A6B5A',deepslate:'#4B4B4B',tuff:'#6E6D64',calcite:'#D8D6CC',
+  stone:'#7E7E7E',andesite:'#8A8A8A',diorite:'#BCBCBC',granite:'#9A6B5A',deepslate:'#4B4B4B',tuff:'#6E6D64',calcite:'#D8D6CC',dripstone_block:'#866B5B',pointed_dripstone:'#866B5B',sculk:'#0B2028',sculk_catalyst:'#0E2833',sculk_sensor:'#0B2B33',sculk_shrieker:'#1C3840',
   terracotta:'#985E43',red_terracotta:'#8E3B26',orange_terracotta:'#A15325',yellow_terracotta:'#BA8523',white_terracotta:'#D2B6A1',light_gray_terracotta:'#876A61',brown_terracotta:'#4D3323',
   snow:'#E9EDF0',snow_block:'#E9EDF0',powder_snow:'#E9EDF0',ice:'#8FBFE0',packed_ice:'#8FB4D6',blue_ice:'#6FA8DC',
   water:'#2E5A8A',kelp:'#2E5A8A',seagrass:'#2E5A8A',
@@ -136,6 +137,19 @@ function blockColor(name){
   if(/snow/.test(k))return '#E9EDF0';
   if(/ice/.test(k))return '#8FBFE0';
   if(/water/.test(k))return '#2E5A8A';
+  if(/lava/.test(k))return '#D05825';
+  if(/diamond_ore/.test(k))return '#5DECF5';
+  if(/emerald_ore/.test(k))return '#17DD62';
+  if(/gold_ore/.test(k))return '#FCEE4B';
+  if(/iron_ore/.test(k))return '#D8AF93';
+  if(/copper_ore/.test(k))return '#C06C4E';
+  if(/redstone_ore/.test(k))return '#E02210';
+  if(/lapis_ore/.test(k))return '#1C4D9C';
+  if(/coal_ore/.test(k))return '#2B2B2B';
+  if(/amethyst/.test(k))return '#9A5CC6';
+  if(/sculk/.test(k))return '#0B2028';
+  if(/dripstone/.test(k))return '#866B5B';
+  if(/deepslate/.test(k))return '#4B4B4B';
   return null;
 }
 // Mix a surface block colour with the biome tint (grass/foliage hue) so grass stays green per biome
@@ -192,8 +206,10 @@ function wmChunkColors(ck,cx,cz){
       out=new Array(16);
       for(let i=0;i<16;i++){
         const bid=grid?grid[i]:rec[2];
-        let c=(surface&&surfaceColor(surface[i],bid))||biomeColor(bid);
-        c=shadeHex(c,rec[3][i]);
+        const h=rec[3][i];
+        let c;
+        c=(surface&&surfaceColor(surface[i],bid))||biomeColor(bid);
+        c=shadeHex(c,h);
         if(rec[4]&&rec[4][i])c=mixHex(c,'#2E5A8A',0.6);
         out[i]=c;
       }
@@ -253,14 +269,15 @@ const WM_BIOME_CACHE_MAX=6000;
 // Store under a dim-scoped key. `dim` is the dim the FETCH was for (captured at call time), so a
 // late reply for an old dim can never overwrite the current dim's data.
 function wmSetBiome(ck,row,dim){ lruSet(wm.biomes,(dim||wm.dim)+':'+ck,row,WM_BIOME_CACHE_MAX); }
+let wmPrefetchReqSeq=0;
 // Debounced biome fetch for the visible chunk range. Drops stale responses via a sequence token.
 function wmScheduleBiomes(){
   if(!wm.level||!wm.layers.terrain)return;
   const cv=$('#wmCanvas');if(!cv)return;
   const W=cv.clientWidth||800,H=cv.clientHeight||520;
-  const cx0=Math.floor((wm.cam.x-W/2/wm.zoom)/16),cx1=Math.floor((wm.cam.x+W/2/wm.zoom)/16);
-  const cz0=Math.floor((wm.cam.z-H/2/wm.zoom)/16),cz1=Math.floor((wm.cam.z+H/2/wm.zoom)/16);
-  // Too wide (far zoom-out or huge viewport): don't fetch — keep the seed wash and show a hint.
+  let cx0=Math.floor((wm.cam.x-W/2/wm.zoom)/16),cx1=Math.floor((wm.cam.x+W/2/wm.zoom)/16);
+  let cz0=Math.floor((wm.cam.z-H/2/wm.zoom)/16),cz1=Math.floor((wm.cam.z+H/2/wm.zoom)/16);
+  // Too wide (far zoom-out or huge viewport): in surface mode keep seed wash; in cave mode clamp to 32x32 around cam so cave is always visible!
   const chunkCount=(cx1-cx0+1)*(cz1-cz0+1);
   if(wm.zoom<WM_BIOME_MIN_ZOOM||chunkCount>WM_BIOME_MAX_CHUNKS){
     wm.lastBiomeRect='';
@@ -295,16 +312,16 @@ function wmScheduleBiomes(){
 // load so the spawn area shows real biomes even when the whole viewport is too wide to fetch.
 async function wmPrefetchBiomes(ccx,ccz,half){
   if(!wm.level)return;
-  const seq=++wm.biomeReqSeq;
+  const seq=++wmPrefetchReqSeq;
   const fetchDim=wm.dim;                 // dim-scoped store (W1)
   wm.biomeLoading=true;wmDraw();
   let r;
   try{r=await window.observer.worldmapBiomes({dim:fetchDim,cx0:ccx-half,cz0:ccz-half,cx1:ccx+half,cz1:ccz+half})}catch{wm.biomeLoading=false;return}
-  if(seq!==wm.biomeReqSeq)return;
+  if(seq!==wmPrefetchReqSeq)return;
   wm.biomeLoading=false;
   if(!r||!r.ok)return;
   for(const row of r.biomes)if(row&&row.length>=2)wmSetBiome(row[0]+','+row[1],row,fetchDim);
-  wmDraw();
+  wmDraw();wmRenderLegend();
 }
 const WM_COLORS=['#FF3B5C','#00E5FF','#FFD23F','#00E5A0','#C792EA','#FF8C42'];
 function wmShow(view){$('#wmNoWorld').hidden=view!=='none';$('#wmApp').hidden=view!=='app'}
@@ -673,6 +690,28 @@ async function wmLoadChunks(dim){
   }catch{}
 }
 $('#wmTerrain').onclick=()=>{wm.layers.terrain=!wm.layers.terrain;$('#wmTerrain').classList.toggle('active',wm.layers.terrain);wmDraw()};
+
+$('#wmWpImport')?.addEventListener('click',async()=>{
+  const raw=await promptDialog({title:t('wm.wpImportTitle'),body:t('wm.wpImportDesc'),placeholder:'waypoint:Name:N:X:Y:Z:9... or JourneyMap JSON',ok:t('wm.wpImportBtn')});
+  if(!raw)return;
+  const r=await window.observer.waypointsImport({data:raw,dim:wm.dim});
+  if(!r.ok)return toast(r.error||'Failed');
+  wm.waypoints=r.waypoints||[];
+  wmRenderWaypoints();wmDraw();
+  toast(t('wm.wpImportSuccess',{n:r.added}));
+});
+$('#wmWpExport')?.addEventListener('click',async()=>{
+  const r=await window.observer.waypointsExport({format:'xaero',dim:wm.dim});
+  if(!r.ok)return toast(r.error||'Failed');
+  if(!r.count)return toast(t('wm.wpNoWaypoints'));
+  const blob=new Blob([r.data],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`waypoints-${wm.dim}-${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(t('wm.wpExportSuccess',{n:r.count}));
+});
 wm.layers.terrain=true;
 $('#wmExport').onclick=()=>{
   const cv=$('#wmCanvas');

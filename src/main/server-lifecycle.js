@@ -62,6 +62,14 @@ function spawnServerProcess(ctx, serverPath, info, customArgs, args) {
   recordSpawnedProcess(ctx, serverPath);
 }
 
+function spawnNativeServerProcess(ctx, serverPath, binPath, args) {
+  if (process.platform !== 'win32') {
+    try { fs.chmodSync(binPath, 0o755); } catch {}
+  }
+  ctx.serverProcess = spawn(binPath, args || [], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false });
+  recordSpawnedProcess(ctx, serverPath);
+}
+
 // v2.0.0 (M3): persist the spawned process identity so orphan cleanup can find a
 // server left behind after an app crash. The child pid's REAL creation time is the
 // PID-reuse guard (M1 platform.getProcessInfo). Recorded immediately with an
@@ -158,6 +166,7 @@ function checkRamBudget(ctx, instId, settings) {
     for (const [id, st] of ctx.instances) {
       if (id === instId) continue;
       if (st && (st.serverStatus === 'running' || st.serverStatus === 'starting' || st.serverStatus === 'stopping')) {
+        if (st.tpsUnsupported || st.currentSoftware === 'horizon' || st.currentSoftware === 'native') continue;
         otherGB += Number(st.memoryMax) || 0;
       }
     }
@@ -260,7 +269,7 @@ async function adoptProcess(ctx, stored, deps) {
   if (Number.isFinite(recorded) && recorded > 0 && Number.isFinite(actual) && actual > 0 && Math.abs(recorded - actual) > 2000) {
     return { ok: false, error: 'That pid was reused by another process — refusing to adopt it.' };
   }
-  if (!/java/i.test(String(info.name || ''))) return { ok: false, error: `That pid is "${info.name || 'unknown'}", not a java server.` };
+  if (!/java|horizon-server/i.test(String(info.name || ''))) return { ok: false, error: `That pid is "${info.name || 'unknown'}", not a java server.` };
 
   const instId = ctx.inst();
   ctx.currentServerPath = stored.serverPath || ctx.currentServerPath;
@@ -333,27 +342,40 @@ async function startServerInternal(ctx, settings) {
   // runInInstance(activeInstanceId); callbacks below are wrapped in runInInstance(instId) so an
   // instance switch mid-start can never write this server's status/process onto another instance.
   const instId = ctx.inst();
-  // B5: RAM budget across running instances. Sum memoryMax (GB) of every OTHER instance that is
-  // currently starting/running/stopping, plus this one, and compare to total system RAM. >100%
-  // blocks (a swap death spiral corrupts nothing but freezes the machine); >80% only warns. The
-  // renderer shows the message; we never silently change the user's requested memory.
-  const ramCheck = checkRamBudget(ctx, instId, settings);
-  if (ramCheck.block) return { ok: false, error: ramCheck.message };
-  if (ramCheck.warn) { try { ctx.appendLog(ramCheck.message, 'system'); } catch {} }
+  const info = serverFiles(settings.serverPath);
+  const isNative = info.engineType === 'native' || info.software === 'horizon' || !!info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript);
+  // B5: RAM budget across running instances (Java/JVM only; native Horizon bypasses heap budgeting).
+  if (!isNative) {
+    const ramCheck = checkRamBudget(ctx, instId, settings);
+    if (ramCheck.block) return { ok: false, error: ramCheck.message };
+    if (ramCheck.warn) { try { ctx.appendLog(ramCheck.message, 'system'); } catch {} }
+  }
   // A7: refuse a port already leased by another running instance.
   const portCheck = checkPortLease(ctx, instId, settings);
   if (portCheck.block) return { ok: false, error: portCheck.message };
-  const error = validateStart(settings, ctx.javaInfo, serverFiles, requiredJavaForServer);
-  if (error) return { ok: false, error };
-  const info = serverFiles(settings.serverPath);
+  if (!isNative) {
+    const error = validateStart(settings, ctx.javaInfo, serverFiles, requiredJavaForServer);
+    if (error) return { ok: false, error };
+  } else {
+    const binName = info.nativeBinary || (process.platform === 'win32' ? 'horizon-server.exe' : 'horizon-server');
+    const fullBin = path.join(settings.serverPath, binName);
+    if (!fs.existsSync(fullBin)) {
+      return { ok: false, error: `Native server executable "${binName}" was not found in the server folder.` };
+    }
+  }
   if (!readEula(settings.serverPath)) {
     if (!settings.autoEula) return { ok: false, error: 'Accept the Minecraft EULA in Settings before starting.' };
     writeEula(settings.serverPath);
   }
   const software = detectSoftware(info);
   ctx.currentSoftware = software;
-  // 2.2.0: fresh start -> re-try the tps poll (a previous run may have flagged it unsupported).
-  ctx.tpsUnsupported = false;
+  // Native server engines (like Horizon) do not have Spigot/Forge tps commands or Spark.
+  // Flag tpsUnsupported immediately so autoPoll doesn't spam invalid commands, and clear live tps.
+  ctx.tpsUnsupported = isNative;
+  if (isNative && ctx.live) {
+    ctx.live.tps = null;
+    ctx.live.mspt = null;
+  }
   // 2.4.0: detect Spark (a common profiling plugin/mod) so a NeoForge server that rejects
   // `forge tps` can still report TPS via `spark tps`.
   try { ctx.sparkAvailable = (info.mods || []).some(m => /spark/i.test(m)) || (info.plugins || []).some(m => /spark/i.test(m)); } catch { ctx.sparkAvailable = false; }
@@ -361,12 +383,45 @@ async function startServerInternal(ctx, settings) {
   // M6: make sure RCON is enabled in server.properties with a per-instance port + password BEFORE
   // the server reads the file. Existing user RCON config is preserved (see desiredRconProps).
   let rconCfg = null;
-  try { rconCfg = ensureRconInProperties(ctx, settings); } catch (e) { try { ctx.appendLog(`RCON setup skipped: ${e?.message || e}`, 'system'); } catch {} }
-  const { customArgs, args } = buildLaunchArgs(settings, isProxy, info.jar);
-  ctx.appendLog(`Starting ${info.launchScript || info.jar} with ${ctx.javaInfo.path}…`, 'system');
-  ctx.manualStop = false;
-
-  spawnServerProcess(ctx, settings.serverPath, info, customArgs, args);
+  if (!isNative) {
+    try { rconCfg = ensureRconInProperties(ctx, settings); } catch (e) { try { ctx.appendLog(`RCON setup skipped: ${e?.message || e}`, 'system'); } catch {} }
+  }
+  if (isNative) {
+    try {
+      const { cleanHorizonToml } = require('./horizon-config.js');
+      const tomlPath = path.join(settings.serverPath, 'server.toml');
+      if (fs.existsSync(tomlPath)) {
+        const raw = fs.readFileSync(tomlPath, 'utf8');
+        const cleaned = cleanHorizonToml(raw);
+        if (cleaned !== raw) require('./fs-utils.js').writeFileAtomic(tomlPath, cleaned);
+      }
+      const propsPath = path.join(settings.serverPath, 'server.properties');
+      if (fs.existsSync(propsPath)) {
+        const rawP = fs.readFileSync(propsPath, 'utf8');
+        const cleanP = rawP.split(/\r?\n/).filter(line => !/^\s*(rcon|enable-rcon)(\.|=|\s)/.test(line)).join('\n');
+        if (cleanP !== rawP) require('./fs-utils.js').writeFileAtomic(propsPath, cleanP);
+      }
+    } catch {}
+    const { hasHorizonResources, prepareHorizonServer } = require('./horizon-prepare.js');
+    if (!hasHorizonResources(settings.serverPath)) {
+      ctx.appendLog('Horizon game files not prepared yet. Preparing automatically…', 'system');
+      try {
+        await prepareHorizonServer(settings.serverPath, (msg) => ctx.appendLog(typeof msg === 'string' ? msg : 'Preparing Horizon…', 'system'), ctx);
+      } catch (prepErr) {
+        ctx.appendLog(`Horizon preparation error: ${prepErr?.message || prepErr}`, 'stderr');
+      }
+    }
+    const binName = info.nativeBinary || (process.platform === 'win32' ? 'horizon-server.exe' : 'horizon-server');
+    const binPath = path.isAbsolute(binName) ? binName : path.join(settings.serverPath, binName);
+    ctx.appendLog(`Starting native Horizon server (${binName})…`, 'system');
+    ctx.manualStop = false;
+    spawnNativeServerProcess(ctx, settings.serverPath, binPath, ['run']);
+  } else {
+    const { customArgs, args } = buildLaunchArgs(settings, isProxy, info.jar);
+    ctx.appendLog(`Starting ${info.launchScript || info.jar} with ${ctx.javaInfo.path}…`, 'system');
+    ctx.manualStop = false;
+    spawnServerProcess(ctx, settings.serverPath, info, customArgs, args);
+  }
 
   try { if (!fs.existsSync(path.join(settings.serverPath, 'server.properties'))) ctx.appendLog('First start: server.properties does not exist yet — the "Failed to load properties" ERROR below is expected; the server creates the file on its own and continues.', 'system'); } catch {}
 
@@ -428,7 +483,7 @@ async function startServerInternal(ctx, settings) {
       // Any output while we are still waiting means boot is still in progress -> push the quiet
       // watchdog out, so a slow modpack is never flipped to 'running' mid-load.
       if (ctx.waitingForDone) armDoneWatchdog();
-      if (ctx.waitingForDone && /\bDone \([^)]*\)!/i.test(x)) {
+      if (ctx.waitingForDone && (/\bDone \([^)]*\)!/i.test(x) || (isNative && /listening on|horizon.*ready|server started/i.test(x)))) {
         ctx.waitingForDone = false;
         clearTimeout(doneWatchdog);
         startAutoPoll(ctx, software);
@@ -653,7 +708,9 @@ async function forceStopServer(ctx) {
   // Best effort: when monitoredPid was never resolved (a fast force-stop), hunt a descendant once.
   try {
     const javaPid = await Promise.race([
-      platform.findJavaDescendant(proc.pid),
+      ((ctx.tpsUnsupported || ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'native') && typeof platform.findServerDescendant === 'function')
+        ? platform.findServerDescendant(proc.pid)
+        : platform.findJavaDescendant(proc.pid),
       new Promise(resolve => setTimeout(() => resolve(null), 4000))
     ]).catch(() => null);
     if (javaPid && javaPid !== proc.pid && javaPid !== ctx.monitoredPid) killTree(javaPid);

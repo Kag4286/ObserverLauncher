@@ -25,6 +25,13 @@ ok('proto chunk -> no biomeGrid', proto.biomeGrid === null);
 const biomes = biomeFromChunk(chunkNbt('minecraft:biomes', 'minecraft:plains'));
 ok('mid-stage (biomes) chunk -> still null', biomes.biome === null);
 
+// --- late generation stages (features, terrain, etc.) yield their real biome ---
+const features = biomeFromChunk(chunkNbt('minecraft:features', 'minecraft:taiga'));
+ok('features chunk -> real biome (taiga)', features.biome === 'minecraft:taiga');
+
+const terrain = biomeFromChunk(chunkNbt('minecraft:terrain', 'minecraft:plains'));
+ok('terrain chunk -> real biome (plains)', terrain.biome === 'minecraft:plains');
+
 // --- a full chunk yields its real biome ---
 const full = biomeFromChunk(chunkNbt('minecraft:full', 'minecraft:the_end'));
 ok('full chunk -> real biome (the_end)', full.biome === 'minecraft:the_end');

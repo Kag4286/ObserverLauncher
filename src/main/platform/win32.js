@@ -16,12 +16,13 @@ async function runPS(script, timeoutMs) {
 }
 
 // Find the real java.exe descendant of a root pid (handles cmd.exe -> java.exe via run.bat, and shim cases)
-function findJavaDescendant(rootPid) {
+function findJavaDescendant(rootPid, filterPattern = '^java(w)?\\.exe$') {
   // 2.4.0 (perf + correctness): walk the process tree ONE LEVEL AT A TIME (children of the current
   // frontier) instead of enumerating EVERY process each call. Cheaper AND more reliable for a
   // run.bat server (cmd.exe -> java.exe). Returns the java pid, or empty.
   const script = `
 $root=${Number(rootPid)}
+$pat='${filterPattern || ""}'
 $frontier=@($root); $visited=New-Object System.Collections.Generic.HashSet[int]; $best=0; $bestWs=-1
 $guard=0
 while($frontier.Count -gt 0 -and $guard -lt 32){
@@ -32,19 +33,23 @@ while($frontier.Count -gt 0 -and $guard -lt 32){
     $kids=Get-CimInstance Win32_Process -Filter "ParentProcessId=$cur" -ErrorAction SilentlyContinue
     if(-not $kids){ $kids=Get-WmiObject Win32_Process -Filter "ParentProcessId=$cur" -ErrorAction SilentlyContinue }
     foreach($k in $kids){
-      if($k.Name -match '^java(w)?\\.exe$'){ $ws=0; try{ $ws=[int64]$k.WorkingSetSize }catch{}; if($ws -gt $bestWs){ $bestWs=$ws; $best=[int]$k.ProcessId } }
+      if(-not $pat -or $k.Name -match $pat){ $ws=0; try{ $ws=[int64]$k.WorkingSetSize }catch{}; if($ws -gt $bestWs){ $bestWs=$ws; $best=[int]$k.ProcessId } }
       $next += [int]$k.ProcessId
     }
   }
   $frontier=$next
 }
 if($best -gt 0){ "$best" }
-else { $r=Get-Process -Id $root -ErrorAction SilentlyContinue; if($r -and $r.ProcessName -match '^java(w)?$'){ "$root" } }
+else { $r=Get-Process -Id $root -ErrorAction SilentlyContinue; if(-not $pat -or ($r -and $r.ProcessName -match '^java(w)?$')){ "$root" } }
 `.trim();
   return runPS(script).then(r => {
     const id = parseInt(String(r.stdout).trim(), 10);
     return Number.isFinite(id) ? id : null;
   }).catch(()=>null);
+}
+
+function findServerDescendant(rootPid) {
+  return findJavaDescendant(rootPid, "").then(res => res || (Number.isFinite(Number(rootPid)) ? Number(rootPid) : null));
 }
 
 // Process identity for orphan cleanup (v2.0.0). Returns { alive, name, startTimeMs }
@@ -123,7 +128,7 @@ async function allowFirewall(port) {
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not create firewall rule — UAC dismissed or rule exists.' };
 }
 
-module.exports = { findJavaDescendant, getProcessInfo, getProcessMetrics, createBackup, restoreBackup, allowFirewall, extractArchive, createArchive };
+module.exports = { findJavaDescendant, findServerDescendant, getProcessInfo, getProcessMetrics, createBackup, restoreBackup, allowFirewall, extractArchive, createArchive };
 
 // Cross-platform archive helpers used by the Java installer and .mrpack import/export.
 // Windows side wraps PowerShell's Expand-Archive / Compress-Archive (unchanged behaviour).

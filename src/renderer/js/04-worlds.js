@@ -6,10 +6,46 @@ function renderWorlds(worlds){
     n.innerHTML=`<div class="wld-none"><img src="./assets/icons/ui/grid.svg" alt=""><div><b>${t('wld.noneT')}</b><span>${t('wld.noneS')}</span></div><button class="btn secondary sm" data-open-world=".">${t('wld.openFolder')} ↗</button></div>`;
   } else {
     const kindOf=x=>/_the_end$/i.test(x)?{tag:t('wld.tagEnd'),cls:'end'}:/_nether$/i.test(x)?{tag:t('wld.tagNether'),cls:'nether'}:{tag:t('wld.tagOverworld'),cls:'over'};
-    // v4.0.0: entity cards (DESIGN.md 16) instead of the old text row — consistent with Players.
-    n.innerHTML=worlds.map(x=>{const k=kindOf(x);return `<div class="entity-card wld-card" title="${esc(x)}"><span class="entity-avatar accent">◫</span><div class="entity-body"><div class="entity-title">${esc(x)}</div><div class="entity-meta"><span class="badge wld-tag-${k.cls}">${esc(k.tag)}</span></div></div><div class="entity-actions"><button class="btn sm secondary" data-open-world="${esc(x)}">${t('wld.open')}</button></div></div>`}).join('');
+    n.innerHTML=worlds.map(x=>{
+      const k=kindOf(x);
+      const isSub=/_the_end$/i.test(x)||/_nether$/i.test(x);
+      const extraBtns=isSub?'':`<button class="btn sm secondary" data-rename-world="${esc(x)}">${t('wld.renameBtn')}</button><button class="btn sm secondary" data-seed-world="${esc(x)}">${t('wld.seedTitle')}</button><button class="btn sm danger-ghost" data-reset-dim="${esc(x)}">${t('wld.resetDimBtn')}</button>`;
+      return `<div class="entity-card wld-card" title="${esc(x)}"><span class="entity-avatar accent">◫</span><div class="entity-body"><div class="entity-title">${esc(x)}</div><div class="entity-meta"><span class="badge wld-tag-${k.cls}">${esc(k.tag)}</span></div></div><div class="entity-actions">${extraBtns}<button class="btn sm secondary" data-open-world="${esc(x)}">${t('wld.open')}</button></div></div>`;
+    }).join('');
   }
   $$('[data-open-world]').forEach(b=>b.onclick=()=>window.observer.openFiles(b.dataset.openWorld));
+  $$('[data-rename-world]').forEach(b=>b.onclick=async()=>{
+    if(state.running)return toast(t('wld.cantRunning'));
+    const curr=b.dataset.renameWorld;
+    const next=await promptDialog({title:t('wld.renameTitle'),value:curr,ok:t('wld.renameBtn')});
+    if(!next||next===curr)return;
+    const r=await window.observer.worldRename(curr,next);
+    if(!r.ok)return toast(r.error||'Failed');
+    toast(t('wld.renamedSuccess'));
+    state.files=r.files;refreshUI();
+  });
+  $$('[data-seed-world]').forEach(b=>b.onclick=async()=>{
+    if(state.running)return toast(t('wld.cantRunning'));
+    const w=b.dataset.seedWorld;
+    const nextSeed=await promptDialog({title:t('wld.seedTitle'),placeholder:t('wld.seedPlaceholder'),ok:t('wld.seedSave')});
+    if(nextSeed===null||nextSeed===undefined||!nextSeed.trim())return;
+    const r=await window.observer.worldSetSeed(w,nextSeed.trim());
+    if(!r.ok)return toast(r.error||'Failed');
+    toast(t('wld.seedSuccess',{s:r.seed}));
+  });
+  $$('[data-reset-dim]').forEach(b=>b.onclick=async()=>{
+    if(state.running)return toast(t('wld.cantRunning'));
+    const w=b.dataset.resetDim;
+    const choice=await promptDialog({title:t('wld.resetDimTitle'),placeholder:'nether or end',ok:t('wld.resetDimBtn')});
+    if(!choice)return;
+    const dim=choice.toLowerCase().trim();
+    if(dim!=='nether'&&dim!=='end')return toast(t('wld.invalidDim'));
+    if(!await confirmDialog({title:t('wld.resetDimTitle'),body:t('wld.resetDimConfirm',{d:dim}),ok:t('wld.resetDimBtn'),danger:true}))return;
+    const r=await window.observer.worldDeleteDimension(w,dim);
+    if(!r.ok)return toast(r.error||'Failed');
+    toast(t('wld.resetDimSuccess'));
+    refreshUI();
+  });
   const wc=$('#worldsCountPill'); if(wc) wc.textContent=String(worlds.length);
 }
 function fmtBytes(n){if(!n)return '0 MB';const mb=n/1024/1024;return mb>=1024?`${(mb/1024).toFixed(2)} GB`:`${mb.toFixed(1)} MB`}

@@ -164,7 +164,7 @@ async function initApp(ctx, ipcMain) {
       try {
         const root = ctx.currentServerPath || ctx.instances?.get(ctx.activeInstanceId || ctx.inst())?.serverPath || loadSettings().serverPath;
         const i = serverFiles(root);
-        return [i.jar, i.launchScript].filter(Boolean);
+        return [i.jar, i.launchScript, i.target && i.target.mc, i.nativeBinary].filter(Boolean);
       } catch { return []; }
     },
     // FEATURE (v6.0.0): mod item icons read their PNG straight from the server's mods/*.jar,

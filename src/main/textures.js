@@ -22,9 +22,28 @@ const path = require('path');
 const { dataDir } = require('./data-dir.js');
 const { singleton: modsIndex } = require('./mods-index.js');
 const { openJar } = require('./jar-reader.js');
+const { readPackTexture } = require('./resource-pack.js');
 
 // Hybrid CDN: jsDelivr is Cloudflare-backed, high-speed, and accessible worldwide (not blocked by
 // ISPs that block raw.githubusercontent.com). raw.githubusercontent is retained as a second fallback.
+
+let _activePackPath = null;
+function setActiveResourcePackPath(p) {
+  _activePackPath = (p && typeof p === 'string' && fs.existsSync(p)) ? p : null;
+}
+function getActiveResourcePackPath() {
+  return _activePackPath;
+}
+function getEffectivePackPath() {
+  if (_activePackPath) return _activePackPath;
+  try {
+    const { loadSettings } = require('./settings.js');
+    const s = loadSettings();
+    if (s.resourcePackPath && fs.existsSync(s.resourcePackPath)) return s.resourcePackPath;
+  } catch {}
+  return null;
+}
+
 const CDN_BASES = [
   'https://cdn.jsdelivr.net/gh/PrismarineJS/minecraft-assets@master/data',
   'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data',
@@ -187,7 +206,7 @@ function itemAliasOf(file) {
 // item/block icons; armor layer 1 (helmet/chest/boots) and layer 2 (leggings); itemmod reads a
 // texture from the server's own mods/*.jar (the mirror is vanilla-only, so a modded server's
 // inventory was all text labels before this).
-const KINDS = ['item', 'block', 'armor', 'armorlegs', 'itemmod'];
+const KINDS = ['item', 'block', 'armor', 'armorlegs', 'itemmod', 'pack'];
 
 // Modern list kept strictly 26.x/1.21.x/1.20.x for test assertion contract.
 const MIRROR_VERSIONS = ['26.1', '1.21.11', '1.21.10', '1.21.9', '1.21.8', '1.21.7', '1.21.6', '1.21.5', '1.21.4', '1.21.1', '1.20.2'];
@@ -576,4 +595,4 @@ function readModTexture(file) {
   return modsIndex.readTexture(parts.namespace, parts.name);
 }
 
-module.exports = { init, handle, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf };
+module.exports = { init, handle, setActiveResourcePackPath, getActiveResourcePackPath, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf };

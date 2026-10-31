@@ -28,40 +28,60 @@ async function metricsTick(ctx, st) {
     return;
   }
   st.idleTicks = 0;
-  if (!ctx.monitoredPid) {
-    const found = await Promise.race([
-      platform.findJavaDescendant(ctx.serverProcess.pid),
-      new Promise(resolve => setTimeout(() => resolve(null), 3000))
-    ]).catch(() => null);
-    if (found) {
-      ctx.monitoredPid = found;
+  const isNative = ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'native';
+  if (!ctx.monitoredPid || (isNative && ctx.monitoredPid === ctx.serverProcess.pid && ((st.nativeScanCount = (st.nativeScanCount || 0) + 1) % 4 === 0))) {
+    if (isNative) {
+      let candidate = ctx.serverProcess.pid;
+      if (typeof platform.findServerDescendant === 'function') {
+        const found = await Promise.race([
+          platform.findServerDescendant(ctx.serverProcess.pid),
+          new Promise(resolve => setTimeout(() => resolve(null), 3000))
+        ]).catch(() => null);
+        if (found) candidate = found;
+      }
+      ctx.monitoredPid = candidate;
+      if (candidate && candidate !== ctx.serverProcess.pid) {
+        try {
+          const cinfo = await platform.getProcessInfo(candidate).catch(() => null);
+          require('./runtime-state.js').setInstanceProcess(ctx.inst(), { pid: ctx.serverProcess.pid, javaPid: candidate, javaPidStartedAt: cinfo && cinfo.startTimeMs || null, serverPath: ctx.currentServerPath });
+        } catch {}
+      }
       st.javaRetryCount = 0;
-      // v6.0.0 FIX (process leak): persist the real java pid so orphan cleanup on a later launch can
-      // find a java that outlived its cmd.exe parent (a Windows run.bat that detached java).
-      try {
-        // Persist the real java pid AND its OS creation time (the PID-reuse guard orphan cleanup uses).
-        const jinfo = await platform.getProcessInfo(found).catch(() => null);
-        require('./runtime-state.js').setInstanceProcess(ctx.inst(), { pid: ctx.serverProcess.pid, javaPid: found, javaPidStartedAt: jinfo && jinfo.startTimeMs || null, serverPath: ctx.currentServerPath });
-      } catch {}
     } else {
-      st.javaRetryCount++;
-      // BUGFIX (2.4.0): a run.bat server's root pid is cmd.exe, NOT java — measuring that showed
-      // 0% CPU / ~0 MB forever. Only fall back to the root pid when it is ITSELF java (a plain jar
-      // server). Otherwise keep retrying to find java.exe; after many tries give up for this run
-      // (java never appeared), but never report cmd.exe's near-zero numbers as the server's.
-      const rootIsJava = st.rootIsJava === true; // resolved once below
-      if (st.javaRetryCount >= 2 && (ctx.currentSoftware === 'paper-like' || rootIsJava)) {
-        ctx.monitoredPid = ctx.serverProcess.pid;
+      const found = await Promise.race([
+        platform.findJavaDescendant(ctx.serverProcess.pid),
+        new Promise(resolve => setTimeout(() => resolve(null), 3000))
+      ]).catch(() => null);
+      if (found) {
+        ctx.monitoredPid = found;
+        st.javaRetryCount = 0;
+        // v6.0.0 FIX (process leak): persist the real java pid so orphan cleanup on a later launch can
+        // find a java that outlived its cmd.exe parent (a Windows run.bat that detached java).
+        try {
+          // Persist the real java pid AND its OS creation time (the PID-reuse guard orphan cleanup uses).
+          const jinfo = await platform.getProcessInfo(found).catch(() => null);
+          require('./runtime-state.js').setInstanceProcess(ctx.inst(), { pid: ctx.serverProcess.pid, javaPid: found, javaPidStartedAt: jinfo && jinfo.startTimeMs || null, serverPath: ctx.currentServerPath });
+        } catch {}
       } else {
-        // Resolve once whether the root pid is java.exe, so we know if the fallback is safe.
-        if (st.rootIsJava === undefined) {
-          try {
-            const info = await platform.getProcessInfo(ctx.serverProcess.pid);
-            st.rootIsJava = !!(info && info.name && /^java(w)?\.exe$/i.test(info.name));
-          } catch { /* leave undefined; try again next tick */ }
+        st.javaRetryCount++;
+        // BUGFIX (2.4.0): a run.bat server's root pid is cmd.exe, NOT java — measuring that showed
+        // 0% CPU / ~0 MB forever. Only fall back to the root pid when it is ITSELF java (a plain jar
+        // server). Otherwise keep retrying to find java.exe; after many tries give up for this run
+        // (java never appeared), but never report cmd.exe's near-zero numbers as the server's.
+        const rootIsJava = st.rootIsJava === true; // resolved once below
+        if (st.javaRetryCount >= 2 && (ctx.currentSoftware === 'paper-like' || rootIsJava)) {
+          ctx.monitoredPid = ctx.serverProcess.pid;
+        } else {
+          // Resolve once whether the root pid is java.exe, so we know if the fallback is safe.
+          if (st.rootIsJava === undefined) {
+            try {
+              const info = await platform.getProcessInfo(ctx.serverProcess.pid);
+              st.rootIsJava = !!(info && info.name && /^java(w)?\.exe$/i.test(info.name));
+            } catch { /* leave undefined; try again next tick */ }
+          }
+          ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: st.lastMetrics.serverMemory, cpu: st.lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
+          return;
         }
-        ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: st.lastMetrics.serverMemory, cpu: st.lastMetrics.cpu, running: true, timestamp: Date.now(), ...ctx.live });
-        return;
       }
     }
     if (!ctx.monitoredPid) { ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: 0, cpu: 0, running: true, timestamp: Date.now(), ...ctx.live }); return; }
@@ -87,10 +107,11 @@ async function metricsTick(ctx, st) {
     if (deltaSeconds > 0) cpu = Math.max(0, Math.min(100, ((cpuTotal - ctx.previousCpu.total) / deltaSeconds / os.cpus().length) * 100));
   }
   if (Number.isFinite(cpuTotal)) ctx.previousCpu = { total: cpuTotal, at: now };
-  if (memory > 20) st.lastMetrics.serverMemory = memory;
+  if (memory > 0) st.lastMetrics.serverMemory = memory;
   if (Number.isFinite(cpu)) st.lastMetrics.cpu = Math.round(cpu);
-  pushHistory(ctx, { t: now, tps: ctx.live?.tps ?? null, mspt: ctx.live?.mspt ?? null, cpu: Number.isFinite(cpu) ? Math.round(cpu) : null, ram: memory > 20 ? Math.round(memory) : (st.lastMetrics.serverMemory || null), players: (ctx.live?.players || []).length });
-  ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: memory > 20 ? memory : st.lastMetrics.serverMemory, cpu: Math.round(cpu), running: true, timestamp: now, ...ctx.live });
+  const curMem = memory > 0 ? memory : st.lastMetrics.serverMemory;
+  pushHistory(ctx, { t: now, tps: ctx.live?.tps ?? null, mspt: ctx.live?.mspt ?? null, cpu: Number.isFinite(cpu) ? Math.round(cpu) : null, ram: curMem ? Math.round(curMem) : null, players: (ctx.live?.players || []).length });
+  ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: curMem, cpu: Math.round(cpu), running: true, timestamp: now, ...ctx.live });
 }
 // Ring buffer of samples, capped at ~1800 (30 min at 1 sample/s). Oldest dropped first.
 const METRICS_HISTORY_CAP = 1800;
