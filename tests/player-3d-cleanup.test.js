@@ -45,10 +45,11 @@ function createMockCanvas() {
     blendFunc: () => {},
     uniformMatrix4fv: () => {},
     drawArrays: () => {},
+    polygonOffset: () => {},
     STATIC_DRAW: 0, ARRAY_BUFFER: 0, TEXTURE_2D: 0,
     COLOR_BUFFER_BIT: 0, DEPTH_BUFFER_BIT: 0, DEPTH_TEST: 0, BLEND: 0,
     SRC_ALPHA: 0, ONE_MINUS_SRC_ALPHA: 0, TRIANGLES: 0, FLOAT: 0,
-    UNPACK_FLIP_Y_WEBGL: 0,
+    UNPACK_FLIP_Y_WEBGL: 0, POLYGON_OFFSET_FILL: 0,
   };
 
   const canvas = {
