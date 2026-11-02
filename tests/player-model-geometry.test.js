@@ -170,6 +170,14 @@ ck('modded leggings strip suffix', (() => {
 })());
 ck('vanilla namespaced item not treated as mod', getArmorMaterial('minecraft:iron_chestplate') === 'iron');
 ck('unrecognized item returns null', getArmorMaterial('stick') === null);
+ck('modded armor with vanilla keyword in name', (() => {
+  const m = getArmorMaterial('iceandfire:armor_copper_metal_helmet');
+  return m && m.isMod && m.ns === 'iceandfire' && m.mat === 'armor_copper_metal';
+})());
+ck('modded armor black', (() => {
+  const m = getArmorMaterial('iceandfire:armor_black_chestplate');
+  return m && m.isMod && m.ns === 'iceandfire' && m.mat === 'armor_black';
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

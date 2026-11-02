@@ -33,7 +33,12 @@ const partPos = (name, isSlim) => { if (isSlim && (name === 'armR' || name === '
 
 function getArmorMaterial(id) {
   if (!id) return null;
-  const s = String(id);
+  const s = String(id).toLowerCase();
+  if (s.includes(':') && !s.startsWith('minecraft:')) {
+    const [ns, name] = s.split(':');
+    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots)$/, '');
+    if (mat && ns) return { isMod: true, ns, mat };
+  }
   if (s.includes('turtle')) return 'turtle';
   if (s.includes('netherite')) return 'netherite';
   if (s.includes('diamond')) return 'diamond';
@@ -42,11 +47,6 @@ function getArmorMaterial(id) {
   if (s.includes('golden')) return 'gold';       // item is golden_*, texture is gold.png
   if (s.includes('iron')) return 'iron';
   if (s.includes('copper')) return 'copper';
-  if (s.includes(':') && !s.startsWith('minecraft:')) {
-    const [ns, name] = s.split(':');
-    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots)$/, '');
-    if (mat && ns) return { isMod: true, ns, mat };
-  }
   return null;
 }
 
@@ -216,12 +216,15 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const allCreatedTextures = [tex];
   const fetchArmor = (kind, mat, cb) => {
     if (!mat) return;
-    const key = kind + ':' + (typeof mat === 'object' && mat ? `${mat.ns}~${mat.mat}` : mat);
+    const isMod = typeof mat === 'object' && mat && mat.isMod;
+    const effectiveKind = isMod ? (kind === 'armorlegs' ? 'armormodlegs' : 'armormod') : kind;
+    const matStr = isMod ? `${encodeURIComponent(mat.ns)}~${encodeURIComponent(mat.mat)}` : String(mat);
+    const key = effectiveKind + ':' + matStr;
     if (armorTexCache.has(key)) {
       cb(armorTexCache.get(key));
       return;
     }
-    loadArmor(kind, mat, t => {
+    loadArmor(effectiveKind, matStr, t => {
       armorTexCache.set(key, t);
       allCreatedTextures.push(t);
       cb(t);
@@ -232,11 +235,20 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // PNG rather than a 404 (to avoid console spam), so a 1px image means "not downloaded yet".
   // Binding it would give the armor cube a fully transparent texture and the alpha test in the
   // fragment shader would discard every fragment -- the armor would silently vanish.
-  const upload = (texture, image) => {
+  const upload = (texture, image, isArmor) => {
     if (!image || image.naturalWidth <= 1) return false;
     try {
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      let source = image;
+      if (isArmor && image.naturalWidth > 0 && image.naturalHeight === image.naturalWidth) {
+        const c = document.createElement('canvas');
+        c.width = image.naturalWidth;
+        c.height = Math.floor(image.naturalWidth / 2);
+        const ctx = c.getContext('2d');
+        ctx.drawImage(image, 0, 0, c.width, c.height, 0, 0, c.width, c.height);
+        source = c;
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       return true;
@@ -259,7 +271,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     // the tex:// scheme itself missing CORS support; that is now fixed in main.js (corsEnabled)
     // and textures.js (Access-Control-Allow-Origin). Both halves are needed.
     image.crossOrigin = 'anonymous';
-    image.onload = () => { if (upload(texture, image)) onReady(texture); };
+    image.onload = () => { if (upload(texture, image, true)) onReady(texture); };
     image.onerror = () => {};
     image.src = `tex://auto/${kind}/${material}.png`;
   };
@@ -269,7 +281,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // from a cross-origin image, and now works because tex:// is a corsEnabled scheme.
   img.crossOrigin = 'anonymous';
   img.onload = () => {
-    upload(tex, img);
+    upload(tex, img, false);
 
     // Detect legacy skin: either 64x32, or Mojang padded it to 64x64 with a transparent bottom half.
     const isLegacy = img.height === 32 || (() => {

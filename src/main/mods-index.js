@@ -42,15 +42,23 @@ function candidateArmorEntries(namespace, material, layer) {
   const mat = String(material || '').toLowerCase();
   const l = Number(layer) === 2 ? 2 : 1;
   if (!isCleanNamespaceAndName(ns, mat)) return [];
-  return [
-    `assets/${ns}/textures/models/armor/${mat}_layer_${l}.png`,
-    `assets/${ns}/textures/model/armor/${mat}_layer_${l}.png`,
-    `assets/${ns}/textures/entity/armor/${mat}_layer_${l}.png`,
-    `assets/${ns}/textures/armor/${mat}_layer_${l}.png`,
-    l === 2
-      ? `assets/${ns}/textures/entity/equipment/humanoid_leggings/${mat}.png`
-      : `assets/${ns}/textures/entity/equipment/humanoid/${mat}.png`,
+  const dirs = [
+    `assets/${ns}/textures/models/armor/`,
+    `assets/${ns}/textures/model/armor/`,
+    `assets/${ns}/textures/entity/armor/`,
+    `assets/${ns}/textures/armor/`,
   ];
+  const fileNames = l === 2
+    ? [`${mat}_layer_2.png`, `${mat}_legs.png`, `${mat}_leggings.png`, `${mat}_layer2.png`, `${mat}_2.png`]
+    : [`${mat}_layer_1.png`, `${mat}.png`, `${mat}_layer1.png`, `${mat}_1.png`];
+  const out = [];
+  for (const d of dirs) {
+    for (const f of fileNames) out.push(d + f);
+  }
+  out.push(l === 2
+    ? `assets/${ns}/textures/entity/equipment/humanoid_leggings/${mat}.png`
+    : `assets/${ns}/textures/entity/equipment/humanoid/${mat}.png`);
+  return out;
 }
 
 // Signature of a mods/ folder that changes when a jar is added/removed/replaced. Pure over the
@@ -180,7 +188,15 @@ class ModsIndex {
     const cacheKey = `armor:${ns}:${mat}:${l}`;
     if (this.extractCache.has(cacheKey)) return this.extractCache.get(cacheKey);
     const wanted = candidateArmorEntries(namespace, material, l);
-    return this._findInJars(ns, wanted, cacheKey, e => e.startsWith(`assets/${ns}/textures/`) && e.includes(`${mat}_layer_${l}.png`));
+    return this._findInJars(ns, wanted, cacheKey, e => {
+      if (!e.startsWith(`assets/${ns}/textures/`) || !e.endsWith('.png')) return false;
+      const lower = e.toLowerCase();
+      if (!lower.includes(mat)) return false;
+      if (l === 2) {
+        return lower.includes('layer_2') || lower.includes('_legs') || lower.includes('layer2') || lower.includes('leggings') || lower.includes('_2.png');
+      }
+      return lower.includes('layer_1') || lower.includes('layer1') || lower.includes('_1.png') || (!lower.includes('layer_2') && !lower.includes('_legs') && !lower.includes('leggings') && !lower.includes('_2.png'));
+    });
   }
 
   // Test seam: namespaces currently indexed (call refresh() first).

@@ -60,9 +60,11 @@ t('candidateEntries tries item, items, then block spellings', () => {
 t('candidateArmorEntries returns standard model armor layer paths', () => {
   const e1 = candidateArmorEntries('botania', 'terrasteel', 1);
   assert(e1.includes('assets/botania/textures/models/armor/terrasteel_layer_1.png'));
+  assert(e1.includes('assets/botania/textures/models/armor/terrasteel.png'));
   assert(e1.includes('assets/botania/textures/entity/equipment/humanoid/terrasteel.png'));
   const e2 = candidateArmorEntries('botania', 'terrasteel', 2);
   assert(e2.includes('assets/botania/textures/models/armor/terrasteel_layer_2.png'));
+  assert(e2.includes('assets/botania/textures/models/armor/terrasteel_legs.png'));
   assert(e2.includes('assets/botania/textures/entity/equipment/humanoid_leggings/terrasteel.png'));
 });
 
