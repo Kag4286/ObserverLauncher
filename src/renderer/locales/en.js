@@ -203,4 +203,13 @@ window.LOCALES.en = {
   'nsw.mem2': "Good for 5–10 players",
   'nsw.mem3': "Great for 10–25 players or modpacks",
   'nsw.mem4': "Heavy worlds, big modpacks & 25+ players",
+  'crash.cat.rust-panic': "Rust panic (Native crash)",
+  'wh.ev.leave': "Player leaves",
+  'cnt.nativeNotice': "Native server engine detected. Horizon uses native Rust plugins; Java mods and plugins are not supported.",
+  'perf.diagNativeTitle': "Native Server Engine",
+  'perf.diagNativeBody': "Horizon runs directly on bare metal without JVM overhead.",
+  'wiz.invalidName': "Folder name cannot contain / \\ : * ? \" < > |",
+  'mkt.rateLimit': "Rate limit reached. Please wait a moment before trying again.",
+  'mkt.rateLimitTitle': "Rate Limited",
+  'mkt.rateLimitHint': "The mod registry is temporarily busy. Wait a few seconds before retrying.",
 };

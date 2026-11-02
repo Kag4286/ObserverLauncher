@@ -680,7 +680,16 @@ $('#wmCopySeed').onclick=async()=>{if(!wm.level)return;try{await navigator.clipb
 // fetch from the OLD dimension, or its response lands after the switch and paints old-dimension
 // biome colours into the new one. Bump the request seq + cancel the debounce timer so a late reply
 // is dropped (the seq check in wmScheduleBiomes/wmPrefetchBiomes discards stale responses).
-$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{wm.dim=c.dataset.dim;clearTimeout(wm.biomeTimer);wm.biomeReqSeq++;wm.biomeLoading=false;wmClearCaches();wm.explored=new Set();wm.exploredDim=null;wmSyncDimTabs();wmRenderLegend();wmLoadChunks(wm.dim);wmDraw()});
+$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{
+  const oldDim=wm.dim;
+  const newDim=c.dataset.dim;
+  if(oldDim!==newDim){
+    if(oldDim==='overworld'&&newDim==='nether'){wm.cam={x:Math.round(wm.cam.x/8),z:Math.round(wm.cam.z/8)};}
+    else if(oldDim==='nether'&&newDim==='overworld'){wm.cam={x:Math.round(wm.cam.x*8),z:Math.round(wm.cam.z*8)};}
+    else if(newDim==='end'){wm.cam={x:0,z:0};}
+  }
+  wm.dim=newDim;clearTimeout(wm.biomeTimer);wm.biomeReqSeq++;wm.biomeLoading=false;wmClearCaches();wm.explored=new Set();wm.exploredDim=null;wmSyncDimTabs();wmRenderLegend();wmLoadChunks(wm.dim);wmDraw();
+});
 $('#wmAdd').onclick=()=>{wm.addMode=!wm.addMode;$('#wmAdd').classList.toggle('active',wm.addMode)};
 async function wmLoadChunks(dim){
   if(!dim)dim=wm.dim; // defensive: default to the ACTIVE dim so an undefined caller can't null wm.exploredDim

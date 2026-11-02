@@ -326,6 +326,10 @@
             <button type="button" class="filter-chip chip-issues" data-qfilter="issues" hidden><span data-i18n="cnt.filterIssues">Issues</span> <b class="chip-count" id="chipIssuesCount">0</b></button>
           </div>
         </div>
+                <div class="content-native-notice info-banner" id="contentNativeNotice" hidden>
+          <span class="info-badge" aria-hidden="true">ℹ</span>
+          <span id="contentNativeNoticeText" data-i18n="cnt.nativeNotice">Native server engine detected. Horizon uses native Rust plugins; Java mods and plugins are not supported.</span>
+        </div>
         <div class="content-conflicts-banner" id="contentConflictsBanner" hidden>
           <div class="ccb-head">
             <div class="ccb-icon-badge" aria-hidden="true">⚠</div>
@@ -1102,6 +1106,7 @@
                       <label class="filter-chip"><input type="checkbox" data-wh-event="stop"> <span data-i18n="wh.ev.stop">Stop</span></label>
                       <label class="filter-chip"><input type="checkbox" data-wh-event="crash"> <span data-i18n="wh.ev.crash">Crash</span></label>
                       <label class="filter-chip"><input type="checkbox" data-wh-event="player_join"> <span data-i18n="wh.ev.join">Player joins</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="player_leave"> <span data-i18n="wh.ev.leave">Player leaves</span></label>
                     </div>
                   </div>
                 </div>

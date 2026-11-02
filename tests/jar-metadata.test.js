@@ -135,5 +135,14 @@ const blindLoader = classifyJar(() => ({ ok: false }), 'kotlinforforge-5.12.0-al
 check('classifyJar fallback loader from filename', blindLoader.loader === 'forge');
 
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+// parseTomlModInfo matches displayName or name
+{
+  const { parseTomlModInfo } = require('../src/main/mod-metadata.js');
+  const info1 = parseTomlModInfo('[[mods]]\nmodId = "test"\nname = "Test Mod"\nversion = "1.0"');
+  check('parseTomlModInfo reads name attribute', info1.name === 'Test Mod');
+  const info2 = parseTomlModInfo('[[mods]]\nmodId = "test"\ndisplayName = "Display Mod"\nversion = "1.0"');
+  check('parseTomlModInfo reads displayName attribute', info2.name === 'Display Mod');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

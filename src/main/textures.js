@@ -206,7 +206,7 @@ function itemAliasOf(file) {
 // item/block icons; armor layer 1 (helmet/chest/boots) and layer 2 (leggings); itemmod reads a
 // texture from the server's own mods/*.jar (the mirror is vanilla-only, so a modded server's
 // inventory was all text labels before this).
-const KINDS = ['item', 'block', 'armor', 'armorlegs', 'itemmod', 'pack'];
+const KINDS = ['item', 'block', 'armor', 'armorlegs', 'itemmod', 'armormod', 'armormodlegs', 'pack'];
 
 // Modern list kept strictly 26.x/1.21.x/1.20.x for test assertion contract.
 const MIRROR_VERSIONS = ['26.1', '1.21.11', '1.21.10', '1.21.9', '1.21.8', '1.21.7', '1.21.6', '1.21.5', '1.21.4', '1.21.1', '1.20.2'];
@@ -396,6 +396,28 @@ function pngResponse(file) {
   catch { return new Response('', { status: 404 }); }
 }
 
+function respondWithCachedPng(buf, version, kind, file) {
+  if (buf && buf.length) {
+    const dest = path.join(cacheRoot(), version, kind, file);
+    try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, buf); } catch {}
+    return new Response(buf, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
+  }
+  return new Response(PLACEHOLDER_PNG, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
+}
+
+function resolveActiveModsDir() {
+  let dir = null;
+  try { dir = modsDirOf(); } catch { dir = null; }
+  if (!dir) {
+    try {
+      const { loadSettings } = require('./settings.js');
+      const sp = loadSettings().serverPath;
+      if (sp) dir = path.join(sp, 'mods');
+    } catch {}
+  }
+  return dir;
+}
+
 function handle(request) {
   let u;
   try { u = new URL(request.url); } catch { return new Response('', { status: 400 }); }
@@ -408,7 +430,8 @@ function handle(request) {
   // itemmod files are written as <namespace>_<name>.png because a tex:// path segment cannot
   // contain a slash. Every other kind keeps the strict lower-case name-only pattern.
   const file = String(rawFile).toLowerCase();
-  const fileOk = kind === 'itemmod'
+  const isModKind = kind === 'itemmod' || kind === 'armormod' || kind === 'armormodlegs';
+  const fileOk = isModKind
     ? /^[a-z0-9_.-]+~[a-z0-9_./-]+\.png$/.test(file) && !file.includes('..')
     : /^[a-z0-9_-]+\.png$/.test(file) && !file.includes('..');
   if (!fileOk) return new Response('', { status: 400 });
@@ -430,13 +453,12 @@ function handle(request) {
   // session-cached and a hit is instant, so the first paint of an inventory renders correctly
   // without the placeholder flash the remote path needs.
   if (kind === 'itemmod') {
-    const buf = readModTexture(file);
-    if (buf && buf.length) {
-      const dest = path.join(cacheRoot(), version, kind, file);
-      try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, buf); } catch {}
-      return new Response(buf, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
-    }
-    return new Response(PLACEHOLDER_PNG, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
+    return respondWithCachedPng(readModTexture(file), version, kind, file);
+  }
+
+  if (kind === 'armormod' || kind === 'armormodlegs') {
+    const layer = kind === 'armormodlegs' ? 2 : 1;
+    return respondWithCachedPng(readModArmorTexture(file, layer), version, kind, file);
   }
 
   // Hybrid: Try reading from a local Minecraft client JAR if available on the system (0ms offline)
@@ -578,21 +600,23 @@ function splitModFile(file) {
 // Read a mod texture through the singleton index. The dir comes from the getter because the active
 // instance can change; readTexture caches per session and drops the cache on a folder signature
 // change, so a mod update is picked up on the next request.
-function readModTexture(file) {
+function prepareModLookup(file) {
   const parts = splitModFile(file);
   if (!parts) return null;
-  let dir = null;
-  try { dir = modsDirOf(); } catch { dir = null; }
-  if (!dir) {
-    try {
-      const { loadSettings } = require('./settings.js');
-      const sp = loadSettings().serverPath;
-      if (sp) dir = path.join(sp, 'mods');
-    } catch {}
-  }
+  const dir = resolveActiveModsDir();
   if (!dir) return null;
   modsIndex.setModsDir(dir);
-  return modsIndex.readTexture(parts.namespace, parts.name);
+  return parts;
 }
 
-module.exports = { init, handle, setActiveResourcePackPath, getActiveResourcePackPath, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf };
+function readModTexture(file) {
+  const parts = prepareModLookup(file);
+  return parts ? modsIndex.readTexture(parts.namespace, parts.name) : null;
+}
+
+function readModArmorTexture(file, layer) {
+  const parts = prepareModLookup(file);
+  return parts ? modsIndex.readArmorTexture(parts.namespace, parts.name, layer) : null;
+}
+
+module.exports = { init, handle, setActiveResourcePackPath, getActiveResourcePackPath, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf, readModArmorTexture };

@@ -215,8 +215,8 @@
     const dot = $('#statusDot');
     dot.className = 'dot ' + (state.status === 'running' || running ? 'on' : 'off');
     const rows = [
-      [t('software'), state.software || (state.jar || '')],
-      [t('java'), (state.java && state.java.version) || (state.javaRequired ? ('needs ' + state.javaRequired) : '')],
+      [t('software'), state.software || state.jar || state.nativeBinary || ''],
+      [t('java'), state.software === 'horizon' ? 'Native Engine' : ((state.java && state.java.version) || (state.javaRequired ? ('needs ' + state.javaRequired) : ''))],
       [t('path'), state.serverPath || '']
     ];
     $('#statusKv').innerHTML = rows.filter(r => r[1]).map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('');

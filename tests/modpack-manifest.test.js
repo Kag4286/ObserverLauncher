@@ -16,7 +16,8 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
   check('missing name rejected', !mm.validateManifest({ version: '1' }).ok);
   check('blank name rejected', !mm.validateManifest({ name: '   ', version: '1' }).ok);
   check('missing version rejected', !mm.validateManifest({ name: 'x' }).ok);
-  check('unknown loader rejected', !mm.validateManifest({ name: 'x', version: '1', loader: 'bogus' }).ok);
+  check('horizon loader accepted', mm.validateManifest({ name: 'm', version: '1', loader: 'horizon' }).ok);
+check('unknown loader rejected', !mm.validateManifest({ name: 'x', version: '1', loader: 'bogus' }).ok);
   check('items not array rejected', !mm.validateManifest({ name: 'x', version: '1', items: {} }).ok);
   check('item missing id rejected', !mm.validateManifest({ name: 'x', version: '1', items: [{}] }).ok);
   check('item unknown kind rejected', !mm.validateManifest({ name: 'x', version: '1', items: [{ id: 'a', kind: 'nope' }] }).ok);

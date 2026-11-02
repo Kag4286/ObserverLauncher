@@ -12,7 +12,7 @@
 
 // Map a server type to the wizard's software id (they match today, but keep it explicit so a rename
 // in one place cannot silently break the generated Dockerfile).
-const TYPE_TO_SOFTWARE = { vanilla: 'vanilla', paper: 'paper', purpur: 'purpur', leaf: 'leaf', fabric: 'fabric', forge: 'forge', neoforge: 'neoforge', spigot: 'spigot' };
+const TYPE_TO_SOFTWARE = { vanilla: 'vanilla', paper: 'paper', purpur: 'purpur', leaf: 'leaf', fabric: 'fabric', forge: 'forge', neoforge: 'neoforge', spigot: 'spigot', horizon: 'horizon' };
 
 function normalizeOpts(opts) {
   opts = opts || {};
@@ -37,10 +37,10 @@ function dockerfile(opts) {
 # Run:    docker compose up -d
 #
 # The launcher is PID 1 and spawns the JVM as a child (see src/main/server-lifecycle.js).
-FROM eclipse-temurin:${o.javaVersion}-jre
+${o.type === 'horizon' ? 'FROM node:20-bookworm-slim' : `FROM eclipse-temurin:${o.javaVersion}-jre`}
 
 # Node.js is required to run the headless entry point (the app itself, not the server).
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm zip unzip \
+RUN apt-get update && apt-get install -y --no-install-recommends ${o.type === 'horizon' ? 'zip unzip ca-certificates' : 'nodejs npm zip unzip'} \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -135,7 +135,7 @@ The launcher runs headless inside the container; the server folder (\`./server\`
 
 ## Notes
 
-- Java ${o.javaVersion} is baked into the image — no runtime Java download inside the container.
+- ${o.type === 'horizon' ? 'Horizon (Rust Native) runs directly on Linux without any Java runtime.' : `Java ${o.javaVersion} is baked into the image - no runtime Java download inside the container.`}
 - The MCP server binds 127.0.0.1 INSIDE the container on a RANDOM port, so publishing a port does
   NOT reach it. To use MCP with this container, run the bridge inside it, e.g.
   docker exec -it <container> node src/mcp/bridge.js (its config/token is the volume file

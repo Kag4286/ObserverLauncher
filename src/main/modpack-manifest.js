@@ -18,7 +18,7 @@ const plan = require('../mcp/modpack-plan.js');
 const { versionMatchesServer } = require('./server-compat.js');
 
 // Loaders a manifest may declare. Matches the adapter/software ids used everywhere else.
-const KNOWN_LOADERS = ['vanilla', 'paper', 'purpur', 'leaf', 'folia', 'spigot', 'fabric', 'quilt', 'forge', 'neoforge', 'proxy'];
+const KNOWN_LOADERS = ['vanilla', 'paper', 'purpur', 'leaf', 'folia', 'spigot', 'fabric', 'quilt', 'forge', 'neoforge', 'proxy', 'horizon'];
 // Kinds a manifest item may declare. Matches folderForKind's inputs.
 const KNOWN_KINDS = ['mod', 'plugin', 'datapack', 'modpack'];
 // Hard cap on items so a runaway manifest cannot queue an unbounded batch (mirrors capPlan default).

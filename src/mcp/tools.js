@@ -1112,8 +1112,9 @@ async function tDiagnoseServer(ctx) {
   // Only test the port when stopped — a running server holds it by design.
   if (ctx.serverStatus === 'stopped') { try { portFree = (await doctor.checkPortFree(port)).free; } catch {} }
   const lastCrash = doctor.latestCrashReport(root);
+  const isNative = files.engineType === 'native' || !!files.nativeBinary || (files.hasHorizonConfig && !files.jar && !files.launchScript);
   const result = doctor.diagnoseFromData({
-    serverPath: root, hasJar: !!files.jar, jar: files.jar, hasLaunchScript: !!files.launchScript, launchScript: files.launchScript,
+    serverPath: root, hasJar: !!files.jar, isNative, hasNativeBinary: !!files.nativeBinary, nativeBinary: files.nativeBinary, software: isNative ? 'horizon' : undefined, engineType: files.engineType, jar: files.jar, hasLaunchScript: !!files.launchScript, launchScript: files.launchScript,
     java: ctx.javaInfo, javaMajor: javaMajor(ctx.javaInfo?.version), javaRequired, eulaAccepted, port, portFree,
     worlds: files.worlds, backups: files.backups, memoryMax: s.memoryMax, lastCrash: lastCrash ? lastCrash.name : null,
   });

@@ -27,6 +27,9 @@ const COMMANDS = {
   logs: { tool: 'read_console', desc: 'Show recent console lines.', build: (f) => ({ lines: f.lines ? Number(f.lines) : 200 }) },
   start: { tool: 'start_server', desc: 'Start the server.' },
   stop: { tool: 'stop_server', desc: 'Gracefully stop the server.' },
+  restart: { tool: 'safe_restart', desc: 'Safely restart the server (backup, stop, start).' },
+  cmd: { tool: 'send_console_command', desc: 'Send a console command to the running server.', build: (f) => ({ command: f._.slice(1).join(' ') }), requires: (f) => (f._[1] ? null : 'cmd requires a command string, e.g. observer cmd "say Hello"') },
+  command: { tool: 'send_console_command', desc: 'Alias for cmd.', build: (f) => ({ command: f._.slice(1).join(' ') }), requires: (f) => (f._[1] ? null : 'command requires a command string, e.g. observer command "say Hello"') },
   backup: { tool: 'create_backup', desc: 'Create a world backup (ZIP).' },
   doctor: { tool: 'doctor_report', desc: 'Full health report (diagnose + console + perf).' },
   list: { tool: 'list_instances', desc: 'List configured server instances.' },
@@ -334,6 +337,8 @@ function printHuman(cmdName, result, log, errlog) {
   if (cmdName === 'backup') { log(d.file ? `backup created: ${d.file}` : 'backup created'); return; }
   if (cmdName === 'start') { log(`server ${d.status || 'starting'}`); return; }
   if (cmdName === 'stop') { log(`server ${d.status || 'stopping'}`); return; }
+  if (cmdName === 'restart') { log(`server restarted (${d.status || 'running'})`); return; }
+  if (cmdName === 'cmd' || cmdName === 'command') { log(d.result || d.message || 'command sent'); return; }
   if (cmdName === 'players') { const n = (d.online || d.players || []).length; log(`${n} online`); return; }
   if (cmdName === 'doctor') { log(d.summary || 'health report ready (use --json for full output)'); return; }
   if (cmdName === 'metrics') { log(`${d.count || 0} samples over the last ${d.spanMinutes || 0} minutes`); return; }
@@ -346,6 +351,6 @@ module.exports = { run, COMMANDS, parseArgs, USAGE };
 // terminal stays attached to the server (the JVM is this process's child).
 if (require.main === module) {
   const argv = process.argv.slice(2);
-  const foreground = argv[0] === 'start';
+  const foreground = parseArgs(argv)._[0] === 'start';
   run(argv, { foreground }).then(r => process.exit(r.code)).catch(e => { console.error(e); process.exit(1); });
 }

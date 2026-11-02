@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { ModsIndex, candidateEntries, folderSignature, namespacesIn } = require('../src/main/mods-index.js');
+const { ModsIndex, candidateEntries, candidateArmorEntries, folderSignature, namespacesIn } = require('../src/main/mods-index.js');
 const { splitModFile } = require('../src/main/textures.js');
 
 let pass = 0, fail = 0;
@@ -55,6 +55,15 @@ t('candidateEntries tries item, items, then block spellings', () => {
     'assets/create/textures/block/wrench.png',
     'assets/create/textures/blocks/wrench.png',
   ]);
+});
+
+t('candidateArmorEntries returns standard model armor layer paths', () => {
+  const e1 = candidateArmorEntries('botania', 'terrasteel', 1);
+  assert(e1.includes('assets/botania/textures/models/armor/terrasteel_layer_1.png'));
+  assert(e1.includes('assets/botania/textures/entity/equipment/humanoid/terrasteel.png'));
+  const e2 = candidateArmorEntries('botania', 'terrasteel', 2);
+  assert(e2.includes('assets/botania/textures/models/armor/terrasteel_layer_2.png'));
+  assert(e2.includes('assets/botania/textures/entity/equipment/humanoid_leggings/terrasteel.png'));
 });
 
 t('candidateEntries rejects path tricks', () => {
@@ -136,6 +145,15 @@ try {
     ]));
     assert.strictEqual(idx.readTexture('botania', 'mana_pearl').toString(), 'PEARL');
     assert.ok(idx.knownNamespaces().includes('botania'));
+  });
+
+t('readArmorTexture extracts layer from jar', () => {
+    fs.writeFileSync(path.join(dir, 'botania-armor-1.0.jar'), makeZip([
+      ['assets/botania/textures/models/armor/terrasteel_layer_1.png', Buffer.from('TERRASTEEL_1')],
+      ['assets/botania/textures/models/armor/terrasteel_layer_2.png', Buffer.from('TERRASTEEL_2')],
+    ]));
+    assert.strictEqual(idx.readArmorTexture('botania', 'terrasteel', 1).toString(), 'TERRASTEEL_1');
+    assert.strictEqual(idx.readArmorTexture('botania', 'terrasteel', 2).toString(), 'TERRASTEEL_2');
   });
 
   t('setModsDir(null) disables lookups', () => {

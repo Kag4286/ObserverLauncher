@@ -82,7 +82,7 @@ function parseTomlModInfo(toml) {
   out.version = pick(/version\s*=\s*["']([^"']+)["']/i);
   // v6.1.6: ignore unexpanded Gradle tokens like "${file.jarVersion}" so version resolves from manifest/filename.
   if (out.version && /^\$\{.*\}$/.test(out.version)) out.version = null;
-  out.name = pick(/displayName\s*=\s*["']([^"']+)["']/i);
+  out.name = pick(/(?:displayName|name)\s*=\s*["']([^"']+)["']/i);
   return out;
 }
 // CB3: name + version from a bukkit/spigot plugin.yml (simple `key: value` lines).

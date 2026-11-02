@@ -6,12 +6,13 @@ const W = require('../src/main/webhook.js');
 let passed = 0;
 function ok(name, cond) { assert(cond, `FAIL: ${name}`); console.log(`PASS ${name}`); passed++; }
 
-ok('events list', JSON.stringify(W.EVENTS) === JSON.stringify(['start', 'stop', 'crash', 'player_join']));
+ok('events list', JSON.stringify(W.EVENTS) === JSON.stringify(['start', 'stop', 'crash', 'player_join', 'player_leave']));
 
 // message builder
 ok('start message', W.buildMessage({ type: 'start', instance: 'Survival' }) === '[Survival] Server started.');
 ok('crash message with detail', W.buildMessage({ type: 'crash', instance: 'S', detail: 'out-of-memory' }).includes('out-of-memory'));
 ok('player join message', W.buildMessage({ type: 'player_join', player: 'Steve' }).includes('Steve'));
+ok('player leave message', W.buildMessage({ type: 'player_leave', player: 'Steve' }).includes('left the server'));
 
 // payload formats
 ok('discord payload has content', W.buildPayload({ type: 'start' }, 'discord').content === 'Server started.');

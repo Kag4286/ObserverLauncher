@@ -69,6 +69,11 @@ const bit32 = doctor.diagnoseFromData({ serverPath: '/s', hasJar: true, jar: 'pa
 ck('diagnose 32-bit + high RAM -> warn', bit32.checks.some(c => c.id === 'java-arch' && c.level === 'warn'));
 const crashWarn = doctor.diagnoseFromData({ serverPath: '/s', hasJar: true, jar: 'paper.jar', java: { ok: true, version: '21', arch: '64-bit' }, lastCrash: 'crash-2024.txt' });
 ck('diagnose recent crash -> warn', crashWarn.checks.some(c => c.id === 'crash' && c.level === 'warn'));
+const nativeServer = doctor.diagnoseFromData({ serverPath: '/s', isNative: true, hasNativeBinary: true, nativeBinary: 'horizon-server.exe', port: 25565, portFree: true });
+ck('diagnose native engine -> healthy true', nativeServer.healthy === true);
+ck('diagnose native engine -> runnable native binary ok', nativeServer.checks.find(c => c.id === 'server-jar' && c.level === 'ok'));
+ck('diagnose native engine -> java ok (native)', nativeServer.checks.find(c => c.id === 'java' && c.level === 'ok'));
+ck('diagnose native engine -> eula ok (native)', nativeServer.checks.find(c => c.id === 'eula' && c.level === 'ok'));
 
 // ---- tailLogFile / listCrashReports / resolveCrashReport (need a real temp tree) ----
 const fs2 = require('fs'), os2 = require('os'), path2 = require('path');
@@ -126,6 +131,7 @@ ck('mixin error -> mixin-conflict', doctor.classifyCrash('org.spongepowered.asm.
 ck('Missing deps -> mod-dependency', doctor.classifyCrash('Missing or unsupported mandatory dependencies: mod x requires y').category === 'mod-dependency');
 ck('NoClassDefFoundError -> mod-dependency medium', doctor.classifyCrash('java.lang.NoClassDefFoundError: net/foo/Bar').category === 'mod-dependency' && doctor.classifyCrash('java.lang.NoClassDefFoundError: net/foo/Bar').confidence === 'medium');
 ck('BindException -> port-conflict', doctor.classifyCrash('java.net.BindException: Address already in use').category === 'port-conflict');
+ck('rust panic -> rust-panic high', doctor.classifyCrash('thread main panicked at src/main.rs:42').category === 'rust-panic' && doctor.classifyCrash('thread main panicked at src/main.rs:42').confidence === 'high');
 ck('zip header -> corrupt-jar', doctor.classifyCrash('java.util.zip.ZipException: zip END header not found').category === 'corrupt-jar');
 ck('generic text -> unknown low', doctor.classifyCrash('everything is fine').category === 'unknown' && doctor.classifyCrash('everything is fine').confidence === 'low');
 ck('classifyCrash null-safe', doctor.classifyCrash(null).category === 'unknown');

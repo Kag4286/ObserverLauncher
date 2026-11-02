@@ -89,7 +89,7 @@ for (const k of ['plugin', 'forge', 'fabric', 'neoforge', 'mod', 'datapack', 'mo
 for (const b of ['water', 'plains', 'forest', 'desert', 'snow', 'mountain', 'swamp', 'nether', 'end']) DEAD_DYN.add('wm.lg.' + b);
 for (const g of ['gameplay', 'world', 'network', 'security']) DEAD_DYN.add('prop.group.' + g);
 // v6.0.0 D2: crash categories are built as 'crash.cat.' + category (doctor.classifyCrash).
-for (const c of ['out-of-memory', 'java-version', 'mixin-conflict', 'mod-dependency', 'port-conflict', 'corrupt-jar', 'unknown']) DEAD_DYN.add('crash.cat.' + c);
+for (const c of ['out-of-memory', 'java-version', 'mixin-conflict', 'mod-dependency', 'port-conflict', 'corrupt-jar', 'rust-panic', 'unknown']) DEAD_DYN.add('crash.cat.' + c);
 const Q = String.fromCharCode(34, 39, 96); // double quote, single quote, backtick
 const haystack = html + '\n' + jsAll;
 const escDot = s => s.split('.').join('[.]');

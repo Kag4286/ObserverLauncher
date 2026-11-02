@@ -150,8 +150,10 @@ async function stop(ctx) {
     }
   } catch {}
   try { stopTunnel(ctx); } catch {}
+  try { const { stopAllPinggy } = require('./main/pinggy-tunnel.js'); stopAllPinggy(); } catch {}
   try { if (typeof ctx.stopMcpServer === 'function') ctx.stopMcpServer(); } catch {}
   try { if (typeof ctx.stopRemoteServer === 'function') ctx.stopRemoteServer(); } catch {}
+  try { if (typeof ctx.stopPrometheus === 'function') ctx.stopPrometheus(); } catch {}
 }
 
 // Only auto-boot when run as a program (`node src/headless.js`), NOT when required by a test.

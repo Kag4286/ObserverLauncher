@@ -74,7 +74,7 @@ function getPlayerAnalytics(root, levelName, knownPlayers) {
         deaths: Number(custom['minecraft:deaths'] ?? 0),
         mobKills: Number(custom['minecraft:mob_kills'] ?? 0),
         playerKills: Number(custom['minecraft:player_kills'] ?? 0),
-        blocksMined: Number(custom['minecraft:blocks_mined'] ?? 0),
+        blocksMined: Object.values(json?.stats?.['minecraft:mined'] || {}).reduce((s, v) => s + (Number(v) || 0), 0) || Number(custom['minecraft:blocks_mined'] ?? 0),
       };
       const prev = byUuid.get(cleanUuid);
       // Merge: playtime and the counters take the larger value. This is a display leaderboard,

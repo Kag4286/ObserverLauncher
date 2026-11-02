@@ -201,4 +201,13 @@ window.LOCALES.es = {
   'nsw.mem2': "Bueno para 5-10 jugadores",
   'nsw.mem3': "Excelente para 10-25 jugadores o modpacks",
   'nsw.mem4': "Mundos pesados, modpacks grandes y 25+ jugadores",
+  'crash.cat.rust-panic': "Pánico de Rust (Fallo de Native)",
+  'wh.ev.leave': "Jugador sale",
+  'cnt.nativeNotice': "Motor de servidor nativo detectado. Horizon usa plugins nativos en Rust; los mods y plugins de Java no son compatibles.",
+  'perf.diagNativeTitle': "Motor de servidor nativo",
+  'perf.diagNativeBody': "Horizon se ejecuta directamente sin la sobrecarga de la JVM.",
+  'wiz.invalidName': "El nombre de carpeta no puede contener / \\ : * ? \" < > |",
+  'mkt.rateLimit': "Límite de solicitudes alcanzado. Espera un momento antes de reintentar.",
+  'mkt.rateLimitTitle': "Límite alcanzado",
+  'mkt.rateLimitHint': "El registro de mods está ocupado. Espera unos segundos antes de reintentar.",
 };

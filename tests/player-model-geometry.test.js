@@ -17,8 +17,8 @@ const ck = (n, c) => c ? (pass++, console.log('PASS', n)) : (fail++, console.log
 // layout constants back out. createPlayerRenderer is never called -- no WebGL needed.
 const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'js', '03b-player-3d.js'), 'utf8');
 const ctx = vm.createContext({ console, Math, Float32Array, Image: function () {} });
-vm.runInContext(src + '\n;globalThis.__layout = { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, LEG_X, TORSO_HALF_W, UV, uvc, buildCube };', ctx);
-const { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, LEG_X, TORSO_HALF_W, UV, uvc, buildCube } = ctx.__layout;
+vm.runInContext(src + '\n;globalThis.__layout = { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, buildCube, getArmorMaterial };', ctx);
+const { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, buildCube, getArmorMaterial } = ctx.__layout;
 
 const box = name => {
   const [x, y, w, h, d] = PLAYER_PARTS[name];
@@ -81,6 +81,8 @@ ck('head depth is 8', PLAYER_PARTS.head[4] === 8);
 ck('arms mirror in X', PLAYER_PARTS.armL[0] === -PLAYER_PARTS.armR[0]);
 ck('legs mirror in X', PLAYER_PARTS.legL[0] === -PLAYER_PARTS.legR[0]);
 ck('ARM_X is 6', ARM_X === 6);
+ck('ARM_X_SLIM is 5.5', ARM_X_SLIM === 5.5);
+ck('slim arm inner edge touches torso at x=4', partPos('armL', true).x - 1.5 === TORSO_HALF_W);
 ck('LEG_X is 2', LEG_X === 2);
 
 // --- 8. Worn-armor textures are 64x32, so they must NOT use the left-arm/left-leg UV regions.
@@ -153,6 +155,21 @@ ck('armor body samples rows 16..32 -> lower v half', armorBody.front[0][1] >= 0 
   ck('front face vertices all sit at +Z', [0, 1, 2, 3, 4, 5].every(v => zOf(v) > 0));
   ck('back face vertices all sit at -Z', [6, 7, 8, 9, 10, 11].every(v => zOf(v) < 0));
 }
+
+// --- 7. Armor material extraction (vanilla + modded) ---
+ck('vanilla diamond armor', getArmorMaterial('diamond_chestplate') === 'diamond');
+ck('vanilla golden armor maps to gold', getArmorMaterial('golden_helmet') === 'gold');
+ck('vanilla netherite armor', getArmorMaterial('netherite_boots') === 'netherite');
+ck('modded botania armor', (() => {
+  const m = getArmorMaterial('botania:terrasteel_helmet');
+  return m && m.isMod && m.ns === 'botania' && m.mat === 'terrasteel';
+})());
+ck('modded leggings strip suffix', (() => {
+  const m = getArmorMaterial('thermal:flux_leggings');
+  return m && m.isMod && m.ns === 'thermal' && m.mat === 'flux';
+})());
+ck('vanilla namespaced item not treated as mod', getArmorMaterial('minecraft:iron_chestplate') === 'iron');
+ck('unrecognized item returns null', getArmorMaterial('stick') === null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

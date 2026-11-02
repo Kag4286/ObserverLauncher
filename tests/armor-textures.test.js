@@ -82,6 +82,9 @@ ck('26.3 fallback uses the NEW armor layout', textures.newArmorLayout(mv('26.3')
 const r = u => textures.handle({ url: u });
 ck('armor kind accepted', r('tex://auto/armor/diamond.png').status === 200);
 ck('armorlegs kind accepted', r('tex://auto/armorlegs/diamond.png').status === 200);
+ck('armormod kind accepted', r('tex://auto/armormod/botania~terrasteel.png').status === 200);
+ck('armormodlegs kind accepted', r('tex://auto/armormodlegs/botania~terrasteel.png').status === 200);
+ck('armormod bad format rejected', r('tex://auto/armormod/terrasteel.png').status === 400);
 ck('item kind still accepted', r('tex://auto/item/diamond.png').status === 200);
 ck('block kind still accepted', r('tex://auto/block/stone.png').status === 200);
 ck('unknown kind still rejected', r('tex://auto/entity/creeper.png').status === 400);

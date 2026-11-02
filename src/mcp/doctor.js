@@ -159,6 +159,8 @@ const CRASH_RULES = [
     hints: ['A required dependency (or a matching version) is missing.', 'Install the missing mod/dependency, or update the mod that needs it.'] },
   { category: 'port-conflict', re: /Address already in use|BindException|failed to bind|Perhaps a server is already running on that port/i,
     hints: ['Another process holds the server port.', 'Stop the other server, or change server-port in server.properties.'] },
+  { category: 'rust-panic', re: /panicked at|fatal runtime error|RUST_BACKTRACE|stack backtrace:/i,
+    hints: ['The Horizon native server encountered a panic.', 'Check server logs for the backtrace and verify configuration in server.toml.'] },
   { category: 'corrupt-jar', re: /invalid LOC header|zip END header not found|error in opening zip file|invalid CEN header|Corrupt/i,
     hints: ['A downloaded jar is truncated/corrupt.', 'Delete the file and re-install it (re-download).'] },
 ];
@@ -168,7 +170,7 @@ function classifyCrash(text) {
     const m = s.match(rule.re);
     if (m) {
       // Confidence: a dedicated marker (OOM / mixin / bind) is high; a broad token (NoClassDefFoundError) is medium.
-      const strong = ['out-of-memory', 'mixin-conflict', 'port-conflict', 'corrupt-jar', 'java-version'].includes(rule.category);
+      const strong = ['out-of-memory', 'mixin-conflict', 'port-conflict', 'corrupt-jar', 'java-version', 'rust-panic'].includes(rule.category);
       let hints = rule.hints;
       let detail = null;
       let action = null;
@@ -312,19 +314,30 @@ function diagnoseFromData(d) {
   d = d || {};
   const checks = [];
   const push = (id, level, detail, fix) => checks.push({ id, level, detail, fix: fix || null });
+  const isNative = !!(d.isNative || d.hasNativeBinary || d.software === 'horizon' || d.engineType === 'native');
   // folder / jar
   if (!d.serverPath) push('server-folder', 'error', 'No server folder selected.', 'Choose a server folder in Settings.');
+  else if (isNative) {
+    if (d.hasNativeBinary || d.nativeBinary) push('server-jar', 'ok', `Runnable native binary: ${d.nativeBinary || 'horizon'}.`);
+    else push('server-jar', 'error', 'No runnable native server binary found.', 'Ensure the Horizon native executable is present in the server folder.');
+  }
   else if (!d.hasJar && !d.hasLaunchScript) push('server-jar', 'error', 'No runnable server jar or run.bat/run.sh found.', 'Use the Create server wizard to download a server jar.');
   else push('server-jar', 'ok', `Runnable: ${d.jar || d.launchScript}.`);
   // java
-  if (!d.java || !d.java.ok) push('java', 'error', 'Java was not detected.', 'Set a valid Java path in Settings, or use Install Java automatically.');
+  if (isNative) {
+    push('java', 'ok', 'Native engine (No Java runtime required).');
+  } else if (!d.java || !d.java.ok) push('java', 'error', 'Java was not detected.', 'Set a valid Java path in Settings, or use Install Java automatically.');
   else {
     if (d.javaRequired && d.javaMajor != null && d.javaMajor < d.javaRequired) push('java-version', 'error', `Server jar needs Java ${d.javaRequired}+ but detected Java ${d.javaMajor}.`, 'Install the required Java version and point Settings > Java at it.');
     else push('java', 'ok', `Java ${d.java.version} (${d.java.arch || 'unknown arch'}).`);
     if (d.java.arch === '32-bit' && Number(d.memoryMax) > 2) push('java-arch', 'warn', '32-bit Java cannot reliably use more than ~2GB of RAM.', 'Install 64-bit Java, or lower Maximum memory to 2GB or less.');
   }
   // eula
-  push('eula', d.eulaAccepted ? 'ok' : 'warn', d.eulaAccepted ? 'EULA accepted.' : 'EULA not accepted yet.', d.eulaAccepted ? null : 'Accept the Minecraft EULA (Settings) or the server will refuse to start.');
+  if (isNative) {
+    push('eula', 'ok', 'Native engine (EULA not required).');
+  } else {
+    push('eula', d.eulaAccepted ? 'ok' : 'warn', d.eulaAccepted ? 'EULA accepted.' : 'EULA not accepted yet.', d.eulaAccepted ? null : 'Accept the Minecraft EULA (Settings) or the server will refuse to start.');
+  }
   // port
   if (d.portFree === false) push('port', 'error', `Server port ${d.port} is already in use.`, 'Stop the other server or change server-port in server.properties.');
   else if (d.portFree === true) push('port', 'ok', `Server port ${d.port} is free.`);

@@ -36,6 +36,11 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
   // Bug 1 guard: the image must install runtime deps, or players.js -> prismarine-nbt crash-loops.
   check('Dockerfile runs npm ci --omit=dev', /npm ci --omit=dev/.test(df));
   check('Dockerfile copies package files before the source', df.indexOf('COPY package.json') !== -1 && df.indexOf('COPY package.json') < df.indexOf('COPY . /app'));
+  const dfH = docker.dockerfile({ type: 'horizon', port: 25565 });
+  check('Horizon Dockerfile uses node-slim base without JRE', /FROM node:20-bookworm-slim/.test(dfH));
+  check('Horizon Dockerfile installs zip/unzip without nodejs duplicate', /zip unzip ca-certificates/.test(dfH) && !/nodejs npm/.test(dfH));
+  const rmH = docker.readme({ type: 'horizon', port: 25565 });
+  check('Horizon README states no Java runtime required', /Horizon \(Rust Native\) runs directly on Linux without any Java runtime/.test(rmH));
 }
 
 // compose contract.

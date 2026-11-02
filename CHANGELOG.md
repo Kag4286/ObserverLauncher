@@ -10,6 +10,67 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [7.0.1] - 2026-11-02
+
+**Maintenance, Mod Armor Preview, Multi-Engine Hardening, and Subsystem Reliability Release.**
+
+### Player Inspector & 3D WebGL Rendering:
+- **Mod Armor Texture Support (`src/main/mods-index.js`, `src/main/textures.js`, `src/renderer/js/03b-player-3d.js`):**
+  - Extended `getArmorMaterial(id)` in `03b-player-3d.js` to parse namespaced item identifiers (`<namespace>:<material>_<armor_piece>`), returning metadata with `isMod: true`.
+  - Decoupled texture loading and material binding per armor slot (`texHelmet`, `texChest`, `texBoots` on layer 1; `texLegs` on layer 2).
+  - Added `armormod` and `armormodlegs` endpoints to `src/main/textures.js` routing via `readModArmorTexture(file, layer)`.
+  - Implemented `candidateArmorEntries` and `readArmorTexture` in `src/main/mods-index.js` to look up mod armor PNG textures directly inside active mod JAR files at `assets/<namespace>/textures/models/armor/<material>_layer_<layer>.png`.
+- **Slim/Alex Model Arm Alignment:**
+  - Adjusted Alex skin geometry arm offset from 5.0 to 5.5 units in `03b-player-3d.js` to eliminate mesh clipping with 3D armor geometry.
+
+### Player Analytics:
+- **Blocks Mined Leaderboard Fix (`src/main/player-analytics.js`):**
+  - Updated `extractStats()` to aggregate all block break counts recorded under `json.stats['minecraft:mined']`. Resolves an issue where mined blocks were missed when servers tracked block stats exclusively within sub-keys.
+
+### Multi-Engine & Doctor Subsystem Hardening:
+- **Doctor Diagnostic Engine Polymorphism (`src/mcp/doctor.js`, `src/mcp/tools.js`):**
+  - Updated `diagnoseFromData()` to recognize native engines (`isNative || hasNativeBinary || software === 'horizon'`). Bypasses Java-specific checks including JRE installation, Java version compatibility, JVM flags, and Mojang EULA file verification.
+  - Added `rust-panic` rule to `CRASH_RULES` and `classifyCrash` to diagnose Rust panics, signal terminations, and unhandled native unwind events.
+  - Forwarded native server properties (`isNative`, `hasNativeBinary`, `nativeBinary`, `software`, `engineType`) through MCP `tDiagnoseServer`.
+- **Modpack & Port Fallback Support (`src/main/tunnel.js`, `src/main/modpack-manifest.js`):**
+  - Added fallback port detection in `src/main/tunnel.js` reading `server.port` from `server.toml` when `server.properties` is omitted on native servers.
+  - Added `'horizon'` to `KNOWN_LOADERS` in `src/main/modpack-manifest.js`.
+- **Docker Export Support (`src/main/docker.js`):**
+  - Added native engine entry `horizon: 'horizon'`, outputting a minimal container configuration based on `node:20-bookworm-slim` without bundled JRE packages.
+
+### CLI & Headless Services:
+- **CLI Startup Flag Ordering & Commands (`src/cli.js`):**
+  - Fixed foreground startup check to verify flags (`--fg`, `--foreground`) across all argv positions, preventing background detachment when flags precede the `start` command.
+  - Added `restart` CLI command executing `safe_restart`.
+  - Added `cmd` / `command` CLI command executing `send_console_command`.
+- **Headless Graceful Resource Teardown (`src/headless.js`):**
+  - Added explicit cleanup for active network tunnels (`stopAllPinggy()`) and metrics listeners (`ctx.stopPrometheus()`) upon headless shutdown.
+
+### UI / UX & Notifications:
+- **Player Leave Webhook Event (`src/main/webhook.js`, `src/main/server-lifecycle.js`, `src/renderer/index.html`):**
+  - Added `player_leave` event type to `EVENTS` with log pattern matching for disconnection notices.
+  - Added webhook event chip to Settings > Webhooks in `index.html`.
+- **Native Engine UI Polish:**
+  - Added `#contentNativeNotice` notice banner in Content tab (`src/renderer/js/01-content.js`).
+  - Added native diagnostic card in Overview tab (`src/renderer/js/07-overview.js`) displaying `perf.diagNativeTitle` and `perf.diagNativeBody`.
+  - Added `updateQuickCommands()` in `src/renderer/js/08-shell.js` hiding Spigot/Spark commands on native servers.
+  - Displayed `./horizon-server (Native Engine)` in Overview JVM command preview.
+- **World Map Dimension Coordinates (`src/renderer/js/02-worldmap.js`):**
+  - Added 1:8 coordinate conversion when toggling between Overworld and Nether coordinates, and centered view at (0, 0) for The End.
+- **Backups & Wizard Validation:**
+  - Toggled `#backupEmpty` container when no backup archives exist (`src/renderer/js/04-worlds.js`).
+  - Added path character validation for server name in wizard (`src/renderer/js/12-wizard.js`).
+  - Added TOML syntax validation in Configuration Editor (`src/renderer/js/01b-editor.js`).
+  - Reduced Market input debounce to 250ms and handled HTTP 429 rate limit backoff (`src/renderer/js/11-market.js`).
+- **Remote UI Compatibility (`src/remote-ui/app.js`):**
+  - Updated status rows to display `Native Engine` cleanly for non-Java runtimes.
+
+### Internationalization & Code Quality:
+- Synchronized all 8 new keys (`wh.ev.leave`, `cnt.nativeNotice`, `perf.diagNativeTitle`, `perf.diagNativeBody`, `wiz.invalidName`, `mkt.rateLimit`, `mkt.rateLimitTitle`, `mkt.rateLimitHint`, `crash.cat.rust-panic`) across 7 locales (`en.js`, `vi.js`, `es.js`, `pt-BR.js`, `de.js`, `ru.js`, `zh-CN.js`).
+- Verified 0 missing, 0 extra, 0 dead keys across 1386 entries per locale.
+- Verified 0 duplicate CSS selectors and 0 duplicate JS blocks.
+- 160 test suites passing.
+
 ## [7.0.0Z] — 2026-10-31
 
 **The Multi-Engine Era & Horizon Dedicated Server Integration: First Local Hosting App with Native Rust Server Support (Horizon for MC 26.3), New Server Wizard Rework with Software Category Chips & Prominent Spotlights for Leaf and Horizon, Safe World Operations (Rename, Seed Edit, Purge Dimension with Backup, Clone), Custom Resource Pack ZIP Overrides, 3D Player Inspector Armor Decoupling, and Brand DMCA Icon Replacement.**

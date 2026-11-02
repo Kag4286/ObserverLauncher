@@ -201,4 +201,13 @@ window.LOCALES['zh-CN'] = {
   'nsw.mem2': "适合 5-10 名玩家",
   'nsw.mem3': "适合 10-25 名玩家或模组包",
   'nsw.mem4': "大型世界、大型模组包和 25+ 玩家",
+  'crash.cat.rust-panic': "Rust 恐慌 (原生引擎崩溃)",
+  'wh.ev.leave': "玩家离开",
+  'cnt.nativeNotice': "检测到原生服务器引擎。Horizon 使用原生 Rust 插件；不支持 Java 模组和插件。",
+  'perf.diagNativeTitle': "原生服务器引擎",
+  'perf.diagNativeBody': "Horizon 直接在物理机上运行，无 JVM 开销。",
+  'wiz.invalidName': "文件夹名称不能包含 / \\ : * ? \" < > |",
+  'mkt.rateLimit': "达到请求速率限制。请稍候再试。",
+  'mkt.rateLimitTitle': "速率限制",
+  'mkt.rateLimitHint': "模组源暂时繁忙。请等待数秒后重试。",
 };

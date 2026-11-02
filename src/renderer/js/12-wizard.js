@@ -612,11 +612,22 @@ $('#nswChooseFolder')?.addEventListener('click',async()=>{
 
 // Step 1: Subfolder input
 $('#nswSubfolderInput')?.addEventListener('input',()=>{
+  const val=$('#nswSubfolderInput')?.value||'';
+  const invalidChars=/[\/\\:*?"<>|]/;
+  const nextBtn=$('#nswNext');
+  const resHint=$('#nswResolvedFolderHint');
+  if(invalidChars.test(val)){
+    if(resHint){resHint.textContent=t('wiz.invalidName');resHint.classList.add('error');}
+    if(nextBtn&&nsw.step===1)nextBtn.disabled=true;
+    return;
+  }
+  if(resHint)resHint.classList.remove('error');
   nswResolveFolder();
-  const resHint=$('#nswResolvedFolderHint'); if(resHint) resHint.textContent=nsw.folder;
-  const fp=$('#nswFolderPath'); if(fp) fp.textContent=nsw.folder||t('nsw.noFolder');
+  if(resHint)resHint.textContent=nsw.folder;
+  const fp=$('#nswFolderPath'); if(fp)fp.textContent=nsw.folder||t('nsw.noFolder');
   const folderName=nsw.folder?nsw.folder.split(/[\\/]/).filter(Boolean).pop():t('nsw.noFolder');
-  const folderSub=$('#nswRailFolderSub'); if(folderSub) folderSub.textContent=folderName;
+  const folderSub=$('#nswRailFolderSub'); if(folderSub)folderSub.textContent=folderName;
+  if(nextBtn&&nsw.step===1)nextBtn.disabled=!nsw.folder;
 });
 
 // Rail clickable completed steps

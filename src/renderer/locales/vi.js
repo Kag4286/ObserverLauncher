@@ -201,4 +201,13 @@ window.LOCALES.vi = {
   'nsw.mem2': "Phù hợp cho 5-10 người chơi",
   'nsw.mem3': "Tốt cho 10-25 người chơi hoặc modpack",
   'nsw.mem4': "Thế giới lớn, modpack nặng & trên 25 người chơi",
+  'crash.cat.rust-panic': "Lỗi Rust panic (Sập máy chủ Native)",
+  'wh.ev.leave': "Người chơi rời",
+  'cnt.nativeNotice': "Đã phát hiện máy chủ Native. Horizon dùng plugin Rust gốc; không hỗ trợ mod và plugin Java.",
+  'perf.diagNativeTitle': "Máy chủ Native",
+  'perf.diagNativeBody': "Horizon chạy trực tiếp trên máy mà không tốn tài nguyên JVM.",
+  'wiz.invalidName': "Tên thư mục không được chứa / \\ : * ? \" < > |",
+  'mkt.rateLimit': "Đã đạt giới hạn yêu cầu. Vui lòng đợi một lát rồi thử lại.",
+  'mkt.rateLimitTitle': "Đạt giới hạn yêu cầu",
+  'mkt.rateLimitHint': "Kho mod đang bận. Đợi vài giây rồi thử lại.",
 };

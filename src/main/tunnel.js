@@ -202,9 +202,18 @@ async function installPlayitAgent(ctx) {
 function resolveTargetPort(ctx) {
   try {
     const { serverFiles } = require('./server-files.js');
-    const n = Number(serverFiles(ctx.currentServerPath).properties['server-port']);
+    const files = serverFiles(ctx?.currentServerPath);
+    const n = Number(files?.properties?.['server-port']);
     if (Number.isFinite(n) && n > 0 && n < 65536) return n;
   } catch {}
+  if (ctx && ctx.currentServerPath) {
+    try {
+      const { readHorizonConfig } = require('./horizon-config.js');
+      const cfg = readHorizonConfig(ctx.currentServerPath);
+      const port = Number(cfg?.server?.port);
+      if (Number.isFinite(port) && port > 0 && port < 65536) return port;
+    } catch {}
+  }
   return 25565;
 }
 

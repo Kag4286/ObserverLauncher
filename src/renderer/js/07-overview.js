@@ -52,6 +52,15 @@ function renderPerfDiagnostics(){
   const jar=String(state.files?.jar||'');
   const proxy=/velocity|bungee|waterfall/i.test(jar);
   const paperLike=/paper|purpur|leaf|folia/i.test(jar)||!!state.files?.hasSpigotConfig;
+  const isNat = (state.files?.engineType === 'native') || !!state.files?.nativeBinary || (state.files?.target && state.files?.target.software === 'horizon');
+  if(isNat){
+    n.innerHTML = `<div class="diag-head"><span class="diag-icon ok">✓</span><div><b>${t('perf.diagNativeTitle')}</b><p>${t('perf.diagNativeBody')}</p></div><span class="diag-badge ok">Native</span></div>
+    <div class="diag-actions">
+      <button class="btn secondary sm" data-command="list">${t('perf.diagListBtn')}</button>
+    </div>`;
+    n.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>command(b.dataset.command));
+    return;
+  }
   if(proxy){n.innerHTML=`<div class="diag-head"><span class="diag-icon">◆</span><div><b>${t('perf.proxyTitle')}</b><p>${t('perf.proxyBody')}</p></div><span class="diag-badge">N/A</span></div>`;return}
   const L={full:t('perf.badgeFull'),partial:t('perf.badgePartial'),bodyF:t('perf.diagBodyFull'),bodyP:t('perf.diagBodyPartial'),list:t('perf.diagListBtn'),spark:t('perf.diagSparkBtn')};
   n.innerHTML=`

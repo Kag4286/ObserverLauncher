@@ -201,4 +201,13 @@ window.LOCALES.de = {
   'nsw.mem2': "Gut für 5–10 Spieler",
   'nsw.mem3': "Ideal für 10–25 Spieler oder Modpacks",
   'nsw.mem4': "Große Welten, schwere Modpacks & 25+ Spieler",
+  'crash.cat.rust-panic': "Rust-Panic (Native-Absturz)",
+  'wh.ev.leave': "Spieler verlässt",
+  'cnt.nativeNotice': "Natives Server-Engine erkannt. Horizon verwendet native Rust-Plugins; Java-Mods und -Plugins werden nicht unterstützt.",
+  'perf.diagNativeTitle': "Natives Server-Engine",
+  'perf.diagNativeBody': "Horizon läuft direkt auf dem System ohne JVM-Overhead.",
+  'wiz.invalidName': "Ordnername darf nicht / \\ : * ? \" < > | enthalten",
+  'mkt.rateLimit': "Anfragelimit erreicht. Bitte warten Sie einen Moment vor dem erneuten Versuch.",
+  'mkt.rateLimitTitle': "Anfragelimit erreicht",
+  'mkt.rateLimitHint': "Die Mod-Registry ist vorübergehend ausgelastet. Warten Sie einige Sekunden vor dem erneuten Versuch.",
 };

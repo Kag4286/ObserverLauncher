@@ -147,6 +147,22 @@ const check = (name, cond, detail) => cond ? (pass++, console.log('PASS', name))
     const r = await cli.run(['player', 'list', '--json'], { print: false });
     check('player list alias routes to players', r.code === 1 || r.code === 0);
   }
+  {
+    const r = await cli.run(['restart', '--json'], { print: false });
+    check('restart command executes (code 0 or 1 when stopped)', r.code === 0 || r.code === 1);
+  }
+  {
+    const r = await cli.run(['cmd'], { print: false });
+    check('cmd without string returns usage exit 2', r.code === 2);
+  }
+  {
+    const r = await cli.run(['cmd', 'say hello', '--json'], { print: false });
+    check('cmd with string executes (fails gracefully when server stopped)', r.code === 0 || r.code === 1);
+  }
+  {
+    const r = await cli.run(['command', 'say hello', '--json'], { print: false });
+    check('command alias executes', r.code === 0 || r.code === 1);
+  }
 
   try { fs.rmSync(tmpData, { recursive: true, force: true }); } catch {}
   console.log(fail ? `\n${fail} check(s) failed.` : `\nAll cli checks passed (${pass}).`);

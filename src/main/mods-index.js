@@ -14,10 +14,11 @@ const fs = require('fs');
 const path = require('path');
 const { openJar } = require('./jar-reader.js');
 
-// NOTE (v6.0.0 memory fix): a JarHandle now holds only the parsed central directory (a few KB per
-// jar), not the whole jar body. Caching the handle is therefore cheap and saves re-parsing the
-// index on every icon lookup. readTexture still opens/closes the file per entry, so no file
-// descriptor is held open between calls.
+// Helper to validate clean namespace and resource names
+function isCleanNamespaceAndName(ns, nm) {
+  if (!/^[a-z0-9_.-]+$/.test(ns) || !/^[a-z0-9_./-]+$/.test(nm)) return false;
+  return !ns.includes('..') && !nm.split('/').includes('..');
+}
 
 // PURE: a Minecraft mod jar packs items as assets/<ns>/textures/item[s]/<name>.png. Return the
 // list of candidate entry paths for a namespace/name pair; some packs nest under `item/`, others
@@ -25,19 +26,30 @@ const { openJar } = require('./jar-reader.js');
 function candidateEntries(namespace, name) {
   const ns = String(namespace || '').toLowerCase();
   const nm = String(name || '').toLowerCase();
-  if (!/^[a-z0-9_.-]+$/.test(ns) || !/^[a-z0-9_./-]+$/.test(nm)) return [];
-  // Defense in depth: a jar entry name is compared verbatim, so a `..` segment cannot escape the
-  // zip, but rejecting it here keeps a caller from ever building a path with it downstream.
-  if (ns.includes('..') || nm.split('/').includes('..')) return [];
-  // BUGFIX: a mod often registers an item as a BlockItem (Create's cogwheel, AE2's cable, a
-  // Botania flower). Its texture lives under textures/block/, not textures/item/, so the old two
-  // candidates missed it and the cell fell back to an initials badge. Item spellings come first
-  // because a plain item of the same name should win over a block of that name.
+  if (!isCleanNamespaceAndName(ns, nm)) return [];
   return [
     `assets/${ns}/textures/item/${nm}.png`,
     `assets/${ns}/textures/items/${nm}.png`,
     `assets/${ns}/textures/block/${nm}.png`,
     `assets/${ns}/textures/blocks/${nm}.png`,
+  ];
+}
+
+// PURE: candidate paths for armor worn textures inside mod jars.
+// Layer 1 is helmet, chestplate, boots; Layer 2 is leggings.
+function candidateArmorEntries(namespace, material, layer) {
+  const ns = String(namespace || '').toLowerCase();
+  const mat = String(material || '').toLowerCase();
+  const l = Number(layer) === 2 ? 2 : 1;
+  if (!isCleanNamespaceAndName(ns, mat)) return [];
+  return [
+    `assets/${ns}/textures/models/armor/${mat}_layer_${l}.png`,
+    `assets/${ns}/textures/model/armor/${mat}_layer_${l}.png`,
+    `assets/${ns}/textures/entity/armor/${mat}_layer_${l}.png`,
+    `assets/${ns}/textures/armor/${mat}_layer_${l}.png`,
+    l === 2
+      ? `assets/${ns}/textures/entity/equipment/humanoid_leggings/${mat}.png`
+      : `assets/${ns}/textures/entity/equipment/humanoid/${mat}.png`,
   ];
 }
 
@@ -119,16 +131,8 @@ class ModsIndex {
     }
   }
 
-  // Extract `assets/<ns>/textures/item[s]/<name>.png` from the first jar that has it.
-  // Returns a Buffer or null. Cached per session; invalidated by the folder signature.
-  readTexture(namespace, name) {
-    if (!this.modsDir) return null;
-    this.refresh();
-    const ns = String(namespace || '').toLowerCase();
-    const cacheKey = `${ns}:${String(name || '').toLowerCase()}`;
-    if (this.extractCache.has(cacheKey)) return this.extractCache.get(cacheKey);
+  _findInJars(ns, wanted, cacheKey, fallbackMatcher) {
     const jars = this.byNamespace.get(ns) || [];
-    const wanted = candidateEntries(namespace, name);
     if (!wanted.length) return null;
     for (const jarPath of jars) {
       let jar = this.jarCache.get(jarPath);
@@ -138,19 +142,45 @@ class ModsIndex {
           const buf = jar.read(entry);
           this.extractCache.set(cacheKey, buf);
           return buf;
-        } catch { /* try next spelling */ }
+        } catch {}
       }
-      try {
-        const nm = String(name || '').toLowerCase();
-        const fallback = jar.list().find(e => e.startsWith(`assets/${ns}/textures/`) && e.endsWith(`/${nm}.png`));
-        if (fallback) {
-          const buf = jar.read(fallback);
-          this.extractCache.set(cacheKey, buf);
-          return buf;
-        }
-      } catch {}
+      if (typeof fallbackMatcher === 'function') {
+        try {
+          const fallback = jar.list().find(fallbackMatcher);
+          if (fallback) {
+            const buf = jar.read(fallback);
+            this.extractCache.set(cacheKey, buf);
+            return buf;
+          }
+        } catch {}
+      }
     }
     return null;
+  }
+
+  // Extract `assets/<ns>/textures/item[s]/<name>.png` from the first jar that has it.
+  readTexture(namespace, name) {
+    if (!this.modsDir) return null;
+    this.refresh();
+    const ns = String(namespace || '').toLowerCase();
+    const nm = String(name || '').toLowerCase();
+    const cacheKey = `${ns}:${nm}`;
+    if (this.extractCache.has(cacheKey)) return this.extractCache.get(cacheKey);
+    const wanted = candidateEntries(namespace, name);
+    return this._findInJars(ns, wanted, cacheKey, e => e.startsWith(`assets/${ns}/textures/`) && e.endsWith(`/${nm}.png`));
+  }
+
+  // Extract worn armor texture from the first jar that has it.
+  readArmorTexture(namespace, material, layer) {
+    if (!this.modsDir) return null;
+    this.refresh();
+    const ns = String(namespace || '').toLowerCase();
+    const mat = String(material || '').toLowerCase();
+    const l = Number(layer) === 2 ? 2 : 1;
+    const cacheKey = `armor:${ns}:${mat}:${l}`;
+    if (this.extractCache.has(cacheKey)) return this.extractCache.get(cacheKey);
+    const wanted = candidateArmorEntries(namespace, material, l);
+    return this._findInJars(ns, wanted, cacheKey, e => e.startsWith(`assets/${ns}/textures/`) && e.includes(`${mat}_layer_${l}.png`));
   }
 
   // Test seam: namespaces currently indexed (call refresh() first).
@@ -161,4 +191,4 @@ class ModsIndex {
 
 const singleton = new ModsIndex();
 
-module.exports = { ModsIndex, singleton, candidateEntries, folderSignature, namespacesIn };
+module.exports = { ModsIndex, singleton, candidateEntries, candidateArmorEntries, folderSignature, namespacesIn };

@@ -83,4 +83,15 @@ fs.writeFileSync(tmp, 'abc');
 ok('sha256File matches known vector', t.sha256File(tmp) === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
 fs.rmSync(tmp, { force: true });
 
+// Horizon fallback port
+{
+  const hDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-tun-h-'));
+  try {
+    fs.writeFileSync(path.join(hDir, 'server.toml'), '[server]\nport = 25580\n');
+    ok('reads port from horizon server.toml', t.resolveTargetPort({ currentServerPath: hDir }) === 25580);
+  } finally {
+    fs.rmSync(hDir, { recursive: true, force: true });
+  }
+}
+
 console.log(`\n${passed} passed, 0 failed`);

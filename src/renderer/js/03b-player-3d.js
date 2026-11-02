@@ -19,6 +19,7 @@ const HIP_Y = 12;                      // top of the legs, bottom of the torso
 const TORSO_HALF_W = 4;                // 8-wide torso -> x = -4..4
 const LEG_X = 2;                       // two 4-wide legs -> centres at +-2
 const ARM_X = TORSO_HALF_W + 2;        // shoulder edge + half a 4-wide arm
+const ARM_X_SLIM = TORSO_HALF_W + 1.5;   // shoulder edge + half a 3-wide arm (5.5)
 // part -> [centreX, centreY, width, height, depth]
 const PLAYER_PARTS = {
   body:  [0, HIP_Y + 6, 8, 12, 4],
@@ -28,7 +29,26 @@ const PLAYER_PARTS = {
   legR:  [-LEG_X, HIP_Y / 2, 4, 12, 4],
   legL:  [LEG_X, HIP_Y / 2, 4, 12, 4],
 };
-const partPos = name => { const p = PLAYER_PARTS[name]; return { x: p[0], y: p[1] }; };
+const partPos = (name, isSlim) => { if (isSlim && (name === 'armR' || name === 'armL')) return { x: (name === 'armR' ? -1 : 1) * ARM_X_SLIM, y: HIP_Y + 6 }; const p = PLAYER_PARTS[name]; return { x: p[0], y: p[1] }; };
+
+function getArmorMaterial(id) {
+  if (!id) return null;
+  const s = String(id);
+  if (s.includes('turtle')) return 'turtle';
+  if (s.includes('netherite')) return 'netherite';
+  if (s.includes('diamond')) return 'diamond';
+  if (s.includes('chainmail')) return 'chainmail';
+  if (s.includes('leather')) return 'leather';
+  if (s.includes('golden')) return 'gold';       // item is golden_*, texture is gold.png
+  if (s.includes('iron')) return 'iron';
+  if (s.includes('copper')) return 'copper';
+  if (s.includes(':') && !s.startsWith('minecraft:')) {
+    const [ns, name] = s.split(':');
+    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots)$/, '');
+    if (mat && ns) return { isMod: true, ns, mat };
+  }
+  return null;
+}
 
 const PLAYER_VS = `
   attribute vec3 aPos;
@@ -166,19 +186,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
 
   // Item id -> armor material name used by the game textures. Mojang calls GOLDEN armor
   // "gold" on disk, so matching on the id prefix alone silently 404s golden helmets.
-  const getMaterial = (id) => {
-    if (!id) return null;
-    const s = String(id);
-    if (s.includes('turtle')) return 'turtle';
-    if (s.includes('netherite')) return 'netherite';
-    if (s.includes('diamond')) return 'diamond';
-    if (s.includes('chainmail')) return 'chainmail';
-    if (s.includes('leather')) return 'leather';
-    if (s.includes('golden')) return 'gold';       // item is golden_*, texture is gold.png
-    if (s.includes('iron')) return 'iron';
-    if (s.includes('copper')) return 'copper';
-    return null;
-  };
+  const getMaterial = getArmorMaterial;
 
   const prog = gl.createProgram();
   const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, PLAYER_VS); gl.compileShader(vs);
@@ -208,7 +216,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const allCreatedTextures = [tex];
   const fetchArmor = (kind, mat, cb) => {
     if (!mat) return;
-    const key = kind + ':' + mat;
+    const key = kind + ':' + (typeof mat === 'object' && mat ? `${mat.ns}~${mat.mat}` : mat);
     if (armorTexCache.has(key)) {
       cb(armorTexCache.get(key));
       return;
@@ -418,7 +426,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     // with no armor and a missing torso.
     gl.bindTexture(gl.TEXTURE_2D, tex);
 
-    const p = name => partPos(name);
+    const p = name => partPos(name, isSlim);
     drawPart(cBody, p('body').x, p('body').y, 0);
     drawPart(cJacket, p('body').x, p('body').y, 0);
     drawPart(cHead, p('head').x, p('head').y, 0);

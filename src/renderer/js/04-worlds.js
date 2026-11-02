@@ -52,6 +52,7 @@ function fmtBytes(n){if(!n)return '0 MB';const mb=n/1024/1024;return mb>=1024?`$
 function fmtBackupDate(mtime){if(!mtime)return t('wld.unknownDate');const d=new Date(mtime);return d.toLocaleDateString(undefined,{day:'numeric',month:'short'})+', '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}
 function renderBackups(items){
   const n=$('#backupsList');if(!n)return;
+  const be=$('#backupEmpty');if(be)be.hidden=items.length>0;
   const totalEl=$('#backupsTotal');
   if(totalEl){ if(items.length){ totalEl.hidden=false; totalEl.textContent=t('wld.backupsTotal',{n:items.length,s:fmtBytes(items.reduce((s,x)=>s+(x.size||0),0))}); } else { totalEl.hidden=true; totalEl.textContent=''; } }
   // Timeline rows, newest first (server-files sorts desc). First entry gets the LATEST treatment.

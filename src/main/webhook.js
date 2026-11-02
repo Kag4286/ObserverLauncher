@@ -6,7 +6,7 @@
 // error in the console (a wrong URL must not spam). Only http(s) URLs are accepted (no file://).
 // The event list + the text builder are PURE so they are unit-tested without a network.
 // Events the user can subscribe to.
-const EVENTS = ['start', 'stop', 'crash', 'player_join'];
+const EVENTS = ['start', 'stop', 'crash', 'player_join', 'player_leave'];
 
 // PURE: is this a safe webhook URL? https/http on a real host, never a local/private IP (SSRF) unless
 // the user explicitly allows it. We reuse isSafeDownloadUrl's public-host rule (loopback/private
@@ -25,6 +25,7 @@ function buildMessage(ev) {
     case 'stop': return `${inst}Server stopped.`;
     case 'crash': return `${inst}Server crashed${e.detail ? ': ' + e.detail : '.'}`;
     case 'player_join': return `${inst}${e.player || 'A player'} joined the server.`;
+    case 'player_leave': return `${inst}${e.player || 'A player'} left the server.`;
     default: return `${inst}${e.type || 'event'}`;
   }
 }

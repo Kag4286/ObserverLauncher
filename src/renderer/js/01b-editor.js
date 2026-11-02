@@ -253,16 +253,33 @@ let edJsonTimer=0;
 function edJsonCheck(){
   const el=$('#edJsonState');if(!el)return;
   clearTimeout(edJsonTimer);
-  if(!edState.rel||!edState.rel.toLowerCase().endsWith('.json')){el.hidden=true;return}
+  const rel=(edState.rel||'').toLowerCase();
+  const isJson=rel.endsWith('.json');
+  const isToml=rel.endsWith('.toml');
+  if(!rel||(!isJson&&!isToml)){el.hidden=true;return}
   edJsonTimer=setTimeout(()=>{
     const v=$('#edText').value;
-    try{JSON.parse(v);el.textContent='✓ JSON';el.className='ed-json ok';el.hidden=false}
-    catch(e){
-      let line='?';
-      const pm=/position (\d+)/.exec(e.message);
-      const lm=/line (\d+)/.exec(e.message);
-      if(lm)line=lm[1];else if(pm)line=v.slice(0,+pm[1]).split('\n').length;
-      el.textContent=`✗ JSON · ${t('ply.page')} ${line}`;el.className='ed-json bad';el.hidden=false;
+    if(isJson){
+      try{JSON.parse(v);el.textContent='✓ JSON';el.className='ed-json ok';el.hidden=false}
+      catch(e){
+        let line='?';
+        const pm=/position (\d+)/.exec(e.message);
+        const lm=/line (\d+)/.exec(e.message);
+        if(lm)line=lm[1];else if(pm)line=v.slice(0,+pm[1]).split('\n').length;
+        el.textContent=`✗ JSON · ${t('ply.page')} ${line}`;el.className='ed-json bad';el.hidden=false;
+      }
+    }else if(isToml){
+      const lines=v.split(/\r?\n/);
+      let badLine=null;
+      for(let i=0;i<lines.length;i++){
+        const raw=lines[i].trim();
+        if(!raw||raw.startsWith('#'))continue;
+        if(/^\[\[?[a-zA-Z0-9_.-]+(\.[a-zA-Z0-9_.-]+)*\]\]?$/.test(raw))continue;
+        if(/^[a-zA-Z0-9_.-]+\s*=\s*.+$/.test(raw))continue;
+        badLine=i+1;break;
+      }
+      if(!badLine){el.textContent='✓ TOML';el.className='ed-json ok';el.hidden=false}
+      else{el.textContent=`✗ TOML · ${t('ply.page')} ${badLine}`;el.className='ed-json bad';el.hidden=false}
     }
   },300);
 }

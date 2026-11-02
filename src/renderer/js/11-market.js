@@ -75,13 +75,15 @@ async function runMarketSearch(page){
   if(seq!==marketReqSeq)return;
   $('#marketSearch').disabled=false;$('#marketSort').disabled=false;status.classList.remove('loading'); status.removeAttribute('aria-busy'); $('#marketResults').removeAttribute('aria-busy');
   if(!r.ok){
-    status.textContent=t('mkt.couldNotLoadResults',{m:r.error});
+    const isRateLimit = /429|rate\s*limit/i.test(String(r.error));
+    const errMsg = isRateLimit ? t('mkt.rateLimit') : r.error;
+    status.textContent=t('mkt.couldNotLoadResults',{m:errMsg});
     const n=$('#marketResults');
     status.hidden=false;
-    n.innerHTML=`<article class="panel"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>${t('mkt.couldNotLoadMarket')}</b><p class="text-muted" style="margin:4px 0 0">${esc(r.error)}</p></div><button class="btn primary" onclick="document.getElementById('marketSearch').click()">${t('mkt.retry')}</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">${t('mkt.checkInternet')}</p></article>`;
+    n.innerHTML=`<article class="panel"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>${isRateLimit?t('mkt.rateLimitTitle'):t('mkt.couldNotLoadMarket')}</b><p class="text-muted" style="margin:4px 0 0">${esc(errMsg)}</p></div><button class="btn primary" onclick="document.getElementById('marketSearch').click()">${t('mkt.retry')}</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">${isRateLimit?t('mkt.rateLimitHint'):t('mkt.checkInternet')}</p></article>`;
     $('#marketPager').hidden=true;
     const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent=t('mkt.error');
-    toast(r.error,'error');return;
+    toast(errMsg,'error');return;
   }
   let items=r.items.map(x=>{
     let itemKind=kind;
@@ -133,7 +135,7 @@ $$('#marketTypeChips .type-chip').forEach(chip=>{
 $('#marketSearch').onclick=()=>runMarketSearch(1);
 $('#marketPrev').onclick=()=>{if(marketPage>1)runMarketSearch(marketPage-1)};
 $('#marketNext').onclick=()=>{if(marketHasNext)runMarketSearch(marketPage+1)};
-const debouncedMarketSearch=debounce(()=>runMarketSearch(1),400);
+const debouncedMarketSearch=debounce(()=>runMarketSearch(1),250);
 $('#marketQuery').addEventListener('input', debouncedMarketSearch);
 $('#marketQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault(); runMarketSearch(1)}});
 function flashMarketField(el){el.classList.remove('just-changed');void el.offsetWidth;el.classList.add('just-changed')}
