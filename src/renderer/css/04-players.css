@@ -46,6 +46,10 @@
 #pd3dCanvas{width:100%;height:100%;object-fit:contain;cursor:grab}
 #pd3dCanvas:active{cursor:grabbing}
 .pd-3d-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface-2);color:var(--text-3);font:500 12px var(--font-ui);line-height:1.5;text-align:center;padding:20px;z-index:2}
+.pd-3d-toggle{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font:500 11px var(--font-ui);border-radius:var(--r-sm);background:rgba(20,24,28,0.7);backdrop-filter:blur(6px);border:1px solid var(--border);color:var(--text-3);cursor:pointer;transition:all var(--t-fast);z-index:3;user-select:none}
+.pd-3d-toggle:hover{background:var(--surface-3);color:var(--text-primary);border-color:var(--border-strong)}
+.pd-3d-toggle.active{background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.4);color:var(--accent)}
+.pd-3d-toggle svg{flex-shrink:0}
 /* v6.0.0 Track B: Inventory Grid */
 .inv-grid{display:grid;grid-template-columns:repeat(9, minmax(0, 1fr));gap:4px;margin-top:10px;max-width:450px}
 /* BUGFIX: the empty-state message is injected INTO the 9-column grid as one child, so it was

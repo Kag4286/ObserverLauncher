@@ -136,4 +136,13 @@ ok('netherite legs armor texture requested', loadedUrls.some(u => u.includes('ar
 r4.destroy();
 ok('clean after r4 destroy', canvas._listeners.pointerdown.length === 0);
 
+// 5. Toggle armor visibility
+const r5 = createPlayerRenderer(canvas, 'data:image/png;base64,dummy', false, mixedEquip);
+ok('r5 defaults to armor visible', r5.isArmorVisible() === true);
+ok('toggleArmor flips to false', r5.toggleArmor() === false);
+ok('isArmorVisible reports false', r5.isArmorVisible() === false);
+ok('toggleArmor flips back to true', r5.toggleArmor(true) === true);
+r5.destroy();
+ok('clean after r5 destroy', canvas._listeners.pointerdown.length === 0);
+
 console.log(`\n${pass} passed, 0 failed`);

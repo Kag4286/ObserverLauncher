@@ -737,13 +737,31 @@ async function renderPlayer3D(canvas,status,uuid,name,armor){
         legs:armor.find(x=>x.slot==='Leggings'),
         boots:armor.find(x=>x.slot==='Boots'),
       };
+      if(!equipment.helmet&&!equipment.chest&&!equipment.legs&&!equipment.boots){
+        equipment=null;
+      }
+    }
+    const toggleBtn=$('#pd3dToggleArmor');
+    if(toggleBtn){
+      toggleBtn.hidden=!equipment;
+      toggleBtn.classList.add('active');
     }
     try{
       const rModel=createPlayerRenderer(canvas,skinRes.dataUri,skinRes.model==='slim',equipment);
       if(!rModel)throw new Error('WebGL not supported');
+      if(toggleBtn&&equipment){
+        toggleBtn.onclick=()=>{
+          if(rModel&&typeof rModel.toggleArmor==='function'){
+            const on=rModel.toggleArmor();
+            toggleBtn.classList.toggle('active',on);
+          }
+        };
+      }
       return skinRes.dataUri;
     }catch(e){ status.hidden=false; status.textContent=t('pd.renderFail'); }
   }else{
+    const toggleBtn=$('#pd3dToggleArmor');
+    if(toggleBtn)toggleBtn.hidden=true;
     status.innerHTML=`<div style="padding:20px;text-align:center;color:var(--text-muted)"><b>${esc(t('pd.no3dTitle'))}</b><br><span style="font-size:11px;opacity:0.8">${esc(t('pd.no3dSub'))}</span></div>`;
   }
   return null;

@@ -209,6 +209,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
 
   let texHelmet = null, texChest = null, texBoots = null, texLegs = null;
   let texHelmetH = 32, texChestH = 32, texBootsH = 32, texLegsH = 32;
+  let showArmor = true;
   const helmetMat = equipment ? getMaterial(equipment.helmet?.id) : null;
   const chestMat = equipment ? getMaterial(equipment.chest?.id) : null;
   const bootsMat = equipment ? getMaterial(equipment.boots?.id) : null;
@@ -343,8 +344,6 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // Level 3: Outer armor parts (Helmet, Chestplate, Boots, +1.0..+1.2 inflation)
   const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32));
   const cHelmet64 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 64));
-  const cHelmetHat32 = buildCube(9.6, 9.6, 9.6, uvc(UV.hat, SKIN, 32));
-  const cHelmetHat64 = buildCube(9.6, 9.6, 9.6, uvc(UV.hat, SKIN, 64));
   const cChestplate32 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 32));
   const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
   const cRightArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
@@ -459,45 +458,53 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     drawPart(cLArm, p('armL').x, p('armL').y, 0);
 
     // 2. Outer skin layers (Hat, Jacket, Pants, Sleeves)
+    // When armor is active, hide corresponding outer skin layers so inner clothes do not poke through
     setOffset(-0.5, -1.0);
-    drawPart(cJacket, p('body').x, p('body').y, 0);
-    drawPart(cHat, p('head').x, p('head').y, 0);
-    drawPart(cRPants, p('legR').x, p('legR').y, 0);
-    drawPart(cLPants, p('legL').x, p('legL').y, 0);
-    drawPart(cRSleeve, p('armR').x, p('armR').y, 0);
-    drawPart(cLSleeve, p('armL').x, p('armL').y, 0);
+    const hasHelmet = Boolean(showArmor && texHelmet && equipment && equipment.helmet);
+    const hasChest = Boolean(showArmor && texChest && equipment && equipment.chest);
+    const hasLegs = Boolean(showArmor && texLegs && equipment && equipment.legs);
 
-    // 3. Inner armor (Leggings)
-    if (texLegs && equipment.legs) {
-      setOffset(-1.0, -2.0);
-      gl.bindTexture(gl.TEXTURE_2D, texLegs);
-      const is64 = texLegsH === 64;
-      drawPart(is64 ? cLeggings64 : cLeggings32, p('body').x, p('body').y, 0);
-      drawPart(is64 ? cRightLeggings64 : cRightLeggings32, p('legR').x, p('legR').y, 0);
-      drawPart(is64 ? cLeftLeggings64 : cLeftLeggings32, p('legL').x, p('legL').y, 0);
+    if (!hasChest) drawPart(cJacket, p('body').x, p('body').y, 0);
+    if (!hasHelmet) drawPart(cHat, p('head').x, p('head').y, 0);
+    if (!hasLegs) {
+      drawPart(cRPants, p('legR').x, p('legR').y, 0);
+      drawPart(cLPants, p('legL').x, p('legL').y, 0);
+    }
+    if (!hasChest) {
+      drawPart(cRSleeve, p('armR').x, p('armR').y, 0);
+      drawPart(cLSleeve, p('armL').x, p('armL').y, 0);
     }
 
-    // 4. Outer armor (Boots, Chestplate, Helmet)
-    setOffset(-2.0, -3.0);
-    if (texBoots && equipment.boots) {
-      gl.bindTexture(gl.TEXTURE_2D, texBoots);
-      const is64 = texBootsH === 64;
-      drawPart(is64 ? cRightBoot64 : cRightBoot32, p('legR').x, p('legR').y, 0);
-      drawPart(is64 ? cLeftBoot64 : cLeftBoot32, p('legL').x, p('legL').y, 0);
-    }
-    if (texChest && equipment.chest) {
-      gl.bindTexture(gl.TEXTURE_2D, texChest);
-      const is64 = texChestH === 64;
-      drawPart(is64 ? cChestplate64 : cChestplate32, p('body').x, p('body').y, 0);
-      drawPart(is64 ? cRightArmArmor64 : cRightArmArmor32, p('armR').x, p('armR').y, 0);
-      drawPart(is64 ? cLeftArmArmor64 : cLeftArmArmor32, p('armL').x, p('armL').y, 0);
-    }
-    if (texHelmet && equipment.helmet) {
-      gl.bindTexture(gl.TEXTURE_2D, texHelmet);
-      const is64 = texHelmetH === 64;
-      drawPart(is64 ? cHelmet64 : cHelmet32, p('head').x, p('head').y, 0);
-      setOffset(-3.0, -4.0);
-      drawPart(is64 ? cHelmetHat64 : cHelmetHat32, p('head').x, p('head').y, 0);
+    // 3 & 4. Inner & Outer Armor (when showArmor is enabled)
+    if (showArmor) {
+      if (texLegs && equipment && equipment.legs) {
+        setOffset(-1.0, -2.0);
+        gl.bindTexture(gl.TEXTURE_2D, texLegs);
+        const is64 = texLegsH === 64;
+        drawPart(is64 ? cLeggings64 : cLeggings32, p('body').x, p('body').y, 0);
+        drawPart(is64 ? cRightLeggings64 : cRightLeggings32, p('legR').x, p('legR').y, 0);
+        drawPart(is64 ? cLeftLeggings64 : cLeftLeggings32, p('legL').x, p('legL').y, 0);
+      }
+
+      setOffset(-2.0, -3.0);
+      if (texBoots && equipment && equipment.boots) {
+        gl.bindTexture(gl.TEXTURE_2D, texBoots);
+        const is64 = texBootsH === 64;
+        drawPart(is64 ? cRightBoot64 : cRightBoot32, p('legR').x, p('legR').y, 0);
+        drawPart(is64 ? cLeftBoot64 : cLeftBoot32, p('legL').x, p('legL').y, 0);
+      }
+      if (texChest && equipment && equipment.chest) {
+        gl.bindTexture(gl.TEXTURE_2D, texChest);
+        const is64 = texChestH === 64;
+        drawPart(is64 ? cChestplate64 : cChestplate32, p('body').x, p('body').y, 0);
+        drawPart(is64 ? cRightArmArmor64 : cRightArmArmor32, p('armR').x, p('armR').y, 0);
+        drawPart(is64 ? cLeftArmArmor64 : cLeftArmArmor32, p('armL').x, p('armL').y, 0);
+      }
+      if (texHelmet && equipment && equipment.helmet) {
+        gl.bindTexture(gl.TEXTURE_2D, texHelmet);
+        const is64 = texHelmetH === 64;
+        drawPart(is64 ? cHelmet64 : cHelmet32, p('head').x, p('head').y, 0);
+      }
     }
   }
 
@@ -521,7 +528,18 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   }
 
   img.src = skinUrl;
-  const handle = { draw, destroy };
+  const handle = {
+    draw,
+    destroy,
+    toggleArmor(val) {
+      showArmor = val !== undefined ? Boolean(val) : !showArmor;
+      draw();
+      return showArmor;
+    },
+    isArmorVisible() {
+      return showArmor;
+    }
+  };
   canvas._playerRenderer = handle;
   return handle;
 }
