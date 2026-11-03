@@ -158,6 +158,24 @@ t('readArmorTexture extracts layer from jar', () => {
     assert.strictEqual(idx.readArmorTexture('botania', 'terrasteel', 2).toString(), 'TERRASTEEL_2');
   });
 
+  t('readTexture matches inverted name (silver_ingot -> ingot_silver)', () => {
+    fs.writeFileSync(path.join(dir, 'thermal-1.0.jar'), makeZip([
+      ['assets/thermal/textures/item/ingot_silver.png', Buffer.from('SILVER_INGOT')],
+    ]));
+    assert.strictEqual(idx.readTexture('thermal', 'silver_ingot').toString(), 'SILVER_INGOT');
+  });
+
+  t('readTexture finds item in nested subfolder (materials/brass_sheet)', () => {
+    fs.writeFileSync(path.join(dir, 'create-materials-1.0.jar'), makeZip([
+      ['assets/create/textures/item/materials/sheet_brass.png', Buffer.from('BRASS_SHEET')],
+    ]));
+    assert.strictEqual(idx.readTexture('create', 'brass_sheet').toString(), 'BRASS_SHEET');
+  });
+
+  t('readTexture falls back to all jars for common tag namespace (c:wrench)', () => {
+    assert.strictEqual(idx.readTexture('c', 'wrench').toString(), 'WRENCH');
+  });
+
   t('setModsDir(null) disables lookups', () => {
     const empty = new ModsIndex();
     empty.setModsDir(null);

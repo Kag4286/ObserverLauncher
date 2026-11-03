@@ -27,12 +27,25 @@ function candidateEntries(namespace, name) {
   const ns = String(namespace || '').toLowerCase();
   const nm = String(name || '').toLowerCase();
   if (!isCleanNamespaceAndName(ns, nm)) return [];
-  return [
+  const out = [
     `assets/${ns}/textures/item/${nm}.png`,
     `assets/${ns}/textures/items/${nm}.png`,
     `assets/${ns}/textures/block/${nm}.png`,
     `assets/${ns}/textures/blocks/${nm}.png`,
   ];
+  if (nm.includes('_')) {
+    const segs = nm.split('_');
+    if (segs.length === 2) {
+      const inv = `${segs[1]}_${segs[0]}`;
+      out.push(
+        `assets/${ns}/textures/item/${inv}.png`,
+        `assets/${ns}/textures/items/${inv}.png`,
+        `assets/${ns}/textures/block/${inv}.png`,
+        `assets/${ns}/textures/blocks/${inv}.png`,
+      );
+    }
+  }
+  return out;
 }
 
 // PURE: candidate paths for armor worn textures inside mod jars.
@@ -95,6 +108,7 @@ class ModsIndex {
   constructor() {
     this.modsDir = null;
     this.signature = '';
+    this.lastSignatureCheck = 0;
     this.byNamespace = new Map(); // ns -> [absJarPath]
     this.jarCache = new Map();    // absJarPath -> jar handle (openJar)
     this.extractCache = new Map(); // `${ns}:${name}` -> Buffer
@@ -107,6 +121,7 @@ class ModsIndex {
     if (d === this.modsDir) return;
     this.modsDir = d;
     this.signature = '';
+    this.lastSignatureCheck = 0;
     this.byNamespace.clear();
     this.jarCache.clear();
     this.extractCache.clear();
@@ -140,8 +155,16 @@ class ModsIndex {
   }
 
   _findInJars(ns, wanted, cacheKey, fallbackMatcher) {
-    const jars = this.byNamespace.get(ns) || [];
-    if (!wanted.length) return null;
+    let jars = this.byNamespace.get(ns) || [];
+    if (!jars.length) {
+      const cleanNs = ns.replace(/[^a-z0-9]/g, '');
+      if (this.byNamespace.has(cleanNs)) {
+        jars = this.byNamespace.get(cleanNs) || [];
+      } else if (ns === 'c' || ns === 'forge' || ns === 'common') {
+        jars = [...this.jarCache.keys()];
+      }
+    }
+    if (!wanted.length && !fallbackMatcher) return null;
     for (const jarPath of jars) {
       let jar = this.jarCache.get(jarPath);
       if (!jar) { try { jar = openJar(jarPath); this.jarCache.set(jarPath, jar); } catch { continue; } }
@@ -174,8 +197,17 @@ class ModsIndex {
     const nm = String(name || '').toLowerCase();
     const cacheKey = `${ns}:${nm}`;
     if (this.extractCache.has(cacheKey)) return this.extractCache.get(cacheKey);
-    const wanted = candidateEntries(namespace, name);
-    return this._findInJars(ns, wanted, cacheKey, e => e.startsWith(`assets/${ns}/textures/`) && e.endsWith(`/${nm}.png`));
+    const isCommonTag = ns === 'c' || ns === 'forge' || ns === 'common';
+    const wanted = isCommonTag ? [] : candidateEntries(namespace, name);
+    const invertedNm = nm.includes('_') ? nm.split('_').reverse().join('_') : '';
+    const matcher = e => {
+      const lower = e.toLowerCase();
+      if (!lower.includes('/textures/') || !lower.endsWith('.png')) return false;
+      if (!isCommonTag && !lower.startsWith(`assets/${ns}/`)) return false;
+      const base = path.basename(lower, '.png');
+      return base === nm || (invertedNm && base === invertedNm);
+    };
+    return this._findInJars(ns, wanted, cacheKey, matcher);
   }
 
   // Extract worn armor texture from the first jar that has it.

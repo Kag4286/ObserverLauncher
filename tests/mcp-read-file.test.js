@@ -55,3 +55,4 @@ const check = (name, cond) => cond ? (pass++, console.log('PASS', name)) : (fail
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
+

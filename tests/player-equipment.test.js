@@ -127,6 +127,24 @@ const write = (root, body) => {
   ck('1.20.5+: modern components durability remaining', d4.inventory[0].durability && d4.inventory[0].durability.remaining === 1931);
   fs.rmSync(r4, { recursive: true, force: true });
 
+  // --- Alternative NBT casing (Horizon rust serde / snake_case / lowercase) ---
+  const r5 = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-equip-alt-'));
+  write(r5, {
+    health: { type: 'float', value: 20 },
+    food_level: { type: 'int', value: 20 },
+    food_saturation_level: { type: 'float', value: 5 },
+    player_game_type: { type: 'int', value: 1 },
+    xp_level: { type: 'int', value: 10 },
+    xp_total: { type: 'int', value: 160 },
+  });
+  const d5 = (await readPlayerData(r5, UUID)).data;
+  ck('alt-casing: health 20 parsed', d5.health === 20);
+  ck('alt-casing: food 20 parsed', d5.food === 20);
+  ck('alt-casing: saturation 5 parsed', d5.saturation === 5);
+  ck('alt-casing: gameType 1 (creative) parsed', d5.gameType === 1);
+  ck('alt-casing: xpLevel 10 parsed', d5.xpLevel === 10);
+  fs.rmSync(r5, { recursive: true, force: true });
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('FAIL:', e); process.exit(1); });

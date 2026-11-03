@@ -420,7 +420,13 @@ async function readPlayerData(root, uuid, name) {
   if (dim === 0 || dim === '0') dim = 'minecraft:overworld';
   else if (dim === -1 || dim === '-1') dim = 'minecraft:the_nether';
   else if (dim === 1 || dim === '1') dim = 'minecraft:the_end';
-  return { file, parsed, type: parsed.type, data: { health: simple.Health ?? null, food: simple.foodLevel ?? null, saturation: simple.foodSaturationLevel ?? null, xpLevel: simple.XpLevel ?? 0, xpTotal: simple.XpTotal ?? 0, gameType: simple.playerGameType ?? 0, dimension: dim, pos: simple.Pos || [], inventory: mainInventory, armor, offhand, enderChest, effects, stats } };
+  const health = simple.Health ?? simple.health ?? null;
+  const food = simple.foodLevel ?? simple.FoodLevel ?? simple.food_level ?? simple.food ?? null;
+  const saturation = simple.foodSaturationLevel ?? simple.FoodSaturationLevel ?? simple.food_saturation_level ?? simple.saturation ?? null;
+  const xpLevel = simple.XpLevel ?? simple.xpLevel ?? simple.xp_level ?? 0;
+  const xpTotal = simple.XpTotal ?? simple.xpTotal ?? simple.xp_total ?? 0;
+  const gameType = simple.playerGameType ?? simple.PlayerGameType ?? simple.player_game_type ?? simple.gameType ?? 0;
+  return { file, parsed, type: parsed.type, data: { health, food, saturation, xpLevel, xpTotal, gameType, dimension: dim, pos: simple.Pos || simple.pos || [], inventory: mainInventory, armor, offhand, enderChest, effects, stats } };
 }
 function parseServerLine(text, live, send) {
   // Strip Minecraft color codes (§a) AND ANSI escape codes (\u001b[31m etc.) that servers/plugins inject.

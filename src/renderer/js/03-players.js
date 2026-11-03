@@ -80,15 +80,17 @@ function itemCellInner(iconUrl,label){
 // in the mod jar). Mark the parent cell so CSS shows the initials badge, and clear the mark when a
 // real texture arrives on a re-render. Do NOT swap the img for text: that change is what made a
 // long label stretch the whole row.
-document.addEventListener('load', (e) => {
+function markCellIcon(e, missing) {
   const img = e.target;
   if (!img || img.tagName !== 'IMG' || !img.dataset || img.dataset.fb === undefined) return;
   const cell = img.closest && img.closest('.inv-cell');
   if (!cell) return;
-  if (img.naturalWidth > 1) { cell.classList.remove('icon-missing'); return; }
+  if (!missing && img.naturalWidth > 1) { cell.classList.remove('icon-missing'); return; }
   cell.classList.add('icon-missing');
   cell.setAttribute('data-initial', img.dataset.fb);
-}, true);
+}
+document.addEventListener('load', e => markCellIcon(e, false), true);
+document.addEventListener('error', e => markCellIcon(e, true), true);
 // v4.0.0: config-driven grid so hotbar (0-8) / main inventory (9-35) / ender chest (0-26)
 // share one renderer. base = first slot index, slots = how many.
 const GRID_CFG={
@@ -320,9 +322,9 @@ function pdIsOnline(name,uuid){
   return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid===uuid));
 }
 function fmtStat(val, fallback = '—') {
-  if (val === null || val === undefined || val === '') return fallback;
+  if (val === null || val === undefined || val === '' || val === 'undefined' || val === 'null') return fallback;
   const num = Number(val);
-  if (!Number.isFinite(num)) return String(val);
+  if (!Number.isFinite(num)) return fallback;
   return Number.isInteger(num) ? String(num) : (Math.round(num * 10) / 10).toFixed(1).replace(/\.0$/, '');
 }
 function renderPdReadout(d,isOnline){
@@ -339,12 +341,12 @@ function renderPdReadout(d,isOnline){
   // Every value still appears in All stats below, nothing is lost.
   const gm=['Survival','Creative','Adventure','Spectator'][d.gameType??0]||'—';
   const gmClass=['gm-survival','gm-creative','gm-adventure','gm-spectator'][d.gameType??0]||'';
-  const vital=(k,v,c)=>`<div class="pd-vital"><span>${esc(k)}</span><b class="${c||''}">${esc(String(v))}</b></div>`;
+  const vital=(k,v,c)=>{const raw=(v===null||v===undefined||v===''||v==='undefined'||v==='null')?'—':String(v);return `<div class="pd-vital"><span>${esc(k)}</span><b class="${c||''}">${esc(raw)}</b></div>`;};
   const meter=(k,value,cls)=>{
     const max=20, segments=10;
-    const hasValue = value !== null && value !== undefined;
+    const hasValue = value !== null && value !== undefined && value !== '' && value !== 'undefined' && value !== 'null' && Number.isFinite(Number(value));
     const num = hasValue ? Number(value) : 0;
-    const n = hasValue ? Math.max(0, Math.min(max, Number.isFinite(num) ? num : 0)) : 0;
+    const n = hasValue ? Math.max(0, Math.min(max, Number(value))) : 0;
     const filled = hasValue ? Math.round(n / max * segments) : 0;
     const segs = Array.from({length: segments}, (_, i) => `<i class="${i < filled ? cls : ''}"></i>`).join('');
     const disp = hasValue ? fmtStat(n) : '—';
