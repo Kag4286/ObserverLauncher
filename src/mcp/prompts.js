@@ -108,6 +108,52 @@ const PROMPTS = [
       '4. On my yes, call assemble_modpack with the planned items, then create_backup if the server has a world already.',
     ].join('\n')),
   },
+  {
+    name: 'recover_corrupted_world',
+    title: 'Recover corrupted world',
+    description: 'Diagnose crash reports or logs for chunk corruption, identify faulty region files, and guide recovery.',
+    arguments: [
+      { name: 'instance', description: 'instance id (optional; default = active)', required: false },
+    ],
+    build: (a) => userMsg([
+      'My Minecraft world seems corrupted or crashes on player join. Help me recover it safely.',
+      a && a.instance ? `Target instance: ${a.instance}.` : 'Use the active instance.',
+      'Steps:',
+      '1. Call explain_crash and read_server_log to inspect the crash trace for corrupted chunk/region coordinates or ticking entities.',
+      '2. Before modifying anything, call create_backup to take an immediate snapshot of the current state.',
+      '3. Identify the problematic region file or entity, explain the options (deleting the corrupted chunk/region or restoring a backup), and wait for my confirmation.',
+    ].join('\n')),
+  },
+  {
+    name: 'update_minecraft_version',
+    title: 'Plan a Minecraft version upgrade',
+    description: 'Check current version, Java requirements, mod/plugin update availability and backup status before upgrading.',
+    arguments: [
+      { name: 'target_version', description: 'Minecraft version to target (e.g. 1.21.4)', required: true },
+    ],
+    build: (a) => userMsg([
+      `I want to upgrade my server to Minecraft ${a?.target_version || 'the latest release'}. Help me plan and perform this safely.`,
+      'Steps:',
+      '1. Read get_status, get_java_info, and check_updates to check current software, Java version and plugin/mod updates.',
+      '2. Check whether installed mods/plugins support the target Minecraft version.',
+      '3. Verify if Java runtime needs upgrading for the target Minecraft version.',
+      '4. If all checks pass, take a backup with create_backup before proceeding.',
+    ].join('\n')),
+  },
+  {
+    name: 'setup_geyser_bedrock',
+    title: 'Set up Geyser for Bedrock cross-play',
+    description: 'Check port configuration, search for Geyser and Floodgate, and guide Bedrock cross-play setup.',
+    arguments: [],
+    build: () => userMsg([
+      'Help me set up GeyserMC and Floodgate so Bedrock players can join my Minecraft Java server.',
+      'Steps:',
+      '1. Call get_status and get_network_info to check current server software and ports.',
+      '2. Search for Geyser and Floodgate plugins/mods via search_marketplace.',
+      '3. Explain port forwarding requirements (UDP 19132 for Bedrock) and offer to install with install_from_market after confirmation.',
+      '4. If Geyser is already installed, run apply_geyser_fix to verify port and auth settings.',
+    ].join('\n')),
+  },
 ];
 
 function getPrompt(name) { return PROMPTS.find(p => p.name === name) || null; }

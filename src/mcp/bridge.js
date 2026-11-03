@@ -33,7 +33,22 @@ function bridgeConfigPath() {
 }
 
 function readConfig() {
-  try { return JSON.parse(fs.readFileSync(bridgeConfigPath(), 'utf8')); } catch { return null; }
+  try {
+    const raw = fs.readFileSync(bridgeConfigPath(), 'utf8');
+    const cfg = JSON.parse(raw);
+    if (!cfg || !cfg.port || !cfg.token) return null;
+    if (cfg.pid && typeof cfg.pid === 'number') {
+      try {
+        process.kill(cfg.pid, 0);
+      } catch (e) {
+        if (e && e.code === 'ESRCH') {
+          try { fs.rmSync(bridgeConfigPath(), { force: true }); } catch {}
+          return null;
+        }
+      }
+    }
+    return cfg;
+  } catch { return null; }
 }
 
 // Guidance sent to the MCP client at initialize time. This is how the AI learns it is talking to a
@@ -103,7 +118,7 @@ function fetchResource(uri) {
   return new Promise(resolve => {
     const cfg = readConfig();
     if (!cfg || !cfg.port || !cfg.token) return resolve(null);
-    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: '/resource?uri=' + encodeURIComponent(uri), method: 'GET', headers: { authorization: 'Bearer ' + cfg.token } }, res => {
+    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: '/resource?uri=' + encodeURIComponent(uri), method: 'GET', headers: { authorization: 'Bearer ' + cfg.token, 'x-ob-client': CLIENT_ID } }, res => {
       let data = ''; res.on('data', c => data += c);
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
     });
@@ -147,7 +162,7 @@ function fetchToolsFromApp() {
   return new Promise(resolve => {
     const cfg = readConfig();
     if (!cfg || !cfg.port || !cfg.token) return resolve(null);
-    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: '/tools', method: 'GET', headers: { authorization: 'Bearer ' + cfg.token } }, res => {
+    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: '/tools', method: 'GET', headers: { authorization: 'Bearer ' + cfg.token, 'x-ob-client': CLIENT_ID } }, res => {
       let data = ''; res.on('data', c => data += c);
       res.on('end', () => { try { const j = JSON.parse(data); resolve(Array.isArray(j.tools) ? j.tools : null); } catch { resolve(null); } });
     });
@@ -163,7 +178,7 @@ function fetchJsonPath(pathQ, timeoutMs) {
   return new Promise(resolve => {
     const cfg = readConfig();
     if (!cfg || !cfg.port || !cfg.token) return resolve(null);
-    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: pathQ, method: 'GET', headers: { authorization: 'Bearer ' + cfg.token } }, res => {
+    const req = http.request({ host: '127.0.0.1', port: cfg.port, path: pathQ, method: 'GET', headers: { authorization: 'Bearer ' + cfg.token, 'x-ob-client': CLIENT_ID } }, res => {
       let data = ''; res.on('data', c => data += c);
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
     });
@@ -300,6 +315,7 @@ async function handle(msg) {
     });
   }
   if (method === 'notifications/initialized') return; // no response
+  if (method === 'notifications/cancelled') return; // no response
   if (method === 'ping') return reply(id, {});
   if (method === 'tools/list') {
     const tools = await fetchTools();

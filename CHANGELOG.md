@@ -46,6 +46,28 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **Headless Graceful Resource Teardown (`src/headless.js`):**
   - Added explicit cleanup for active network tunnels (`stopAllPinggy()`) and metrics listeners (`ctx.stopPrometheus()`) upon headless shutdown.
 
+### MCP (Model Context Protocol) Security & Subsystem Hardening:
+- **Path Traversal Elimination (`src/mcp/tools.js`):**
+  - Added strict `path.basename(name) === name` validation to `tDeleteContent`, blocking directory traversal escapes (`../server.properties`, `../world`) out of `mods/`, `plugins/`, and `datapacks/`.
+- **Sensitive Credential & Secret Masking (`src/mcp/tools.js`, `src/mcp/resources.js`):**
+  - Direct file reads via `tReadFile`, `tReadManyFiles`, and the `observer://file/{path}` resource template now route through `maskSecrets()`, ensuring plain-text credentials (`rcon.password`, Velocity `forwarding-secret`) are never leaked to LLM clients.
+- **Privilege Escalation Defense (`src/mcp/tools.js`):**
+  - Removed `mcpAutoAllowWrite` and `mcpReadOnly` from `SETTABLE` so autonomous clients cannot modify their own safety gates or disable confirmation dialogs via `set_setting`.
+- **Export Modpack System Boundary Protection (`src/mcp/tools.js`):**
+  - Added system directory boundary verification to `tExportModpack`, blocking writes targeting OS system directories (`C:\Windows`, `/etc`, etc.).
+- **Rate-Limiting & Client Isolation Fix (`src/mcp/bridge.js`, `src/mcp/server.js`):**
+  - Forwarded `x-ob-client: CLIENT_ID` in `fetchResource`, `fetchToolsFromApp`, and `fetchJsonPath`, preventing multi-client or subscription requests from falling into a shared global bucket.
+  - Increased resource endpoint limit to 180 req/min, preventing background resource polling from causing HTTP 429 rate limit errors.
+- **Headless & Background Modpack Overrides Guard (`src/main/modpacks.js`):**
+  - Added `canShowDialog()` helper in `importMrpackFromPath` and `copyOverridesWithConfirm` to avoid Electron modal dialog invocation and process deadlocks in headless, CLI, or MCP contexts.
+- **Stream Performance & UTF-8 Integrity (`src/mcp/server.js`):**
+  - Replaced quadratic string concatenation in POST `/rpc` handler with a chunked buffer array, eliminating $O(N^2)$ byte length scans and preserving multi-byte UTF-8 character integrity.
+- **Bridge Lifecycle & Spec Upgrades (`src/mcp/bridge.js`, `src/mcp/prompts.js`, `src/mcp/resources.js`):**
+  - Added stale launcher PID detection with automatic dead config cleanup via `process.kill(cfg.pid, 0)`.
+  - Added support for `notifications/cancelled` notification.
+  - Added 3 new workflow prompts: `recover_corrupted_world`, `update_minecraft_version`, `setup_geyser_bedrock`.
+  - Added new resource templates: `observer://instance/{id}/properties`, `observer://instance/{id}/players`, and static resource `observer://crash-reports/latest`.
+
 ### UI / UX & Notifications:
 - **Player Leave Webhook Event (`src/main/webhook.js`, `src/main/server-lifecycle.js`, `src/renderer/index.html`):**
   - Added `player_leave` event type to `EVENTS` with log pattern matching for disconnection notices.
@@ -69,7 +91,7 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - Synchronized all 8 new keys (`wh.ev.leave`, `cnt.nativeNotice`, `perf.diagNativeTitle`, `perf.diagNativeBody`, `wiz.invalidName`, `mkt.rateLimit`, `mkt.rateLimitTitle`, `mkt.rateLimitHint`, `crash.cat.rust-panic`) across 7 locales (`en.js`, `vi.js`, `es.js`, `pt-BR.js`, `de.js`, `ru.js`, `zh-CN.js`).
 - Verified 0 missing, 0 extra, 0 dead keys across 1386 entries per locale.
 - Verified 0 duplicate CSS selectors and 0 duplicate JS blocks.
-- 160 test suites passing.
+- 161 test suites passing (including tests/mcp-v7-fixes.test.js).
 
 ## [7.0.0Z] — 2026-10-31
 

@@ -84,7 +84,8 @@ async function tReadFile(ctx, a) {
   const root = needPath(ctx);
   const r = editor.openFile(root, a?.path);
   if (!r.ok) return { ok: false, error: friendlyEditorError(r.error) };
-  return ok(r);
+  const { maskSecrets } = require('./doctor.js');
+  return ok({ ...r, content: maskSecrets(r.content) });
 }
 async function tSearchFiles(ctx, a) {
   const root = needPath(ctx);
@@ -477,9 +478,9 @@ const SETTABLE = {
   // SECURITY: playitPath is NOT settable over MCP. tunnel:start spawns whatever binary that path
   // points at, so letting an AI set it (then start the tunnel) would be a one-approval RCE. The
   // user sets it in the GUI only.
-  // MCP safety toggles (1.2.0): an AI may flip these only if the user allows the write tier.
-  mcpReadOnly: v => typeof v === 'boolean',
-  mcpAutoAllowWrite: v => typeof v === 'boolean',
+  // SECURITY: mcpReadOnly and mcpAutoAllowWrite are intentionally NOT settable over MCP.
+  // Allowing an AI to modify its own privilege gating or disable confirmation prompts is a privilege-escalation risk.
+  // The user must toggle these in Settings > MCP on the GUI.
 };
 async function tSetSetting(ctx, a) {
   const key = String(a.key || '');
@@ -602,6 +603,13 @@ async function tExportModpack(ctx, a) {
   const dest = String(a.path || '');
   if (!dest) return { ok: false, error: 'path is required.' };
   if (!/\.mrpack$/i.test(dest)) return { ok: false, error: 'Destination must end in .mrpack.' };
+  const normDest = path.normalize(path.resolve(dest));
+  if (process.platform === 'win32') {
+    const winDir = process.env.SystemRoot || 'C:\\Windows';
+    if (normDest.toLowerCase().startsWith(winDir.toLowerCase() + path.sep)) return { ok: false, error: 'Cannot export to a system directory.' };
+  } else {
+    if (/^\/(etc|bin|sbin|usr|boot|sys|proc)($|\/)/i.test(normDest)) return { ok: false, error: 'Cannot export to a system directory.' };
+  }
   const root = needPath(ctx);
   const manifest = readJsonList(root, 'observerlauncher-manifest.json');
   if (!manifest.length) return { ok: false, error: 'Nothing to export (no Marketplace-installed content).' };
@@ -914,6 +922,7 @@ async function tDeleteContent(ctx, a) {
   const kind = (a && a.kind) || 'plugin';
   const name = String((a && a.name) || '');
   if (!name) return { ok: false, error: 'name is required.' };
+  if (path.basename(name) !== name) return { ok: false, error: 'Invalid file name.' };
   const f = serverFiles(root);
   const folder = kind === 'datapack' ? f.datapackFolder : kind === 'mod' ? 'mods' : 'plugins';
   const target = safeTarget(root, path.join(folder, name));
@@ -1255,7 +1264,8 @@ async function tReadManyFiles(ctx, a) {
     // returned as utf8 garbage. editor.openFile already runs everything we need.
     const r = editor.openFile(root, rel);
     if (!r.ok) { out.push({ path: rel, ok: false, error: friendlyEditorError(r.error) }); continue; }
-    out.push({ path: rel, ok: true, content: r.content, readOnly: r.readOnly, size: r.size });
+    const { maskSecrets } = require('./doctor.js');
+    out.push({ path: rel, ok: true, content: maskSecrets(r.content), readOnly: r.readOnly, size: r.size });
   }
   return { ok: true, result: { files: out } };
 }

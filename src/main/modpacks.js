@@ -96,6 +96,13 @@ function dependenciesFor(serverInfo) {
   return dependencies;
 }
 
+function canShowDialog(ctx) {
+  try {
+    const electron = require('electron');
+    return !!(electron && electron.dialog && ctx.win && typeof ctx.win.isDestroyed === 'function' && !ctx.win.isDestroyed());
+  } catch { return false; }
+}
+
 async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
   const { dialog } = require('electron'); // GUI-only: the compat/overwrite prompts below
   let tempZip, extractDir;
@@ -121,13 +128,17 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
         const lines = [];
         if (compat.warnings.includes('mc')) lines.push(`• Minecraft version: pack targets ${compat.mc.want}, this server is ${compat.mc.have}`);
         if (compat.warnings.includes('loader')) lines.push(`• Loader: pack targets ${compat.loader.want}, this server is ${compat.loader.have}`);
-        const choice = await dialog.showMessageBox(ctx.win, {
-          type: 'warning', buttons: ['Cancel', 'Install anyway'], defaultId: 0, cancelId: 0,
-          title: 'Modpack may not be compatible',
-          message: 'This modpack does not match your server:',
-          detail: lines.join('\n') + '\n\nInstalling it may make the server fail to start. Continue anyway?'
-        });
-        if (choice.response !== 1) return { ok: false, cancelled: true };
+        if (canShowDialog(ctx)) {
+          const choice = await dialog.showMessageBox(ctx.win, {
+            type: 'warning', buttons: ['Cancel', 'Install anyway'], defaultId: 0, cancelId: 0,
+            title: 'Modpack may not be compatible',
+            message: 'This modpack does not match your server:',
+            detail: lines.join('\n') + '\n\nInstalling it may make the server fail to start. Continue anyway?'
+          });
+          if (choice.response !== 1) return { ok: false, cancelled: true };
+        } else if (ctx.confirmMode === 'auto-deny') {
+          return { ok: false, cancelled: true, error: 'Incompatible modpack rejected by headless policy.' };
+        }
       }
     }
     let installed = 0, skipped = 0;
@@ -230,13 +241,17 @@ async function copyOverridesWithConfirm(ctx, overridesDir, tx) {
     const head = clobbered.slice(0, 8).join('\n');
     const more = clobbered.length > 8 ? `\n…and ${clobbered.length - 8} more` : '';
     const detail = head + more + (sensitiveHit.length ? '\n\n⚠ This includes server.properties/eula.txt you may have configured yourself.' : '');
-    const choice = await dialog.showMessageBox(ctx.win, {
-      type: 'warning', buttons: ['Cancel', 'Overwrite'], defaultId: 0, cancelId: 0,
-      title: 'Modpack will overwrite existing files',
-      message: `This modpack includes ${clobbered.length} file(s) that already exist in your server folder and would be replaced:`,
-      detail: detail + '\n\nOverwrite them?',
-    });
-    proceed = choice.response === 1;
+    if (canShowDialog(ctx)) {
+      const choice = await dialog.showMessageBox(ctx.win, {
+        type: 'warning', buttons: ['Cancel', 'Overwrite'], defaultId: 0, cancelId: 0,
+        title: 'Modpack will overwrite existing files',
+        message: `This modpack includes ${clobbered.length} file(s) that already exist in your server folder and would be replaced:`,
+        detail: detail + '\n\nOverwrite them?',
+      });
+      proceed = choice.response === 1;
+    } else {
+      proceed = ctx.confirmMode !== 'auto-deny';
+    }
   }
   if (!proceed) return { cancelled: true };
   fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });

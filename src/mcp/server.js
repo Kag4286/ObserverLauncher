@@ -212,7 +212,9 @@ function startMcpServer(ctx) {
   // 'local', preserving the old per-tool behaviour for it.
   // 4.4.0: the bucket math lives in the shared rate-limit.js (also used by the remote server).
   const limitBucket = require('../main/rate-limit.js').makeRateLimiter(60, 60000);
+  const resourceBucket = require('../main/rate-limit.js').makeRateLimiter(180, 60000);
   const rateLimited = (client, name) => limitBucket(client + '::' + name);
+  const resourceRateLimited = client => resourceBucket(client + '::resource');
   const server = http.createServer((req, res) => {
     // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
     // Origin header and connects by IP. A browser page on any site can still POST to 127.0.0.1
@@ -313,9 +315,9 @@ function startMcpServer(ctx) {
       // (it called the handler directly). Both now apply, so an instance template reads the RIGHT
       // instance and a leaked token cannot spam the expensive diagnosis resource.
       const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';
-      if (rateLimited(client, 'resource')) {
+      if (resourceRateLimited(client)) {
         res.writeHead(429, { 'content-type': 'application/json' });
-        return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (60/min) - slow down and retry.' }));
+        return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (180/min) - slow down and retry.' }));
       }
       let uri = '';
       try { uri = new URL(req.url, 'http://127.0.0.1').searchParams.get('uri') || ''; } catch {}
@@ -337,12 +339,14 @@ function startMcpServer(ctx) {
     if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
     if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
     announceClient();
-    let body = '';
+    const chunks = [];
+    let receivedBytes = 0;
     let tooBig = false;
     req.on('data', c => {
       if (tooBig) return;
-      body += c;
-      if (Buffer.byteLength(body) > MAX_BODY) {
+      chunks.push(c);
+      receivedBytes += c.length;
+      if (receivedBytes > MAX_BODY) {
         tooBig = true;
         res.writeHead(413, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Request too large (max 4 MB).' }));
@@ -352,7 +356,10 @@ function startMcpServer(ctx) {
     req.on('end', async () => {
       if (tooBig) return; // 413 already sent
       let payload;
-      try { payload = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end('bad json'); }
+      try {
+        const body = Buffer.concat(chunks).toString('utf8');
+        payload = JSON.parse(body || '{}');
+      } catch { res.writeHead(400); return res.end('bad json'); }
       const settings = require('../main/settings.js').loadSettings();
       const cfg = { autoAllowWrite: !!settings.mcpAutoAllowWrite, readOnly: !!settings.mcpReadOnly };
       const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';

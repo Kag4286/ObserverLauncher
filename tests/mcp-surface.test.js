@@ -41,11 +41,11 @@ check('at least 15 outputSchemas', schemaNames.length >= 15);
 check('non-schema read tools have no outputSchema', getTool('list_files').outputSchema === undefined);
 
 // --- Gói B: prompts ---
-check('6 prompts', PROMPTS.length === 6);
+check('9 prompts', PROMPTS.length === 9);
 check('every prompt has name/title/description/arguments/build', PROMPTS.every(p => p.name && p.title && p.description && Array.isArray(p.arguments) && typeof p.build === 'function'));
 check('prompt names unique', new Set(PROMPTS.map(p => p.name)).size === PROMPTS.length);
 const names = PROMPTS.map(p => p.name);
-['diagnose_server','optimize_for_ram','explain_last_crash','set_up_paper_for_players','audit_mods','safe_modpack_install'].forEach(n => check('prompt exists: ' + n, names.includes(n)));
+['diagnose_server','optimize_for_ram','explain_last_crash','set_up_paper_for_players','audit_mods','safe_modpack_install','recover_corrupted_world','update_minecraft_version','setup_geyser_bedrock'].forEach(n => check('prompt exists: ' + n, names.includes(n)));
 // build returns a non-empty message list with text content
 check('build returns messages', PROMPTS.every(p => { const m = p.build({}); return Array.isArray(m) && m.length > 0 && m[0].role === 'user' && m[0].content.type === 'text' && m[0].content.text.length > 0; }));
 check('safe_modpack_install interpolates query', getPrompt('safe_modpack_install').build({ query: 'better mc' })[0].content.text.includes('better mc'));
@@ -54,8 +54,8 @@ check('promptList strips build', promptList().every(p => p.build === undefined &
 check('promptList length matches', promptList().length === PROMPTS.length);
 
 // --- Gói C: resources ---
-check('8 static resources', STATIC_RESOURCES.length === 8);
-check('4 resource templates', RESOURCE_TEMPLATES.length === 4);
+check('9 static resources', STATIC_RESOURCES.length === 9);
+check('6 resource templates', RESOURCE_TEMPLATES.length === 6);
 check('every template has uriTemplate/name/match', RESOURCE_TEMPLATES.every(t => t.uriTemplate && t.name && typeof t.match === 'function'));
 check('resolve static status', JSON.stringify(resolveResource('observer://server/status')) === JSON.stringify({ tool: 'get_status', args: {} }));
 check('resolve instance/console template', (() => { const r = resolveResource('observer://instance/abc123/console'); return r && r.tool === 'get_instance_snapshot' && r.args.instance === 'abc123'; })());

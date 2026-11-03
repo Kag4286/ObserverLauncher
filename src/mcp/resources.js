@@ -153,6 +153,7 @@ const STATIC_RESOURCES = [
   { uri: 'observer://console/tail', name: 'Console tail', description: 'Last 200 console lines.', mimeType: 'application/json' },
   { uri: 'observer://world/players', name: 'Players', description: 'Online, whitelisted, banned, op and known players.', mimeType: 'application/json' },
   { uri: 'observer://instances', name: 'Instances', description: 'Every server instance (id, name, path, status, active).', mimeType: 'application/json' },
+  { uri: 'observer://crash-reports/latest', name: 'Latest crash report', description: 'Summary of the most recent crash report.', mimeType: 'application/json' },
 ];
 
 // Resource TEMPLATES (RFC 6570). Each maps a concrete URI to an existing read tool + args.
@@ -186,6 +187,20 @@ const RESOURCE_TEMPLATES = [
     mimeType: 'text/plain',
     match: (uri) => { const m = uri.match(/^observer:\/\/file\/(.+)$/); return m ? { tool: 'read_file', args: { path: decodeURIComponent(m[1]) } } : null; },
   },
+  {
+    uriTemplate: 'observer://instance/{id}/properties',
+    name: 'Instance properties',
+    description: 'Parsed server.properties of ONE instance by id.',
+    mimeType: 'application/json',
+    match: (uri) => { const m = uri.match(/^observer:\/\/instance\/([^/]+)\/properties$/); return m ? { tool: 'get_properties', args: { instance: decodeURIComponent(m[1]) } } : null; },
+  },
+  {
+    uriTemplate: 'observer://instance/{id}/players',
+    name: 'Instance players',
+    description: 'Online, whitelisted, and banned players of ONE instance by id.',
+    mimeType: 'application/json',
+    match: (uri) => { const m = uri.match(/^observer:\/\/instance\/([^/]+)\/players$/); return m ? { tool: 'list_players', args: { instance: decodeURIComponent(m[1]) } } : null; },
+  },
 ];
 
 // Resolve a concrete URI against the static list first, then the templates. Returns
@@ -207,6 +222,7 @@ function resolveResource(uri) {
     'observer://console/tail': { tool: 'read_console', args: { lines: 200 } },
     'observer://world/players': { tool: 'list_players', args: {} },
     'observer://instances': { tool: 'list_instances', args: {} },
+    'observer://crash-reports/latest': { tool: 'read_crash_report', args: {} },
   };
   if (STATIC_MAP[uri]) return STATIC_MAP[uri];
   for (const t of RESOURCE_TEMPLATES) { const hit = t.match(uri); if (hit) return hit; }
