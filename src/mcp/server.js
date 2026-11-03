@@ -151,6 +151,22 @@ async function callTool(ctx, toolName, args, cfg) {
   // still ALWAYS confirms.
   const LIFECYCLE_TOOLS = new Set(['start_server', 'stop_server', 'force_stop_server', 'safe_restart', 'start_instance', 'stop_instance', 'prepare_and_start']);
   const lifecycleAutoAllowed = cfg.autoAllowWrite && LIFECYCLE_TOOLS.has(toolName);
+  if (args && typeof args === 'object') {
+    if (['delete_content', 'toggle_content', 'delete_backup', 'restore_backup', 'extract_datapack', 'validate_datapack'].includes(toolName)) {
+      const raw = String(args.name || '');
+      if (!raw) return { ok: false, error: 'name is required.' };
+      if (path.basename(raw) !== raw || raw.includes('/') || raw.includes('\\')) {
+        return { ok: false, error: 'Invalid file name.' };
+      }
+    }
+    if (['write_file', 'edit_file'].includes(toolName)) {
+      const raw = String(args.path || '');
+      if (!raw) return { ok: false, error: 'path is required.' };
+      if (raw.includes('..') || path.isAbsolute(raw)) {
+        return { ok: false, error: 'Path outside the server folder.' };
+      }
+    }
+  }
   if (tool.risk === 'write' && !cfg.autoAllowWrite) {
     const yes = await confirmOnGui(ctx, toolName, args, 'write', instanceName);
     if (!yes) { auditLog(toolName, 'write', { ok: false, error: 'denied by user' }); return { ok: false, error: denyMsg('write tool') }; }

@@ -50,6 +50,19 @@ const check = (name, cond) => cond ? (pass++, console.log('PASS', name)) : (fail
   const gpRes = await gp.handler(ctx, { name: 'diagnose_server' });
   check('get_prompt returns messages', gpRes && gpRes.ok && Array.isArray(gpRes.result?.messages) && gpRes.result.messages.length > 0);
 
+  // Test 4: read_file resolves virtual resources server/status and crash-reports/latest
+  const rfStatus = await rf.handler(ctx, { path: 'server/status' });
+  check('read_file server/status ok', rfStatus && rfStatus.ok && typeof rfStatus.result?.content === 'string');
+
+  const rfCrash = await rf.handler(ctx, { path: 'crash-reports/latest' });
+  check('read_file crash-reports/latest ok', rfCrash && rfCrash.ok && typeof rfCrash.result?.content === 'string');
+
+  // Test 5: callTool pre-validates path traversal before confirmation prompt
+  const { callTool } = require('../src/mcp/server.js');
+  const guardCtx = { activeInstanceId: 'default', runInInstance: (id, fn) => fn(), onMcpConfirm: () => { throw new Error('should not ask confirm'); } };
+  const evilDel = await callTool(guardCtx, 'delete_content', { name: '../server.properties' }, {});
+  check('callTool pre-validates traversal without prompt', evilDel && evilDel.ok === false && evilDel.error === 'Invalid file name.');
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
 
   console.log(`\n${pass} passed, ${fail} failed`);

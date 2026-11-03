@@ -81,9 +81,25 @@ function friendlyEditorError(err) {
   return err;
 }
 async function tReadFile(ctx, a) {
-  const p = String(a?.path || '');
-  if (p === 'server/status' || p === 'observer://server/status') return { ok: false, error: "File not found. Note: 'observer://server/status' is an MCP resource. Use tool 'get_status' or MCP protocol 'resources/read' with uri 'observer://server/status'." };
-  if (p === 'crash-reports/latest' || p === 'observer://crash-reports/latest') return { ok: false, error: "File not found. Note: 'observer://crash-reports/latest' is an MCP resource. Use tool 'get_crash_report' or MCP protocol 'resources/read' with uri 'observer://crash-reports/latest'." };
+  const p = String(a?.path || '').trim();
+  if (p === 'server/status' || p === 'crash-reports/latest' || p.startsWith('observer://')) {
+    const uri = p.startsWith('observer://') ? p : ('observer://' + p);
+    try {
+      const { resolveResource } = require('./resources.js');
+      const target = resolveResource(uri);
+      if (target) {
+        const tool = getTool(target.tool);
+        if (tool) {
+          const res = await tool.handler(ctx, target.args || {});
+          const payload = res.result !== undefined ? res.result : res;
+          const content = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+          const out = { path: p, content, size: Buffer.byteLength(content, 'utf8'), readOnly: true };
+          return { ok: true, rel: p, ...out, result: out };
+        }
+      }
+    } catch {}
+  }
+
   const root = needPath(ctx);
   const r = editor.openFile(root, a?.path);
   if (!r.ok) return { ok: false, error: friendlyEditorError(r.error) };
