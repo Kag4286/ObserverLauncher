@@ -680,7 +680,7 @@ $('#wmCopySeed').onclick=async()=>{if(!wm.level)return;try{await navigator.clipb
 // fetch from the OLD dimension, or its response lands after the switch and paints old-dimension
 // biome colours into the new one. Bump the request seq + cancel the debounce timer so a late reply
 // is dropped (the seq check in wmScheduleBiomes/wmPrefetchBiomes discards stale responses).
-$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{
+$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{
   const oldDim=wm.dim;
   const newDim=c.dataset.dim;
   if(oldDim!==newDim){
