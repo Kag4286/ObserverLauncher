@@ -148,6 +148,24 @@ function uvc(uv, texW, texH) {
   };
 }
 
+function uvcMirrored(uv, texW, texH) {
+  const px = 1 / (texW || 64), py = 1 / (texH || 64);
+  const mapMirrored = (box) => {
+    const [x, y, pw, ph] = box;
+    const u0 = x * px;
+    const u1 = (x + pw) * px;
+    const v0 = 1 - (y + ph) * py;
+    const v1 = 1 - y * py;
+    // Swapped U coordinates for horizontal mirror (vanilla Minecraft ModelRenderer):
+    return [[u1, v0], [u0, v0], [u0, v1], [u1, v1]];
+  };
+  return {
+    top: mapMirrored(uv.top), bottom: mapMirrored(uv.bottom),
+    east: mapMirrored(uv.right), front: mapMirrored(uv.front), // +X outside face takes right limb outer face
+    west: mapMirrored(uv.left),  back: mapMirrored(uv.back),  // -X inner face takes right limb inner face
+  };
+}
+
 function buildCube(w, h, d, faces) {
   const x = w / 2, y = h / 2, z = d / 2;
   const p = []; const t = [];
@@ -338,8 +356,8 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const cLeggings64 = buildCube(8.7, 12.4, 4.7, uvc(UV.body, SKIN, 64));
   const cRightLeggings32 = buildCube(4.55, 12.35, 4.55, uvc(UV.rightLeg, SKIN, 32));
   const cRightLeggings64 = buildCube(4.55, 12.35, 4.55, uvc(UV.rightLeg, SKIN, 64));
-  const cLeftLeggings32 = buildCube(4.55, 12.35, 4.55, uvc(UV.rightLeg, SKIN, 32));
-  const cLeftLeggings64 = buildCube(4.55, 12.35, 4.55, uvc(UV.rightLeg, SKIN, 64));
+  const cLeftLeggings32 = buildCube(4.55, 12.35, 4.55, uvcMirrored(UV.rightLeg, SKIN, 32));
+  const cLeftLeggings64 = buildCube(4.55, 12.35, 4.55, uvcMirrored(UV.rightLeg, SKIN, 64));
 
   // Level 3: Outer armor parts (Helmet, Chestplate, Boots, +1.0..+1.2 inflation)
   const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32));
@@ -348,12 +366,12 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
   const cRightArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
   const cRightArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
-  const cLeftArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
-  const cLeftArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
+  const cLeftArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvcMirrored(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
+  const cLeftArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvcMirrored(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
   const cRightBoot32 = buildCube(4.9, 12.6, 4.9, uvc(UV.rightLeg, SKIN, 32));
   const cRightBoot64 = buildCube(4.9, 12.6, 4.9, uvc(UV.rightLeg, SKIN, 64));
-  const cLeftBoot32 = buildCube(4.9, 12.6, 4.9, uvc(UV.rightLeg, SKIN, 32));
-  const cLeftBoot64 = buildCube(4.9, 12.6, 4.9, uvc(UV.rightLeg, SKIN, 64));
+  const cLeftBoot32 = buildCube(4.9, 12.6, 4.9, uvcMirrored(UV.rightLeg, SKIN, 32));
+  const cLeftBoot64 = buildCube(4.9, 12.6, 4.9, uvcMirrored(UV.rightLeg, SKIN, 64));
 
   let rotX = 0, rotY = 0;
   let dragging = false, lastX = 0, lastY = 0;

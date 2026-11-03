@@ -211,6 +211,8 @@ const STATIC_TOOLS = [
   ['list_players', 'Online, whitelisted, banned, op and known players.'],
   ['get_player_data', 'Read one player .dat (stats/inventory) by UUID or name.'],
   ['list_files', 'List a directory inside the server folder.'],
+  ['list_prompts', 'List available workflow prompt templates (name, title, description, arguments).'],
+  ['get_prompt', 'Get the sequence of messages for a specific workflow prompt.'],
   ['read_file', 'Read a text file inside the server folder.'],
   ['search_files', 'Grep text files inside the server folder.'],
   ['list_content', 'Plugins, mods and datapacks (mods carry a loader flag).'],
@@ -331,14 +333,25 @@ async function handle(msg) {
   }
   if (method === 'prompts/list') {
     const r = await fetchJsonPath('/prompts');
-    return reply(id, { prompts: (r && r.prompts) || [] });
+    let prompts = (r && r.prompts) || [];
+    if (!prompts.length) {
+      try { prompts = require('./prompts.js').promptList(); } catch {}
+    }
+    return reply(id, { prompts });
   }
   if (method === 'prompts/get') {
     const name = params && params.name;
     if (!name) return replyError(id, -32602, 'prompt name is required');
     const args = (params && params.arguments) || {};
     const b64 = Buffer.from(JSON.stringify(args)).toString('base64');
-    const r = await fetchJsonPath('/prompt?name=' + encodeURIComponent(name) + '&args=' + encodeURIComponent(b64));
+    let r = await fetchJsonPath('/prompt?name=' + encodeURIComponent(name) + '&args=' + encodeURIComponent(b64));
+    if (!r || !r.ok) {
+      try {
+        const { getPrompt } = require('./prompts.js');
+        const p = getPrompt(name);
+        if (p) r = { ok: true, description: p.description, messages: p.build(args) };
+      } catch {}
+    }
     if (!r || !r.ok) return replyError(id, -32602, (r && r.error) || 'Prompt not available (is ObserverLauncher running?).');
     return reply(id, { description: r.description, messages: r.messages });
   }
@@ -366,7 +379,7 @@ async function handle(msg) {
     const name = params && params.name;
     const args = (params && params.arguments) || {};
     const r = await callApp(name, args);
-    const payload = r.ok ? (r.result === undefined ? { ok: true } : r.result) : { ok: false, error: r.error || 'unknown' };
+    const payload = r.ok ? (r.result !== undefined ? r.result : (() => { const { ok, ...rest } = r; return Object.keys(rest).length ? rest : { ok: true }; })()) : { ok: false, error: r.error || 'unknown' };
     const text = r.ok ? JSON.stringify(payload, null, 2) : ('Error: ' + (r.error || 'unknown'));
     // structuredContent (MCP 2025-06-18): the machine-readable form, so a client can act on fields
     // (e.g. doctor checks[].level/fix) without re-parsing the text blob.

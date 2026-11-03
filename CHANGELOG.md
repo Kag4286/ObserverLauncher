@@ -22,6 +22,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Implemented `candidateArmorEntries` and `readArmorTexture` in `src/main/mods-index.js` to look up mod armor PNG textures directly inside active mod JAR files at `assets/<namespace>/textures/models/armor/<material>_layer_<layer>.png`.
 - **Slim/Alex Model Arm Alignment:**
   - Adjusted Alex skin geometry arm offset from 5.0 to 5.5 units in `03b-player-3d.js` to eliminate mesh clipping with 3D armor geometry.
+- **Armor Texture Mirroring (`src/renderer/js/03b-player-3d.js`):**
+  - Implemented `uvcMirrored(uv, texW, texH)` to flip U coordinates and map East face to outer right-limb texture for left limbs (`cLeftArmArmor`, `cLeftLeggings`, `cLeftBoot`), preventing transparent outer armor faces and base skin show-through.
+- **Player Inspector Float Precision Formatting (`src/renderer/js/03-players.js`):**
+  - Added `fmtStat()` to format raw NBT 32-bit floats (Health, Saturation) to at most 1 decimal place, preventing text wrapping in health vital meters and text collision in `#pdSupport`.
 
 ### Player Analytics:
 - **Blocks Mined Leaderboard Fix (`src/main/player-analytics.js`):**
@@ -62,6 +66,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Added `canShowDialog()` helper in `importMrpackFromPath` and `copyOverridesWithConfirm` to avoid Electron modal dialog invocation and process deadlocks in headless, CLI, or MCP contexts.
 - **Stream Performance & UTF-8 Integrity (`src/mcp/server.js`):**
   - Replaced quadratic string concatenation in POST `/rpc` handler with a chunked buffer array, eliminating $O(N^2)$ byte length scans and preserving multi-byte UTF-8 character integrity.
+- **Tool Payload Preservation (`src/mcp/bridge.js`, `src/mcp/tools.js`):**
+  - Fixed payload unpacking in `bridge.js` so flat tool return objects retain their keys instead of collapsing to `{ ok: true }`. Ensured `tReadFile` returns both structured `result` and backward-compatible fields with masked secrets.
+- **Tool-Based Prompt Discovery (`src/mcp/tools.js`, `src/mcp/bridge.js`):**
+  - Registered `list_prompts` and `get_prompt` read-tier tools so AI clients without native prompt menus can discover and execute workflow prompts programmatically. Added offline fallback for `prompts/list` in `bridge.js`.
 - **Bridge Lifecycle & Spec Upgrades (`src/mcp/bridge.js`, `src/mcp/prompts.js`, `src/mcp/resources.js`):**
   - Added stale launcher PID detection with automatic dead config cleanup via `process.kill(cfg.pid, 0)`.
   - Added support for `notifications/cancelled` notification.
@@ -69,6 +77,10 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Added new resource templates: `observer://instance/{id}/properties`, `observer://instance/{id}/players`, and static resource `observer://crash-reports/latest`.
 
 ### UI / UX & Notifications:
+- **Multi-Instance Tunnel Isolation (`src/renderer/js/07-overview.js`, `src/renderer/js/08-shell.js`):**
+  - Removed shared `localStorage` caching for `#tunnelManual`, keeping manual tunnel addresses strictly isolated per instance in settings. Added automatic re-sync of Pinggy and Playit status on instance switch.
+- **Pinggy Error Feedback (`src/renderer/index.html`, `src/renderer/js/08-shell.js`):**
+  - Added `#pinggyMsg` banner for clear error feedback when SSH tunnels fail or encounter startup timeouts.
 - **Player Leave Webhook Event (`src/main/webhook.js`, `src/main/server-lifecycle.js`, `src/renderer/index.html`):**
   - Added `player_leave` event type to `EVENTS` with log pattern matching for disconnection notices.
   - Added webhook event chip to Settings > Webhooks in `index.html`.

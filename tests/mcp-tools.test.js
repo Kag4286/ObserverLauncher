@@ -58,6 +58,11 @@ check('read_file path is string', rf.inputSchema.properties.path.type === 'strin
 
 // --- 0.9.0 additions ---
 check('get_schedule is read', getTool('get_schedule')?.risk === 'read');
+check('tool exists: list_prompts', !!getTool('list_prompts'));
+check('list_prompts is read', getTool('list_prompts')?.risk === 'read');
+check('tool exists: get_prompt', !!getTool('get_prompt'));
+check('get_prompt is read', getTool('get_prompt')?.risk === 'read');
+check('get_prompt requires name', (getTool('get_prompt')?.inputSchema?.required || []).includes('name'));
 check('set_schedule is write', getTool('set_schedule')?.risk === 'write');
 check('list_waypoints is read', getTool('list_waypoints')?.risk === 'read');
 check('kick_player is write', getTool('kick_player')?.risk === 'write');

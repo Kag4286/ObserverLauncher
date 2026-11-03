@@ -457,6 +457,8 @@ async function refreshFromState(){
   repaintConsole(state.logs);
   rebuildSamples(state.metricsHistory,state.metricsLong);
   refreshUI();
+  try{ window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{}); }catch{}
+  try{ refreshTunnelUI(); }catch{}
 }
 // F1 (3.2.5): per-instance views must be dropped when the active instance changes, or they keep
 // showing the PREVIOUS instance's data - the editor held an open file whose Save would then write
@@ -875,11 +877,12 @@ $('#geyserTestBtn')?.addEventListener('click',async()=>{const b=$('#geyserTestBt
 // the user owns), then re-fetch state so the panel reflects the repaired config.
 $('#geyserFixBtn')?.addEventListener('click',()=>withBusy($('#geyserFixBtn'),async()=>{if(!await confirmDialog({title:t('geyser.fix'),body:t('geyser.fixConfirm'),ok:t('geyser.fix')}))return;const safe=await window.observer.geyserApplyFix({});if(!safe||!safe.ok)return toast((safe&&safe.error)||t('geyser.fixFail'),'error');let changed=(safe.changed||[]).slice(),backup=safe.backup;const portIssue=!!(state.geyser&&state.geyser.issues&&state.geyser.issues.some(it=>it.key==='bedrock.port'));if(portIssue&&await confirmDialog({title:t('geyser.fixPort'),body:t('geyser.fixPortConfirm'),ok:t('geyser.fixPort')})){const pr=await window.observer.geyserApplyFix({includeBedrockPort:true});if(!pr||!pr.ok)toast((pr&&pr.error)||t('geyser.fixFail'),'error');else{changed=changed.concat(pr.changed||[]);backup=pr.backup||backup}}if(!changed.length)return toast(t('geyser.fixNone'),'success');toast(t('geyser.fixDone',{n:changed.length}),'success');if(backup)toast(t('geyser.fixBackup',{p:backup}),'success');try{const s=await window.observer.getState();state={...state,...s};refreshUI()}catch{}}));
 // v6.0.0 A2.5: Pinggy Bedrock UDP tunnel controls.
-function applyPinggyStatus(s){s=s||{};const pill=$('#pinggyPill'),start=$('#pinggyStartBtn'),stop=$('#pinggyStopBtn'),copy=$('#pinggyCopyBtn'),row=$('#pinggyAddrRow'),addr=$('#pinggyAddr'),hint=$('#pinggyHint');const st=s.status||'stopped';
+function applyPinggyStatus(s){s=s||{};const pill=$('#pinggyPill'),start=$('#pinggyStartBtn'),stop=$('#pinggyStopBtn'),copy=$('#pinggyCopyBtn'),row=$('#pinggyAddrRow'),addr=$('#pinggyAddr'),hint=$('#pinggyHint'),msg=$('#pinggyMsg');const st=s.status||'stopped';
   if(pill){pill.textContent=st==='running'?t('pg.running'):st==='starting'?t('pg.starting'):st==='error'?t('pg.error'):t('pg.off');pill.className='tunnel-pill '+(st==='running'?'running':st==='error'?'error':'')}
   if(start){start.hidden=st==='running'||st==='starting';start.disabled=st==='starting'}
   if(stop)stop.hidden=!(st==='running'||st==='starting')
   if(s.address){if(addr)addr.value=s.address;if(row)row.hidden=false;if(copy)copy.hidden=false;if(hint)hint.textContent=t('pg.shareHint')}else{if(row)row.hidden=true;if(copy)copy.hidden=true}
+  if(msg){if(st==='error'){msg.hidden=false;msg.textContent=s.error||t('pg.startFail')}else{msg.hidden=true;msg.textContent=''}}
 }
 $('#pinggyStartBtn')?.addEventListener('click',()=>withBusy($('#pinggyStartBtn'),async()=>{const r=await window.observer.pinggyStart('udp');if(!r||!r.ok)return toast((r&&r.error)||t('pg.startFail'),'error');toast(t('pg.started'),'success');applyPinggyStatus({status:'running',address:r.address})}));
 $('#pinggyStopBtn')?.addEventListener('click',()=>withBusy($('#pinggyStopBtn'),async()=>{const r=await window.observer.pinggyStop();if(r&&r.ok){toast(t('pg.stopped'),'success');applyPinggyStatus({status:'stopped'})}else toast((r&&r.error)||t('pg.stopFail'),'error')}));
@@ -912,7 +915,7 @@ $('#crashFixJavaBtn')?.addEventListener('click',()=>{
 $('#crashClose')?.addEventListener('click',()=>{const p=$('#crashPanel');if(p)p.hidden=true});
 try{window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{})}catch{}
 $('#autoTunnelQuick')?.addEventListener('change',async()=>{const next={...getSettings(),autoTunnel:$('#autoTunnelQuick').checked};const r=await window.observer.saveSettings(next);if(!r.ok){toast(r.error,'error');return}state={...state,settings:next,java:r.java};if($('#autoTunnelInput'))$('#autoTunnelInput').checked=next.autoTunnel;toast(next.autoTunnel?t('tun.autoOnToast'):t('tun.autoOffToast'),'success')});
-const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=localStorage.getItem('tunnelManualAddress')||state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{localStorage.setItem('tunnelManualAddress',tunnelManual.value.trim());window.observer.saveManualTunnel(tunnelManual.value.trim())})}
+const tunnelManual=$('#tunnelManual');if(tunnelManual){tunnelManual.value=state.settings?.tunnelAddress||'';tunnelManual.addEventListener('change',()=>{const addr=tunnelManual.value.trim();if(state.settings)state.settings.tunnelAddress=addr;window.observer.saveManualTunnel(addr);if(typeof renderTunnelOverview==='function')renderTunnelOverview()})}
 async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();applyTunnelStatus(s)}catch{}}
 function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelStart'),msg=$('#tunnelMsg');if(!pill)return;
   const st=s?.status||'stopped';pill.textContent=st==='running'?t('tun.live'):st==='installing'?t('tun.installing'):st==='starting'?t('tun.starting'):st==='error'?t('tun.error'):t('tun.off');pill.className='tunnel-pill '+st;

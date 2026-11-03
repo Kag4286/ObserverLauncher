@@ -1,6 +1,6 @@
 # ObserverLauncher 7.0.1
 
-ObserverLauncher 7.0.1 is a comprehensive maintenance, security hardening, and reliability release. It brings full custom mod armor rendering and visibility toggles to the **3D Player Inspector**, polymorphic multi-engine diagnostics for the **Horizon Dedicated Server**, hardened security boundaries and new workflows for the **MCP (Model Context Protocol)** AI integration, and key platform bug fixes.
+ObserverLauncher 7.0.1 is a comprehensive maintenance, security hardening, and reliability release. It brings full custom mod armor rendering and visibility toggles to the **3D Player Inspector**, polymorphic multi-engine diagnostics for the **Horizon Dedicated Server**, hardened security boundaries and new workflows for the **MCP (Model Context Protocol)** AI integration, multi-instance network tunnel isolation, and key platform bug fixes.
 
 For developer-level technical details, see the [developer changelog](https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md#701---2026-11-02).
 
@@ -9,6 +9,8 @@ For developer-level technical details, see the [developer changelog](https://git
 ## 3D Player Inspector: Custom Mod Armor & Clean Previews
 
 - **Modded Armor Texture Rendering:** Players wearing armor from popular Minecraft mods (such as Ice and Fire, Botania, or custom modpacks) now have their armor textures loaded and rendered directly from active mod files onto the 3D player model.
+- **Symmetric Armor UV Mirroring:** Left arm, left leggings, and left boot textures now mirror horizontal U coordinates and map outer faces correctly, eliminating transparent outer shoulders that revealed underlying skin.
+- **Stat Float Precision Formatting:** Health and Saturation values from NBT data are now rounded to at most 1 decimal place, preventing awkward text wrapping and overlapping numbers in the inspector header.
 - **Armor Decoupling & Independent Layers:** Each armor slot (helmet, chestplate, leggings, boots) loads and binds its respective texture layer independently, correctly supporting mixed sets and custom 64x64 or 64x32 UV layouts.
 - **Alex / Slim Model Alignment:** Adjusted arm positions for slim skin models by 0.5 units, completely eliminating visual mesh clipping between player sleeves and 3D armor geometry.
 - **3D Armor Visibility Toggle:** Added a dedicated toggle button (`#pd3dToggleArmor`) allowing users to easily hide or show 3D armor on the player preview. Outer skin layers are cleanly managed to avoid Z-fighting artifacts.
@@ -26,7 +28,8 @@ For developer-level technical details, see the [developer changelog](https://git
 ## MCP (Model Context Protocol) AI Integration: Hardened Security & New Workflows
 
 - **Path Traversal Elimination:** Enhanced file deletion validation (`delete_content`) to prevent directory traversal escapes out of mod and plugin directories.
-- **Credential Protection:** Direct file reads (`read_file`, `read_many_files`, and file resource templates) now automatically mask sensitive configuration keys (`rcon.password`, Velocity forwarding secrets) with `[redacted]`, preventing accidental credential disclosure to connected AI clients.
+- **Credential Protection & Content Preservation:** Direct file reads (`read_file`, `read_many_files`, and file resource templates) automatically mask sensitive configuration keys (`rcon.password`, Velocity forwarding secrets) with `[redacted]`. Fixed bridge payload unwrap so masked file contents are fully preserved and transmitted to connected AI clients.
+- **Tool-Based Prompt Discovery:** Added `list_prompts` and `get_prompt` tools along with offline fallbacks so AI agents using tool-only interfaces can discover and trigger ready-made diagnostic workflows directly.
 - **Privilege Escalation Defense:** Removed internal write-approval toggles from MCP-settable launcher settings, guaranteeing that an AI agent cannot self-grant write permissions without GUI user confirmation.
 - **Subscription Rate-Limit Stability:** Resolved an issue where background resource subscriptions could consume request quotas and trigger HTTP 429 rate limits, ensuring smooth polling and real-time updates.
 - **New Workflow Prompts:**
@@ -39,6 +42,8 @@ For developer-level technical details, see the [developer changelog](https://git
 
 ## Subsystem & Platform Improvements
 
+- **Multi-Instance Tunnel Isolation:** Manual Playit tunnel addresses are now isolated strictly per server instance in configuration rather than shared globally across instances, and Pinggy tunnel status updates immediately upon switching instances.
+- **Pinggy Error Messaging:** Added dedicated status message banner for Pinggy tunnels to surface actionable error descriptions when SSH port forwarding fails.
 - **Accurate Blocks Mined Stats:** Updated player analytics to count all mined blocks across individual block categories, resolving an issue where mined totals were underreported on certain server builds.
 - **Player Leave Webhook Notifications:** Added Discord-compatible webhook notifications whenever a player leaves the server.
 - **World Map Coordinate Switching:** Added 1:8 coordinate conversion when switching between Overworld and Nether views on the interactive world map, with centered navigation for The End.

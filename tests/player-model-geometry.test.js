@@ -17,8 +17,8 @@ const ck = (n, c) => c ? (pass++, console.log('PASS', n)) : (fail++, console.log
 // layout constants back out. createPlayerRenderer is never called -- no WebGL needed.
 const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'js', '03b-player-3d.js'), 'utf8');
 const ctx = vm.createContext({ console, Math, Float32Array, Image: function () {} });
-vm.runInContext(src + '\n;globalThis.__layout = { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, buildCube, getArmorMaterial };', ctx);
-const { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, buildCube, getArmorMaterial } = ctx.__layout;
+vm.runInContext(src + '\n;globalThis.__layout = { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, uvcMirrored, buildCube, getArmorMaterial };', ctx);
+const { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, uvcMirrored, buildCube, getArmorMaterial } = ctx.__layout;
 
 const box = name => {
   const [x, y, w, h, d] = PLAYER_PARTS[name];
@@ -178,6 +178,15 @@ ck('modded armor black', (() => {
   const m = getArmorMaterial('iceandfire:armor_black_chestplate');
   return m && m.isMod && m.ns === 'iceandfire' && m.mat === 'armor_black';
 })());
+
+// --- uvcMirrored assertions for left limbs armor ---
+ck('uvcMirrored is function', typeof uvcMirrored === 'function');
+const mArm = uvcMirrored(UV.rightArm, 64, 32);
+// In uvcMirrored, east (+X outer face for left limb) samples right-arm outer texture (right), mirrored
+ck('mArm east samples rightArm.right', Math.round(mArm.east[1][0] * 64) === UV.rightArm.right[0]);
+ck('mArm east has flipped U order', mArm.east[0][0] > mArm.east[1][0]);
+ck('mArm west samples rightArm.left', Math.round(mArm.west[1][0] * 64) === UV.rightArm.left[0]);
+ck('mArm west has flipped U order', mArm.west[0][0] > mArm.west[1][0]);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

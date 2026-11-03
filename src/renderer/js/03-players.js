@@ -319,6 +319,12 @@ function pdIsOnline(name,uuid){
   const n=String(name||'').toLowerCase();
   return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid===uuid));
 }
+function fmtStat(val, fallback = '—') {
+  if (val === null || val === undefined || val === '') return fallback;
+  const num = Number(val);
+  if (!Number.isFinite(num)) return String(val);
+  return Number.isInteger(num) ? String(num) : (Math.round(num * 10) / 10).toFixed(1).replace(/\.0$/, '');
+}
 function renderPdReadout(d,isOnline){
   // v6.0.0 redesign: hierarchy before decoration (DESIGN.md 2.2). Four headline facts at display
   // weight, one supporting line, and the full detail behind a disclosure (2.4).
@@ -337,10 +343,12 @@ function renderPdReadout(d,isOnline){
   const meter=(k,value,cls)=>{
     const max=20, segments=10;
     const hasValue = value !== null && value !== undefined;
-    const n = hasValue ? Math.max(0, Math.min(max, Number(value) || 0)) : 0;
+    const num = hasValue ? Number(value) : 0;
+    const n = hasValue ? Math.max(0, Math.min(max, Number.isFinite(num) ? num : 0)) : 0;
     const filled = hasValue ? Math.round(n / max * segments) : 0;
     const segs = Array.from({length: segments}, (_, i) => `<i class="${i < filled ? cls : ''}"></i>`).join('');
-    return `<div class="pd-vital pd-vital-meter"><span>${esc(k)}</span><b>${hasValue ? esc(String(n)) : '—'}</b>` +
+    const disp = hasValue ? fmtStat(n) : '—';
+    return `<div class="pd-vital pd-vital-meter"><span>${esc(k)}</span><b>${esc(disp)}</b>` +
       `<div class="pd-meter" role="meter" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${n}"${hasValue ? '' : ' aria-disabled="true"'}>${segs}</div></div>`;
   };
   const vitals=$('#pdVitals');
@@ -357,7 +365,7 @@ function renderPdReadout(d,isOnline){
   const support=$('#pdSupport');
   if(support) support.innerHTML=[
     `<span>${esc(t('pd.dimension'))} <span class="pd-dim-chip pd-dim-${dimKey}">${esc(dim||t('ply.unknownDim'))}</span></span>`,
-    `<span>${esc(t('pd.saturation'))} <b>${esc(String(d.saturation??'—'))}</b></span>`,
+    `<span>${esc(t('pd.saturation'))} <b>${esc(fmtStat(d.saturation))}</b></span>`,
     `<span>${esc(t('pd.xp'))} <b>${esc(String(d.xpLevel??0))}</b></span>`,
     `<span>${esc(t('pd.totalXp'))} <b>${esc(String(d.xpTotal??0))}</b></span>`,
   ].join('');
@@ -368,9 +376,9 @@ function renderPdReadout(d,isOnline){
   const rows=[
     [t('pd.stateLabel'),isOnline?t('pd.stateOnline'):t('pd.stateOffline'),isOnline?'ok':'dim'],
     [t('pd.dimension'),d.dimension||t('ply.unknownDim'),'dim'],
-    [t('pd.health'),d.health??'—',''],
-    [t('pd.food'),d.food??'—',''],
-    [t('pd.saturation'),d.saturation??'—',''],
+    [t('pd.health'),fmtStat(d.health),''],
+    [t('pd.food'),fmtStat(d.food),''],
+    [t('pd.saturation'),fmtStat(d.saturation),''],
     [t('pd.xp'),d.xpLevel??0,''],
     [t('pd.totalXp'),d.xpTotal??0,''],
     [t('pd.gamemode'),gm,''],
@@ -822,7 +830,7 @@ async function openPlayerInspector(uuid,name){
   if(posEl){const p=d.pos||[];if(p.length>=3){posEl.hidden=false;posEl.textContent=`X ${Math.round(p[0])}  Y ${Math.round(p[1])}  Z ${Math.round(p[2])}`}else{posEl.hidden=true}}
   renderPdReadout(d,isOnline);
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
-  $('#pdHealth').value=d.health??'';$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation??'';$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
+  $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtStat(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtStat(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
   renderEquipment(d.armor,d.offhand);
   renderItemGrid('#hotbarList',d.inventory);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);

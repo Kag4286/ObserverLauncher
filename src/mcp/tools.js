@@ -85,7 +85,26 @@ async function tReadFile(ctx, a) {
   const r = editor.openFile(root, a?.path);
   if (!r.ok) return { ok: false, error: friendlyEditorError(r.error) };
   const { maskSecrets } = require('./doctor.js');
-  return ok({ ...r, content: maskSecrets(r.content) });
+  const masked = maskSecrets(r.content);
+  const res = { path: a?.path || r.rel, content: masked, size: r.size, readOnly: !!r.readOnly };
+  return { ok: true, rel: r.rel || a?.path, ...res, result: res };
+}
+async function tListPrompts() {
+  const { promptList } = require('./prompts.js');
+  return ok({ prompts: promptList() });
+}
+async function tGetPrompt(ctx, a) {
+  const name = String(a?.name || '').trim();
+  if (!name) return { ok: false, error: 'name is required.' };
+  const { getPrompt } = require('./prompts.js');
+  const p = getPrompt(name);
+  if (!p) return { ok: false, error: 'Unknown prompt: ' + name };
+  try {
+    const messages = p.build(a?.arguments || {});
+    return ok({ name, description: p.description, messages });
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 }
 async function tSearchFiles(ctx, a) {
   const root = needPath(ctx);
@@ -1453,6 +1472,8 @@ const TOOLS = [
   { name: 'list_players', risk: 'read', description: 'Online, whitelisted, banned, op and known players.', inputSchema: S(), handler: tListPlayers },
   { name: 'get_player_data', risk: 'read', description: 'Read one player .dat (stats/inventory) by UUID or name.', inputSchema: S({ uuid: STR('player UUID (optional)'), name: STR('player name (optional)') }), handler: tReadPlayer },
   { name: 'list_files', risk: 'read', description: 'List a directory inside the server folder.', inputSchema: S({ path: STR('relative dir, default .') }), handler: tListFiles },
+  { name: 'list_prompts', risk: 'read', description: 'List available workflow prompt templates (name, title, description, arguments).', inputSchema: S(), handler: tListPrompts },
+  { name: 'get_prompt', risk: 'read', description: 'Get the sequence of messages for a specific workflow prompt.', inputSchema: S({ name: STR('prompt name'), arguments: { type: 'object', description: 'arguments object for the prompt (optional)' } }, ['name']), handler: tGetPrompt },
   { name: 'read_file', risk: 'read', description: 'Read a text file inside the server folder.', inputSchema: S({ path: STR('relative file path') }, ['path']), handler: tReadFile },
   { name: 'search_files', risk: 'read', description: 'Grep text files inside the server folder.', inputSchema: S({ query: STR('substring') }, ['query']), handler: tSearchFiles },
   { name: 'list_content', risk: 'read', description: 'Plugins, mods and datapacks (mods carry a loader flag + loaderMismatch when they do not match the server).', inputSchema: S(), handler: tListContent },
