@@ -833,6 +833,7 @@ async function openPlayerInspector(uuid,name){
   renderPdReadout(d,isOnline);
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
   $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtStat(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtStat(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
+  iconEpoch++;
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
   renderEquipment(d.armor,d.offhand);
   renderItemGrid('#hotbarList',d.inventory);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);

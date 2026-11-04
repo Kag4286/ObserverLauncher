@@ -1177,7 +1177,7 @@ async function tDiagnoseServer(ctx) {
   const result = doctor.diagnoseFromData({
     serverPath: root, hasJar: !!files.jar, isNative, hasNativeBinary: !!files.nativeBinary, nativeBinary: files.nativeBinary, software: isNative ? 'horizon' : undefined, engineType: files.engineType, jar: files.jar, hasLaunchScript: !!files.launchScript, launchScript: files.launchScript,
     java: ctx.javaInfo, javaMajor: javaMajor(ctx.javaInfo?.version), javaRequired, eulaAccepted, port, portFree,
-    worlds: files.worlds, backups: files.backups, memoryMax: s.memoryMax, lastCrash: lastCrash ? lastCrash.name : null,
+    worlds: files.worlds, backups: files.backups, memoryMax: s.memoryMax, modsCount: files.mods?.length || 0, lastCrash: lastCrash ? lastCrash.name : null,
   });
   return { ok: true, result };
 }

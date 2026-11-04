@@ -174,6 +174,31 @@ function classifyCrash(text) {
       let hints = rule.hints;
       let detail = null;
       let action = null;
+      let subCategory = null;
+      if (rule.category === 'out-of-memory') {
+        const isMetaspace = /Metaspace|Compressed class space/i.test(s);
+        if (isMetaspace) {
+          subCategory = 'metaspace';
+          detail = 'JVM ran out of Metaspace (class metadata memory). This typically occurs when loading heavy modpacks with 100+ mods, not from world chunks.';
+          hints = [
+            detail,
+            'Add -XX:MaxMetaspaceSize=512M (or 768M) to JVM arguments in Settings.',
+            'Do not merely increase Heap memory (-Xmx); Metaspace is allocated outside the Java heap.',
+            'Check for mods with classloader leaks or duplicate library jars.'
+          ];
+          action = { type: 'jvm_args', append: '-XX:MaxMetaspaceSize=512M', subCategory: 'metaspace' };
+        } else {
+          subCategory = 'heap';
+          detail = 'Java Heap space exhausted. The server exceeded its maximum allocated RAM.';
+          hints = [
+            detail,
+            'Raise Maximum memory (memoryMax) in Settings if system RAM permits.',
+            'Lower view-distance or simulation-distance in server.properties.',
+            "Consider using Aikar's optimized GC flags."
+          ];
+          action = { type: 'open_settings_memory', subCategory: 'heap' };
+        }
+      }
       if (rule.category === 'java-version') {
         const classVerMatch = s.match(/class file version (\d+(?:\.\d+)?)/i);
         const upToMatch = s.match(/only recognizes class file versions up to (\d+(?:\.\d+)?)/i);
@@ -204,7 +229,7 @@ function classifyCrash(text) {
           action = { type: 'open_settings_java', javaRequired: Number(req) };
         }
       }
-      return { category: rule.category, confidence: strong ? 'high' : 'medium', hints, ...(detail ? { description: detail } : {}), ...(action ? { action } : {}) };
+      return { category: rule.category, ...(subCategory ? { subCategory } : {}), confidence: strong ? 'high' : 'medium', hints, ...(detail ? { description: detail } : {}), ...(action ? { action } : {}) };
     }
   }
   return { category: 'unknown', confidence: 'low', hints: ['No known crash signature matched. Read the crash report and the server log for the first real cause.'] };
@@ -336,6 +361,10 @@ function diagnoseFromData(d) {
     if (d.javaRequired && d.javaMajor != null && d.javaMajor < d.javaRequired) push('java-version', 'error', `Server jar needs Java ${d.javaRequired}+ but detected Java ${d.javaMajor}.`, 'Install the required Java version and point Settings > Java at it.');
     else push('java', 'ok', `Java ${d.java.version} (${d.java.arch || 'unknown arch'}).`);
     if (d.java.arch === '32-bit' && Number(d.memoryMax) > 2) push('java-arch', 'warn', '32-bit Java cannot reliably use more than ~2GB of RAM.', 'Install 64-bit Java, or lower Maximum memory to 2GB or less.');
+  }
+  // modpack memory sizing
+  if (!isNative && d.modsCount != null && Number(d.modsCount) > 50 && Number(d.memoryMax) < 4) {
+    push('modpack-memory', 'warn', `Large modpack detected (${d.modsCount} mods) with only ${d.memoryMax}GB RAM allocated.`, 'Modpacks with 50+ mods typically require at least 4GB-6GB of RAM to prevent OutOfMemory errors.');
   }
   // eula
   if (isNative) {

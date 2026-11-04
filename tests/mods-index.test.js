@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { ModsIndex, candidateEntries, candidateArmorEntries, folderSignature, namespacesIn } = require('../src/main/mods-index.js');
+const { ModsIndex, candidateEntries, candidateModelEntries, resolveTextureFromModelJson, candidateArmorEntries, folderSignature, namespacesIn } = require('../src/main/mods-index.js');
 const { splitModFile } = require('../src/main/textures.js');
 
 let pass = 0, fail = 0;
@@ -71,6 +71,23 @@ t('candidateArmorEntries returns standard model armor layer paths', () => {
 t('candidateEntries rejects path tricks', () => {
   assert.deepStrictEqual(candidateEntries('../../etc', 'x'), []);
   assert.deepStrictEqual(candidateEntries('create', '../secret'), []);
+});
+
+t('candidateModelEntries returns standard model json paths', () => {
+  const m = candidateModelEntries('botania', 'lexicon');
+  assert.deepStrictEqual(m, [
+    'assets/botania/models/item/lexicon.json',
+    'assets/botania/models/block/lexicon.json',
+  ]);
+});
+
+t('resolveTextureFromModelJson resolves layer0 and all', () => {
+  const json1 = JSON.stringify({ textures: { layer0: 'botania:item/special/lexicon' } });
+  assert.strictEqual(resolveTextureFromModelJson(json1, 'botania'), 'assets/botania/textures/item/special/lexicon.png');
+  const json2 = JSON.stringify({ textures: { all: 'create:block/casing/brass' } });
+  assert.strictEqual(resolveTextureFromModelJson(json2, 'create'), 'assets/create/textures/block/casing/brass.png');
+  const json3 = JSON.stringify({ textures: { layer0: 'item/copper_pickaxe' } });
+  assert.strictEqual(resolveTextureFromModelJson(json3, 'create'), 'assets/create/textures/item/copper_pickaxe.png');
 });
 
 t('namespacesIn reads the first path segment', () => {
@@ -170,6 +187,17 @@ t('readArmorTexture extracts layer from jar', () => {
       ['assets/create/textures/item/materials/sheet_brass.png', Buffer.from('BRASS_SHEET')],
     ]));
     assert.strictEqual(idx.readTexture('create', 'brass_sheet').toString(), 'BRASS_SHEET');
+  });
+
+  t('readTexture resolves via model JSON when direct PNG has different name', () => {
+    fs.writeFileSync(path.join(dir, 'tinkers-1.0.jar'), makeZip([
+      ['assets/tinkers/models/item/broadsword.json', Buffer.from(JSON.stringify({
+        parent: 'item/handheld',
+        textures: { layer0: 'tinkers:item/weapons/cleaver' }
+      }))],
+      ['assets/tinkers/textures/item/weapons/cleaver.png', Buffer.from('CLEAVER_PNG')],
+    ]));
+    assert.strictEqual(idx.readTexture('tinkers', 'broadsword').toString(), 'CLEAVER_PNG');
   });
 
   t('readTexture falls back to all jars for common tag namespace (c:wrench)', () => {

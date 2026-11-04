@@ -123,6 +123,24 @@ ck('analyze budget stops early', capped.timedOut === true && (Date.now() - t0) <
 
 // ---- classifyCrash (C1) ----
 ck('OOM -> out-of-memory high', doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space').category === 'out-of-memory' && doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space').confidence === 'high');
+
+const metaOom = doctor.classifyCrash('java.lang.OutOfMemoryError: Metaspace');
+ck('OOM Metaspace -> subCategory metaspace', metaOom.category === 'out-of-memory' && metaOom.subCategory === 'metaspace');
+ck('OOM Metaspace -> action appends MaxMetaspaceSize', metaOom.action && metaOom.action.append === '-XX:MaxMetaspaceSize=512M');
+
+const heapOom = doctor.classifyCrash('java.lang.OutOfMemoryError: Java heap space');
+ck('OOM Heap -> subCategory heap', heapOom.category === 'out-of-memory' && heapOom.subCategory === 'heap');
+
+const c65 = doctor.classifyCrash('java.lang.UnsupportedClassVersionError: ... (class file version 65.0), this version only recognizes up to 61.0');
+ck('class file 65.0 -> Java 21 hint', c65.hints[0].includes('Requires Java 21') && c65.hints[0].includes('Minecraft 1.20.5+ / 1.21.x'));
+ck('class file 65.0 -> action has javaRequired 21', c65.action && c65.action.javaRequired === 21);
+
+const diagMod = doctor.diagnoseFromData({
+  serverPath: 'C:\\server', hasJar: true, jar: 'fabric.jar',
+  java: { ok: true, version: '21.0.2' }, javaMajor: 21,
+  modsCount: 65, memoryMax: 2
+});
+ck('diagnose warns on large modpack with low RAM', diagMod.checks.some(c => c.id === 'modpack-memory' && c.level === 'warn'));
 ck('UnsupportedClassVersion -> java-version', doctor.classifyCrash('java.lang.UnsupportedClassVersionError: class file version 65.0').category === 'java-version');
 const c69 = doctor.classifyCrash('UnsupportedClassVersionError: ... has been compiled by a more recent version of the Java Runtime (class file version 69.0), this version only recognizes class file versions up to 65.0');
 ck('class file 69.0 -> Java 25 hint', c69.hints[0].includes('Requires Java 25') && c69.hints[0].includes('detected Java 21') && c69.hints[0].includes('Minecraft 26.x'));

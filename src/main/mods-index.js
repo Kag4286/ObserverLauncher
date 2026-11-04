@@ -20,32 +20,82 @@ function isCleanNamespaceAndName(ns, nm) {
   return !ns.includes('..') && !nm.split('/').includes('..');
 }
 
+function prepareResourceName(namespace, name) {
+  const ns = String(namespace || '').toLowerCase();
+  const nm = String(name || '').toLowerCase();
+  if (!isCleanNamespaceAndName(ns, nm)) return null;
+  const segs = nm.split('_');
+  const inv = (nm.includes('_') && segs.length === 2) ? `${segs[1]}_${segs[0]}` : null;
+  return { ns, nm, inv };
+}
+
+function expandAssetPaths(namespace, name, formatFn) {
+  const p = prepareResourceName(namespace, name);
+  if (!p) return [];
+  const list = [formatFn(p.ns, p.nm)];
+  if (p.inv) list.push(formatFn(p.ns, p.inv));
+  return list.flat();
+}
+
 // PURE: a Minecraft mod jar packs items as assets/<ns>/textures/item[s]/<name>.png. Return the
 // list of candidate entry paths for a namespace/name pair; some packs nest under `item/`, others
 // under `items/`, so try both spellings.
 function candidateEntries(namespace, name) {
-  const ns = String(namespace || '').toLowerCase();
-  const nm = String(name || '').toLowerCase();
-  if (!isCleanNamespaceAndName(ns, nm)) return [];
-  const out = [
-    `assets/${ns}/textures/item/${nm}.png`,
-    `assets/${ns}/textures/items/${nm}.png`,
-    `assets/${ns}/textures/block/${nm}.png`,
-    `assets/${ns}/textures/blocks/${nm}.png`,
-  ];
-  if (nm.includes('_')) {
-    const segs = nm.split('_');
-    if (segs.length === 2) {
-      const inv = `${segs[1]}_${segs[0]}`;
-      out.push(
-        `assets/${ns}/textures/item/${inv}.png`,
-        `assets/${ns}/textures/items/${inv}.png`,
-        `assets/${ns}/textures/block/${inv}.png`,
-        `assets/${ns}/textures/blocks/${inv}.png`,
-      );
+  return expandAssetPaths(namespace, name, (ns, n) => [
+    `assets/${ns}/textures/item/${n}.png`,
+    `assets/${ns}/textures/items/${n}.png`,
+    `assets/${ns}/textures/block/${n}.png`,
+    `assets/${ns}/textures/blocks/${n}.png`,
+  ]);
+}
+
+// PURE: candidate paths for item/block model JSON descriptors inside mod jars.
+function candidateModelEntries(namespace, name) {
+  return expandAssetPaths(namespace, name, (ns, n) => [
+    `assets/${ns}/models/item/${n}.json`,
+    `assets/${ns}/models/block/${n}.json`,
+  ]);
+}
+
+// PURE: parse a model JSON descriptor to extract the primary texture file path.
+// Handles layer0, layer1, texture, all, and other custom variable assignments.
+function resolveTextureFromModelJson(jsonText, defaultNs) {
+  if (!jsonText) return null;
+  let parsed;
+  try {
+    parsed = typeof jsonText === 'string' ? JSON.parse(jsonText) : jsonText;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const tex = parsed.textures;
+  if (!tex || typeof tex !== 'object') return null;
+  const priorityKeys = ['layer0', 'layer1', 'texture', 'all', 'top', 'front', 'side', 'particle'];
+  let ref = null;
+  for (const k of priorityKeys) {
+    if (typeof tex[k] === 'string' && tex[k].trim()) {
+      ref = tex[k].trim();
+      break;
     }
   }
-  return out;
+  if (!ref) {
+    for (const v of Object.values(tex)) {
+      if (typeof v === 'string' && v.trim()) {
+        ref = v.trim();
+        break;
+      }
+    }
+  }
+  if (!ref || ref.startsWith('#')) return null;
+  ref = ref.replace(/\.png$/i, '');
+  let texNs = defaultNs;
+  let texPath = ref;
+  if (ref.includes(':')) {
+    const idx = ref.indexOf(':');
+    texNs = ref.slice(0, idx).toLowerCase();
+    texPath = ref.slice(idx + 1);
+  }
+  return `assets/${texNs}/textures/${texPath}.png`;
 }
 
 // PURE: candidate paths for armor worn textures inside mod jars.
@@ -108,7 +158,6 @@ class ModsIndex {
   constructor() {
     this.modsDir = null;
     this.signature = '';
-    this.lastSignatureCheck = 0;
     this.byNamespace = new Map(); // ns -> [absJarPath]
     this.jarCache = new Map();    // absJarPath -> jar handle (openJar)
     this.extractCache = new Map(); // `${ns}:${name}` -> Buffer
@@ -121,7 +170,6 @@ class ModsIndex {
     if (d === this.modsDir) return;
     this.modsDir = d;
     this.signature = '';
-    this.lastSignatureCheck = 0;
     this.byNamespace.clear();
     this.jarCache.clear();
     this.extractCache.clear();
@@ -154,16 +202,18 @@ class ModsIndex {
     }
   }
 
-  _findInJars(ns, wanted, cacheKey, fallbackMatcher) {
+  _getJarsForNamespace(ns) {
     let jars = this.byNamespace.get(ns) || [];
     if (!jars.length) {
       const cleanNs = ns.replace(/[^a-z0-9]/g, '');
-      if (this.byNamespace.has(cleanNs)) {
-        jars = this.byNamespace.get(cleanNs) || [];
-      } else if (ns === 'c' || ns === 'forge' || ns === 'common') {
-        jars = [...this.jarCache.keys()];
-      }
+      if (this.byNamespace.has(cleanNs)) jars = this.byNamespace.get(cleanNs) || [];
+      else if (ns === 'c' || ns === 'forge' || ns === 'common') jars = [...this.jarCache.keys()];
     }
+    return jars;
+  }
+
+  _findInJars(ns, wanted, cacheKey, fallbackMatcher) {
+    const jars = this._getJarsForNamespace(ns);
     if (!wanted.length && !fallbackMatcher) return null;
     for (const jarPath of jars) {
       let jar = this.jarCache.get(jarPath);
@@ -189,6 +239,38 @@ class ModsIndex {
     return null;
   }
 
+  _findModelTexture(ns, modelCandidates, cacheKey) {
+    const jars = this._getJarsForNamespace(ns);
+    for (const jarPath of jars) {
+      let jar = this.jarCache.get(jarPath);
+      if (!jar) { try { jar = openJar(jarPath); this.jarCache.set(jarPath, jar); } catch { continue; } }
+      for (const modelEntry of modelCandidates) {
+        try {
+          const jsonBuf = jar.read(modelEntry);
+          if (jsonBuf) {
+            const pngTarget = resolveTextureFromModelJson(jsonBuf.toString('utf8'), ns);
+            if (pngTarget) {
+              try {
+                const pngBuf = jar.read(pngTarget);
+                if (pngBuf) {
+                  this.extractCache.set(cacheKey, pngBuf);
+                  return pngBuf;
+                }
+              } catch {}
+              const match = pngTarget.match(/^assets\/([a-z0-9_.-]+)\//i);
+              const targetNs = match ? match[1].toLowerCase() : ns;
+              if (targetNs !== ns) {
+                const crossBuf = this._findInJars(targetNs, [pngTarget], cacheKey);
+                if (crossBuf) return crossBuf;
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+    return null;
+  }
+
   // Extract `assets/<ns>/textures/item[s]/<name>.png` from the first jar that has it.
   readTexture(namespace, name) {
     if (!this.modsDir) return null;
@@ -207,7 +289,15 @@ class ModsIndex {
       const base = path.basename(lower, '.png');
       return base === nm || (invertedNm && base === invertedNm);
     };
-    return this._findInJars(ns, wanted, cacheKey, matcher);
+    const directBuf = this._findInJars(ns, wanted, cacheKey, matcher);
+    if (directBuf) return directBuf;
+
+    if (!isCommonTag) {
+      const modelCandidates = candidateModelEntries(namespace, name);
+      const modelBuf = this._findModelTexture(ns, modelCandidates, cacheKey);
+      if (modelBuf) return modelBuf;
+    }
+    return null;
   }
 
   // Extract worn armor texture from the first jar that has it.
@@ -239,4 +329,13 @@ class ModsIndex {
 
 const singleton = new ModsIndex();
 
-module.exports = { ModsIndex, singleton, candidateEntries, candidateArmorEntries, folderSignature, namespacesIn };
+module.exports = {
+  ModsIndex,
+  singleton,
+  candidateEntries,
+  candidateModelEntries,
+  resolveTextureFromModelJson,
+  candidateArmorEntries,
+  folderSignature,
+  namespacesIn
+};
