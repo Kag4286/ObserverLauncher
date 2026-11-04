@@ -71,10 +71,81 @@ function getInitials(label){
 }
 // tex:// answers a cache miss with a 1x1 transparent PNG and HTTP 200, so onerror never fires.
 // Detect that placeholder in onload and swap in the readable label instead of a blank cell.
-function itemCellInner(iconUrl,label){
-  const initials=getInitials(label);
-  if(!iconUrl)return `<span class="inv-initial">${esc(initials)}</span>`;
-  return `<img src="${iconUrl}" alt="" data-fb="${esc(initials)}">`;
+const isoBlockCache = new Map();
+
+function isBlockItem(id) {
+  if (!id || typeof id !== 'string') return false;
+  const name = id.includes(':') ? id.split(':')[1] : id;
+  if (/(?:_ingot|_nugget|_sword|_pickaxe|_axe|_shovel|_hoe|_helmet|_chestplate|_leggings|_boots|_horse_armor|_bucket|_bottle|_potion|_stew|_soup|_dust|_shard|_seeds?|_egg|_spawn_egg|_disc|_rod|_arrow|_apple|_bow|_book|_fish|_meat)$/.test(name)) return false;
+  if (/^(?:redstone|glowstone_dust|clay_ball|amethyst_shard|prismarine_shard|prismarine_crystals|honeycomb|brick|nether_brick|stick|string|feather|flint|coal|charcoal|diamond|emerald|iron_nugget|gold_nugget|copper_ingot|iron_ingot|gold_ingot|netherite_ingot|netherite_scrap|slime_ball|ender_pearl|eye_of_ender|blaze_powder|ghast_tear|magma_cream|sugar|paper|book|name_tag|lead|saddle|compass|clock|bread|cookie)$/.test(name)) return false;
+  if (/(?:sapling|flower|tulip|rose|orchid|daisy|allium|dandelion|poppy|lily_pad|sugar_cane|bamboo|cactus|torch|lantern|rail|lever|tripwire_hook|door|trapdoor|carpet|bed|sign|banner|chain|anvil|cauldron|hopper|bell|brewing_stand)$/.test(name)) return false;
+  if (/(?:_block|_ore|_log|_wood|_stem|_hyphae|_planks|_bricks|_leaves|_wool|_terracotta|_concrete(?:_powder)?|_pillar|_crate|_casing)$/.test(name)) return true;
+  return /^(?:stone|cobblestone|mossy_cobblestone|smooth_stone|deepslate|cobbled_deepslate|polished_deepslate|blackstone|polished_blackstone|granite|polished_granite|diorite|polished_diorite|andesite|polished_andesite|dirt|coarse_dirt|rooted_dirt|podzol|mycelium|mud|packed_mud|sand|red_sand|gravel|clay|sandstone|red_sandstone|bedrock|obsidian|crying_obsidian|tnt|crafting_table|furnace|smoker|blast_furnace|dispenser|dropper|observer|sponge|wet_sponge|glowstone|sea_lantern|shroomlight|netherrack|soul_sand|soul_soil|basalt|smooth_basalt|end_stone|ice|packed_ice|blue_ice|sculk|sculk_catalyst|bookshelf|chiseled_bookshelf|beehive|bee_nest|prismarine|dark_prismarine|calcite|tuff|lodestone|target|respawn_anchor)$/.test(name);
+}
+
+function drawCubeFace(ctx, img, poly, matrix, tint) {
+  const w = img.naturalWidth || 16;
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo(poly[0], poly[1]);
+    for (let i = 2; i < poly.length; i += 2) ctx.lineTo(poly[i], poly[i + 1]);
+    ctx.closePath();
+  };
+  ctx.save();
+  path();
+  ctx.clip();
+  ctx.transform(...matrix);
+  ctx.drawImage(img, 0, 0, w, w, 0, 0, w, w);
+  if (tint) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    path();
+    ctx.fillStyle = tint;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function renderIsometricBlock(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = false;
+  const w = img.naturalWidth || 16;
+  drawCubeFace(ctx, img, [16, 3, 28, 9, 16, 15, 4, 9], [12 / w, 6 / w, -12 / w, 6 / w, 16, 3], null);
+  drawCubeFace(ctx, img, [4, 9, 16, 15, 16, 27, 4, 21], [12 / w, 6 / w, 0, 12 / w, 4, 9], 'rgba(0,0,0,0.18)');
+  drawCubeFace(ctx, img, [16, 15, 28, 9, 28, 21, 16, 27], [12 / w, -6 / w, 0, 12 / w, 16, 15], 'rgba(0,0,0,0.40)');
+  return canvas.toDataURL();
+}
+
+function applyIsometricBlockIfNeeded(img) {
+  if (!img || img.dataset.iso === '1' || !isBlockItem(img.dataset.id)) return;
+  try {
+    const origSrc = img.src;
+    const cached = isoBlockCache.get(origSrc);
+    if (cached) {
+      img.dataset.iso = '1';
+      img.src = cached;
+      return;
+    }
+    const dataUrl = renderIsometricBlock(img);
+    if (dataUrl) {
+      isoBlockCache.set(origSrc, dataUrl);
+      img.dataset.iso = '1';
+      img.src = dataUrl;
+    }
+  } catch (_) {}
+}
+
+function itemCellInner(iconUrl, label, id) {
+  const initials = getInitials(label);
+  if (!iconUrl) return `<span class="inv-initial">${esc(initials)}</span>`;
+  const cached = isoBlockCache.get(iconUrl);
+  const src = cached || iconUrl;
+  const isIso = cached ? ' data-iso="1"' : '';
+  const idAttr = id ? ` data-id="${esc(id)}"` : '';
+  return `<img src="${src}" alt="" data-fb="${esc(initials)}"${idAttr}${isIso}>`;
 }
 // A load event that resolves to the 1x1 placeholder means the texture is not on the mirror (or not
 // in the mod jar). Mark the parent cell so CSS shows the initials badge, and clear the mark when a
@@ -85,7 +156,11 @@ function markCellIcon(e, missing) {
   if (!img || img.tagName !== 'IMG' || !img.dataset || img.dataset.fb === undefined) return;
   const cell = img.closest && img.closest('.inv-cell');
   if (!cell) return;
-  if (!missing && img.naturalWidth > 1) { cell.classList.remove('icon-missing'); return; }
+  if (!missing && img.naturalWidth > 1) {
+    cell.classList.remove('icon-missing');
+    applyIsometricBlockIfNeeded(img);
+    return;
+  }
   cell.classList.add('icon-missing');
   cell.setAttribute('data-initial', img.dataset.fb);
 }
@@ -106,7 +181,7 @@ function showInvItemDetail(x){
   const enchHtml=enchs.length?`<div class="inv-item-detail-enchs">${enchs.map(e=>`<span class="pd-ench-pill">✨ ${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}</div>`:'';
   const durHtml=x.durability?`<div class="inv-item-detail-meta"><span style="color:${durColor(x.durability)}">Durability: ${x.durability.remaining} / ${x.durability.max} (${Math.round(x.durability.remaining/x.durability.max*100)}%)</span></div>`:'';
   d.hidden=false;
-  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,label)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${esc(label)}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==label?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true">✕</button>`;
+  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,label,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${esc(label)}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==label?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true">✕</button>`;
 }
 function renderItemGrid(id,items){
   const n=$(id);if(!n)return;
@@ -139,7 +214,7 @@ function renderItemGrid(id,items){
     const tipHtml=itemTooltipHtml(x,label);
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
-    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${tipHtml}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${tipHtml}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label,x.id)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
 }
 function renderEquipment(armor,offhand){
@@ -154,7 +229,7 @@ function renderEquipment(armor,offhand){
     let dur='';
     let enchList='';
     if(it&&it.id){
-      cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id));
+      cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id),it.id);
       if(it.durability){
         dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
       }
