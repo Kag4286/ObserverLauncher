@@ -960,7 +960,7 @@ async function tDeleteContent(ctx, a) {
   const kind = (a && a.kind) || 'plugin';
   const name = String((a && a.name) || '');
   if (!name) return { ok: false, error: 'name is required.' };
-  if (path.basename(name) !== name) return { ok: false, error: 'Invalid file name.' };
+  if (path.basename(name) !== name || name.includes('/') || name.includes('\\')) return { ok: false, error: 'Invalid file name.' };
   const f = serverFiles(root);
   const folder = kind === 'datapack' ? f.datapackFolder : kind === 'mod' ? 'mods' : 'plugins';
   const target = safeTarget(root, path.join(folder, name));
@@ -1021,6 +1021,7 @@ function needBackupFile(ctx, a) {
   const { resolveBackupFile } = require('../main/backups.js');
   const name = String((a && a.name) || '');
   if (!name) return { ok: false, error: 'name is required.' };
+  if (path.basename(name) !== name || name.includes('/') || name.includes('\\')) return { ok: false, error: 'Invalid file name.' };
   const file = resolveBackupFile(ctx, name);
   if (!file || !fs.existsSync(file)) return { ok: false, error: 'Backup not found.' };
   return { ok: true, file, name };

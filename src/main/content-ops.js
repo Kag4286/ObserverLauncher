@@ -29,7 +29,7 @@ function toggledName(name, action) {
 // basename (path escape) and reports a locked file clearly (Windows keeps running jars open).
 function toggleContent(root, kind, name, action) {
   const raw = String(name || '');
-  if (!raw || path.basename(raw) !== raw) return { ok: false, error: 'Invalid file name.' };
+  if (!raw || path.basename(raw) !== raw || raw.includes('/') || raw.includes('\\')) return { ok: false, error: 'Invalid file name.' };
   const next = toggledName(raw, action);
   if (!next) return { ok: false, error: (action === 'enable' || /\.disabled$/i.test(raw)) ? 'That file is not disabled.' : 'That file is already disabled.' };
   let levelName = 'world';
@@ -50,7 +50,7 @@ function toggleContent(root, kind, name, action) {
 // is unknown the classifier returns 'unknown' rather than a false 'ok' (see datapack.js).
 function validateDatapack(root, name) {
   const raw = String(name || '');
-  if (!raw || path.basename(raw) !== raw) return { ok: false, error: 'Invalid file name.' };
+  if (!raw || path.basename(raw) !== raw || raw.includes('/') || raw.includes('\\')) return { ok: false, error: 'Invalid file name.' };
   let levelName = 'world';
   try { levelName = require('./server-files.js').serverFiles(root).properties['level-name'] || 'world'; } catch {}
   const target = safeTarget(root, path.join(contentFolder('datapack', levelName), raw));
@@ -73,7 +73,7 @@ function validateDatapack(root, name) {
 async function extractDatapack(root, name, opts) {
   const o = opts || {};
   const raw = String(name || '');
-  if (!raw || path.basename(raw) !== raw) return { ok: false, error: 'Invalid file name.' };
+  if (!raw || path.basename(raw) !== raw || raw.includes('/') || raw.includes('\\')) return { ok: false, error: 'Invalid file name.' };
   if (!/\.zip$/i.test(raw)) return { ok: false, error: 'Only a .zip datapack can be extracted.' };
   const destName = raw.replace(/\.zip$/i, '');
   if (!destName) return { ok: false, error: 'Invalid datapack name.' };
