@@ -200,9 +200,16 @@ function loadSettingsFor(instanceId) {
 // M11: resolve an optional instance param to a real id. Unknown -> null (caller errors).
 function resolveInstanceId(instanceId) {
   const store = loadSettingsStore();
-  const ids = Array.isArray(store.instances) ? store.instances.map(i => i.id) : [];
+  const insts = Array.isArray(store.instances) ? store.instances : [];
+  const ids = insts.map(i => i.id);
   if (!instanceId) return store.activeInstanceId || ids[0] || 'default';
-  return ids.includes(instanceId) ? instanceId : null;
+  const target = String(instanceId).trim();
+  if (ids.includes(target)) return target;
+  const byName = insts.find(i => i.name && i.name.toLowerCase() === target.toLowerCase());
+  if (byName) return byName.id;
+  const byPrefix = insts.filter(i => i.id && i.id.startsWith(target));
+  if (byPrefix.length === 1) return byPrefix[0].id;
+  return null;
 }
 
 // --- v2.0.0 multi-instance CRUD (Phase B) ---

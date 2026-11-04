@@ -234,9 +234,14 @@ function listCrashReports(root) {
 // Resolve ONE crash report by name (basename only, inside crash-reports/). Returns the path or null.
 function resolveCrashReport(root, name) {
   if (!root || !name) return null;
-  if (String(name) !== path.basename(String(name))) return null;
-  if (!/crash-.*\.txt$/i.test(name)) return null;
-  const p = path.join(root, 'crash-reports', name);
+  const sName = String(name).trim();
+  if (sName === 'latest' || sName === 'latest.txt' || sName === 'newest') {
+    const lat = latestCrashReport(root);
+    return lat ? lat.file : null;
+  }
+  if (sName !== path.basename(sName)) return null;
+  if (!/crash-.*\.txt$/i.test(sName)) return null;
+  const p = path.join(root, 'crash-reports', sName);
   try { return fs.statSync(p).isFile() ? p : null; } catch { return null; }
 }
 // Tail the SERVER log (logs/latest.log by default) without loading the whole file. Logs can be

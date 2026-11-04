@@ -82,6 +82,19 @@ function friendlyEditorError(err) {
 }
 async function tReadFile(ctx, a) {
   const p = String(a?.path || '').trim();
+  if (p === 'crash-reports/latest' || p === 'crash-reports/latest.txt') {
+    const root = needPath(ctx);
+    const { latestCrashReport, maskSecrets } = require('./doctor.js');
+    const lat = latestCrashReport(root);
+    if (lat && lat.file && fs.existsSync(lat.file)) {
+      try {
+        const raw = fs.readFileSync(lat.file, 'utf8');
+        const content = maskSecrets(raw);
+        const out = { path: p, rel: path.relative(root, lat.file).replace(/\\/g, '/'), content, size: Buffer.byteLength(content, 'utf8'), readOnly: true };
+        return { ok: true, ...out, result: out };
+      } catch {}
+    }
+  }
   if (p === 'server/status' || p === 'crash-reports/latest' || p.startsWith('observer://')) {
     const uri = p.startsWith('observer://') ? p : ('observer://' + p);
     try {
