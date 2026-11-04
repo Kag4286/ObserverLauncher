@@ -28,6 +28,9 @@ For developer-level technical details, see the [developer changelog](https://git
 ## MCP (Model Context Protocol) AI Integration: Hardened Security & New Workflows
 
 - **Path Traversal Elimination:** Enhanced file deletion validation (`delete_content`) to prevent directory traversal escapes out of mod and plugin directories.
+- **Fast-Path Security Gates:** Parameter validation in destructive tools now executes immediately before user confirmation prompts, rejecting traversal attempts in under 1 second without stalling for 60-second GUI confirmation timeouts.
+- **Virtual Resources & Crash Report Aliases:** Direct file reads (`read_file`) seamlessly resolve virtual resources like `server/status` and `crash-reports/latest`. Crash report tools automatically resolve `latest`, `latest.txt`, and `newest` aliases to the newest report file on disk without requiring filesystem symlinks.
+- **Human-Readable Instance Targeting:** Instance selection and snapshot queries (`get_instance_snapshot`) now support matching by instance display name (such as "Servertest") and unambiguous ID prefixes, allowing AI agents to target servers easily without copying raw hex IDs.
 - **Credential Protection & Content Preservation:** Direct file reads (`read_file`, `read_many_files`, and file resource templates) automatically mask sensitive configuration keys (`rcon.password`, Velocity forwarding secrets) with `[redacted]`. Fixed bridge payload unwrap so masked file contents are fully preserved and transmitted to connected AI clients.
 - **Tool-Based Prompt Discovery:** Added `list_prompts` and `get_prompt` tools along with offline fallbacks so AI agents using tool-only interfaces can discover and trigger ready-made diagnostic workflows directly.
 - **Privilege Escalation Defense:** Removed internal write-approval toggles from MCP-settable launcher settings, guaranteeing that an AI agent cannot self-grant write permissions without GUI user confirmation.
@@ -42,6 +45,9 @@ For developer-level technical details, see the [developer changelog](https://git
 
 ## Subsystem & Platform Improvements
 
+- **Cross-Platform Path Traversal Hardening:** File operations treat both forward slash `/` and backslash `\` as path separators across Windows and Linux, preventing traversal escapes and ensuring 100% CI pass rates on Ubuntu.
+- **World Map Dimension Switcher:** Fixed dimension selector button handlers to properly toggle views without throwing JavaScript console errors.
+- **Player Inspector Reliability:** Added support for alternative player NBT stats on modded and Horizon servers to eliminate `undefined` stat labels. Expanded item texture resolution with inverted names, subfolder scanning, and common tag namespaces.
 - **Multi-Instance Tunnel Isolation:** Manual Playit tunnel addresses are now isolated strictly per server instance in configuration rather than shared globally across instances, and Pinggy tunnel status updates immediately upon switching instances.
 - **Pinggy Error Messaging:** Added dedicated status message banner for Pinggy tunnels to surface actionable error descriptions when SSH port forwarding fails.
 - **Accurate Blocks Mined Stats:** Updated player analytics to count all mined blocks across individual block categories, resolving an issue where mined totals were underreported on certain server builds.

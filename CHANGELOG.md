@@ -75,6 +75,15 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Added support for `notifications/cancelled` notification.
   - Added 3 new workflow prompts: `recover_corrupted_world`, `update_minecraft_version`, `setup_geyser_bedrock`.
   - Added new resource templates: `observer://instance/{id}/properties`, `observer://instance/{id}/players`, and static resource `observer://crash-reports/latest`.
+- **MCP Fast-Path Pre-Validation (`src/mcp/server.js`):**
+  - Added pre-validation in `callTool` to reject path traversal attempts before triggering `confirmOnGui`, preventing 60-second GUI confirmation timeouts for automated QA agents and MCP clients.
+- **MCP Virtual Resource & Crash Report Aliases (`src/mcp/tools.js`, `src/mcp/doctor.js`):**
+  - Updated `tReadFile` to transparently resolve virtual resources (`server/status`, `crash-reports/latest`).
+  - Updated `doctor.resolveCrashReport` and `tReadFile` to support `latest`, `latest.txt`, and `newest` aliases, automatically loading the newest crash report file in `crash-reports/` without requiring filesystem symlinks.
+- **Cross-Platform Path Traversal & Ubuntu Runner Hardening (`src/main/content-ops.js`, `src/main/content-handlers.js`, `src/mcp/tools.js`):**
+  - Updated `tDeleteContent`, `needBackupFile`, `toggleContent`, `validateDatapack`, and `extractDatapack` to explicitly reject both `/` and `\`. On Linux/POSIX systems where backslash is not a directory separator, path traversal attempts like `..\server.properties` are now rejected with `Invalid file name.`, fixing the runner failure on Ubuntu.
+- **Multi-Instance Resolver Resilience (`src/main/settings.js`):**
+  - Extended `resolveInstanceId()` to match instances by display name (case-insensitive) or unambiguous ID prefix, enabling external AI clients and CLI commands to target instances using human-readable names.
 
 ### UI / UX & Notifications:
 - **Multi-Instance Tunnel Isolation (`src/renderer/js/07-overview.js`, `src/renderer/js/08-shell.js`):**
@@ -91,6 +100,11 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Displayed `./horizon-server (Native Engine)` in Overview JVM command preview.
 - **World Map Dimension Coordinates (`src/renderer/js/02-worldmap.js`):**
   - Added 1:8 coordinate conversion when toggling between Overworld and Nether coordinates, and centered view at (0, 0) for The End.
+  - Fixed dimension chip selector in `02-worldmap.js` from `$` to `$$`, resolving `TypeError: $(...).forEach is not a function`.
+- **Player Inspector Missing Stats & Mod Icons (`src/main/server-files.js`, `src/renderer/js/03-players.js`, `src/main/mods-index.js`):**
+  - Added support for alternative player NBT field names (`simple.health`, `simple.food_level`, `simple.food_saturation_level`, `simple.player_game_type`, `simple.xp_level`, `simple.xp_total`) in `src/main/server-files.js`, eliminating `undefined` stats when inspecting Horizon or modded server players.
+  - Hardened `fmtStat()`, `vital()`, and `meter()` against `null`, `undefined`, literal `"undefined"`, and `"null"`.
+  - Added inverted name matching (`silver_ingot` <-> `ingot_silver`), subfolder scanning, and common tag fallback namespaces (`c:`, `forge:`, `common:`) in `src/main/mods-index.js` for reliable item texture resolution.
 - **Backups & Wizard Validation:**
   - Toggled `#backupEmpty` container when no backup archives exist (`src/renderer/js/04-worlds.js`).
   - Added path character validation for server name in wizard (`src/renderer/js/12-wizard.js`).
@@ -103,7 +117,7 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - Synchronized all 8 new keys (`wh.ev.leave`, `cnt.nativeNotice`, `perf.diagNativeTitle`, `perf.diagNativeBody`, `wiz.invalidName`, `mkt.rateLimit`, `mkt.rateLimitTitle`, `mkt.rateLimitHint`, `crash.cat.rust-panic`) across 7 locales (`en.js`, `vi.js`, `es.js`, `pt-BR.js`, `de.js`, `ru.js`, `zh-CN.js`).
 - Verified 0 missing, 0 extra, 0 dead keys across 1386 entries per locale.
 - Verified 0 duplicate CSS selectors and 0 duplicate JS blocks.
-- 161 test suites passing (including tests/mcp-v7-fixes.test.js).
+- 162 test suites passing (including tests/mcp-v7-fixes.test.js and tests/mcp-read-file.test.js).
 
 ## [7.0.0Z] — 2026-10-31
 
