@@ -59,6 +59,8 @@ const WOOD_TYPES = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'c
 const ITEM_ALIASES = {
   enchanted_golden_apple: 'golden_apple',
   enchanted_book: 'book',
+  chipped_anvil: 'anvil',
+  damaged_anvil: 'anvil',
 };
 
 function itemCandidateUrls(file) {
@@ -129,6 +131,8 @@ function itemCandidateUrls(file) {
     cauldron: ['items/cauldron.png', 'blocks/cauldron_side.png'],
     brewing_stand: ['items/brewing_stand.png', 'blocks/brewing_stand_base.png'],
     anvil: ['blocks/anvil.png', 'blocks/anvil_top.png'],
+    chipped_anvil: ['blocks/chipped_anvil_top.png', 'blocks/anvil.png', 'blocks/anvil_top.png'],
+    damaged_anvil: ['blocks/damaged_anvil_top.png', 'blocks/anvil.png', 'blocks/anvil_top.png'],
     bell: ['blocks/bell_body.png'],
     beacon: ['blocks/beacon.png'],
     glowstone: ['blocks/glowstone.png'],

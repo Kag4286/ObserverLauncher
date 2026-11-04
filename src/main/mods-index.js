@@ -68,9 +68,11 @@ function resolveTextureFromModelJson(jsonText, defaultNs) {
     return null;
   }
   if (!parsed || typeof parsed !== 'object') return null;
-  const tex = parsed.textures;
-  if (!tex || typeof tex !== 'object') return null;
-  const priorityKeys = ['layer0', 'layer1', 'texture', 'all', 'top', 'front', 'side', 'particle'];
+  const tex = (parsed.textures && typeof parsed.textures === 'object') ? { ...parsed.textures } : {};
+  for (const [k, v] of Object.entries(parsed)) {
+    if (/texture$/i.test(k) && typeof v === 'string') tex[k] = v;
+  }
+  const priorityKeys = ['layer0', 'layer1', 'texture', 'clipsTexture', 'all', 'top', 'front', 'side', 'particle'];
   let ref = null;
   for (const k of priorityKeys) {
     if (typeof tex[k] === 'string' && tex[k].trim()) {
@@ -248,7 +250,18 @@ class ModsIndex {
         try {
           const jsonBuf = jar.read(modelEntry);
           if (jsonBuf) {
-            const pngTarget = resolveTextureFromModelJson(jsonBuf.toString('utf8'), ns);
+            let pngTarget = resolveTextureFromModelJson(jsonBuf.toString('utf8'), ns);
+            if (!pngTarget) {
+              try {
+                const parsed = JSON.parse(jsonBuf.toString('utf8'));
+                if (parsed && typeof parsed.parent === 'string') {
+                  const pNs = parsed.parent.includes(':') ? parsed.parent.split(':')[0].toLowerCase() : ns;
+                  const pPath = parsed.parent.replace(/^[^:]+:/, '');
+                  const pBuf = jar.read(`assets/${pNs}/models/${pPath}.json`);
+                  if (pBuf) pngTarget = resolveTextureFromModelJson(pBuf.toString('utf8'), pNs);
+                }
+              } catch {}
+            }
             if (pngTarget) {
               try {
                 const pngBuf = jar.read(pngTarget);
@@ -296,6 +309,11 @@ class ModsIndex {
       const modelCandidates = candidateModelEntries(namespace, name);
       const modelBuf = this._findModelTexture(ns, modelCandidates, cacheKey);
       if (modelBuf) return modelBuf;
+
+      const entityCandidates = [`assets/${ns}/textures/entity/${nm}.png`];
+      if (nm.includes('backpack')) entityCandidates.push(`assets/${ns}/textures/entity/backpack.png`);
+      const entityBuf = this._findInJars(ns, entityCandidates, cacheKey);
+      if (entityBuf) return entityBuf;
     }
     return null;
   }
