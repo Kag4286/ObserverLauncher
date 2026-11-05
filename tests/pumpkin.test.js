@@ -10,6 +10,7 @@ const {
   syncPropertiesToPumpkinToml,
 } = require('../src/main/pumpkin-config.js');
 const { serverFiles, detectSoftware } = require('../src/main/server-files.js');
+const { RESOLVERS } = require('../src/main/wizard.js');
 
 let pass = 0;
 function ck(name, condition) {
@@ -41,6 +42,11 @@ function ck(name, condition) {
   const resolved021 = await resolve('0.2.1');
   ck('resolve("0.2.1") maps to tag 0.2.1+26.3-26.51', resolved021.version.includes('0.2.1'));
   ck('resolve("0.2.1") includes mirror url', resolved021.urls.some(u => u.includes('ghfast.top')));
+
+  // RESOLVERS integration check
+  ck('RESOLVERS.pumpkin is a function', typeof RESOLVERS.pumpkin === 'function');
+  const wizardResolved = await RESOLVERS.pumpkin('0.2.1');
+  ck('RESOLVERS.pumpkin returns url and name', Boolean(wizardResolved.url && wizardResolved.name));
 
   // 2. TOML Generation & Parsing
   const defaultToml = getDefaultPumpkinToml();

@@ -23,6 +23,7 @@ const RESOLVERS = {
   purpur: (v) => require('./adapters/purpur.js').resolve(v),
   leaf: (v) => require('./adapters/leaf.js').resolve(v),
   horizon: (v) => require('./adapters/horizon.js').resolve(v),
+  pumpkin: (v) => require('./adapters/pumpkin.js').resolve(v),
 };
 
 // 5.1.0: the wizard's server-download logic, extracted to MODULE scope so the create_instance MCP
