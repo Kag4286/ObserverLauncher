@@ -72,7 +72,7 @@ function resolveTextureFromModelJson(jsonText, defaultNs) {
   for (const [k, v] of Object.entries(parsed)) {
     if (/texture$/i.test(k) && typeof v === 'string') tex[k] = v;
   }
-  const priorityKeys = ['layer0', 'layer1', 'texture', 'clipsTexture', 'all', 'top', 'front', 'side', 'particle'];
+  const priorityKeys = ['layer0', 'layer1', 'texture', 'all', 'top', 'front', 'side', 'particle'];
   let ref = null;
   for (const k of priorityKeys) {
     if (typeof tex[k] === 'string' && tex[k].trim()) {

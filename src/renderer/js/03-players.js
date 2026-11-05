@@ -155,6 +155,19 @@ function renderIsometricAnvil(id) {
   return canvas.toDataURL();
 }
 
+function isPreRenderedIcon(img) {
+  if (!img || !img.naturalWidth || !img.naturalHeight) return false;
+  if (img.naturalWidth > 32) return true;
+  try {
+    const { canvas, ctx } = createIsoCanvas(16);
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, 16, 16);
+    const d = ctx.getImageData(0, 0, 16, 1).data;
+    if (d[3] === 0 && d[15 * 4 + 3] === 0) return true;
+  } catch (_) {}
+  return false;
+}
+
 function applyIsometricBlockIfNeeded(img) {
   if (!img || img.dataset.iso === '1' || !isBlockItem(img.dataset.id)) return;
   try {
@@ -163,6 +176,10 @@ function applyIsometricBlockIfNeeded(img) {
     if (cached) {
       img.dataset.iso = '1';
       img.src = cached;
+      return;
+    }
+    if (isPreRenderedIcon(img)) {
+      img.dataset.iso = '1';
       return;
     }
     const id = img.dataset.id;

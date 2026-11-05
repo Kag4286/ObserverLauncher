@@ -23,6 +23,7 @@ const { dataDir } = require('./data-dir.js');
 const { singleton: modsIndex } = require('./mods-index.js');
 const { openJar } = require('./jar-reader.js');
 const { readPackTexture } = require('./resource-pack.js');
+const { renderCustomModItem } = require('./custom-item-renders.js');
 
 // Hybrid CDN: jsDelivr is Cloudflare-backed, high-speed, and accessible worldwide (not blocked by
 // ISPs that block raw.githubusercontent.com). raw.githubusercontent is retained as a second fallback.
@@ -445,7 +446,20 @@ function handle(request) {
     : u.hostname;
 
   const local = resolveLocal(version, kind, file);
-  if (local) return pngResponse(local);
+  if (local) {
+    if (kind === 'item') {
+      try {
+        if (fs.statSync(local).size < 2048) queueRemote(version, kind, file);
+      } catch {}
+    } else if (kind === 'itemmod') {
+      const parts = splitModFile(file);
+      if (parts) {
+        const custom = renderCustomModItem(parts.namespace, parts.name);
+        if (custom) return respondWithCachedPng(custom, version, kind, file);
+      }
+    }
+    return pngResponse(local);
+  }
   // An aliased item serves the base texture's cached copy immediately, so the second open of the
   // inspector does not flash the placeholder first.
   if (kind === 'item') {
@@ -529,6 +543,9 @@ function queueRemote(version, kind, file) {
     }
 
     const urls = [];
+    if (kind === 'item') {
+      urls.push(`https://cdn.jsdelivr.net/gh/Owen1212055/mc-assets@main/item-assets/${encodeURIComponent(mat.toUpperCase())}.png`);
+    }
     // Prioritize jsDelivr global CDN first, fallback to raw github second
     for (const baseCdn of CDN_BASES) {
       for (const v of targets) {
@@ -615,7 +632,10 @@ function prepareModLookup(file) {
 
 function readModTexture(file) {
   const parts = prepareModLookup(file);
-  return parts ? modsIndex.readTexture(parts.namespace, parts.name) : null;
+  if (!parts) return null;
+  const custom = renderCustomModItem(parts.namespace, parts.name);
+  if (custom) return custom;
+  return modsIndex.readTexture(parts.namespace, parts.name);
 }
 
 function readModArmorTexture(file, layer) {
