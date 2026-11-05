@@ -11,9 +11,10 @@ For developer-level technical details, see the [developer changelog](https://git
 ObserverLauncher expands its native engine support by integrating [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) alongside Horizon as a first-class native server software:
 
 - **Zero Java / JVM Required:** Pumpkin is compiled directly to native machine code (`pumpkin-X64-Windows.exe`, `pumpkin-X64-Linux`, `pumpkin-ARM64-macOS`). It requires no Java installation, no JVM tuning, and no garbage collection pauses.
-- **Ultra-Low Memory Footprint:** Starts instantly and operates within an astonishingly compact ~100 MB working set.
+- **Ultra-Low Memory Footprint (~100 MB):** Starts instantly and operates within an astonishingly compact ~100 MB working set. The wizard memory step dynamically explains Pumpkin's dynamic memory allocation without misleading ~600 MB presets.
+- **Resilient Multi-Source Downloads:** Features automatic fallback mirror routing (`ghfast.top`) and release tag reconciliation (`0.2.1+26.3-26.51`), ensuring lightning-fast and stall-free binary downloads worldwide.
 - **Two-Way `Pumpkin.toml` Synchronization:** Settings edited in the launcher (port, max players, online-mode, MOTD, difficulty, view distance, simulation distance, seed, hardcore) automatically sync to `Pumpkin.toml` and vice versa.
-- **1-Click Wizard Setup:** Create a Pumpkin server with one click under **Create new server** > **Featured** / **Native & Proxy**.
+- **Seamless 1-Click Wizard Setup:** Create a Pumpkin server with one click under **Create new server** > **Featured** / **Native & Proxy**. Step 1 folder selection immediately enables navigation without subfolder hurdles.
 - **Complete Headless & Process Management:** Background process monitoring, CPU/RAM telemetry, graceful stop, and orphan process adoption seamlessly support native Pumpkin processes.
 
 ---
@@ -39,3 +40,4 @@ ObserverLauncher expands its native engine support by integrating [Pumpkin](http
 
 - **100% Locale Coverage:** All new Pumpkin and native configuration strings are translated across all 7 supported interface languages: English (`en`), Tiếng Việt (`vi`), Español (`es`), Português do Brasil (`pt-BR`), Deutsch (`de`), Русский (`ru`), and 简体中文 (`zh-CN`).
 - **Comprehensive Quality Gates:** 100% pass rate across 165 test suites, strictly complying with headless integrity, duplicate code guards, and i18n key consistency.
+

@@ -35,7 +35,12 @@ function ck(name, condition) {
 
   const resolvedCurrent = await resolve();
   ck('resolve() returns url, name, version', resolvedCurrent.url && resolvedCurrent.name && resolvedCurrent.version);
+  ck('resolve() returns urls array with mirror fallback', Array.isArray(resolvedCurrent.urls) && resolvedCurrent.urls.length >= 2);
   ck('resolve() name matches platform binary', process.platform === 'win32' ? resolvedCurrent.name.endsWith('.exe') : !resolvedCurrent.name.endsWith('.exe'));
+
+  const resolved021 = await resolve('0.2.1');
+  ck('resolve("0.2.1") maps to tag 0.2.1+26.3-26.51', resolved021.version.includes('0.2.1'));
+  ck('resolve("0.2.1") includes mirror url', resolved021.urls.some(u => u.includes('ghfast.top')));
 
   // 2. TOML Generation & Parsing
   const defaultToml = getDefaultPumpkinToml();

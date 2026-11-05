@@ -25,7 +25,9 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Added Pumpkin software detection based on binary name and TOML configuration files.
 - **Wizard & Multi-Language UI (`src/main/wizard.js`, `src/renderer/index.html`, `src/renderer/js/12-wizard.js`, `src/renderer/locales/*.js`):**
   - Added Pumpkin setup card in Create Server wizard under Featured / Native & Proxy filters.
-  - Configured direct physical RAM estimation (~100 MB working set) and zero Java requirements.
+  - Added dedicated Step 4 memory panel for Pumpkin showcasing its ultra-lightweight dynamic working set (~100 MB) with zero JVM heap requirement.
+  - Resolved Step 1 wizard navigation blocker: folder selection now immediately enables the Next button, and the server name/subfolder field is clearly marked as optional.
+  - Implemented automatic high-speed CDN/mirror download fallback (`ghfast.top`) alongside verified GitHub release tag mappings to prevent download stalls or 404 errors.
   - Added localized strings across all 7 supported languages (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
 
 ### Player Inspector & Inventory Texture Rendering:

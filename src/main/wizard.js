@@ -91,9 +91,18 @@ async function createServerFiles(ctx, { software, version }) {
 
     if (software === 'pumpkin') {
       const resolved = await (RESOLVERS.pumpkin)(targetVersion);
-      const { url, name, version: resolvedVersion, sha256 } = resolved;
+      const { url, urls, name, version: resolvedVersion, sha256 } = resolved;
       const finalBin = path.join(ctx.currentServerPath, name);
-      await download(url, finalBin, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
+      const candidateUrls = (Array.isArray(urls) && urls.length) ? urls : [url];
+      let dlErr = null;
+      for (const dlUrl of candidateUrls) {
+        try {
+          await download(dlUrl, finalBin, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
+          dlErr = null;
+          break;
+        } catch (err) { dlErr = err; }
+      }
+      if (dlErr) throw dlErr;
       if (sha256) {
         try {
           const got = crypto.createHash('sha256').update(fs.readFileSync(finalBin)).digest('hex');

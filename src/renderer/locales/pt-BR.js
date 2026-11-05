@@ -201,7 +201,10 @@ window.LOCALES['pt-BR'] = {
   'nsw.nativeMemExplain': "O Horizon gerencia a memória diretamente do sistema operacional sem pausas de Garbage Collection do Java. Ele escala dinamicamente com o número de jogadores sem pré-alocar gigabytes de RAM.",
   'nsw.tagStable': "Estável",
   'nsw.tagNightly': "Nightly",
-  'nsw.serverName': "Nome do servidor (cria subpasta)",
+  'nsw.serverName': "Opcional: Nome da subpasta (deixe em branco para usar a pasta selecionada)",
+  'nsw.nativeMemExplainPumpkin': "Pumpkin é um servidor de Minecraft multithread e leve feito em Rust. Ele gerencia a memória diretamente do sistema operacional, sem reserva de heap da JVM nem pausas de Garbage Collection. O uso de memória começa em apenas ~100MB e escala de forma suave com os jogadores.",
+  'nsw.nativeNoJvmPumpkin': "Rust Native • ~100MB RAM",
+  'nsw.subfolderPlaceholder': "Opcional — deixe em branco para usar a pasta selecionada",
   'nsw.nativeDirectRam': "RAM direta do sistema (~600 MB)",
 
   'nsw.mem1': "Bom para 1-4 jogadores",

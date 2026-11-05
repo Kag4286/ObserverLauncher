@@ -201,7 +201,10 @@ window.LOCALES.es = {
   'nsw.nativeMemExplain': "Horizon gestiona la memoria directamente desde el sistema operativo sin pausas de Garbage Collection de Java. Se escala dinámicamente con el número de jugadores sin preasignar gigabytes de RAM.",
   'nsw.tagStable': "Estable",
   'nsw.tagNightly': "Nightly",
-  'nsw.serverName': "Nombre del servidor (crea subcarpeta)",
+  'nsw.serverName': "Opcional: Nombre de subcarpeta (dejar en blanco para usar la carpeta seleccionada)",
+  'nsw.nativeMemExplainPumpkin': "Pumpkin es un servidor de Minecraft multihilo y ultraligero escrito en Rust. Gestiona la memoria RAM directamente desde el sistema operativo sin reservar memoria heap de JVM ni pausas por Garbage Collection. El uso de memoria comienza en solo ~100MB y escala suavemente con los jugadores.",
+  'nsw.nativeNoJvmPumpkin': "Rust Native • ~100MB RAM",
+  'nsw.subfolderPlaceholder': "Opcional: dejar en blanco para usar la carpeta seleccionada",
   'nsw.nativeDirectRam': "RAM directa del sistema (~600 MB)",
 
   'nsw.mem1': "Bueno para 1-4 jugadores",

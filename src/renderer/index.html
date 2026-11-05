@@ -1417,7 +1417,7 @@
           </div>
           <div class="nsw-subfolder-wrap" id="nswSubfolderWrap">
             <label class="field-label" for="nswSubfolderInput" data-i18n="nsw.serverName">Server name (creates subfolder)</label>
-            <input type="text" id="nswSubfolderInput" class="input" placeholder="my-server">
+            <input type="text" id="nswSubfolderInput" class="input" placeholder="(Optional)" data-i18n-placeholder="nsw.subfolderPlaceholder">
             <small class="field-hint" id="nswResolvedFolderHint"></small>
           </div>
         </div>
@@ -1506,12 +1506,12 @@
             <h2 id="nswNativeMemTitle" data-i18n="nsw.nativeMemT">Direct System Memory</h2>
             <p class="text-muted nsw2-lead" id="nswNativeMemLead" data-i18n="nsw.nativeMemLead">Native Rust executable without JVM heap limits.</p>
             <div class="nsw2-memory-head">
-              <div class="nsw2-memory-num"><b>~600</b><span>MB</span></div>
-              <div class="nsw2-memory-desc ok" data-i18n="nsw.noJvmNeeded">No JVM Required</div>
+              <div class="nsw2-memory-num"><b id="nswNativeMemNum">~600</b><span>MB</span></div>
+              <div class="nsw2-memory-desc ok" id="nswNativeMemBadge" data-i18n="nsw.noJvmNeeded">No JVM Required</div>
             </div>
             <div class="nsw-native-box">
               <div class="nsw2-native-stat-sub" data-i18n="nsw.dynamicWorkingSet">Dynamic working set</div>
-              <p class="nsw2-native-explain" data-i18n="nsw.nativeMemExplain">Horizon manages memory directly from the operating system with zero Java Garbage Collection pauses. It scales dynamically with player count without pre-allocating gigabytes of RAM.</p>
+              <p class="nsw2-native-explain" id="nswNativeMemExplain" data-i18n="nsw.nativeMemExplain">Horizon manages memory directly from the operating system with zero Java Garbage Collection pauses. It scales dynamically with player count without pre-allocating gigabytes of RAM.</p>
             </div>
           </div>
         </div>

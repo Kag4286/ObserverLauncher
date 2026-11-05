@@ -201,7 +201,10 @@ window.LOCALES['zh-CN'] = {
   'nsw.nativeMemExplain': "Horizon 直接由操作系统管理内存，没有 Java 垃圾回收停顿。它根据玩家数量动态扩展，无需预先分配数吉字节的内存。",
   'nsw.tagStable': "稳定版",
   'nsw.tagNightly': "每日构建",
-  'nsw.serverName': "服务器名称（创建子文件夹）",
+  'nsw.serverName': "可选：子文件夹名称（留空则直接使用所选文件夹）",
+  'nsw.nativeMemExplainPumpkin': "Pumpkin 是使用 Rust 编写的高性能轻量级多线程 Minecraft 服务端。它直接由操作系统分配物理内存，无需预分配 JVM 堆内存，亦无垃圾回收导致的卡顿。启动内存仅约 100MB，随玩家数量平滑自适应扩展。",
+  'nsw.nativeNoJvmPumpkin': "Rust 原生 • ~100MB 内存",
+  'nsw.subfolderPlaceholder': "可选 — 留空直接使用所选文件夹",
   'nsw.nativeDirectRam': "直接系统内存 (~600 MB)",
 
   'nsw.mem1': "适合 1-4 名玩家",

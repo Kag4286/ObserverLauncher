@@ -239,6 +239,7 @@ function nswRender(){
   const folderName=nsw.folder?nsw.folder.split(/[\\/]/).filter(Boolean).pop():t('nsw.noFolder');
   const folderSub=$('#nswRailFolderSub'); if(folderSub)folderSub.textContent=folderName;
   const fp=$('#nswFolderPath'); if(fp)fp.textContent=nsw.folder||t('nsw.noFolder');
+  if(nsw.step===1){const nb=$('#nswNext');if(nb)nb.disabled=!nsw.folder;}
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
   $('#nswRailSub3').textContent=nsw.software==='horizon'?'~600 MB':nsw.software==='pumpkin'?'~100 MB':`${$('#nswMemorySlider').value} GB`;
@@ -263,7 +264,12 @@ function nswRender(){
     const nWrap=$('#nswNativeMemoryWrap');
     if(jWrap) jWrap.hidden=isNat;
     if(nWrap) nWrap.hidden=!isNat;
-    if(!isNat){
+    if(isNat){
+      const isPumpkin=nsw.software==='pumpkin';
+      const numEl=$('#nswNativeMemNum');if(numEl)numEl.textContent=isPumpkin?'~100':'~600';
+      const badgeEl=$('#nswNativeMemBadge');if(badgeEl)badgeEl.textContent=isPumpkin?t('nsw.nativeNoJvmPumpkin'):t('nsw.noJvmNeeded');
+      const explainEl=$('#nswNativeMemExplain');if(explainEl)explainEl.textContent=isPumpkin?t('nsw.nativeMemExplainPumpkin'):t('nsw.nativeMemExplain');
+    } else {
       if(state.systemMemoryGB){$('#nswMemorySlider').max=Math.max(2,state.systemMemoryGB-1);$('#nswRamHint').textContent=t('nsw.ramHint',{n:state.systemMemoryGB})}
       nswUpdateMemory();
     }
@@ -584,6 +590,7 @@ function openNewServerWizard(folder){
   $$('#nswSoftwareFilters .nsw-filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.filter==='all'));
   $$('#nswCards .nsw2-cardwrap').forEach(w=>{ w.hidden=false; });
   $$('#nswCards .nsw2-group').forEach(g=>{ g.hidden=false; });
+  const _nb=$('#nswNext');if(_nb)_nb.disabled=!nsw.folder;
   nswRender();const _m=$('#newServerModal');_m.hidden=false;trapFocus(_m);
 }
 // Step 1: pick the folder for the new instance. Uses pickFolder directly (NOT chooseFolder),
@@ -608,6 +615,7 @@ $('#nswChooseFolder')?.addEventListener('click',async()=>{
   nsw.baseFolder=f;
   nswResolveFolder();
   const resHint=$('#nswResolvedFolderHint'); if(resHint) resHint.textContent=nsw.folder;
+  const nextBtn=$('#nswNext'); if(nextBtn) nextBtn.disabled=!nsw.folder;
   nswRender();
 });
 

@@ -201,7 +201,10 @@ window.LOCALES.vi = {
   'nsw.nativeMemExplain': "Horizon quản lý bộ nhớ trực tiếp từ hệ điều hành với độ trễ thấp và không có hiện tượng dừng do Java GC. Mức tiêu thụ tự động điều chỉnh theo số người chơi mà không cần cấp phát trước nhiều GB RAM.",
   'nsw.tagStable': "Ổn định",
   'nsw.tagNightly': "Thử nghiệm",
-  'nsw.serverName': "Tên máy chủ (tạo thư mục con)",
+  'nsw.serverName': "Tùy chọn: Tên thư mục con (để trống nếu dùng trực tiếp thư mục đã chọn)",
+  'nsw.nativeMemExplainPumpkin': "Pumpkin là máy chủ Minecraft đa luồng siêu nhẹ được xây dựng bằng Rust. Khác với máy chủ Java cần cấp phát trước hàng gigabyte RAM heap (-Xmx), Pumpkin quản lý RAM trực tiếp từ hệ điều hành và không bị giật lag do Garbage Collection. Mức tiêu thụ bộ nhớ chỉ khoảng ~100MB khi khởi động và co giãn mượt mà theo lượng người chơi.",
+  'nsw.nativeNoJvmPumpkin': "Rust Native • RAM ~100MB",
+  'nsw.subfolderPlaceholder': "Không bắt buộc — để trống nếu dùng thư mục đã chọn",
   'nsw.nativeDirectRam': "RAM hệ thống trực tiếp (~600 MB)",
 
   'nsw.mem1': "Phù hợp cho 1-4 người chơi",
