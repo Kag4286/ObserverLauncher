@@ -242,5 +242,34 @@ function renderCustomModItem(namespace, name) {
   return null;
 }
 
-module.exports = { renderCustomModItem, renderBackpack, renderWaystone, encodePng };
+const TNT_3D_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAE3klEQVR4AexSXUxbZRh++0NnacspXWm7BqcxRIyJW5hRNOoyNYvR' +
+  'GY0XLlmIDJi6C4iQZpuMtTop4NRsAcd2MWV1AyKCF0y8MOFCMxd1izFxiMqPQxDa9bD2AAUKXQHP87mDtKeMQrLsZk3f8/29' +
+  '7/c83/O8SrrNvzsE1qyA7ylbRu/mDW4E5mt1ctUE+nJsGR2W7EqVhvivd+93IjAHEZytlkjSBFptWRmjz9oqORPxuQ+NuwCk' +
+  '8rgJgbnRvODEGf+M1b0aIisSmNhmN+N1OdZp/ofLnKtk/VZC/HiZo8PDBhbZv2jYHtvvMjppXsmDSDLWLEvA+7DdfC4j2z2j' +
+  'mh+FzIeyn6THN41Tdc8Fyvv2V2p+ejO5XGV4PPVsiSzuF0TDhNymF992JmONjECH/X4z2Lfk7RsVAZ1AgMxP/NGJKT06pCaA' +
+  'dHb+RG53LduDAgAV8xkZ6Qz7sKbjtQNMkUTWyAhwdwsfXvydS8XNn/OzBKlfUGppl2Ud4cLDmSEcxcT27Y+xtZSPxaWNUfpM' +
+  'rSXsYX2hR284c0VZj/nSUC5dYB4UFC8b7gk6NNV1nqxgxjHsdezexzzGhSADQMwxImAJrLn3qoWpI9VgfCSSWmf0vNfarQiU' +
+  '/qkbfx57S0NGAIehMQX9YxIKdZlBR4op6FGdqjkGCyAxpEYO5thDoB9A8q+De5kFUEl1uqpuWMe3NnmjpSOCYqdvfB3KZJGQ' +
+  'gJQFInNEheTXO3JS1Z6L3WmMCEBhDWxBQAH0CeL73/S1/JC27Xo0Wtod0OwMpIWk6xKOMgIbW76RJXrNQRofE4lwgkPlTVu0' +
+  'pmnHAUKgIDeSWmug+baBdL6sXz/2anhSdjVtq/gAqTEhzxKPlR810NajTeIs9n+F18msgdQB29W2s95omSh1QmDlmw4ylb4R' +
+  'e9mNVUICvr8HqbyinvYEM2m6Uta4FBJ7pI/XFQ7PRQoCwlwRgBNJDdBLKQ/Sp6e/Iq1GQ9f8/huw/w8JCRisFpZxvL6c9Fot' +
+  'ban6hKAK20zis2lvOc0WlDDQ14teImFsjAIiuNlqlVXLCPx8/jyF/Dz5/aMMHBVV7gaaDIcp68zHCa1BDgKgkDsciWBJGBFs' +
+  'IX56u7rEb+xfRsBysoam3j1KNa4i8olWIP1ITQlJJGBNRUoOI4MzBIAhdX19CwOF3M1N/zXztCBQUd5zNNLuIW+HvK9kBHDh' +
+  'fZYp6jt+iBEBCYTTtQdHJI1QZNcX35HlYDWTWhBl3u/IZ3O8+pUduQRwAKefa6b1EwZWH/9JSEBKAhHriUpGBrYgcAZ7MB8Z' +
+  'HGSNBcB0o5G9Hl4DeObsl4RA/s1CRmDIm/bAEK8/GV+0lAjskRoVjQXJpRcDFK/ewM3GXJGmUDeaUhayYzbFhYzAW5P9o8XC' +
+  'QLFyYd4ST8R+zcTUQI9AAZ+oABoLrwYopI4H1qsUjeEgZz8yMZJ/anDaJ2LG/GUEpNP3+ycZkYERzqJWUIwisAYk+k68QzPN' +
+  '7QRgqU4apyZ0jca5u+wNQ1P5NdODMmApTylNlhuhSHXvRDEjQooYIqixcTMYFgPAnJrYi28GLBWsSEBKBJHlrEHOSlIjJ1Ek' +
+  'TUCAqlqxRXFdbNApqiYT07fB4Jaml+vhx1QSkC6AIrEFzJSO1VBc/rplA/EVrXd8hcMsVWMmafwEAAP//YUNOvQAAAAZJREFU' +
+  'wAKNHNfBXugFgAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+function renderCustomVanillaItem(name) {
+  const nm = String(name || '').toLowerCase();
+  if (nm === 'tnt') return TNT_3D_PNG;
+  return null;
+}
+
+module.exports = { renderCustomModItem, renderCustomVanillaItem, renderBackpack, renderWaystone, encodePng };
 

@@ -157,7 +157,7 @@ function renderIsometricAnvil(id) {
 
 function isPreRenderedIcon(img) {
   if (!img || !img.naturalWidth || !img.naturalHeight) return false;
-  if (img.naturalWidth > 32) return true;
+  if (img.naturalWidth > 32) return false;
   try {
     const { canvas, ctx } = createIsoCanvas(16);
     if (!ctx) return false;

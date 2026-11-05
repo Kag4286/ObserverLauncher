@@ -22,7 +22,7 @@ let nswVersions={software:null,list:[],latest:null,raw:false,loading:false,faile
 let nswMc=null;   // chosen Minecraft version for forge/neoforge
 const NSW_MC_FIRST={forge:true,neoforge:true};
 const isMcFirst=()=>!!NSW_MC_FIRST[nsw.software];
-const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity',horizon:'Horizon'};
+const NSW_SOFTWARE_LABEL={vanilla:'Vanilla',paper:'Paper',purpur:'Purpur',leaf:'Leaf',fabric:'Fabric',neoforge:'NeoForge',forge:'Forge',folia:'Folia',spigot:'Spigot',velocity:'Velocity',horizon:'Horizon',pumpkin:'Pumpkin'};
 // D3 (v3.0.0): server templates. A template pre-fills the wizard (software + memory); its plugin and
 // config steps are shown as a plan the user can act on after creation. Loaded once from the main
 // process (templates:list) and cached. Degrades silently when the IPC is unavailable.
@@ -155,7 +155,7 @@ function renderNswChips(filter){
     const st=statusMap.get(v);
     const soft=st&&st.stable===false;
     let tag=soft?` <em class="nsw2-tag warn">${esc((st.channel||'beta').toLowerCase())}</em>`:(st&&st.stable?'':'');
-    if(nsw.software==='horizon'){
+    if(nsw.software==='horizon'||nsw.software==='pumpkin'){
       const isNightly=/nightly|dev/i.test(v);
       tag=isNightly?` <em class="nsw2-tag warn">${esc(t('nsw.tagNightly'))}</em>`:` <em class="nsw2-tag accent">${esc(t('nsw.tagStable'))}</em>`;
     }
@@ -241,7 +241,7 @@ function nswRender(){
   const fp=$('#nswFolderPath'); if(fp)fp.textContent=nsw.folder||t('nsw.noFolder');
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
-  $('#nswRailSub3').textContent=nsw.software==='horizon'?'~600 MB':`${$('#nswMemorySlider').value} GB`;
+  $('#nswRailSub3').textContent=nsw.software==='horizon'?'~600 MB':nsw.software==='pumpkin'?'~100 MB':`${$('#nswMemorySlider').value} GB`;
   if(nsw.step===2){loadNswTemplates()}
   if(nsw.step===3){
     loadNswVersions(nsw.software);
@@ -258,7 +258,7 @@ function nswRender(){
     if(!nswVersions.loading) renderNswChips($('#nswVersionInput')?.value.trim()||'');
   }
   if(nsw.step===4){
-    const isNat=nsw.software==='horizon';
+    const isNat=nsw.software==='horizon'||nsw.software==='pumpkin';
     const jWrap=$('#nswJavaMemoryWrap');
     const nWrap=$('#nswNativeMemoryWrap');
     if(jWrap) jWrap.hidden=isNat;
@@ -275,19 +275,19 @@ function nswRender(){
     const memory=$('#nswMemorySlider').value;
     // P2d (2.2.0): the review shows the download source + where it lands + Java readiness, so the
     // user knows what is about to happen before pressing Create.
-    const srcMap={vanilla:t('nsw.srcVanilla'),paper:t('nsw.srcPaper'),purpur:t('nsw.srcPurpur'),leaf:t('nsw.srcLeaf'),fabric:t('nsw.srcFabric'),forge:t('nsw.srcForge'),neoforge:t('nsw.srcForge'),folia:t('nsw.srcPaper'),spigot:t('nsw.srcSpigot'),velocity:t('nsw.srcPaper'),horizon:t('nsw.srcHorizon')};
+    const srcMap={vanilla:t('nsw.srcVanilla'),paper:t('nsw.srcPaper'),purpur:t('nsw.srcPurpur'),leaf:t('nsw.srcLeaf'),fabric:t('nsw.srcFabric'),forge:t('nsw.srcForge'),neoforge:t('nsw.srcForge'),folia:t('nsw.srcPaper'),spigot:t('nsw.srcSpigot'),velocity:t('nsw.srcPaper'),horizon:t('nsw.srcHorizon'),pumpkin:t('nsw.srcPumpkin')};
     const src=srcMap[nsw.software]||'';
     const jm=state.java&&state.java.ok?javaMajorOf(state.java.version):null;
     const javaNeed=nswJava.java;
     const javaBad=javaNeed&&jm!=null&&jm<javaNeed;
-    const javaRow=nsw.software==='horizon'?`<div class="nsw2-kv"><span>${t('nsw.engine')}</span><b>${t('nsw.nativeEngine')}</b></div>`:(javaNeed?`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${`Java ${javaNeed}${nswJava.exact?' (verified)':'+'}`}</b></div>`:`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>—</b></div>`);
+    const javaRow=(nsw.software==='horizon'||nsw.software==='pumpkin')?`<div class="nsw2-kv"><span>${t('nsw.engine')}</span><b>${t('nsw.nativeEngine')}</b></div>`:(javaNeed?`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>${`Java ${javaNeed}${nswJava.exact?' (verified)':'+'}`}</b></div>`:`<div class="nsw2-kv"><span>${t('nsw.sumJava')}</span><b>—</b></div>`);
     const rows=[
       `<div class="nsw2-kv"><span>${t('nsw.sumFolder')}</span><b>${esc(nsw.folder||'—')}</b></div>`,
       `<div class="nsw2-kv"><span>${t('nsw.sumSoftware')}</span><b>${esc(NSW_SOFTWARE_LABEL[nsw.software]||nsw.software)}</b></div>`,
       `<div class="nsw2-kv"><span>${t('nsw.sumVersion')}</span><b>${esc(version)}</b></div>`,
       src?`<div class="nsw2-kv"><span>${t('nsw.sumSource')}</span><b>${esc(src)}</b></div>`:'',
       javaRow,
-      nsw.software==='horizon'
+      (nsw.software==='horizon'||nsw.software==='pumpkin')
         ? `<div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(t('nsw.nativeDirectRam'))}</b></div>`
         : `<div class="nsw2-kv"><span>${t('nsw.sumMemory')}</span><b>${esc(memory)} GB</b></div>`,
     ].join('');
@@ -324,6 +324,7 @@ const NSW_INFO={
   forge:{url:'https://files.minecraftforge.net/',for:'nsw.inf.forge',b:['nsw.inf.forge.b1','nsw.inf.forge.b2']},
   velocity:{url:'https://papermc.io/software/velocity',for:'nsw.inf.velocity',b:['nsw.inf.velocity.b1','nsw.inf.velocity.b2']},
   horizon:{url:'https://github.com/horizon-rust/horizon',for:'nsw.inf.horizon',b:['nsw.inf.horizon.b1','nsw.inf.horizon.b2']},
+  pumpkin:{url:'https://github.com/Pumpkin-MC/Pumpkin',for:'nsw.inf.pumpkin',b:['nsw.inf.pumpkin.b1','nsw.inf.pumpkin.b2']},
 };
 function nswCloseInfo(){const pop=$('#nswInfoPop');if(pop)pop.hidden=true;_nswInfoAnchor=null}
 // A position:fixed popover drifts when the wizard body scrolls — close it instead.

@@ -16,7 +16,7 @@ No terminal, no monthly cloud bills, no accounts. Pick a folder, select a versio
 <br>
 [![Minecraft Support](https://img.shields.io/badge/Minecraft-1.8_%E2%86%92_26.x-brightgreen?style=flat-square&logo=minecraft&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
 [![Java Runtimes](https://img.shields.io/badge/Java-8_%7C_17_%7C_21_%7C_25-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://github.com/Kag4286/ObserverLauncher)
-[![Native Engine](https://img.shields.io/badge/Native_Engine-Horizon_(Rust)-dea584?style=flat-square&logo=rust&logoColor=white)](https://github.com/horizon-rust/horizon)
+[![Native Engines](https://img.shields.io/badge/Native_Engines-Horizon_%7C_Pumpkin_(Rust)-dea584?style=flat-square&logo=rust&logoColor=white)](https://github.com/horizon-rust/horizon)
 [![Languages](https://img.shields.io/badge/languages-7_supported-informational?style=flat-square&logo=translate&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#supported-languages)
 [![MCP Ready](https://img.shields.io/badge/MCP-78_Tools_Ready-8A2BE2?style=flat-square&logo=anthropic&logoColor=white)](https://github.com/Kag4286/ObserverLauncher#mcp--ai-integration)
 [![Remote API](https://img.shields.io/badge/Remote_API-HTTP_%2B_Bearer-blueviolet?style=flat-square)](https://github.com/Kag4286/ObserverLauncher#remote-management--api)
@@ -33,7 +33,7 @@ No terminal, no monthly cloud bills, no accounts. Pick a folder, select a versio
 
 ## What is ObserverLauncher?
 
-ObserverLauncher is a **local Minecraft server hosting application** for Windows and Linux. It replaces confusing terminal commands and wikis with a simple, friendly interface: downloading server files, finding the right Java runtime, offering native Rust server support as the first app to integrate [Horizon](https://github.com/horizon-rust/horizon), letting friends join over the internet without port forwarding, warning you if mods conflict, and taking automatic world backups.
+ObserverLauncher is a **local Minecraft server hosting application** for Windows and Linux. It replaces confusing terminal commands and wikis with a simple, friendly interface: downloading server files, finding the right Java runtime, offering native Rust server support as the first app to integrate [Horizon](https://github.com/horizon-rust/horizon) and [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin), letting friends join over the internet without port forwarding, warning you if mods conflict, and taking automatic world backups.
 
 Everything runs locally on your PC. There are no paid subscriptions, no account signups, and zero tracking.
 
@@ -52,8 +52,8 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 
 ### Simple & Friendly for Everyday Use
 
-- **Pioneering Horizon Dedicated Server Integration:** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) out of the box—a clean-room Minecraft 26.3 server built in Rust. It offers ultra-low RAM usage (~600MB dynamic working set) and zero Java GC pauses, providing a fast native alternative alongside your favorite Paper, Fabric, and Forge setups.
-- **1-Click Server Creation:** Choose from Horizon (Rust Native), Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
+- **Pioneering Native Rust Engine Support (Horizon & Pumpkin):** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) and [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) out of the box—clean-room Minecraft servers built in Rust. They offer ultra-low RAM usage (~100MB to ~600MB dynamic working set) and zero Java GC pauses, providing fast native alternatives alongside your favorite Paper, Fabric, and Forge setups.
+- **1-Click Server Creation:** Choose from Horizon, Pumpkin (Rust Native), Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
 - **Automatic Java Setup:** Never worry about which Java to install. The launcher automatically detects what Java version your server needs (Java 8, 17, 21, or 25) and downloads it for you with 1 click.
 - **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.
 - **Built-in Mod & Plugin Store:** Browse and install mods, plugins, and datapacks directly from Modrinth, Hangar, and SpigotMC. The app checks if mods match your server before installing and lets you rollback updates with one click.

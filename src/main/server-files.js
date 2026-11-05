@@ -96,8 +96,9 @@ function serverFiles(root) {
   const names = list(root).filter(x => x.isFile() && /\.jar$/i.test(x.name)).map(x => x.name);
   const runnable = names.filter(x => !/(installer|universal|shim|buildtools)/i.test(x)); const launchScript = list(root).find(x => x.isFile() && /^run\.(bat|sh)$/i.test(x.name))?.name || null;
   const jar = runnable.find(x => /spigot/i.test(x)) || runnable.find(x => /(purpur|paper|leaf|folia|velocity|craftbukkit|forge|fabric|server)/i.test(x)) || runnable[0] || null;
-  const nativeBinary = list(root).find(x => x.isFile() && /^horizon-server(\.exe)?$/i.test(x.name))?.name || null;
+  const nativeBinary = list(root).find(x => x.isFile() && /^(horizon-server|pumpkin)(\.exe)?$/i.test(x.name))?.name || null;
   const hasHorizonConfig = fs.existsSync(path.join(root, 'server.toml'));
+  const hasPumpkinConfig = fs.existsSync(path.join(root, 'Pumpkin.toml')) || fs.existsSync(path.join(root, 'pumpkin.toml'));
   const fileNames = folder => list(path.join(root, folder)).filter(x => x.isFile()).map(x => x.name);
   const dirNames = folder => list(path.join(root, folder)).filter(x => x.isDirectory()).map(x => x.name);
   let properties = {};
@@ -107,6 +108,7 @@ function serverFiles(root) {
   try { for (const line of fs.readFileSync(path.join(root, 'server.properties'), 'utf8').split(/\r?\n/)) { const i = line.indexOf('='); if (i > 0 && !line.startsWith('#')) properties[line.slice(0, i)] = decodePropertiesValue(line.slice(i + 1)); } } catch {}
   // For native Horizon servers, server.toml takes precedence over legacy server.properties.
   if (hasHorizonConfig) { try { const { syncTomlToProperties } = require('./horizon-config.js'); Object.assign(properties, syncTomlToProperties(fs.readFileSync(path.join(root, 'server.toml'), 'utf8'))); } catch {} }
+  if (hasPumpkinConfig) { try { const { syncPumpkinTomlToProperties } = require('./pumpkin-config.js'); const pFile = fs.existsSync(path.join(root, 'Pumpkin.toml')) ? 'Pumpkin.toml' : 'pumpkin.toml'; Object.assign(properties, syncPumpkinTomlToProperties(fs.readFileSync(path.join(root, pFile), 'utf8'))); } catch {} }
   let knownPlayers = [];
   try { const cache = JSON.parse(fs.readFileSync(path.join(root, 'usercache.json'), 'utf8')); knownPlayers = cache.map(x => ({ name: x.name, uuid: x.uuid, hasData: !!findPlayerDataFile(root, properties, x.uuid, x.name) })).filter(x => x.name); } catch {}
   const hasSpigotConfig = fs.existsSync(path.join(root, 'spigot.yml')) || fs.existsSync(path.join(root, 'bukkit.yml'));
@@ -154,22 +156,24 @@ function serverFiles(root) {
     const dt = detectServerTarget(root, { jar, launchScript, nativeBinary, hasHorizonConfig, hasSpigotConfig });
     let soft = dt.loader;
     const name = String(jar || launchScript || nativeBinary || '').toLowerCase();
-    if (/horizon/.test(name) || dt.loader === 'horizon' || nativeBinary || (hasHorizonConfig && !jar && !launchScript)) soft = 'horizon';
+    if (/pumpkin/.test(name) || (hasPumpkinConfig && !jar && !launchScript)) soft = 'pumpkin';
+    else if (/horizon/.test(name) || dt.loader === 'horizon' || nativeBinary || (hasHorizonConfig && !jar && !launchScript)) soft = 'horizon';
     if (/purpur/.test(name)) soft = 'purpur';
     else if (/leaf/.test(name)) soft = 'leaf';
     else if (/folia/.test(name)) soft = 'folia';
     else if (/paper/.test(name)) soft = 'paper';
     else if (/spigot/.test(name) || hasSpigotConfig) soft = 'spigot';
     else if (/velocity|bungee|waterfall/.test(name)) soft = 'velocity';
-    target = { mc: dt.mc || (soft === 'horizon' ? '26.3' : null), loader: dt.loader || (soft === 'horizon' ? 'horizon' : 'unknown'), software: soft || dt.loader || 'unknown', engineType: (soft === 'horizon' || nativeBinary) ? 'native' : (dt.engineType || 'java') };
+    target = { mc: dt.mc || (soft === 'horizon' ? '26.3' : soft === 'pumpkin' ? 'latest' : null), loader: dt.loader || (soft === 'horizon' ? 'horizon' : soft === 'pumpkin' ? 'pumpkin' : 'unknown'), software: soft || dt.loader || 'unknown', engineType: (soft === 'horizon' || soft === 'pumpkin' || nativeBinary) ? 'native' : (dt.engineType || 'java') };
   } catch {}
-  const isNative = (target.software === 'horizon' || !!nativeBinary || (hasHorizonConfig && !jar && !launchScript));
+  const isNative = (target.software === 'horizon' || target.software === 'pumpkin' || !!nativeBinary || (hasHorizonConfig && !jar && !launchScript) || (hasPumpkinConfig && !jar && !launchScript));
   const engineType = isNative ? 'native' : 'java';
-  return { jar: isNative ? null : jar, launchScript: isNative ? null : launchScript, nativeBinary, hasHorizonConfig, engineType, target, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
+  return { jar: isNative ? null : jar, launchScript: isNative ? null : launchScript, nativeBinary, hasHorizonConfig, hasPumpkinConfig, engineType, target, plugins, mods, datapacks: datapackEntries, datapackFolder, worlds, backups, knownPlayers, whitelist, banned, ops, hasSpigotConfig, properties, geyser };
 }
 function detectSoftware(info) {
   const name = String(info.jar || info.launchScript || info.nativeBinary || '');
-  if (/horizon/i.test(name) || info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript)) return 'horizon';
+  if (/pumpkin/i.test(name) || (info.hasPumpkinConfig && !info.jar && !info.launchScript)) return 'pumpkin';
+  if (/horizon/i.test(name) || (info.nativeBinary && !/pumpkin/i.test(info.nativeBinary)) || (info.hasHorizonConfig && !info.jar && !info.launchScript)) return 'horizon';
   if (/velocity|bungee|waterfall/i.test(name)) return 'proxy';
   if (/paper|purpur|leaf|folia|spigot|bukkit|craftbukkit/i.test(name)) return 'paper-like';
   if (info.hasSpigotConfig) return 'paper-like';

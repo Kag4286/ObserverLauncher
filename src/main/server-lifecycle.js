@@ -269,7 +269,7 @@ async function adoptProcess(ctx, stored, deps) {
   if (Number.isFinite(recorded) && recorded > 0 && Number.isFinite(actual) && actual > 0 && Math.abs(recorded - actual) > 2000) {
     return { ok: false, error: 'That pid was reused by another process — refusing to adopt it.' };
   }
-  if (!/java|horizon-server/i.test(String(info.name || ''))) return { ok: false, error: `That pid is "${info.name || 'unknown'}", not a java server.` };
+  if (!/java|horizon-server|pumpkin/i.test(String(info.name || ''))) return { ok: false, error: `That pid is "${info.name || 'unknown'}", not a java server.` };
 
   const instId = ctx.inst();
   ctx.currentServerPath = stored.serverPath || ctx.currentServerPath;
@@ -343,7 +343,7 @@ async function startServerInternal(ctx, settings) {
   // instance switch mid-start can never write this server's status/process onto another instance.
   const instId = ctx.inst();
   const info = serverFiles(settings.serverPath);
-  const isNative = info.engineType === 'native' || info.software === 'horizon' || !!info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript);
+  const isNative = info.engineType === 'native' || info.software === 'horizon' || info.software === 'pumpkin' || !!info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript) || (info.hasPumpkinConfig && !info.jar && !info.launchScript);
   // B5: RAM budget across running instances (Java/JVM only; native Horizon bypasses heap budgeting).
   if (!isNative) {
     const ramCheck = checkRamBudget(ctx, instId, settings);
@@ -357,7 +357,8 @@ async function startServerInternal(ctx, settings) {
     const error = validateStart(settings, ctx.javaInfo, serverFiles, requiredJavaForServer);
     if (error) return { ok: false, error };
   } else {
-    const binName = info.nativeBinary || (process.platform === 'win32' ? 'horizon-server.exe' : 'horizon-server');
+    const isPumpkin = info.software === 'pumpkin' || /pumpkin/i.test(info.nativeBinary || '') || info.hasPumpkinConfig;
+    const binName = info.nativeBinary || (process.platform === 'win32' ? (isPumpkin ? 'pumpkin.exe' : 'horizon-server.exe') : (isPumpkin ? 'pumpkin' : 'horizon-server'));
     const fullBin = path.join(settings.serverPath, binName);
     if (!fs.existsSync(fullBin)) {
       return { ok: false, error: `Native server executable "${binName}" was not found in the server folder.` };
@@ -387,35 +388,52 @@ async function startServerInternal(ctx, settings) {
     try { rconCfg = ensureRconInProperties(ctx, settings); } catch (e) { try { ctx.appendLog(`RCON setup skipped: ${e?.message || e}`, 'system'); } catch {} }
   }
   if (isNative) {
-    try {
-      const { cleanHorizonToml } = require('./horizon-config.js');
-      const tomlPath = path.join(settings.serverPath, 'server.toml');
-      if (fs.existsSync(tomlPath)) {
-        const raw = fs.readFileSync(tomlPath, 'utf8');
-        const cleaned = cleanHorizonToml(raw);
-        if (cleaned !== raw) require('./fs-utils.js').writeFileAtomic(tomlPath, cleaned);
-      }
-      const propsPath = path.join(settings.serverPath, 'server.properties');
-      if (fs.existsSync(propsPath)) {
-        const rawP = fs.readFileSync(propsPath, 'utf8');
-        const cleanP = rawP.split(/\r?\n/).filter(line => !/^\s*(rcon|enable-rcon)(\.|=|\s)/.test(line)).join('\n');
-        if (cleanP !== rawP) require('./fs-utils.js').writeFileAtomic(propsPath, cleanP);
-      }
-    } catch {}
-    const { hasHorizonResources, prepareHorizonServer } = require('./horizon-prepare.js');
-    if (!hasHorizonResources(settings.serverPath)) {
-      ctx.appendLog('Horizon game files not prepared yet. Preparing automatically…', 'system');
+    const isPumpkin = info.software === 'pumpkin' || /pumpkin/i.test(info.nativeBinary || '') || info.hasPumpkinConfig;
+    if (isPumpkin) {
       try {
-        await prepareHorizonServer(settings.serverPath, (msg) => ctx.appendLog(typeof msg === 'string' ? msg : 'Preparing Horizon…', 'system'), ctx);
-      } catch (prepErr) {
-        ctx.appendLog(`Horizon preparation error: ${prepErr?.message || prepErr}`, 'stderr');
+        const { syncPropertiesToPumpkinToml } = require('./pumpkin-config.js');
+        const pFile = fs.existsSync(path.join(settings.serverPath, 'Pumpkin.toml')) ? 'Pumpkin.toml' : 'pumpkin.toml';
+        const tomlPath = path.join(settings.serverPath, pFile);
+        const existingToml = fs.existsSync(tomlPath) ? fs.readFileSync(tomlPath, 'utf8') : '';
+        const updated = syncPropertiesToPumpkinToml(existingToml, info.properties || {});
+        if (updated !== existingToml) require('./fs-utils.js').writeFileAtomic(tomlPath, updated);
+      } catch {}
+      const binName = info.nativeBinary || (process.platform === 'win32' ? 'pumpkin.exe' : 'pumpkin');
+      const binPath = path.isAbsolute(binName) ? binName : path.join(settings.serverPath, binName);
+      ctx.appendLog(`Starting native Pumpkin server (${binName})…`, 'system');
+      ctx.manualStop = false;
+      spawnNativeServerProcess(ctx, settings.serverPath, binPath, []);
+    } else {
+      try {
+        const { cleanHorizonToml } = require('./horizon-config.js');
+        const tomlPath = path.join(settings.serverPath, 'server.toml');
+        if (fs.existsSync(tomlPath)) {
+          const raw = fs.readFileSync(tomlPath, 'utf8');
+          const cleaned = cleanHorizonToml(raw);
+          if (cleaned !== raw) require('./fs-utils.js').writeFileAtomic(tomlPath, cleaned);
+        }
+        const propsPath = path.join(settings.serverPath, 'server.properties');
+        if (fs.existsSync(propsPath)) {
+          const rawP = fs.readFileSync(propsPath, 'utf8');
+          const cleanP = rawP.split(/\r?\n/).filter(line => !/^\s*(rcon|enable-rcon)(\.|=|\s)/.test(line)).join('\n');
+          if (cleanP !== rawP) require('./fs-utils.js').writeFileAtomic(propsPath, cleanP);
+        }
+      } catch {}
+      const { hasHorizonResources, prepareHorizonServer } = require('./horizon-prepare.js');
+      if (!hasHorizonResources(settings.serverPath)) {
+        ctx.appendLog('Horizon game files not prepared yet. Preparing automatically…', 'system');
+        try {
+          await prepareHorizonServer(settings.serverPath, (msg) => ctx.appendLog(typeof msg === 'string' ? msg : 'Preparing Horizon…', 'system'), ctx);
+        } catch (prepErr) {
+          ctx.appendLog(`Horizon preparation error: ${prepErr?.message || prepErr}`, 'stderr');
+        }
       }
+      const binName = info.nativeBinary || (process.platform === 'win32' ? 'horizon-server.exe' : 'horizon-server');
+      const binPath = path.isAbsolute(binName) ? binName : path.join(settings.serverPath, binName);
+      ctx.appendLog(`Starting native Horizon server (${binName})…`, 'system');
+      ctx.manualStop = false;
+      spawnNativeServerProcess(ctx, settings.serverPath, binPath, ['run']);
     }
-    const binName = info.nativeBinary || (process.platform === 'win32' ? 'horizon-server.exe' : 'horizon-server');
-    const binPath = path.isAbsolute(binName) ? binName : path.join(settings.serverPath, binName);
-    ctx.appendLog(`Starting native Horizon server (${binName})…`, 'system');
-    ctx.manualStop = false;
-    spawnNativeServerProcess(ctx, settings.serverPath, binPath, ['run']);
   } else {
     const { customArgs, args } = buildLaunchArgs(settings, isProxy, info.jar);
     ctx.appendLog(`Starting ${info.launchScript || info.jar} with ${ctx.javaInfo.path}…`, 'system');

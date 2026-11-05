@@ -23,7 +23,7 @@ const { dataDir } = require('./data-dir.js');
 const { singleton: modsIndex } = require('./mods-index.js');
 const { openJar } = require('./jar-reader.js');
 const { readPackTexture } = require('./resource-pack.js');
-const { renderCustomModItem } = require('./custom-item-renders.js');
+const { renderCustomModItem, renderCustomVanillaItem } = require('./custom-item-renders.js');
 
 // Hybrid CDN: jsDelivr is Cloudflare-backed, high-speed, and accessible worldwide (not blocked by
 // ISPs that block raw.githubusercontent.com). raw.githubusercontent is retained as a second fallback.
@@ -447,6 +447,10 @@ function handle(request) {
 
   const local = resolveLocal(version, kind, file);
   if (local) {
+    if (kind === 'item' || kind === 'block') {
+      const customVanilla = renderCustomVanillaItem(file.replace(/\.png$/, ''));
+      if (customVanilla) return respondWithCachedPng(customVanilla, version, kind, file);
+    }
     if (kind === 'itemmod') {
       const parts = splitModFile(file);
       if (parts) {
@@ -473,6 +477,11 @@ function handle(request) {
   if (kind === 'armormod' || kind === 'armormodlegs') {
     const layer = kind === 'armormodlegs' ? 2 : 1;
     return respondWithCachedPng(readModArmorTexture(file, layer), version, kind, file);
+  }
+
+  if (kind === 'item' || kind === 'block') {
+    const customVanilla = renderCustomVanillaItem(file.replace(/\.png$/, ''));
+    if (customVanilla) return respondWithCachedPng(customVanilla, version, kind, file);
   }
 
   // Hybrid: Try reading from a local Minecraft client JAR if available on the system (0ms offline)

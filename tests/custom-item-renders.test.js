@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { renderCustomModItem, renderBackpack, renderWaystone, encodePng } = require('../src/main/custom-item-renders.js');
+const { renderCustomModItem, renderCustomVanillaItem, renderBackpack, renderWaystone, encodePng } = require('../src/main/custom-item-renders.js');
 
 let pass = 0;
 function ck(name, condition) {
@@ -49,16 +49,22 @@ ck('mossy_waystone produces buffer', Buffer.isBuffer(mossyWs) && mossyWs.length 
 const sharestone = renderCustomModItem('waystones', 'sharestone');
 ck('sharestone produces buffer', Buffer.isBuffer(sharestone) && sharestone.length > 50);
 
-// 3. Negative cases
+// 3. Custom Vanilla Item (TNT 3D)
+const tntBuf = renderCustomVanillaItem('tnt');
+ck('renderCustomVanillaItem("tnt") produces buffer', Buffer.isBuffer(tntBuf) && tntBuf.length > 500);
+const tntDim = getDimensions(tntBuf);
+ck('TNT 3D icon is 32x32', tntDim.w === 32 && tntDim.h === 32);
+ck('renderCustomVanillaItem("diamond") returns null', renderCustomVanillaItem('diamond') === null);
+
+// 4. Negative cases
 ck('unsupported mod returns null', renderCustomModItem('unknown_ns', 'item') === null);
 ck('non-backpack item in sophisticatedbackpacks returns null', renderCustomModItem('sophisticatedbackpacks', 'upgrade_base') === null);
 ck('non-waystone item in waystones returns null', renderCustomModItem('waystones', 'warp_scroll') === null);
 
-// 4. Standalone encodePng
+// 5. Standalone encodePng
 const testRgba = Buffer.alloc(16 * 16 * 4, 0);
 const rawPng = encodePng(16, 16, testRgba);
 const rawDim = getDimensions(rawPng);
 ck('encodePng produces valid 16x16 PNG', rawDim.w === 16 && rawDim.h === 16);
 
 console.log(`\n${pass} passed, 0 failed`);
-

@@ -65,7 +65,7 @@ function resolveTemplate(id) {
 }
 
 // Validate a template object. Returns { ok, errors:[] }. PURE — used by the test and by init.
-const VALID_SOFTWARE = ['vanilla', 'paper', 'purpur', 'folia', 'velocity', 'fabric', 'forge', 'neoforge', 'spigot', 'leaf'];
+const VALID_SOFTWARE = ['vanilla', 'paper', 'purpur', 'folia', 'velocity', 'fabric', 'forge', 'neoforge', 'spigot', 'leaf', 'horizon', 'pumpkin'];
 const VALID_KINDS = ['plugin', 'mod', 'datapack'];
 function validateTemplate(t) {
   const errors = [];

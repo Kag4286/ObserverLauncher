@@ -10,6 +10,34 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [7.0.2] - 2026-11-05
+
+**Native Pumpkin Server Integration, Authentic 3D Block/Item Procedural Rendering, and Player Inspector Loop Stabilization.**
+
+### Native Rust Engine Integration (Pumpkin):
+- **Native Pumpkin Server Support (`src/main/adapters/pumpkin.js`, `src/main/pumpkin-config.js`):**
+  - Added dedicated software adapter for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) (high-concurrency Minecraft server written in Rust).
+  - Implemented standalone multi-architecture binary resolution (`pumpkin-X64-Windows.exe`, `pumpkin-X64-Linux`, `pumpkin-ARM64-macOS`).
+  - Added full parser and two-way synchronizer between `Pumpkin.toml` and server properties (`server-port`, `max-players`, `online-mode`, `motd`, `difficulty`, `view-distance`, `simulation-distance`, `level-seed`, `hardcore`).
+- **Server Lifecycle & Native Spawning (`src/main/server-lifecycle.js`, `src/main/server-files.js`):**
+  - Updated `isNative` engine evaluation and process adopt regex to support Pumpkin (`pumpkin.exe` / `pumpkin`).
+  - Automatically syncs UI server properties to `Pumpkin.toml` on launch without requiring Java, JVM flags, or asset extraction.
+  - Added Pumpkin software detection based on binary name and TOML configuration files.
+- **Wizard & Multi-Language UI (`src/main/wizard.js`, `src/renderer/index.html`, `src/renderer/js/12-wizard.js`, `src/renderer/locales/*.js`):**
+  - Added Pumpkin setup card in Create Server wizard under Featured / Native & Proxy filters.
+  - Configured direct physical RAM estimation (~100 MB working set) and zero Java requirements.
+  - Added localized strings across all 7 supported languages (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
+
+### Player Inspector & Inventory Texture Rendering:
+- **Infinite Render Loop Elimination (`src/main/textures.js`, `src/renderer/js/03-players.js`):**
+  - Fixed a re-render cascade in Player Inspector where ~78 lightweight vanilla items (< 2048 bytes) continuously re-triggered background downloads and IPC broadcasts on cache hits.
+  - Debounced `onIconsUpdate` by 120ms to batch icon arrival events and eliminate UI stutter.
+- **Procedural 3D Mod & Item Rendering (`src/main/custom-item-renders.js`, `src/main/textures.js`):**
+  - Added procedural pixel-perfect 32x32 generators for mods lacking flat 2D icons: Sophisticated Backpacks (leather, copper, iron, gold, diamond, netherite with tier-colored buckles) and Waystones (3D stone pillar with purple warp crystal).
+  - Added authentic multi-face 3D isometric renderer for TNT with distinct circular top fuse pattern and shaded side labels, eliminating 2D flat textures.
+- **Client-Side Isometric Pre-Render Guard (`src/renderer/js/03-players.js`):**
+  - Updated `isPreRenderedIcon` to inspect alpha corners rather than blindly assuming dimensions > 32 are 3D rendered, ensuring flat CDN textures are properly converted into isometric cubes.
+
 ## [7.0.1] - 2026-11-02
 
 **Maintenance, Mod Armor Preview, Multi-Engine Hardening, and Subsystem Reliability Release.**

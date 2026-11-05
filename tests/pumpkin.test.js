@@ -1,0 +1,91 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { listVersions, getPumpkinPlatform, resolve } = require('../src/main/adapters/pumpkin.js');
+const {
+  getDefaultPumpkinToml,
+  parsePumpkinToml,
+  syncPumpkinTomlToProperties,
+  syncPropertiesToPumpkinToml,
+} = require('../src/main/pumpkin-config.js');
+const { serverFiles, detectSoftware } = require('../src/main/server-files.js');
+
+let pass = 0;
+function ck(name, condition) {
+  assert(condition, name);
+  pass++;
+  console.log(`PASS ${name}`);
+}
+
+(async () => {
+  // 1. Adapter & Platform Resolution
+  const versions = listVersions();
+  ck('listVersions returns array of versions', Array.isArray(versions) && versions.length > 0);
+  ck('latest version is latest or semver', versions[0] === 'latest' || /^v?\d+/.test(versions[0]));
+
+  const winPlatform = getPumpkinPlatform({ platform: 'win32', arch: 'x64' });
+  ck('win32 x64 resolves to pumpkin-X64-Windows.exe', winPlatform.assetName === 'pumpkin-X64-Windows.exe');
+
+  const linuxPlatform = getPumpkinPlatform({ platform: 'linux', arch: 'x64' });
+  ck('linux x64 resolves to pumpkin-X64-Linux', linuxPlatform.assetName === 'pumpkin-X64-Linux');
+
+  const macArmPlatform = getPumpkinPlatform({ platform: 'darwin', arch: 'arm64' });
+  ck('darwin arm64 resolves to pumpkin-ARM64-macOS', macArmPlatform.assetName === 'pumpkin-ARM64-macOS');
+
+  const resolvedCurrent = await resolve();
+  ck('resolve() returns url, name, version', resolvedCurrent.url && resolvedCurrent.name && resolvedCurrent.version);
+  ck('resolve() name matches platform binary', process.platform === 'win32' ? resolvedCurrent.name.endsWith('.exe') : !resolvedCurrent.name.endsWith('.exe'));
+
+  // 2. TOML Generation & Parsing
+  const defaultToml = getDefaultPumpkinToml();
+  ck('default Pumpkin.toml contains [networking.java]', defaultToml.includes('[networking.java]'));
+  ck('default Pumpkin.toml sets port 25565', defaultToml.includes('0.0.0.0:25565'));
+
+  const parsed = parsePumpkinToml(defaultToml);
+  ck('parsePumpkinToml reads address', (parsed.address || parsed['networking.java']?.address) === '0.0.0.0:25565');
+  ck('parsePumpkinToml reads max_players', (parsed.max_players || parsed['networking.java']?.max_players) === 20);
+  ck('parsePumpkinToml reads online_mode', (parsed.online_mode ?? parsed['networking.java']?.online_mode) === true);
+
+  // 3. TOML <-> Properties Synchronization
+  const props = syncPumpkinTomlToProperties(defaultToml);
+  ck('syncPumpkinTomlToProperties extracts server-port', props['server-port'] === '25565');
+  ck('syncPumpkinTomlToProperties extracts max-players', props['max-players'] === '20');
+  ck('syncPumpkinTomlToProperties extracts online-mode', props['online-mode'] === 'true');
+
+  const updatedToml = syncPropertiesToPumpkinToml(defaultToml, {
+    'server-port': '25577',
+    'max-players': '50',
+    'online-mode': 'false',
+    motd: 'A Pumpkin Server in Rust',
+    difficulty: 'hard',
+    'view-distance': '16',
+  });
+  ck('syncPropertiesToPumpkinToml updates port to 25577', updatedToml.includes('0.0.0.0:25577'));
+  ck('syncPropertiesToPumpkinToml updates max_players to 50', updatedToml.includes('max_players = 50'));
+  ck('syncPropertiesToPumpkinToml updates online_mode to false', updatedToml.includes('online_mode = false'));
+  ck('syncPropertiesToPumpkinToml updates motd', updatedToml.includes('A Pumpkin Server in Rust'));
+  ck('syncPropertiesToPumpkinToml updates view_distance', updatedToml.includes('view_distance = 16'));
+
+  // 4. Server files detection
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-'));
+  try {
+    const binName = process.platform === 'win32' ? 'pumpkin.exe' : 'pumpkin';
+    fs.writeFileSync(path.join(tmpDir, binName), 'binary-dummy');
+    fs.writeFileSync(path.join(tmpDir, 'Pumpkin.toml'), defaultToml);
+
+    const sf = serverFiles(tmpDir);
+    ck('serverFiles detects nativeBinary', sf.nativeBinary === binName);
+    ck('serverFiles marks engineType as native', sf.engineType === 'native');
+    ck('serverFiles marks target.software as pumpkin', sf.target.software === 'pumpkin');
+    ck('serverFiles populates properties from Pumpkin.toml', sf.properties['server-port'] === '25565');
+    ck('detectSoftware returns pumpkin', detectSoftware(sf) === 'pumpkin');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  console.log(`\n${pass} passed, 0 failed`);
+})().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
