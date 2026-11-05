@@ -447,11 +447,7 @@ function handle(request) {
 
   const local = resolveLocal(version, kind, file);
   if (local) {
-    if (kind === 'item') {
-      try {
-        if (fs.statSync(local).size < 2048) queueRemote(version, kind, file);
-      } catch {}
-    } else if (kind === 'itemmod') {
+    if (kind === 'itemmod') {
       const parts = splitModFile(file);
       if (parts) {
         const custom = renderCustomModItem(parts.namespace, parts.name);

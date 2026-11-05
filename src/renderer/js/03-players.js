@@ -1096,7 +1096,11 @@ $('#refreshPlayersBtn').onclick=async()=>{
 };
 // icons:update — a placeholder icon just got its real pixels; re-render the open player
 // inspector grid. Lives with the inspector that owns lastInspectData (was misplaced in 02-worldmap.js).
+let _iconUpdateTimer = null;
 window.observer.onIconsUpdate(()=>{
+  if (_iconUpdateTimer) clearTimeout(_iconUpdateTimer);
+  _iconUpdateTimer = setTimeout(() => {
+    _iconUpdateTimer = null;
   iconEpoch++;
   if($('#playerInspectModal').hidden||!lastInspectData)return;
   renderEquipment(lastInspectData.armor,lastInspectData.offhand);
@@ -1108,4 +1112,5 @@ window.observer.onIconsUpdate(()=>{
   if(selectedPlayer&&selectedPlayer.uuid&&lastInspectData.armor?.length){
     renderPlayer3D($('#pd3dCanvas'),$('#pd3dStatus'),selectedPlayer.uuid,selectedPlayer.name,lastInspectData.armor);
   }
+  }, 120);
 });

@@ -61,3 +61,4 @@ const rawDim = getDimensions(rawPng);
 ck('encodePng produces valid 16x16 PNG', rawDim.w === 16 && rawDim.h === 16);
 
 console.log(`\n${pass} passed, 0 failed`);
+

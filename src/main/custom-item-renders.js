@@ -243,3 +243,4 @@ function renderCustomModItem(namespace, name) {
 }
 
 module.exports = { renderCustomModItem, renderBackpack, renderWaystone, encodePng };
+
