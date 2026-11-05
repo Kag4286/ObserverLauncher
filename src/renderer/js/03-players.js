@@ -78,8 +78,9 @@ function isBlockItem(id) {
   const name = id.includes(':') ? id.split(':')[1] : id;
   if (/(?:_ingot|_nugget|_sword|_pickaxe|_axe|_shovel|_hoe|_helmet|_chestplate|_leggings|_boots|_horse_armor|_bucket|_bottle|_potion|_stew|_soup|_dust|_shard|_seeds?|_egg|_spawn_egg|_disc|_rod|_arrow|_apple|_bow|_book|_fish|_meat)$/.test(name)) return false;
   if (/^(?:redstone|glowstone_dust|clay_ball|amethyst_shard|prismarine_shard|prismarine_crystals|honeycomb|brick|nether_brick|stick|string|feather|flint|coal|charcoal|diamond|emerald|iron_nugget|gold_nugget|copper_ingot|iron_ingot|gold_ingot|netherite_ingot|netherite_scrap|slime_ball|ender_pearl|eye_of_ender|blaze_powder|ghast_tear|magma_cream|sugar|paper|book|name_tag|lead|saddle|compass|clock|bread|cookie)$/.test(name)) return false;
-  if (/(?:sapling|flower|tulip|rose|orchid|daisy|allium|dandelion|poppy|lily_pad|sugar_cane|bamboo|cactus|torch|lantern|rail|lever|tripwire_hook|door|trapdoor|carpet|bed|sign|banner|chain|anvil|cauldron|hopper|bell|brewing_stand)$/.test(name)) return false;
-  if (/(?:_block|_ore|_log|_wood|_stem|_hyphae|_planks|_bricks|_leaves|_wool|_terracotta|_concrete(?:_powder)?|_pillar|_crate|_casing)$/.test(name)) return true;
+  if (/(?:sapling|flower|tulip|rose|orchid|daisy|allium|dandelion|poppy|lily_pad|sugar_cane|bamboo|cactus|torch|lantern|rail|lever|tripwire_hook|door|trapdoor|carpet|bed|sign|banner|chain|cauldron|hopper|bell|brewing_stand)$/.test(name)) return false;
+  if (/(?:^anvil|_anvil)$/.test(name)) return true;
+  if (/(?:_block|_ore|_log|_wood|_stem|_hyphae|_planks|_bricks|_leaves|_wool|_terracotta|_concrete(?:_powder)?|_pillar|_crate|_casing|_cobblestone|_stone|waystone)$/.test(name)) return true;
   return /^(?:stone|cobblestone|mossy_cobblestone|smooth_stone|deepslate|cobbled_deepslate|polished_deepslate|blackstone|polished_blackstone|granite|polished_granite|diorite|polished_diorite|andesite|polished_andesite|dirt|coarse_dirt|rooted_dirt|podzol|mycelium|mud|packed_mud|sand|red_sand|gravel|clay|sandstone|red_sandstone|bedrock|obsidian|crying_obsidian|tnt|crafting_table|furnace|smoker|blast_furnace|dispenser|dropper|observer|sponge|wet_sponge|glowstone|sea_lantern|shroomlight|netherrack|soul_sand|soul_soil|basalt|smooth_basalt|end_stone|ice|packed_ice|blue_ice|sculk|sculk_catalyst|bookshelf|chiseled_bookshelf|beehive|bee_nest|prismarine|dark_prismarine|calcite|tuff|lodestone|target|respawn_anchor)$/.test(name);
 }
 
@@ -105,17 +106,52 @@ function drawCubeFace(ctx, img, poly, matrix, tint) {
   ctx.restore();
 }
 
-function renderIsometricBlock(img) {
+function createIsoCanvas(size = 32) {
   const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 32;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext('2d');
+  if (ctx) ctx.imageSmoothingEnabled = false;
+  return { canvas, ctx };
+}
+
+function renderIsometricBlock(img) {
+  const { canvas, ctx } = createIsoCanvas(32);
   if (!ctx) return null;
-  ctx.imageSmoothingEnabled = false;
   const w = img.naturalWidth || 16;
   drawCubeFace(ctx, img, [16, 3, 28, 9, 16, 15, 4, 9], [12 / w, 6 / w, -12 / w, 6 / w, 16, 3], null);
   drawCubeFace(ctx, img, [4, 9, 16, 15, 16, 27, 4, 21], [12 / w, 6 / w, 0, 12 / w, 4, 9], 'rgba(0,0,0,0.18)');
   drawCubeFace(ctx, img, [16, 15, 28, 9, 28, 21, 16, 27], [12 / w, -6 / w, 0, 12 / w, 16, 15], 'rgba(0,0,0,0.40)');
+  return canvas.toDataURL();
+}
+
+function renderIsometricAnvil(id) {
+  const { canvas, ctx } = createIsoCanvas(32);
+  if (!ctx) return null;
+  ctx.fillStyle = '#4a4a4a';
+  ctx.beginPath(); ctx.moveTo(16, 17); ctx.lineTo(25, 21.5); ctx.lineTo(16, 26); ctx.lineTo(7, 21.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3a3a3a';
+  ctx.beginPath(); ctx.moveTo(7, 21.5); ctx.lineTo(16, 26); ctx.lineTo(16, 29); ctx.lineTo(7, 24.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2b2b2b';
+  ctx.beginPath(); ctx.moveTo(16, 26); ctx.lineTo(25, 21.5); ctx.lineTo(25, 24.5); ctx.lineTo(16, 29); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#343434';
+  ctx.beginPath(); ctx.moveTo(13, 16.5); ctx.lineTo(16, 18); ctx.lineTo(16, 23); ctx.lineTo(13, 21.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#262626';
+  ctx.beginPath(); ctx.moveTo(16, 18); ctx.lineTo(19, 16.5); ctx.lineTo(19, 21.5); ctx.lineTo(16, 23); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#424242';
+  ctx.beginPath(); ctx.moveTo(4, 9); ctx.lineTo(16, 15); ctx.lineTo(16, 20); ctx.lineTo(4, 14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2c2c2c';
+  ctx.beginPath(); ctx.moveTo(16, 15); ctx.lineTo(29, 8.5); ctx.lineTo(29, 12); ctx.lineTo(20, 16.5); ctx.lineTo(16, 20); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#5a5a5a';
+  ctx.beginPath(); ctx.moveTo(16, 3); ctx.lineTo(29, 8.5); ctx.lineTo(16, 15); ctx.lineTo(4, 9); ctx.closePath(); ctx.fill();
+  if (id && id.includes('chipped')) {
+    ctx.strokeStyle = '#222222'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(14, 8); ctx.lineTo(18, 10); ctx.lineTo(16, 12); ctx.stroke();
+  } else if (id && id.includes('damaged')) {
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(12, 7); ctx.lineTo(17, 10); ctx.lineTo(15, 13);
+    ctx.moveTo(20, 8); ctx.lineTo(24, 10); ctx.stroke();
+  }
   return canvas.toDataURL();
 }
 
@@ -129,13 +165,29 @@ function applyIsometricBlockIfNeeded(img) {
       img.src = cached;
       return;
     }
-    const dataUrl = renderIsometricBlock(img);
+    const id = img.dataset.id;
+    let dataUrl;
+    if (id && (id.includes('anvil') || id.endsWith('anvil'))) {
+      dataUrl = renderIsometricAnvil(id);
+    } else {
+      dataUrl = renderIsometricBlock(img);
+    }
     if (dataUrl) {
       isoBlockCache.set(origSrc, dataUrl);
       img.dataset.iso = '1';
       img.src = dataUrl;
     }
   } catch (_) {}
+}
+
+function scanAndApplyIsoBlocks(container) {
+  if (!container) return;
+  const imgs = container.querySelectorAll ? container.querySelectorAll('img[data-id]:not([data-iso="1"])') : [];
+  for (const img of imgs) {
+    if (img.complete && img.naturalWidth > 1) {
+      applyIsometricBlockIfNeeded(img);
+    }
+  }
 }
 
 function itemCellInner(iconUrl, label, id) {
@@ -145,7 +197,7 @@ function itemCellInner(iconUrl, label, id) {
   const src = cached || iconUrl;
   const isIso = cached ? ' data-iso="1"' : '';
   const idAttr = id ? ` data-id="${esc(id)}"` : '';
-  return `<img src="${src}" alt="" data-fb="${esc(initials)}"${idAttr}${isIso}>`;
+  return `<img src="${src}" alt="" crossorigin="anonymous" data-fb="${esc(initials)}"${idAttr}${isIso}>`;
 }
 // A load event that resolves to the 1x1 placeholder means the texture is not on the mirror (or not
 // in the mod jar). Mark the parent cell so CSS shows the initials badge, and clear the mark when a
@@ -182,6 +234,7 @@ function showInvItemDetail(x){
   const durHtml=x.durability?`<div class="inv-item-detail-meta"><span style="color:${durColor(x.durability)}">Durability: ${x.durability.remaining} / ${x.durability.max} (${Math.round(x.durability.remaining/x.durability.max*100)}%)</span></div>`:'';
   d.hidden=false;
   d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,label,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${esc(label)}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==label?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true">✕</button>`;
+  scanAndApplyIsoBlocks(d);
 }
 function renderItemGrid(id,items){
   const n=$(id);if(!n)return;
@@ -216,6 +269,7 @@ function renderItemGrid(id,items){
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
     return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${tipHtml}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label,x.id)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
+  scanAndApplyIsoBlocks(n);
 }
 function renderEquipment(armor,offhand){
   const n=$('#equipmentGrid');if(!n)return;
@@ -250,6 +304,7 @@ function renderEquipment(armor,offhand){
       ${enchList}
     </div>`;
   }).join('');
+  scanAndApplyIsoBlocks(n);
 }
 let playerFilter='online';
 const PLAYERS_PAGE_SIZE=14;

@@ -50,10 +50,14 @@ ck('recognizes oak_log as block', isBlockItem('minecraft:oak_log') === true);
 ck('recognizes oak_leaves as block', isBlockItem('minecraft:oak_leaves') === true);
 ck('recognizes redstone_block as block', isBlockItem('minecraft:redstone_block') === true);
 
-// 2. Modded cubic blocks
+// 2. Modded cubic blocks & 3D items
 ck('recognizes modded thermal:tin_block', isBlockItem('thermal:tin_block') === true);
 ck('recognizes modded create:brass_casing', isBlockItem('create:brass_casing') === true);
 ck('recognizes modded ae2:fluix_block', isBlockItem('ae2:fluix_block') === true);
+ck('recognizes modded iceandfire:chared_cobblestone', isBlockItem('iceandfire:chared_cobblestone') === true);
+ck('recognizes modded waystones:waystone', isBlockItem('waystones:waystone') === true);
+ck('recognizes anvil as 3D block', isBlockItem('minecraft:anvil') === true);
+ck('recognizes chipped_anvil as 3D block', isBlockItem('minecraft:chipped_anvil') === true);
 
 // 3. Items, tools, consumables must NOT be treated as cubic blocks
 ck('does NOT treat redstone dust as block', isBlockItem('minecraft:redstone') === false);
@@ -70,12 +74,12 @@ ck('does NOT treat bread as block', isBlockItem('minecraft:bread') === false);
 ck('does NOT treat oak_sapling as cubic block', isBlockItem('minecraft:oak_sapling') === false);
 ck('does NOT treat poppy as cubic block', isBlockItem('minecraft:poppy') === false);
 ck('does NOT treat torch as cubic block', isBlockItem('minecraft:torch') === false);
-ck('does NOT treat chipped_anvil as cubic block', isBlockItem('minecraft:chipped_anvil') === false);
 ck('does NOT treat iron_backpack as cubic block', isBlockItem('sophisticatedbackpacks:iron_backpack') === false);
 
-// 5. itemCellInner produces data-id and utilizes cache
+// 5. itemCellInner produces data-id, crossorigin, and utilizes cache
 const htmlInitial = itemCellInner('tex://auto/item/tnt.png', 'TNT', 'minecraft:tnt');
 ck('itemCellInner includes data-id', htmlInitial.includes('data-id="minecraft:tnt"'));
+ck('itemCellInner includes crossorigin=anonymous', htmlInitial.includes('crossorigin="anonymous"'));
 ck('itemCellInner does not have data-iso before caching', !htmlInitial.includes('data-iso="1"'));
 
 isoBlockCache.set('tex://auto/item/tnt.png', 'data:image/png;base64,isometricTntMock');
