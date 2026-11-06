@@ -465,7 +465,7 @@ function wmDraw(){
   // been loaded (wm.biomes), each cell is coloured by its chunk's actual surface biome; cells
   // without data fall back to the seed-coloured approximation. Only explored chunks render
   // when a chunk mask is present.
-  if(wm.layers.terrain){
+  if(wm.layers.terrain && wm.explored.size > 0){
     const chunkPx=16*wm.zoom;
     // Close enough to spend pixels on the real 4x4 per-chunk heightmap (relief + water); when
     // zoomed out a single flat cell per chunk is faster and looks the same.
@@ -514,8 +514,38 @@ function wmDraw(){
   wmScheduleBiomes();
   // biome status hint (top-left): a loading indicator while a fetch is in flight, or a
   // "zoom in" note when the viewport is too wide / the backend hit its chunk cap.
-  { const hint=!wm.explored.size?t('wm.seedPreviewHint'):(wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null));
+  { const hint=!wm.explored.size?null:(wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null));
     if(hint){ ctx.fillStyle='rgba(232,244,248,.75)';ctx.font='600 10.5px "JetBrains Mono",monospace';ctx.fillText(hint,14,20); } }
+  if(!wm.explored.size){
+    ctx.save();
+    const cardW = Math.min(480, W - 32), cardH = 92;
+    const cardX = (W - cardW) / 2, cardY = (H - cardH) / 2;
+    ctx.fillStyle = 'rgba(10, 15, 20, 0.88)';
+    ctx.strokeStyle = 'rgba(59, 203, 141, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, 10);
+    else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#3BCB8D';
+    ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('◈ ' + t('wm.emptyChunksTitle'), W / 2, cardY + 16);
+
+    ctx.fillStyle = 'rgba(232, 244, 248, 0.85)';
+    ctx.font = '12px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t('wm.emptyChunksSub'), W / 2, cardY + 42);
+
+    ctx.fillStyle = 'rgba(184, 194, 204, 0.7)';
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t('wm.emptyChunksTip'), W / 2, cardY + 63);
+    ctx.restore();
+  }
   wmDrawMini();
   // scale bar
   const px=step*wm.zoom;
