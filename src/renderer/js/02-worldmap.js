@@ -342,7 +342,7 @@ async function wmLoad(){
   wm.level=(r&&r.level&&r.level.ok)?r.level:null;
   wm.players=(r&&r.players&&r.players.players)||[];
   wm.waypoints=(r&&r.waypoints)||[];
-  if(!wm.level){wmShow('none');if(r.error)toast(t('nav.worldmap')+': '+r.error,'error');return}
+  if(!wm.level){wmShow('none');if(r.error&&r.error!=='noWorld')toast(t('nav.worldmap')+': '+r.error,'error');return}
   wmShow('app');
   // MODDED HONESTY: custom biomes get approximate colours and custom dimensions can't be drawn.
   // Show a short note (JS-owned text — NOT data-i18n, or applyLocale would clobber it) when the

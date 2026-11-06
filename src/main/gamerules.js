@@ -82,10 +82,48 @@ function rulesFromGr(grTag) {
 }
 
 // Read all game rules for a world. Returns { ok, rules:{name:string}, source } or { ok:false, error }.
+async function readGameRulesFromDat(root, levelName) {
+  const name = String(levelName || 'world').replace(/[\\/]/g, '') || 'world';
+  const cands = [
+    path.join(root, name, 'data', 'minecraft', 'game_rules.dat'),
+    path.join(root, name, 'data', 'game_rules.dat'),
+    path.join(root, 'data', 'minecraft', 'game_rules.dat'),
+    path.join(root, 'data', 'game_rules.dat'),
+  ];
+  for (const c of cands) {
+    try {
+      if (fs.existsSync(c)) {
+        const buf = fs.readFileSync(c);
+        const parsed = await nbt.parse(buf);
+        const simp = nbt.simplify(parsed.parsed);
+        const gr = simp?.data || simp?.Data || simp || {};
+        const rules = {};
+        for (const [k, v] of Object.entries(gr)) {
+          if (k !== 'type' && RULE_RE.test(k)) rules[k] = String(v);
+        }
+        if (Object.keys(rules).length > 0) {
+          return { ok: true, rules, source: path.relative(root, c) };
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+// Read all game rules for a world. Returns { ok, rules:{name:string}, source } or { ok:false, error }.
 async function readGameRules(root, levelName) {
   const L = await loadLevel(root, levelName);
-  if (!L.ok) return L;
-  return { ok: true, rules: rulesFromGr(L.data.GameRules), source: path.relative(root, L.file) };
+  if (!L.ok) {
+    const alt = await readGameRulesFromDat(root, levelName);
+    if (alt) return alt;
+    return L;
+  }
+  const rules = rulesFromGr(L.data.GameRules);
+  if (Object.keys(rules).length === 0) {
+    const alt = await readGameRulesFromDat(root, levelName);
+    if (alt) return alt;
+  }
+  return { ok: true, rules, source: path.relative(root, L.file) };
 }
 
 // SHARED: serialize the (already-mutated) NBT tree back to disk, preserving the original

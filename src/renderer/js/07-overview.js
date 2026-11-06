@@ -120,7 +120,7 @@ else n.textContent=t('set.javaOk',{v:j.version,p:j.path});
 // Show Install when Java is missing, mismatched/too-new, OR still coming from PATH (no managed
 // javaPath set) - so a run.bat server with no jar can still pin a specific runtime.
 const javaPathSet=!!((s.javaPath||'').trim());
-const isNatSetting=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+const isNatSetting=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
 $('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
   if(!isNatSetting) populateJavaPicker(j);
   else { const jpRow=$('#javaPickRow'); if(jpRow) jpRow.hidden=true; }
@@ -128,8 +128,13 @@ $('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!too
   const nt=$('#setNativeTopic');
   if(nt){
     nt.hidden=!isNatSetting;
+    const isPumpkin=(f.target&&f.target.software==='pumpkin')||(f.nativeBinary&&/pumpkin/i.test(f.nativeBinary))||f.hasPumpkinConfig;
+    const titleEl=$('#setNativeEngineTitle');
+    if(titleEl) titleEl.textContent=isPumpkin?t('set.nativeEnginePumpkinT'):t('set.nativeEngineT');
+    const noticeEl=$('#nativeNotice');
+    if(noticeEl) noticeEl.textContent=isPumpkin?t('set.nativeNoticePumpkin'):t('set.nativeNotice');
     const nbb=$('#nativeBinBadge');
-    if(nbb) nbb.textContent=f.nativeBinary||'horizon-server.exe';
+    if(nbb) nbb.textContent=f.nativeBinary||(isPumpkin?'pumpkin.exe':'horizon-server.exe');
   }
   const shSub=$('#settingsHeadSub');
   if(shSub) shSub.textContent=isNatSetting?t('set.subNative'):t('set.sub');
@@ -148,7 +153,7 @@ $('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!too
   // Java compatibility banner — proactive warning + one-click fix
   const jw=$('#javaWarnBanner');
   if(jw){
-    const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+    const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
     const need=isNat?null:(state.javaRequired||null);
     const have=(j.ok&&j.version)?(javaMajorOf(j.version)):null;
     const mismatch=!isNat&&need&&have&&have<need;

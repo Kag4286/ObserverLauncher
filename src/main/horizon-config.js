@@ -27,8 +27,8 @@ function parseSimpleToml(text) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    // Check for section header: [section]
-    const sectionMatch = trimmed.match(/^\[([A-Za-z0-9_-]+)\]$/);
+    // Check for section header: [section] or [section.sub]
+    const sectionMatch = trimmed.match(/^\[([A-Za-z0-9_.-]+)\]$/);
     if (sectionMatch) {
       const sec = sectionMatch[1];
       if (DANGEROUS_KEYS.has(sec)) {

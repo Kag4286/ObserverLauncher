@@ -33,7 +33,8 @@ function anyFile(folder, re) {
 function detectServerTarget(root, files) {
   const f = files || {};
   const name = String(f.jar || f.launchScript || f.nativeBinary || '').toLowerCase();
-  if (/horizon/.test(name) || f.nativeBinary || (f.hasHorizonConfig && !f.jar && !f.launchScript)) return { mc: '26.3', loader: 'horizon', engineType: 'native' };
+  if (/pumpkin/.test(name) || (f.hasPumpkinConfig && !f.jar && !f.launchScript)) return { mc: 'latest', loader: 'pumpkin', engineType: 'native' };
+  if (/horizon/.test(name) || (f.nativeBinary && !/pumpkin/.test(f.nativeBinary)) || (f.hasHorizonConfig && !f.jar && !f.launchScript)) return { mc: '26.3', loader: 'horizon', engineType: 'native' };
   // Proxy first (a Velocity server has no worlds/mods of its own).
   if (/velocity|bungee|waterfall/.test(name)) return { mc: mcFromName(name), loader: 'proxy' };
   // Explicit loader in the filename wins.
@@ -68,6 +69,7 @@ const LOADER_FAMILY = {
   fabric: ['fabric', 'quilt'],
   quilt: ['fabric', 'quilt'],
   horizon: ['horizon'],
+  pumpkin: ['pumpkin'],
 };
 const { areMcVersionsCompatible } = require('./mc-compat.js');
 

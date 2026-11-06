@@ -14,6 +14,9 @@ ObserverLauncher expands its native engine support by integrating [Pumpkin](http
 - **Ultra-Low Memory Footprint (~100 MB):** Starts instantly and operates within an astonishingly compact ~100 MB working set. The wizard memory step dynamically explains Pumpkin's dynamic memory allocation without misleading ~600 MB presets.
 - **Resilient Multi-Source Downloads:** Features automatic fallback mirror routing (`ghfast.top`) and release tag reconciliation (`0.2.1+26.3-26.51`), ensuring lightning-fast and stall-free binary downloads worldwide.
 - **Two-Way `Pumpkin.toml` Synchronization:** Settings edited in the launcher (port, max players, online-mode, MOTD, difficulty, view distance, simulation distance, seed, hardcore) automatically sync to `Pumpkin.toml` and vice versa.
+- **Dedicated Native Settings & Content UI:** Launcher Settings and Content views dynamically reflect Pumpkin identity and runtime instructions instead of defaulting to Horizon, displaying accurate executable badges and native notice banners.
+- **Full World Map & Anvil Region Integration:** Configures Pumpkin's chunk storage engine to standard Anvil (`[world.chunk] type = "anvil"`), generating `.mca` files that seamlessly render interactive 2D cartography, relief elevation, and biome layers.
+- **Accurate Signed 64-bit Seeds & Game Rules:** Converts world seeds to standard Minecraft signed 64-bit integers and reads modern game rules directly from `game_rules.dat`.
 - **Seamless 1-Click Wizard Setup:** Create a Pumpkin server with one click under **Create new server** > **Featured** / **Native & Proxy**. Step 1 folder selection immediately enables navigation without subfolder hurdles.
 - **Complete Headless & Process Management:** Background process monitoring, CPU/RAM telemetry, graceful stop, and orphan process adoption seamlessly support native Pumpkin processes.
 

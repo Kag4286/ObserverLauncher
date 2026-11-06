@@ -35,7 +35,8 @@ plus a window-less entry point that reuses the exact same backend:
     `validate.js` (IPC & SSRF guards covering IPv4/IPv6 loopback, link-local, ULA, multicast, and private ranges),
     `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
     (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key),
-    `server-compat.js` (loader detection for Vanilla, Paper/Purpur/Spigot/Bukkit, Fabric, Forge, NeoForge, Velocity),
+    `server-compat.js` (loader detection for Vanilla, Paper/Purpur/Spigot/Bukkit, Fabric, Forge, NeoForge, Velocity, Horizon, Pumpkin),
+    `horizon-config.js` and `pumpkin-config.js` (native TOML configuration parsers and two-way synchronizers),
     `server-java.js`, `version-compare.js` (natural digit-aware version compare),
     `forge-versions.js`, `jar-read.js`, `mod-metadata.js` (reads `mods.toml`, `fabric.mod.json`, `mcmod.info`),
     `content-conflicts.js` (pre-flight mod conflict scanner, duplicate modId detector, missing dependency resolver),

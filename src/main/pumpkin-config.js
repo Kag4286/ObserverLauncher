@@ -14,14 +14,22 @@ function getDefaultPumpkinToml(opts = {}) {
   const vDist = Number(p['view-distance']) || 10;
   const simDist = Number(p['simulation-distance']) || 8;
   const hc = p['hardcore'] === 'true';
+  const levelName = p['level-name'] || 'world';
 
   return `# Pumpkin Minecraft Server Configuration (managed by ObserverLauncher)
+default_level_name = ${JSON.stringify(String(levelName))}
 seed = ${JSON.stringify(String(seed))}
 default_difficulty = ${JSON.stringify(String(diff))}
 allow_nether = true
 allow_end = true
 hardcore = ${hc ? 'true' : 'false'}
 tps = 20.0
+
+[world]
+autosave_ticks = 6000
+
+[world.chunk]
+type = "anvil"
 
 [networking.java]
 enabled = true
@@ -39,6 +47,7 @@ function syncPumpkinTomlToProperties(tomlText) {
   const parsed = parseSimpleToml(tomlText);
   const props = {};
 
+  if (parsed.default_level_name !== undefined) props['level-name'] = String(parsed.default_level_name);
   if (parsed.seed !== undefined) props['level-seed'] = String(parsed.seed);
   if (parsed.default_difficulty !== undefined) props['difficulty'] = String(parsed.default_difficulty).toLowerCase();
   if (parsed.hardcore !== undefined) props['hardcore'] = String(parsed.hardcore);
@@ -82,6 +91,10 @@ function syncPropertiesToPumpkinToml(tomlText, props) {
       const key = line.slice(0, eqIdx).trim();
 
       if (!currentSection) {
+        if (key === 'default_level_name' && props['level-name'] !== undefined) {
+          outLines.push(`default_level_name = ${JSON.stringify(String(props['level-name']))}`);
+          continue;
+        }
         if (key === 'seed' && props['level-seed'] !== undefined) {
           outLines.push(`seed = ${JSON.stringify(String(props['level-seed']))}`);
           continue;
@@ -128,7 +141,11 @@ function syncPropertiesToPumpkinToml(tomlText, props) {
     outLines.push(line);
   }
 
-  return outLines.join(eol);
+  let res = outLines.join(eol);
+  if (!res.includes('[world.chunk]')) {
+    res += `${eol}${eol}[world.chunk]${eol}type = "anvil"${eol}`;
+  }
+  return res;
 }
 
 module.exports = {

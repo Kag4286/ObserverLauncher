@@ -14,9 +14,15 @@ const { readJsonList, writeFileAtomic } = require('./fs-utils.js');
 function lruSet(map, key, val, max) { map.set(key, val); if (map.size > max) map.delete(map.keys().next().value); return map; }
 
 function longToBigInt(v) {
-  if (typeof v === 'bigint') return v;
-  if (Array.isArray(v)) return ((BigInt(v[0] | 0) & 0xFFFFFFFFn) << 32n) | (BigInt(v[1] | 0) & 0xFFFFFFFFn);
-  if (typeof v === 'number') return BigInt(Math.trunc(v));
+  if (typeof v === 'bigint') return BigInt.asIntN(64, v);
+  if (Array.isArray(v)) {
+    const raw = ((BigInt(v[0] | 0) & 0xFFFFFFFFn) << 32n) | (BigInt(v[1] | 0) & 0xFFFFFFFFn);
+    return BigInt.asIntN(64, raw);
+  }
+  if (typeof v === 'number') return BigInt.asIntN(64, BigInt(Math.trunc(v)));
+  if (typeof v === 'string') {
+    try { return BigInt.asIntN(64, BigInt(v.trim())); } catch {}
+  }
   return 0n;
 }
 
@@ -44,7 +50,19 @@ async function readLevel(root, levelName) {
     let hasReg = false;
     for (const d of rDirs) { try { if (fs.existsSync(d) && fs.readdirSync(d).some(f => f.endsWith('.mca'))) { hasReg = true; break; } } catch {} }
     if (hasReg) {
-      return { ok: true, source: 'region', seed: '0', levelName: name, spawn: { x: 0, y: 64, z: 0 }, version: { name: '26.3 (Native)', id: 0, snapshot: false }, dataVersion: 0, hardcore: false };
+      let seedStr = '0';
+      try {
+        const pToml = path.join(root, 'Pumpkin.toml');
+        const pTomlAlt = path.join(root, 'pumpkin.toml');
+        const hToml = path.join(root, 'horizon.toml');
+        const tFile = fs.existsSync(pToml) ? pToml : fs.existsSync(pTomlAlt) ? pTomlAlt : fs.existsSync(hToml) ? hToml : null;
+        if (tFile) {
+          const txt = fs.readFileSync(tFile, 'utf8');
+          const m = txt.match(/seed\s*=\s*["']?([^"'\r\n]+)["']?/);
+          if (m && m[1]) seedStr = m[1].trim();
+        }
+      } catch {}
+      return { ok: true, source: 'region', seed: seedStr, levelName: name, spawn: { x: 0, y: 64, z: 0 }, version: { name: '26.3 (Native)', id: 0, snapshot: false }, dataVersion: 0, hardcore: false };
     }
     return { ok: false, error: 'noWorld', tried: name + '/level.dat, level.dat' };
   }

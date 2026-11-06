@@ -121,6 +121,7 @@ ObserverLauncher provides robust infrastructure for experienced server operators
 | Software | Mod/Plugin Support | Live TPS / MSPT | Pre-flight Scan |
 |---|---|---|---|
 | **Horizon** (Rust Native) | Rust Native MC 26.3 • Clean-room | Process telemetry | Native TOML validation |
+| **Pumpkin** (Rust Native) | Rust Native MC 26.3 • Clean-room | Process telemetry | Native TOML validation |
 | **Paper / Purpur / Leaf / Folia** | Bukkit / Spigot / Paper plugins | Yes | Plugin conflicts |
 | **Fabric / Quilt** | Fabric mods | Player count | Mod & Dep scan |
 | **Forge / NeoForge** | Forge / NeoForge mods | Yes | Mod & Dep scan |
@@ -135,7 +136,7 @@ ObserverLauncher provides robust infrastructure for experienced server operators
 - **Operating System:** Windows 10/11 (64-bit) or modern 64-bit Linux distribution.
 - **Memory:** 4 GB RAM minimum (8 GB+ recommended for modded servers).
 - **Disk:** ~1 GB for launcher and dependencies; additional space for world saves.
-- **Java:** Any Java 8–25 runtime for Java servers (the app detects existing installations and can automatically download OpenJDK runtimes). Horizon native instances require no Java.
+- **Java:** Any Java 8–25 runtime for Java servers (the app detects existing installations and can automatically download OpenJDK runtimes). Native instances (Horizon, Pumpkin) require no Java.
 
 ---
 

@@ -344,6 +344,17 @@ function updateContentToolbarState() {
   if (sumPill) {
     sumPill.textContent = t('cnt.summary', { n: total }) + (disabled > 0 ? ` (${enabled} on, ${disabled} off)` : '');
   }
+
+  const cnn = $('#contentNativeNotice');
+  if (cnn) {
+    const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
+    cnn.hidden = !isNat;
+    if (isNat) {
+      const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
+      const cnnText = $('#contentNativeNoticeText');
+      if (cnnText) cnnText.textContent = isPumpkin ? t('cnt.nativeNoticePumpkin') : t('cnt.nativeNotice');
+    }
+  }
 }
 
 function filterContentList() {
