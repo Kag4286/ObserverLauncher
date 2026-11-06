@@ -12,6 +12,30 @@ const resourcePack = require('./resource-pack.js');
 const worldOps = require('./world-ops.js');
 const waypointSync = require('./waypoint-sync.js');
 
+function syncHorizonToml(serverPath, props) {
+  try {
+    const tomlPath = path.join(serverPath, 'server.toml');
+    if (!fs.existsSync(tomlPath)) return;
+    const { syncPropertiesToToml } = require('./horizon-config.js');
+    const existing = fs.readFileSync(tomlPath, 'utf8');
+    const updated = syncPropertiesToToml(existing, props || {});
+    writeFileAtomic(tomlPath, updated);
+  } catch {}
+}
+
+function syncPumpkinToml(serverPath, props) {
+  try {
+    const pFile = fs.existsSync(path.join(serverPath, 'Pumpkin.toml')) ? 'Pumpkin.toml'
+      : fs.existsSync(path.join(serverPath, 'pumpkin.toml')) ? 'pumpkin.toml' : null;
+    if (!pFile) return;
+    const tomlPath = path.join(serverPath, pFile);
+    const { syncPropertiesToPumpkinToml } = require('./pumpkin-config.js');
+    const existing = fs.readFileSync(tomlPath, 'utf8');
+    const updated = syncPropertiesToPumpkinToml(existing, props || {});
+    writeFileAtomic(tomlPath, updated);
+  } catch {}
+}
+
 function registerContent(ipcMain, ctx) {
   ipcMain.handle('files:get', async () => {
     try {
@@ -56,6 +80,7 @@ function registerContent(ipcMain, ctx) {
     try { const cur = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8'); require('./properties-history.js').recordSnapshot(typeof ctx.inst === 'function' ? ctx.inst() : 'default', cur); } catch {}
     writeFileAtomic(path.join(ctx.currentServerPath, 'server.properties'), buildPropertiesContent(ctx.currentServerPath, props));
     syncHorizonToml(ctx.currentServerPath, props);
+    syncPumpkinToml(ctx.currentServerPath, props);
     return { ok: true };
   });
 
@@ -94,6 +119,7 @@ function registerContent(ipcMain, ctx) {
         if (i > 0 && !line.startsWith('#')) restoredProps[line.slice(0, i)] = line.slice(i + 1);
       }
       syncHorizonToml(ctx.currentServerPath, restoredProps);
+      syncPumpkinToml(ctx.currentServerPath, restoredProps);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || 'Could not restore.' }; }
   });

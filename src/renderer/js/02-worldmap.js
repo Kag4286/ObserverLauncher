@@ -10,8 +10,7 @@ function hash32(x, z, s) {
   h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35);
   return (h ^ (h >>> 16)) >>> 0;
 }
-function valueNoise(wx, wz, s) {
-  const sc = 420;
+function valueNoise(wx, wz, s, sc = 420) {
   const x = wx / sc, z = wz / sc;
   const xi = Math.floor(x), zi = Math.floor(z);
   const xf = x - xi, zf = z - zi;
@@ -23,7 +22,7 @@ function valueNoise(wx, wz, s) {
   return nx0 * (1 - v) + nx1 * v;
 }
 function terrainValue(wx, wz, s) {
-  return valueNoise(wx, wz, s) * 0.62 + valueNoise(wx * 0.45 + 999, wz * 0.45 - 777, s ^ 0x5A5A5A5A) * 0.38;
+  return valueNoise(wx, wz, s, 540) * 0.52 + valueNoise(wx + 389, wz - 419, s ^ 0x5A5A5A5A, 210) * 0.32 + valueNoise(wx - 719, wz + 853, s ^ 0x3C3C3C3C, 85) * 0.16;
 }
 function getTerrainColor(wx, wz, seedBig, dim) {
   const s = Number(seedBig & 0xFFFFFFFFn) | 0;
@@ -272,7 +271,7 @@ function wmSetBiome(ck,row,dim){ lruSet(wm.biomes,(dim||wm.dim)+':'+ck,row,WM_BI
 let wmPrefetchReqSeq=0;
 // Debounced biome fetch for the visible chunk range. Drops stale responses via a sequence token.
 function wmScheduleBiomes(){
-  if(!wm.level||!wm.layers.terrain)return;
+  if(!wm.level||!wm.layers.terrain||!wm.explored.size)return;
   const cv=$('#wmCanvas');if(!cv)return;
   const W=cv.clientWidth||800,H=cv.clientHeight||520;
   let cx0=Math.floor((wm.cam.x-W/2/wm.zoom)/16),cx1=Math.floor((wm.cam.x+W/2/wm.zoom)/16);
@@ -515,7 +514,7 @@ function wmDraw(){
   wmScheduleBiomes();
   // biome status hint (top-left): a loading indicator while a fetch is in flight, or a
   // "zoom in" note when the viewport is too wide / the backend hit its chunk cap.
-  { const hint=wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null);
+  { const hint=!wm.explored.size?t('wm.seedPreviewHint'):(wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null));
     if(hint){ ctx.fillStyle='rgba(232,244,248,.75)';ctx.font='600 10.5px "JetBrains Mono",monospace';ctx.fillText(hint,14,20); } }
   wmDrawMini();
   // scale bar

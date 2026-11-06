@@ -18,16 +18,20 @@ All notable changes to ObserverLauncher are documented here. Format follows
 - **Native Pumpkin Server Support (`src/main/adapters/pumpkin.js`, `src/main/pumpkin-config.js`):**
   - Added dedicated software adapter for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) (high-concurrency Minecraft server written in Rust).
   - Implemented standalone multi-architecture binary resolution (`pumpkin-X64-Windows.exe`, `pumpkin-X64-Linux`, `pumpkin-ARM64-macOS`).
-  - Added full parser and two-way synchronizer between `Pumpkin.toml` and server properties (`server-port`, `max-players`, `online-mode`, `motd`, `difficulty`, `view-distance`, `simulation-distance`, `level-seed`, `hardcore`).
-- **Server Lifecycle & Native Spawning (`src/main/server-lifecycle.js`, `src/main/server-files.js`, `src/main/server-compat.js`):**
+  - Added full parser and two-way synchronizer between `Pumpkin.toml` and server properties (`server-port`, `max-players`, `online-mode`, `motd`, `difficulty`, `gamemode`, `hardcore`, `pvp`, `force-gamemode`, `allow-nether`, `white-list`, `enforce-whitelist`, `spawn-protection`, `op-permission-level`, `view-distance`, `simulation-distance`, `level-seed`, `network-compression-threshold`, `prevent-proxy-connections`, `resource-pack`, `broadcast-console-to-ops`).
+  - Pre-populates all standard Minecraft property groups (gameplay, world, network, security) with sane defaults so Server Properties tab is fully populated without missing fields.
+- **Server Lifecycle & Native Handlers (`src/main/content-handlers.js`, `src/main/server-lifecycle.js`, `src/main/server-files.js`, `src/main/server-compat.js`):**
+  - Fixed `ReferenceError: syncHorizonToml is not defined` when applying or restoring server properties by implementing safe `syncPumpkinToml` and `syncHorizonToml` atomic synchronizers in `content-handlers.js`.
   - Updated `isNative` engine evaluation and process adopt regex to support Pumpkin (`pumpkin.exe` / `pumpkin`).
   - Automatically syncs UI server properties to `Pumpkin.toml` on launch without requiring Java, JVM flags, or asset extraction.
   - Added Pumpkin software detection based on binary name and TOML configuration files.
   - Fixed `detectServerTarget` in `server-compat.js` checking Pumpkin before Horizon so `pumpkin.exe` is accurately tagged with `loader: 'pumpkin'`.
   - Added `pumpkin` to `LOADER_FAMILY`.
   - Enhanced `parseSimpleToml` in `horizon-config.js` to parse dotted sections (e.g. `[networking.java]`, `[world.chunk]`).
-- **Settings & Content UI Differentiation (`src/renderer/js/07-overview.js`, `src/renderer/js/01-content.js`, `src/renderer/index.html`):**
-  - Dynamically updates native engine headings and notice text in Launcher Settings (`#setNativeEngineTitle`, `#nativeNotice`) to distinguish Pumpkin from Horizon Dedicated Server.
+- **Settings & Content UI Differentiation (`src/renderer/js/07-overview.js`, `src/renderer/js/00-core.js`, `src/renderer/js/08-shell.js`, `src/renderer/index.html`):**
+  - Removed static `data-i18n` binding from `#setNativeEngineTitle` and `#nativeNotice` in `index.html` so `applyLocale()` does not clobber Pumpkin engine labels back to Horizon.
+  - Enhanced `applyLocale()` and `refreshUI()` to dynamically update native engine headings and notice text to distinguish Pumpkin from Horizon Dedicated Server.
+  - Updated `isNatSave` in `08-shell.js` to recognize Pumpkin instances, bypassing inappropriate Java heap allocation checks when saving settings.
   - Dynamically updates the native server notice banner in the Content tab (`#contentNativeNoticeText`) to explain Pumpkin's native architecture.
   - Added localized strings across all 7 supported languages (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
 - **World Map & Chunk Cartography Hardening (`src/main/worldmap.js`, `src/main/pumpkin-config.js`, `src/main/gamerules.js`, `src/renderer/js/02-worldmap.js`):**
@@ -35,6 +39,9 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Enhanced `longToBigInt` using `BigInt.asIntN(64, ...)` to ensure signed 64-bit seed strings match `Pumpkin.toml` and vanilla seeds.
   - Added fallback in `readGameRules` to read modern 26.x/Pumpkin game rules from `world/data/minecraft/game_rules.dat`.
   - Suppressed false alarm red error toasts in `02-worldmap.js` when a world has not yet been generated on disk (`noWorld`).
+  - Replaced misleading "zoom in to see detailed biomes" prompt with localized seed preview status (`wm.seedPreviewHint`) when zero `.mca` chunks exist on disk.
+  - Enhanced procedural `terrainValue` noise with multi-frequency harmonic octaves (540, 210, 85 scale) to produce smooth, natural coastlines and elevation gradients rather than 4 giant stepped contour bands.
+  - Skipped wasteful disk scans and biome RPC calls when 0 chunks are explored on disk.
 - **Wizard & Multi-Language UI (`src/main/wizard.js`, `src/renderer/index.html`, `src/renderer/js/12-wizard.js`, `src/renderer/locales/*.js`):**
   - Added Pumpkin setup card in Create Server wizard under Featured / Native & Proxy filters.
   - Added dedicated Step 4 memory panel for Pumpkin showcasing its ultra-lightweight dynamic working set (~100 MB) with zero JVM heap requirement.

@@ -174,7 +174,8 @@ $('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!too
   // console live dot
   const cd=$('#consoleLiveDot'), cl=$('#consoleLiveLabel'); if(cd&&cl){ cd.className='live-dot'+(state.status==='running'?' on':state.status==='starting'||state.status==='stopping'?' busy':''); cl.textContent={starting:t('top.starting'),running:t('con.live'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||'stopped']||t('top.offline'); }
   // P0.1: disable Start when no folder / no runnable jar, highlight welcome card
-  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
+  const isPumpkin=(f.target&&f.target.software==='pumpkin')||(f.nativeBinary&&/pumpkin/i.test(f.nativeBinary))||f.hasPumpkinConfig;
   const hasFolder=!!s.serverPath; const hasJar=!!(f.jar||f.launchScript||isNat); const startBtn=$('#startBtn'), stopBtn=$('#stopBtn'), welcomeCard=$('#welcomeCard');
   // 5.4.0: if the ACTIVE instance's folder is gone, Start is blocked with a specific hint.
   const activeInst=(Array.isArray(state.instances)?state.instances:[]).find(i=>i.id===state.activeInstanceId);
@@ -248,14 +249,15 @@ function renderSetupSteps(){
   const card=$('#welcomeCard');if(card)card.classList.toggle('is-running',!!state.running);
   const s=state.settings||{},f=state.files||{},j=state.java||{};
   const base=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():'';
-  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
+  const isPumpkin=(f.target&&f.target.software==='pumpkin')||(f.nativeBinary&&/pumpkin/i.test(f.nativeBinary))||f.hasPumpkinConfig;
   const jar=f.jar||f.launchScript||f.nativeBinary;
   const jm=j.ok&&j.version?javaMajorOf(j.version):null;
   const steps=[
     {t:base||t('top.noServer'),c:s.serverPath?'ok':'bad',title:s.serverPath||t('set.folderNone')},
     {t:jar||t('set.noJar'),c:jar?'ok':'bad',title:jar?tf('set.jarOk',{n:jar}):t('set.noJar')},
     (isNat||j.ok)
-      ? {t:isNat?t('nsw.nativeEngine'):('Java '+(jm||j.version)),c:'ok',title:isNat?'Native Horizon engine':tf('set.javaOk',{v:j.version,p:j.path})}
+      ? {t:isNat?t('nsw.nativeEngine'):('Java '+(jm||j.version)),c:'ok',title:isNat?(isPumpkin?t('set.nativeEnginePumpkinT'):'Native Horizon engine'):tf('set.javaOk',{v:j.version,p:j.path})}
       : {t:t('ov.fixJava'),c:'bad',title:t('set.javaBad',{m:j.message||''}),tab:'settings'},
     state.eulaAccepted
       ? {t:'EULA ✓',c:'ok',title:t('set.eulaOk')}
@@ -447,7 +449,8 @@ async function populateJavaPicker(j){
 function renderJvmPreview(){
   const el=$('#jvmPreview');if(!el)return;
   const s=state.settings||{},f=state.files||{};
-  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&f.target.software==='horizon');
+  const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
+  const isPumpkin=(f.target&&f.target.software==='pumpkin')||(f.nativeBinary&&/pumpkin/i.test(f.nativeBinary))||f.hasPumpkinConfig;
   const jar=f.jar||f.launchScript||f.nativeBinary;
   if(isNat||!jar){el.hidden=true;return}
   const custom=String(s.jvmArgs||'').trim();

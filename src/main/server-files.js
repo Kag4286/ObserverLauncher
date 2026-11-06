@@ -153,7 +153,7 @@ function serverFiles(root) {
   let target = { mc: null, loader: 'unknown', software: 'unknown' };
   try {
     const { detectServerTarget } = require('./server-compat.js');
-    const dt = detectServerTarget(root, { jar, launchScript, nativeBinary, hasHorizonConfig, hasSpigotConfig });
+    const dt = detectServerTarget(root, { jar, launchScript, nativeBinary, hasHorizonConfig, hasPumpkinConfig, hasSpigotConfig });
     let soft = dt.loader;
     const name = String(jar || launchScript || nativeBinary || '').toLowerCase();
     if (/pumpkin/.test(name) || (hasPumpkinConfig && !jar && !launchScript)) soft = 'pumpkin';

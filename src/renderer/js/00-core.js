@@ -36,6 +36,12 @@ function applyLocale(){
   const titleEl = document.getElementById('pageTitle');
   if (activeNav?.dataset.tab && titleEl) titleEl.textContent = t('nav.' + activeNav.dataset.tab) || titles[activeNav.dataset.tab] || titleEl.textContent;
   if (typeof updateMarketServerBanner === 'function') updateMarketServerBanner();
+  const f = (window.state && window.state.files) || {};
+  const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
+  const netTitle = document.getElementById('setNativeEngineTitle');
+  if (netTitle) netTitle.textContent = isPumpkin ? t('set.nativeEnginePumpkinT') : t('set.nativeEngineT');
+  const netNotice = document.getElementById('nativeNotice');
+  if (netNotice) netNotice.textContent = isPumpkin ? t('set.nativeNoticePumpkin') : t('set.nativeNotice');
 }
 const tf=t;
 // "?" bubbles: hover shows the native title, click/tap opens an instant translated bubble.

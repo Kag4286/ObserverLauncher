@@ -67,6 +67,11 @@ function ck(name, condition) {
   ck('syncPumpkinTomlToProperties extracts max-players', props['max-players'] === '20');
   ck('syncPumpkinTomlToProperties extracts online-mode', props['online-mode'] === 'true');
   ck('syncPumpkinTomlToProperties extracts level-name', props['level-name'] === 'world');
+  ck('syncPumpkinTomlToProperties populates pvp', props['pvp'] === 'true');
+  ck('syncPumpkinTomlToProperties populates gamemode', props['gamemode'] === 'survival');
+  ck('syncPumpkinTomlToProperties populates difficulty', props['difficulty'] === 'normal');
+  ck('syncPumpkinTomlToProperties populates allow-nether', props['allow-nether'] === 'true');
+  ck('syncPumpkinTomlToProperties populates spawn-protection', props['spawn-protection'] === '16');
 
   const updatedToml = syncPropertiesToPumpkinToml(defaultToml, {
     'server-port': '25577',
@@ -74,6 +79,11 @@ function ck(name, condition) {
     'online-mode': 'false',
     motd: 'A Pumpkin Server in Rust',
     difficulty: 'hard',
+    gamemode: 'creative',
+    pvp: 'false',
+    'allow-nether': 'false',
+    'white-list': 'true',
+    'spawn-protection': '32',
     'view-distance': '16',
     'level-name': 'myworld',
   });
@@ -83,6 +93,12 @@ function ck(name, condition) {
   ck('syncPropertiesToPumpkinToml updates motd', updatedToml.includes('A Pumpkin Server in Rust'));
   ck('syncPropertiesToPumpkinToml updates view_distance', updatedToml.includes('view_distance = 16'));
   ck('syncPropertiesToPumpkinToml updates default_level_name', updatedToml.includes('default_level_name = "myworld"'));
+  ck('syncPropertiesToPumpkinToml updates default_difficulty', updatedToml.includes('default_difficulty = "Hard"'));
+  ck('syncPropertiesToPumpkinToml updates default_gamemode', updatedToml.includes('default_gamemode = "Creative"'));
+  ck('syncPropertiesToPumpkinToml updates pvp.enabled to false', updatedToml.includes('enabled = false'));
+  ck('syncPropertiesToPumpkinToml updates allow_nether to false', updatedToml.includes('allow_nether = false'));
+  ck('syncPropertiesToPumpkinToml updates white_list to true', updatedToml.includes('white_list = true'));
+  ck('syncPropertiesToPumpkinToml updates spawn_protection to 32', updatedToml.includes('spawn_protection = 32'));
 
   // 4. Server files detection
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-'));
