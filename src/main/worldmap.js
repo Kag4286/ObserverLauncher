@@ -175,7 +175,7 @@ function exploredSignature(dirs) {
 }
 const VALID_GENERATED_STATUSES = new Set([
   'full', 'postprocessed', 'spawn', 'light', 'initialize_light',
-  'features', 'liquid_carvers', 'carvers', 'surface', 'terrain'
+  'features', 'liquid_carvers', 'carvers', 'surface', 'terrain', 'biomes'
 ]);
 
 function scanExploredChunks(root, levelName, dim) {
@@ -233,16 +233,14 @@ function scanExploredChunks(root, levelName, dim) {
 // Opens + closes its own fd. Returns the raw NBT buffer, or null when the chunk is missing or
 // unreadable. Shared by the sync and async readers so the header parse and the compression branch
 // cannot drift apart (gotcha #20).
-function readLz4VarLen(src, cur, initial) {
-  let len = initial;
-  if ((initial & 15) === 15 || initial === 19) {
-    while (cur.pos < src.length) {
-      const b = src[cur.pos++];
-      len += b;
-      if (b !== 255) break;
-    }
+function readLz4Extra(src, cur) {
+  let extra = 0;
+  while (cur.pos < src.length) {
+    const b = src[cur.pos++];
+    extra += b;
+    if (b !== 255) break;
   }
-  return len;
+  return extra;
 }
 
 function decompressLz4Block(src, uncompressedSize) {
@@ -251,10 +249,11 @@ function decompressLz4Block(src, uncompressedSize) {
   let dstPos = 0;
   while (cur.pos < src.length && dstPos < uncompressedSize) {
     const token = src[cur.pos++];
-    const literalLen = readLz4VarLen(src, cur, token >> 4);
-    const copyLen = Math.min(literalLen, src.length - cur.pos, uncompressedSize - dstPos);
+    let litLen = token >> 4;
+    if (litLen === 15) litLen += readLz4Extra(src, cur);
+    const copyLen = Math.min(litLen, src.length - cur.pos, uncompressedSize - dstPos);
     src.copy(dst, dstPos, cur.pos, cur.pos + copyLen);
-    cur.pos += literalLen;
+    cur.pos += litLen;
     dstPos += copyLen;
 
     if (cur.pos >= src.length || dstPos >= uncompressedSize) break;
@@ -263,7 +262,9 @@ function decompressLz4Block(src, uncompressedSize) {
     cur.pos += 2;
     if (offset === 0) break;
 
-    const matchLen = readLz4VarLen(src, cur, (token & 0x0F) + 4);
+    let matchLen = (token & 0x0F) + 4;
+    if ((token & 0x0F) === 15) matchLen += readLz4Extra(src, cur);
+
     let matchSrc = dstPos - offset;
     for (let i = 0; i < matchLen && dstPos < uncompressedSize; i++) {
       dst[dstPos++] = dst[matchSrc++];

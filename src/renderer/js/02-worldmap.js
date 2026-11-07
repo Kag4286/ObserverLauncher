@@ -217,9 +217,9 @@ function wmChunkColors(ck,cx,cz){
       out=new Array(16);
       for(let i=0;i<16;i++)out[i]=grid[i]?((surface&&surfaceColor(surface[i],grid[i]))||biomeColor(grid[i])):'#20262E';
       if(wm.biomeBlend)out=blendCells(out,wm.biomeBlendW);
-    } else out=[rec[2]?base:'#20262E'];
-  } else if(rec){ out=['#20262E']; }
-  else { out=null; } // not loaded — caller uses seed wash
+    } else if(rec[2]){ out=[base]; }
+    else { out=null; }
+  } else { out=null; } // not loaded or no biome data — caller uses seed wash
   lruSet(wmColorCache,key,out,4000);
   return out;
 }
