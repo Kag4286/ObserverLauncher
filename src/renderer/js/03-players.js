@@ -323,6 +323,15 @@ function populateSlotCell(el, it, defaultLabel){
   }
 }
 
+function resetInvItemDetail(){
+  const d=$('#invItemDetail');if(!d)return;
+  d.hidden=false;
+  d.innerHTML=`<div class="inv-detail-placeholder">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    <span>Select any item slot above to inspect its enchantments, durability, and custom lore.</span>
+  </div>`;
+}
+
 function showInvItemDetail(x){
   const d=$('#invItemDetail');if(!d)return;
   const rawLabel=x.customName||itemLabel(x.id);
@@ -336,8 +345,34 @@ function showInvItemDetail(x){
     loreHtml=`<div class="inv-item-lore">${x.lore.map(l=>`<div class="inv-lore-line">${parseMinecraftColors(l)}</div>`).join('')}</div>`;
   }
   d.hidden=false;
-  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,rawLabel,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${formattedLabel}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==rawLabel?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${loreHtml}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true" aria-label="Close details">✕</button>`;
+  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,rawLabel,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${formattedLabel}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==rawLabel?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${loreHtml}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="resetInvItemDetail()" aria-label="Clear selection">✕</button>`;
   scanAndApplyIsoBlocks(d);
+}
+
+function renderPdMiniStats(stats){
+  const el=$('#pdStatsMiniGrid');if(!el)return;
+  const custom=(stats&&stats['minecraft:custom'])||{};
+  const playtimeTicks=custom['minecraft:play_time']??custom['minecraft:total_world_time']??0;
+  const kills=custom['minecraft:mob_kills']??0;
+  const deaths=custom['minecraft:deaths']??0;
+  const walkCm=custom['minecraft:walk_one_cm']??0;
+  const sprintCm=custom['minecraft:sprint_one_cm']??0;
+  const totalWalkM=Math.round((walkCm+sprintCm)/100);
+  const dmgDealt=custom['minecraft:damage_dealt']??0;
+  const jumps=custom['minecraft:jump']??0;
+
+  const fmtPlay=typeof formatTicks==='function'?formatTicks(playtimeTicks):`${Math.round(playtimeTicks/20/60)}m`;
+  const fmtDist=totalWalkM>=1000?`${(totalWalkM/1000).toFixed(2)} km`:`${totalWalkM} m`;
+  const kd=deaths>0?(kills/deaths).toFixed(1):(kills>0?`${kills}.0`:'0.0');
+
+  el.innerHTML=[
+    `<div class="pd-mini-stat"><span>${t('ply.colPlaytime')}</span><b>${esc(fmtPlay)}</b></div>`,
+    `<div class="pd-mini-stat"><span>${t('ply.colMobs')}</span><b>${esc(String(kills))}</b></div>`,
+    `<div class="pd-mini-stat"><span>K / D</span><b>${esc(kd)} <small style="font-weight:400;color:var(--text-dim)">(${deaths} d)</small></b></div>`,
+    `<div class="pd-mini-stat"><span>Distance</span><b>${esc(fmtDist)}</b></div>`,
+    `<div class="pd-mini-stat"><span>Damage</span><b>${esc(String(dmgDealt))}</b></div>`,
+    `<div class="pd-mini-stat"><span>Jumps</span><b>${esc(String(jumps))}</b></div>`,
+  ].join('');
 }
 function renderItemGrid(id,items){
   const n=$(id);if(!n)return;
@@ -348,7 +383,15 @@ function renderItemGrid(id,items){
   const raw=(items||[]).filter(x=>x&&x.id&&x.id!=='minecraft:air'&&x.slot>=cfg.base&&x.slot<cfg.base+cfg.slots);
   const totalSlots=cfg.slots;
   const used=raw.length;
-  const countEl=$(cfg.count); if(countEl) countEl.textContent=`${used} / ${totalSlots}`;
+  const countEl=$(cfg.count);
+  if(countEl){
+    if(id==='#inventoryList'&&Array.isArray(lastInspectData?.inventory)){
+      const usedTotal=(lastInspectData.inventory||[]).filter(x=>x&&x.id&&x.id!=='minecraft:air'&&x.slot>=0&&x.slot<=35).length;
+      countEl.textContent=`${usedTotal} / 36`;
+    }else{
+      countEl.textContent=`${used} / ${totalSlots}`;
+    }
+  }
   const bar=cfg.bar?$(cfg.bar):null; if(bar) bar.style.width=`${Math.round(used/totalSlots*100)}%`;
   if(!used && !showEmpty){n.innerHTML=`<div class="inv-empty"><b>${esc(t('pd.emptyInv'))}</b><span>${esc(t('pd.emptyInvSub'))}</span></div>`;return}
   let list;
@@ -1178,6 +1221,8 @@ async function openPlayerInspector(uuid,name){
     if(mapJump)mapJump.hidden=true;
   }
   renderPdReadout(d,isOnline);
+  renderPdMiniStats(d.stats);
+  resetInvItemDetail();
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
   $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtNum(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtNum(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   iconEpoch++;

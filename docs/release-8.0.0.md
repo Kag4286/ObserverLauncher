@@ -52,3 +52,4 @@ The centerpiece of Player Inspector 2.0 is the **Spatial Character Stage**, whic
 - **100% Locale Coverage**: All new Player Inspector 2.0 strings are synchronized across all 7 supported interface languages: English (`en`), Tiếng Việt (`vi`), Español (`es`), Português do Brasil (`pt-BR`), Deutsch (`de`), Русский (`ru`), and 简体中文 (`zh-CN`).
 - **Zero External Dependencies**: All vector icons, HUD meters, and layout bridges are implemented with pure HTML5, vanilla CSS, and standard Electron IPC.
 - **Comprehensive Quality Gates**: 100% test pass rate across all 167 automated test suites.
+

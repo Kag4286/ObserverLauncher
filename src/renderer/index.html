@@ -298,6 +298,10 @@
                       <div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div>
                       <div id="pdEffectsList" class="pd-effects-strip"></div>
                     </div>
+                    <div class="pd-overview-stats" id="pdOverviewStats">
+                      <div class="pd-stats-card-head"><span class="eyebrow">KEY TELEMETRY</span></div>
+                      <div class="pd-stats-mini-grid" id="pdStatsMiniGrid"></div>
+                    </div>
                     <details class="pd-more" id="pdMore">
                       <summary data-i18n="pd.allStats">All stats</summary>
                       <div class="pd-vitals" id="pdReadout"></div>
@@ -320,28 +324,27 @@
                   </div>
                   <div class="inv-toolbar">
                     <input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory">
-                    <input id="ecSearch" type="hidden">
+                    <input id="ecSearch" type="hidden" style="display:none !important">
                     <label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label>
-                    <input type="checkbox" id="ecShowEmpty" hidden>
+                    <input type="checkbox" id="ecShowEmpty" style="display:none !important">
                     <select id="invSort" class="ol-select" aria-label="Sort">
                       <option value="slot" data-i18n="pd.sortSlot">Slot</option>
                       <option value="name" data-i18n="pd.sortName">Name</option>
                       <option value="count" data-i18n="pd.sortCount">Count</option>
                     </select>
-                    <select id="ecSort" class="ol-select" aria-label="Sort" hidden>
+                    <select id="ecSort" style="display:none !important" aria-label="Sort" hidden>
                       <option value="slot">Slot</option>
                       <option value="name">Name</option>
                       <option value="count">Count</option>
                     </select>
                   </div>
                 </div>
-                <div id="invItemDetail" class="inv-item-detail" hidden></div>
                 <div id="invViewMain" class="inv-view-container">
                   <div class="inspect-section inv-sec">
                     <div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div>
                     <div id="inventoryList" class="inv-grid inv-matrix"></div>
                   </div>
-                  <div class="inspect-section inv-sec" style="margin-top:12px">
+                  <div class="inspect-section inv-sec" style="margin-top:14px">
                     <div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div>
                     <div id="hotbarList" class="inv-grid inv-matrix inv-matrix-hotbar"></div>
                   </div>
@@ -352,6 +355,7 @@
                     <div id="enderChestList" class="inv-grid inv-matrix inv-matrix-ender"></div>
                   </div>
                 </div>
+                <div id="invItemDetail" class="inv-item-detail"></div>
               </div>
               <div class="inspect-panel" id="pdPanelStats">
                 <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>
