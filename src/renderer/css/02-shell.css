@@ -34,9 +34,9 @@ body.beginner-mode .ov-adv{display:none}
 body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="ai"],
 body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="advanced"]{display:none}
 .rail-showall,
-.rail-showbeginner{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px;padding:9px;border:1px dashed var(--border-strong);border-radius:var(--r-sm);background:transparent;color:var(--text-muted);font:600 12px var(--font-ui);cursor:pointer;transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast)}
-.rail-showall:hover,
-.rail-showbeginner:hover{background:var(--panel-raised);color:var(--text);border-color:var(--brand)}
+.rail-showbeginner{display:none !important}
+.bshare-hint-btn.warn{color:var(--warn-fg, #eab308)}
+.bshare-hint-ok{font:500 12px var(--font-ui);color:var(--brand);margin:0}
 /* Beginner "share this address" card on Overview (shown only when running + beginner mode) */
 .beginner-share{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--brand-soft);animation:heroIn var(--dur-slow) var(--ease-out) both}
 .beginner-share-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;width:100%}

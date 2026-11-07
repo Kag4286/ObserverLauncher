@@ -351,27 +351,31 @@ function showInvItemDetail(x){
 
 function renderPdMiniStats(stats){
   const el=$('#pdStatsMiniGrid');if(!el)return;
-  const custom=(stats&&stats['minecraft:custom'])||{};
-  const playtimeTicks=custom['minecraft:play_time']??custom['minecraft:total_world_time']??0;
-  const kills=custom['minecraft:mob_kills']??0;
-  const deaths=custom['minecraft:deaths']??0;
-  const walkCm=custom['minecraft:walk_one_cm']??0;
-  const sprintCm=custom['minecraft:sprint_one_cm']??0;
-  const totalWalkM=Math.round((walkCm+sprintCm)/100);
-  const dmgDealt=custom['minecraft:damage_dealt']??0;
-  const jumps=custom['minecraft:jump']??0;
+  const custom=(stats && (stats.stats?.['minecraft:custom'] || stats['minecraft:custom'] || stats.stats || stats)) || {};
+  const playtimeTicks=Number(custom['minecraft:play_time'] ?? custom['minecraft:play_one_minute'] ?? custom['minecraft:total_world_time'] ?? custom['stat.playOneMinute'] ?? 0);
+  const mobKills=Number(custom['minecraft:mob_kills'] ?? custom['stat.mobKills'] ?? 0);
+  const playerKills=Number(custom['minecraft:player_kills'] ?? custom['stat.playerKills'] ?? 0);
+  const totalKills=mobKills+playerKills;
+  const deaths=Number(custom['minecraft:deaths'] ?? custom['stat.deaths'] ?? 0);
+  const walkCm=Number(custom['minecraft:walk_one_cm'] ?? custom['stat.walkOneCm'] ?? 0);
+  const sprintCm=Number(custom['minecraft:sprint_one_cm'] ?? custom['stat.sprintOneCm'] ?? 0);
+  const crouchCm=Number(custom['minecraft:crouch_one_cm'] ?? custom['stat.crouchOneCm'] ?? 0);
+  const totalWalkCm=walkCm+sprintCm+crouchCm;
+  const totalWalkM=Math.round(totalWalkCm/100);
+  const dmgDealt=Number(custom['minecraft:damage_dealt'] ?? custom['stat.damageDealt'] ?? 0);
+  const jumps=Number(custom['minecraft:jump'] ?? custom['stat.jump'] ?? 0);
 
   const fmtPlay=typeof formatTicks==='function'?formatTicks(playtimeTicks):`${Math.round(playtimeTicks/20/60)}m`;
-  const fmtDist=totalWalkM>=1000?`${(totalWalkM/1000).toFixed(2)} km`:`${totalWalkM} m`;
-  const kd=deaths>0?(kills/deaths).toFixed(1):(kills>0?`${kills}.0`:'0.0');
+  const fmtDist=typeof formatDistance==='function'?formatDistance(totalWalkCm):(totalWalkM>=1000?`${(totalWalkM/1000).toFixed(2)} km`:`${totalWalkM} m`);
+  const kd=deaths>0?(totalKills/deaths).toFixed(1):(totalKills>0?`${totalKills}.0`:'0.0');
 
   el.innerHTML=[
     `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colPlaytime')}</span><b class="pd-stat-num">${esc(fmtPlay)}</b></div>`,
-    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colMobs')}</span><b class="pd-stat-num">${esc(String(kills))}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colMobs')}</span><b class="pd-stat-num">${esc(mobKills.toLocaleString())}</b></div>`,
     `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colDeaths')} (K/D)</span><b class="pd-stat-num">${esc(kd)} <small>(${deaths} d)</small></b></div>`,
-    `<div class="pd-mini-stat"><span class="pd-stat-label">Distance Walked</span><b class="pd-stat-num">${esc(fmtDist)}</b></div>`,
-    `<div class="pd-mini-stat"><span class="pd-stat-label">Damage Dealt</span><b class="pd-stat-num">${esc(String(dmgDealt))}</b></div>`,
-    `<div class="pd-mini-stat"><span class="pd-stat-label">Jumps</span><b class="pd-stat-num">${esc(String(jumps))}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('pd.statDistance')}</span><b class="pd-stat-num">${esc(fmtDist)}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('pd.statDamage')}</span><b class="pd-stat-num">${esc(dmgDealt.toLocaleString())}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('pd.statJumps')}</span><b class="pd-stat-num">${esc(jumps.toLocaleString())}</b></div>`,
   ].join('');
   const viewAllBtn = $('#pdViewAllStatsBtn');
   if(viewAllBtn){
@@ -573,6 +577,12 @@ function getHeadAvatarHtml(uuid, name) {
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
   const all=buildPlayerRows();
+  if(selectedPlayer){
+    const still=all.find(p=>(selectedPlayer.uuid&&p.uuid===selectedPlayer.uuid)||(selectedPlayer.name&&String(p.name).toLowerCase()===String(selectedPlayer.name).toLowerCase()));
+    if(!still||!still.hasData){
+      deselectPlayer();
+    }
+  }
   let list=playerFilter==='online'?all.filter(p=>p.online):playerFilter==='offline'?all.filter(p=>!p.online):playerFilter==='whitelist'?all.filter(p=>p.whitelisted):playerFilter==='banned'?all.filter(p=>p.banned):playerFilter==='ops'?all.filter(p=>p.op):all;
   const q=playerSearchQuery.trim().toLowerCase();
   if(q) list=list.filter(p=>String(p.name).toLowerCase().includes(q));
@@ -1416,3 +1426,5 @@ window.observer.onIconsUpdate(()=>{
   }
   }, 120);
 });
+
+try{ window.deselectPlayer=deselectPlayer; window.openPlayerInspector=openPlayerInspector; window.buildPlayerRows=buildPlayerRows; }catch{}

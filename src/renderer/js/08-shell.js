@@ -469,6 +469,18 @@ async function refreshFromState(){
 // config. Close the editor back to the bays, forget its file state, and force a properties reload.
 function resetInstanceViews(){
   try{
+    if(typeof selectedPlayer!=='undefined' && selectedPlayer){
+      const rows = typeof buildPlayerRows==='function' ? buildPlayerRows() : [];
+      const still = rows.find(p =>
+        (selectedPlayer.uuid && p.uuid === selectedPlayer.uuid) ||
+        (selectedPlayer.name && String(p.name).toLowerCase() === String(selectedPlayer.name).toLowerCase())
+      );
+      if(!still || !still.hasData){
+        if(typeof deselectPlayer==='function') deselectPlayer();
+      } else {
+        if(typeof openPlayerInspector==='function') openPlayerInspector(still.uuid, still.name);
+      }
+    }
     if(typeof edState!=='undefined' && edState){
       // Always return to the bays and drop any open file / browsed tree (a stale tree points at the
       // previous instance's folder). edState.files is repopulated lazily by openFileBrowser().
@@ -865,39 +877,70 @@ let bShareMode='auto'; // 'lan' | 'tunnel' | 'auto'
 
 function updateBeginnerShareCard(){
   const bs=$('#beginnerShareAddr');if(!bs)return;
+  const sub=$('#beginnerShareSub');
   const tunVal=(($('#tunnelManual')?.value)||'').trim();
   const pinggyVal=(($('#pinggyAddr')?.value)||'').trim();
   const actTun=tunVal||pinggyVal||lastTunAddr;
-  const hasTun=!!(actTun&&actTun!=='—');
+  const isTunnelLive=$('#tunnelPill')?.classList.contains('running')||$('#pinggyPill')?.classList.contains('running');
+  const hasTunAddr=!!(actTun&&actTun!=='—');
 
   const tabs=$('#beginnerShareTabs');
-  const hint=$('#beginnerShareHint');
+  const hintBtn=$('#bShareHintBtn');
   const tabLan=$('#bShareTabLan');
   const tabTun=$('#bShareTabTun');
 
-  if(hasTun){
-    if(tabs)tabs.hidden=false;
-    if(hint)hint.hidden=true;
-    const effMode=(bShareMode==='auto')?'tunnel':bShareMode;
-    if(effMode==='tunnel'){
+  if(tabs) tabs.hidden=false;
+
+  let effMode=bShareMode;
+  if(effMode==='auto'){
+    effMode=(hasTunAddr || isTunnelLive)?'tunnel':'lan';
+  }
+
+  if(effMode==='tunnel'){
+    if(tabTun)tabTun.classList.add('active');
+    if(tabLan)tabLan.classList.remove('active');
+    if(hasTunAddr){
       bs.value=actTun;
-      if(tabTun)tabTun.classList.add('active');
-      if(tabLan)tabLan.classList.remove('active');
+      if(sub)sub.textContent=t('ov.shareTunnelActiveSub');
+      if(hintBtn){
+        hintBtn.textContent=t('ov.shareTunnelOk');
+        hintBtn.className='bshare-hint-ok';
+      }
+    } else if(isTunnelLive){
+      bs.value=t('ov.shareTunnelPendingAddr');
+      if(sub)sub.textContent=t('ov.shareTunnelPendingSub');
+      if(hintBtn){
+        hintBtn.textContent=t('ov.shareTunnelSetupAction');
+        hintBtn.className='bshare-hint-btn';
+      }
     } else {
-      bs.value=lastLanAddr||t('conn.noLan');
-      if(tabLan)tabLan.classList.add('active');
-      if(tabTun)tabTun.classList.remove('active');
+      bs.value='—';
+      if(sub)sub.textContent=t('ov.shareTunnelOffSub');
+      if(hintBtn){
+        hintBtn.textContent=t('ov.shareTunnelStartAction');
+        hintBtn.className='bshare-hint-btn';
+      }
     }
   } else {
-    if(tabs)tabs.hidden=true;
+    if(tabLan)tabLan.classList.add('active');
+    if(tabTun)tabTun.classList.remove('active');
     bs.value=lastLanAddr||t('conn.noLan');
-    if(hint)hint.hidden=false;
+    if(sub)sub.textContent=t('ov.shareLanSub');
+    if(hintBtn){
+      hintBtn.textContent=t('ov.shareLanWarning');
+      hintBtn.className='bshare-hint-btn warn';
+    }
   }
 }
 
 $('#bShareTabLan')&&($('#bShareTabLan').onclick=()=>{bShareMode='lan';updateBeginnerShareCard()});
 $('#bShareTabTun')&&($('#bShareTabTun').onclick=()=>{bShareMode='tunnel';updateBeginnerShareCard()});
 $('#bShareHintBtn')&&($('#bShareHintBtn').onclick=()=>{
+  if($('#bShareHintBtn')?.classList.contains('warn')){
+    bShareMode='tunnel';
+    updateBeginnerShareCard();
+    return;
+  }
   const cp=$('#connectPanel');if(cp)cp.open=true;
   const tb=$('#tunnelBox');if(tb){tb.open=true;try{tb.scrollIntoView({behavior:'smooth'})}catch{}}
 });
@@ -1103,8 +1146,8 @@ function applyBeginnerMode(on){
       if(setupBtn)setupBtn.click();
     }
   }
-  const sa=$('#railShowAll');if(sa)sa.hidden=!on_;
-  const sb=$('#railShowBeginner');if(sb)sb.hidden=on_;
+  const sa=$('#railShowAll');if(sa)sa.hidden=true;
+  const sb=$('#railShowBeginner');if(sb)sb.hidden=true;
   const share=$('#beginnerShare');if(share){
     share.hidden=!(on_&&state.running);
     if(on_&&state.running)updateBeginnerShareCard();

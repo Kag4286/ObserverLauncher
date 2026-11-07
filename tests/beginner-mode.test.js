@@ -49,5 +49,16 @@ check('HTML has beginnerShareAddr', /id="beginnerShareAddr"/.test(html));
 check('HTML has beginnerShareTabs', /id="beginnerShareTabs"/.test(html));
 check('content group has data-grp', /data-grp="content"/.test(html));
 
+// Mode toggle buttons hidden on rail (mode controlled in Launcher Settings and Onboarding)
+check('CSS hides rail mode toggle buttons', /\.rail-showall,\s*\.rail-showbeginner\{display:none !important\}/.test(css));
+
+// Player inspector mini stats unpacking
+const p03 = fs.readFileSync(path.join(root, 'src', 'renderer', 'js', '03-players.js'), 'utf8');
+check('mini stats unpacks stats.stats custom', /stats\.stats\?\.\['minecraft:custom'\]/.test(p03));
+check('renderPlayers deselects missing player on instance switch', /still\.hasData\)[\s\S]*?deselectPlayer\(\)/.test(p03));
+
+// resetInstanceViews deselects missing player
+check('resetInstanceViews deselects missing player', /resetInstanceViews\(\)\{[\s\S]*?deselectPlayer\(\)/.test(sh));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
