@@ -49,7 +49,11 @@
     const b = ensure();
     if (html) {
       b.classList.add('has-html');
-      b.innerHTML = html;
+      let clean = html;
+      if (clean.includes('&lt;') || clean.includes('&gt;') || clean.includes('&quot;')) {
+        clean = clean.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+      }
+      b.innerHTML = clean;
     } else {
       b.classList.remove('has-html');
       b.textContent = '';

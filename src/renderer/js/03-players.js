@@ -42,7 +42,7 @@ function itemTooltipHtml(x,label){
     parts.push(`<div class="tip-dur" style="color:${col}">Durability: ${x.durability.remaining} / ${x.durability.max} (${pct}%)</div>`);
   }
   parts.push(`<div class="tip-meta"><span>×${x.count}</span><span>${esc(x.id)}</span></div>`);
-  return esc(parts.join(''));
+  return parts.join('');
 }
 // ONE place decides which tex:// URL an item id maps to. The inventory grid used to carry this
 // logic inline while the equipment row did not, so a mod item worn as armor fell through to the
@@ -420,7 +420,7 @@ function renderItemGrid(id,items){
     const tipHtml=itemTooltipHtml(x,label);
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
-    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${tipHtml}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label,x.id)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${esc(tipHtml)}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label,x.id)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
   scanAndApplyIsoBlocks(n);
 }
@@ -469,7 +469,7 @@ function renderEquipment(armor,offhand,mainhand){
       const tipHtml=it&&it.id?itemTooltipHtml(it,itemLabel(it.id)):'';
       const tip=it&&it.id?itemTooltip(it,itemLabel(it.id)):t('ply.emptySlot');
       return `<div class="pd-equip">
-        <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipHtml?`data-tip-html="${tipHtml}"`:''} tabindex="0">${cell}${dur}</div>
+        <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipHtml?`data-tip-html="${esc(tipHtml)}"`:''} tabindex="0">${cell}${dur}</div>
         <span class="pd-equip-slot">${esc(label)}</span>
         ${it&&it.id?`<span class="pd-equip-name" title="${esc(it.customName||itemLabel(it.id))}">${esc(it.customName||itemLabel(it.id))}</span>`:''}
         ${enchList}
