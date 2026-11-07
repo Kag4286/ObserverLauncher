@@ -27,7 +27,7 @@ node tests/no-dup.test.js
 # 2. Strict i18n parity across all 7 locales (en, vi, zh, ja, ko, ru, es)
 node tests/i18n.test.js
 
-# 3. Full test suite execution (160+ suites must pass 100%)
+# 3. Full test suite execution (167 suites must pass 100%)
 node tests/run.js
 ```
 

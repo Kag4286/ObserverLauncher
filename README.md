@@ -58,7 +58,7 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 - **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.
 - **Built-in Mod & Plugin Store:** Browse and install mods, plugins, and datapacks directly from Modrinth, Hangar, and SpigotMC. The app checks if mods match your server before installing and lets you rollback updates with one click.
 - **Automatic Mod Conflict Checks:** Warns you before your server starts if mods are missing required dependencies, duplicate, built for the wrong mod loader, or made for an incompatible Minecraft version.
-- **Player Inspector & 3D Skins:** View online and offline players, browse player inventories and equipment with real game icons, and preview interactive 3D skins.
+- **Player Inspector 2.0 & 3D Skins:** Manage online and offline players with an authentic Spatial Character Stage, 10-segment precision vitals HUD, 9×4 inventory matrix, editorial item lore drawer, direct World Map bridge, intention-clustered live admin actions, and interactive 3D skins with dynamic dimension lighting.
 - **Safe World Backups:** Back up your worlds to ZIP files anytime or on an automatic schedule. Backups pause world saving for a split second so your saves never get corrupted.
 - **Live World Map:** Explore your generated world terrain, surface biomes, and custom waypoints in real-time.
 - **Friendly Crash Explanations:** If your server crashes due to a wrong Java version, the launcher explains the problem in plain English (e.g. *"This server requires Java 21, but Java 17 is selected"*) and gives you a button to fix it immediately.
@@ -155,7 +155,7 @@ npm install
 # Run the app in development mode
 npm start
 
-# Run unit and integration tests (160 test suites)
+# Run unit and integration tests (167 test suites)
 npm test
 
 # Run end-to-end tests
