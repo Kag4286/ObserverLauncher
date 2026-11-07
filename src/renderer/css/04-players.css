@@ -2,12 +2,15 @@
 /* players roster, inspect modal, equipment. */
 /* PLAYERS — roster (v4.0.0: the roster-panel card wrapper is gone; the list sits on the canvas). */
 .roster-count{font:700 11px var(--font-mono);letter-spacing:.06em;color:var(--text-muted);border:1px solid var(--border);padding:7px 10px;border-radius:999px;background:var(--field);white-space:nowrap}
-.roster-toolbar{display:flex;justify-content:space-between;gap:var(--space-3);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-2)}
-.roster-search{position:relative;display:flex;align-items:center}
-.roster-search input{width:200px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 28px 8px 10px;color:var(--text);font:12px var(--font-ui);outline:0}
-.roster-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.roster-search span{position:absolute;right:8px;color:var(--text-dim);font-size:12px;pointer-events:none}
-.player-filters{display:flex;gap:6px;flex-wrap:wrap}
+.roster-toolbar{display:flex;flex-direction:column;gap:8px;align-items:stretch;margin-bottom:var(--space-2)}
+.roster-search{position:relative;display:flex;align-items:center;width:100%}
+.roster-search input{width:100%;box-sizing:border-box;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 28px 7px 10px;color:var(--text);font:12px var(--font-ui);outline:0;transition:border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.roster-search input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.roster-search span{position:absolute;right:10px;color:var(--text-dim);font-size:13px;pointer-events:none}
+.player-filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.player-filters .filter-chip{padding:4px 9px;font:600 11px var(--font-ui);border-radius:var(--r-xs);background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;line-height:1.2;transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.player-filters .filter-chip:hover{background:var(--surface-3);color:var(--text);border-color:var(--border-strong)}
+.player-filters .filter-chip.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);box-shadow:none}
 .player-manual-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:12px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm)}
 .manual-kicker{font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-dim);flex-shrink:0}
 .player-manual-row input{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--field-border);padding:8px 10px;border-radius:var(--r-sm);color:var(--text);font:12px var(--font-ui)}
