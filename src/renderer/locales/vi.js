@@ -227,4 +227,6 @@ window.LOCALES.vi = {
   'mkt.rateLimit': "Đã đạt giới hạn yêu cầu. Vui lòng đợi một lát rồi thử lại.",
   'mkt.rateLimitTitle': "Đạt giới hạn yêu cầu",
   'mkt.rateLimitHint': "Kho mod đang bận. Đợi vài giây rồi thử lại.",
+  'set.wmCheat': "Chế độ gian lận bản đồ",
+  'set.wmCheatSub': "Hiển thị công trình, slime chunk, lớp cắt hang động và liên kết cổng. Mặc định tắt để thám hiểm công bằng.",
 };

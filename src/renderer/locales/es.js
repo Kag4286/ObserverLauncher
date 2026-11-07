@@ -227,4 +227,6 @@ window.LOCALES.es = {
   'mkt.rateLimit': "Límite de solicitudes alcanzado. Espera un momento antes de reintentar.",
   'mkt.rateLimitTitle': "Límite alcanzado",
   'mkt.rateLimitHint': "El registro de mods está ocupado. Espera unos segundos antes de reintentar.",
+  'set.wmCheat': "Modo trampa para el mapa mundial",
+  'set.wmCheatSub': "Muestra estructuras, slime chunks, capas de cuevas y enlaces de portales. Desactivado por defecto para exploración justa.",
 };

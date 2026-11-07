@@ -229,4 +229,6 @@ window.LOCALES.en = {
   'mkt.rateLimit': "Rate limit reached. Please wait a moment before trying again.",
   'mkt.rateLimitTitle': "Rate Limited",
   'mkt.rateLimitHint': "The mod registry is temporarily busy. Wait a few seconds before retrying.",
+  'set.wmCheat': "Cheat mode for world map",
+  'set.wmCheatSub': "Reveal structures, slime chunks, cave layers, and portal links. Disabled by default for fair exploration.",
 };

@@ -2,55 +2,6 @@
 // 60 FPS hardware-accelerated tile engine, topographic hillshading, slime chunks,
 // Nether roof peeler, player vision cones, and waypoint tooling.
 
-// ============ TERRAIN PREVIEW (deterministic seed-coloured wash) ============
-function hash32(x, z, s) {
-  let h = Math.imul(x, 0x9E3779B9) ^ Math.imul(z, 0x85EBCA6B) ^ s;
-  h = Math.imul(h ^ (h >>> 16), 0x85EBCB6B);
-  h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35);
-  return (h ^ (h >>> 16)) >>> 0;
-}
-
-function valueNoise(wx, wz, s, sc = 420) {
-  const x = wx / sc, z = wz / sc;
-  const xi = Math.floor(x), zi = Math.floor(z);
-  const xf = x - xi, zf = z - zi;
-  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
-  const n00 = hash32(xi, zi, s), n10 = hash32(xi + 1, zi, s), n01 = hash32(xi, zi + 1, s), n11 = hash32(xi + 1, zi + 1, s);
-  const f = v => v / 4294967295 - 0.5;
-  const nx0 = f(n00) * (1 - u) + f(n10) * u;
-  const nx1 = f(n01) * (1 - u) + f(n11) * u;
-  return nx0 * (1 - v) + nx1 * v;
-}
-
-function terrainValue(wx, wz, s) {
-  return valueNoise(wx, wz, s, 540) * 0.52 + valueNoise(wx + 389, wz - 419, s ^ 0x5A5A5A5A, 210) * 0.32 + valueNoise(wx - 719, wz + 853, s ^ 0x3C3C3C3C, 85) * 0.16;
-}
-
-function getTerrainColor(wx, wz, seedBig, dim) {
-  const s = Number(seedBig & 0xFFFFFFFFn) | 0;
-  if (dim === 'nether') {
-    const n = terrainValue(wx, wz, s);
-    if (n < -0.22) return 'rgba(90,26,26,.95)';
-    if (n < 0.02) return 'rgba(122,42,26,.95)';
-    if (n < 0.24) return 'rgba(58,42,42,.95)';
-    return 'rgba(42,90,90,.92)';
-  }
-  if (dim === 'end') {
-    const d = Math.hypot(wx, wz);
-    const n = terrainValue(wx * 0.3, wz * 0.3, s);
-    if (d > 1700 + n * 500) return 'rgba(8,10,20,.98)';
-    return 'rgba(219,207,138,.96)';
-  }
-  const n = terrainValue(wx, wz, s);
-  if (n < -0.34) return 'rgba(15,42,74,.98)';
-  if (n < -0.19) return 'rgba(26,74,110,.96)';
-  if (n < -0.07) return 'rgba(194,178,128,.96)';
-  if (n < 0.09) return 'rgba(123,175,74,.96)';
-  if (n < 0.26) return 'rgba(58,125,46,.96)';
-  if (n < 0.42) return 'rgba(138,138,138,.96)';
-  return 'rgba(208,208,208,.97)';
-}
-
 // Java Edition Slime Chunk formula for Overworld (chunkX, chunkZ)
 function isSlimeChunk(seedBig, cx, cz) {
   if (seedBig === null || seedBig === undefined) return false;
@@ -101,11 +52,12 @@ let wm = {
   dragWp: null,
   loaded: false,
   seedBig: 0n,
+  cheatMode: false,
   layers: {
     terrain: true,
     hillshade: true,
     slime: false,
-    structures: true,
+    structures: false,
     grid: false,
     netherLink: false
   },
@@ -119,7 +71,6 @@ let wm = {
   biomeLoading: false,
   biomeTooWide: false,
   biomeTruncated: false,
-  terrainCache: new Map(),
   miniAt: 0,
   biomeBlend: true,
   biomeBlendW: 0.22,
@@ -382,13 +333,19 @@ function wmScheduleBiomes() {
   let cx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / 16), cx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / 16);
   let cz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / 16), cz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / 16);
 
-  const chunkCount = (cx1 - cx0 + 1) * (cz1 - cz0 + 1);
-  if (wm.zoom < WM_BIOME_MIN_ZOOM || chunkCount > WM_BIOME_MAX_CHUNKS) {
-    wm.lastBiomeRect = '';
-    wm.biomeTooWide = true;
-    return;
+  // When zoomed far out, clamp fetch rect to 45-chunk radius around camera center (90x90 chunks = 1440x1440 blocks)
+  // so the view around the player / camera vantage point always loads authentic world terrain.
+  const MAX_RADIUS = 45;
+  const ccx = Math.floor(wm.cam.x / 16), ccz = Math.floor(wm.cam.z / 16);
+  if (cx1 - cx0 > MAX_RADIUS * 2) {
+    cx0 = ccx - MAX_RADIUS;
+    cx1 = ccx + MAX_RADIUS;
   }
-  if (wm.biomeTooWide) wm.biomeTooWide = false;
+  if (cz1 - cz0 > MAX_RADIUS * 2) {
+    cz0 = ccz - MAX_RADIUS;
+    cz1 = ccz + MAX_RADIUS;
+  }
+
   const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? ''].join(',');
   if (rect === wm.lastBiomeRect) return;
 
@@ -485,13 +442,9 @@ function wmGetTile(tx, tz) {
         ctx.fillStyle = cols[0];
         ctx.fillRect(px, pz, 16, 16);
       } else {
-        // Seed terrain approximation
-        for (let oz = 0; oz < 4; oz++) {
-          for (let ox = 0; ox < 4; ox++) {
-            ctx.fillStyle = getTerrainColorCached(cx * 16 + ox * 4, cz * 16 + oz * 4);
-            ctx.fillRect(px + ox * 4, pz + oz * 4, 4, 4);
-          }
-        }
+        // Explored chunk pending real biome load: draw neutral dark cartographic tone
+        ctx.fillStyle = wm.dim === 'nether' ? '#1E1212' : (wm.dim === 'end' ? '#1B1A14' : '#141E28');
+        ctx.fillRect(px, pz, 16, 16);
       }
     }
   }
@@ -504,7 +457,29 @@ function wmGetTile(tx, tz) {
 
 function wmShow(view) { $('#wmNoWorld').hidden = view !== 'none'; $('#wmApp').hidden = view !== 'app'; }
 
+function wmSyncCheatMode() {
+  const isCheat = !!(window.state?.settings?.worldmapCheatMode);
+  wm.cheatMode = isCheat;
+  const cheatElements = [$('#wmSlime'), $('#wmStructures'), $('#wmNetherLink'), $('#wmSliceCtrl')];
+  for (const el of cheatElements) {
+    if (el) el.hidden = !isCheat;
+  }
+  if (!isCheat) {
+    wm.layers.slime = false;
+    wm.layers.structures = false;
+    wm.layers.netherLink = false;
+    wm.sliceY = null;
+    $('#wmSlime')?.classList.remove('active');
+    $('#wmStructures')?.classList.remove('active');
+    $('#wmNetherLink')?.classList.remove('active');
+    if (wmSliceSlider) wmSliceSlider.value = 320;
+    if (wmSliceLabel) wmSliceLabel.textContent = 'Y: Surface';
+  }
+}
+window.wmSyncCheatMode = wmSyncCheatMode;
+
 async function wmLoad() {
+  wmSyncCheatMode();
   let r;
   try {
     r = await window.observer.worldmapLoad();
@@ -576,20 +551,9 @@ function wmVisible() {
   return list;
 }
 
-function getTerrainColorCached(wx, wz) {
-  const k = wm.dim + ':' + wx + ',' + wz;
-  let c = wm.terrainCache.get(k);
-  if (c === undefined) {
-    c = getTerrainColor(wx, wz, wm.seedBig, wm.dim);
-    lruSet(wm.terrainCache, k, c, 6000);
-  }
-  return c;
-}
-
 function wmClearCaches() {
   wm.biomes.clear();
   wmColorCache.clear();
-  wm.terrainCache.clear();
   wmTileCache.clear();
   wm.lastBiomeRect = '';
   wm.biomeTooWide = false;
@@ -649,7 +613,8 @@ function wmDraw() {
     const tz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / WM_TILE_BLOCKS);
     const tz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / WM_TILE_BLOCKS);
 
-    ctx.imageSmoothingEnabled = wm.zoom < 0.8;
+    ctx.imageSmoothingEnabled = wm.zoom < 0.9;
+    if (wm.zoom < 0.9) ctx.imageSmoothingQuality = 'high';
 
     for (let tz = tz0; tz <= tz1; tz++) {
       for (let tx = tx0; tx <= tx1; tx++) {
@@ -662,8 +627,8 @@ function wmDraw() {
     }
   }
 
-  // 2. SLIME CHUNKS OVERLAY (Overworld only)
-  if (wm.layers.slime && wm.dim === 'overworld') {
+  // 2. SLIME CHUNKS OVERLAY (Overworld cheat mode only)
+  if (wm.cheatMode && wm.layers.slime && wm.dim === 'overworld') {
     const cx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / 16);
     const cx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / 16);
     const cz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / 16);
@@ -738,8 +703,8 @@ function wmDraw() {
   const [ax] = toS(0, 0); ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, H); ctx.stroke();
   const [, ay] = toS(0, 0); ctx.beginPath(); ctx.moveTo(0, ay); ctx.lineTo(W, ay); ctx.stroke();
 
-  // 5. NETHER PORTAL LINK RADIUS CIRCLE
-  if (wm.selectedPos && (wm.layers.netherLink || wm.selectedPos.showPortal)) {
+  // 5. NETHER PORTAL LINK RADIUS CIRCLE (Cheat mode only)
+  if (wm.cheatMode && wm.selectedPos && (wm.layers.netherLink || wm.selectedPos.showPortal)) {
     const [sx, sy] = toS(wm.selectedPos.x, wm.selectedPos.z);
     const radiusBlocks = wm.dim === 'nether' ? 16 : 128;
     const radiusPx = radiusBlocks * wm.zoom;
@@ -754,8 +719,8 @@ function wmDraw() {
     ctx.fill();
   }
 
-  // 6. DISCOVERED STRUCTURES
-  if (wm.layers.structures && wm.structures.size > 0) {
+  // 6. DISCOVERED STRUCTURES (Cheat mode only)
+  if (wm.cheatMode && wm.layers.structures && wm.structures.size > 0) {
     for (const st of wm.structures.values()) {
       if (st.dim !== wm.dim) continue;
       const [sx, sy] = toS(st.x, st.z);
@@ -1185,29 +1150,31 @@ function wmMapClick(px, py, wx, wz) {
     }
   }
 
-  // Hit test structures
-  for (const st of wm.structures.values()) {
-    if (st.dim !== wm.dim) continue;
-    const [sx, sy] = wmToScreen(st.x, st.z);
-    if (Math.hypot(px - sx, py - sy) <= hitRadius) {
-      const tpCmd = `/tp @s ${st.x} ~ ${st.z}`;
-      wmShowPopup(px, py, {
-        title: st.name.toUpperCase(),
-        lines: [`Coordinates: ${st.x} ${st.z}`, `Dimension: ${st.dim}`],
-        copy: tpCmd
-      });
-      return;
+  // Hit test structures (cheat mode only)
+  if (wm.cheatMode) {
+    for (const st of wm.structures.values()) {
+      if (st.dim !== wm.dim) continue;
+      const [sx, sy] = wmToScreen(st.x, st.z);
+      if (Math.hypot(px - sx, py - sy) <= hitRadius) {
+        const tpCmd = `/tp @s ${st.x} ~ ${st.z}`;
+        wmShowPopup(px, py, {
+          title: st.name.toUpperCase(),
+          lines: [`Coordinates: ${st.x} ${st.z}`, `Dimension: ${st.dim}`],
+          copy: tpCmd
+        });
+        return;
+      }
     }
   }
 
-  // Terrain inspect & portal calculation
+  // Terrain inspect
   const cx = Math.floor(wx / 16), cz = Math.floor(wz / 16);
   const rec = wm.biomes.get(wm.dim + ':' + cx + ',' + cz);
   const lines = [`${wm.dim} · Chunk ${cx}, ${cz}`];
 
   if (rec && rec[2]) {
     lines.push(`Biome: ${rec[2].replace(/^minecraft:/, '')}`);
-    if (rec[3]) {
+    if (wm.cheatMode && rec[3]) {
       const lx = ((wx % 16) + 16) % 16, lz = ((wz % 16) + 16) % 16;
       const cellIdx = Math.floor(lz / 4) * 4 + Math.floor(lx / 4);
       lines.push(`Elevation Y: ${rec[3][cellIdx]}`);
@@ -1215,23 +1182,25 @@ function wmMapClick(px, py, wx, wz) {
     }
   }
 
-  // Slime chunk indicator
-  if (wm.dim === 'overworld') {
-    const isSlime = isSlimeChunk(wm.seedBig, cx, cz);
-    lines.push(`Slime Chunk: ${isSlime ? '✅ YES' : '❌ NO'}`);
+  // Slime chunk & Nether portal link calculations (cheat mode only)
+  if (wm.cheatMode) {
+    if (wm.dim === 'overworld') {
+      const isSlime = isSlimeChunk(wm.seedBig, cx, cz);
+      lines.push(`Slime Chunk: ${isSlime ? '✅ YES' : '❌ NO'}`);
+      const nx = Math.floor(wx / 8), nz = Math.floor(wz / 8);
+      lines.push(`🌀 ${t('wm.inspectPortal')}: ${nx} ${nz}`);
+      lines.push(t('wm.safetyRadius'));
+    } else if (wm.dim === 'nether') {
+      const ox = wx * 8, oz = wz * 8;
+      lines.push(`🌀 ${t('wm.inspectPortal')}: ${ox} ${oz}`);
+    }
   }
 
-  // Nether portal link calculation
-  if (wm.dim === 'overworld') {
-    const nx = Math.floor(wx / 8), nz = Math.floor(wz / 8);
-    lines.push(`🌀 ${t('wm.inspectPortal')}: ${nx} ${nz}`);
-    lines.push(t('wm.safetyRadius'));
-  } else if (wm.dim === 'nether') {
-    const ox = wx * 8, oz = wz * 8;
-    lines.push(`🌀 ${t('wm.inspectPortal')}: ${ox} ${oz}`);
+  if (wm.cheatMode) {
+    wm.selectedPos = { x: wx, z: wz, showPortal: true };
+  } else {
+    wm.selectedPos = null;
   }
-
-  wm.selectedPos = { x: wx, z: wz, showPortal: true };
   wmDrawSoon();
 
   const copyTp = `/tp @s ${wx} ~ ${wz}`;
@@ -1369,8 +1338,8 @@ $$('#wmDims .filter-chip').forEach(c => c.onclick = () => {
     }
   }
   wm.dim = newDim;
-  // Nether auto-peel: default Y=126 in Nether to peel bedrock roof
-  if (newDim === 'nether') {
+  // Nether auto-peel: default Y=126 in Nether to peel bedrock roof (only in cheat mode)
+  if (wm.cheatMode && newDim === 'nether') {
     wm.sliceY = 126;
     if (wmSliceSlider) wmSliceSlider.value = 126;
     if (wmSliceLabel) wmSliceLabel.textContent = 'Y: 126';

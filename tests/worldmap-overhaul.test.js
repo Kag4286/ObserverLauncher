@@ -84,5 +84,12 @@ test('extractStructureStarts extracts valid structures and ignores INVALID', () 
   assert.strictEqual(outpost.z, 328); // 20 * 16 + 8
 });
 
+// 4. Cheat mode default setting
+test('worldmapCheatMode defaults to false (fair survival mode)', () => {
+  const { loadSettingsStore } = require('../src/main/settings.js');
+  const s = loadSettingsStore();
+  assert.strictEqual(s.worldmapCheatMode, false);
+});
+
 console.log(`\n${passed} worldmap overhaul unit tests passed.`);
 

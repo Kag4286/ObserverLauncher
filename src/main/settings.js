@@ -57,6 +57,7 @@ function defaultGlobal() {
     // 5.2.0: Beginner mode — a gentler UI (fewer tabs, no RAM/JVM panel). Set by the onboarding
     // choice, changeable in Settings. GLOBAL, not per-instance. Default false (advanced).
     beginnerMode: false,
+    worldmapCheatMode: false,
     mcpEnabled: false, mcpAutoAllowWrite: false, mcpReadOnly: false,
     // 3.3.0 remote management (Track A): OFF by default, read-only by default, no IP restriction by
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
@@ -85,7 +86,7 @@ function flattenActive(s) {
   const inst = (Array.isArray(s.instances) && s.instances.length)
     ? (s.instances.find(i => i.id === s.activeInstanceId) || s.instances[0])
     : null;
-  const out = { ...defaultInstanceFields(), ...s, ...(inst || {}) };
+  const out = { ...defaultGlobal(), ...defaultInstanceFields(), ...s, ...(inst || {}) };
   delete out.instances;
   delete out.activeInstanceId;
   return out;
@@ -171,7 +172,7 @@ function loadSettingsStore() {
     if (migrated.version !== rawVersion) {
       try { saveSettings(migrated); } catch {}
     }
-    return migrated;
+    return { ...defaultGlobal(), ...migrated };
   } catch (error) {
     // MIGRATION FAILURE: prefer the ORIGINAL settings over defaults. Legacy code
     // returned defaults here, which would silently wipe a user's config on a bug.

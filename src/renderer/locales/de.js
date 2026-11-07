@@ -227,4 +227,6 @@ window.LOCALES.de = {
   'mkt.rateLimit': "Anfragelimit erreicht. Bitte warten Sie einen Moment vor dem erneuten Versuch.",
   'mkt.rateLimitTitle': "Anfragelimit erreicht",
   'mkt.rateLimitHint': "Die Mod-Registry ist vorübergehend ausgelastet. Warten Sie einige Sekunden vor dem erneuten Versuch.",
+  'set.wmCheat': "Cheat-Modus für Weltkarte",
+  'set.wmCheatSub': "Zeigt Strukturen, Slime-Chunks, Höhlenebenen und Portalverbindungen an. Standardmäßig für faires Erkunden deaktiviert.",
 };

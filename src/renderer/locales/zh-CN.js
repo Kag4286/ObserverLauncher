@@ -227,4 +227,6 @@ window.LOCALES['zh-CN'] = {
   'mkt.rateLimit': "达到请求速率限制。请稍候再试。",
   'mkt.rateLimitTitle': "速率限制",
   'mkt.rateLimitHint': "模组源暂时繁忙。请等待数秒后重试。",
+  'set.wmCheat': "世界地图作弊模式",
+  'set.wmCheatSub': "显示世界结构、史莱姆区块、洞穴切片层与地狱门连结。默认关闭以保证公平探索。",
 };

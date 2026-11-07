@@ -227,4 +227,6 @@ window.LOCALES['pt-BR'] = {
   'mkt.rateLimit': "Limite de requisições atingido. Aguarde um momento antes de tentar novamente.",
   'mkt.rateLimitTitle': "Limite Atingido",
   'mkt.rateLimitHint': "O registro de mods está ocupado. Aguarde alguns segundos antes de tentar novamente.",
+  'set.wmCheat': "Modo trapaça para o mapa do mundo",
+  'set.wmCheatSub': "Revela estruturas, slime chunks, camadas de cavernas e links de portais. Desativado por padrão para exploração justa.",
 };

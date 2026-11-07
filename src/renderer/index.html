@@ -497,11 +497,11 @@
               <span class="spacer"></span>
               <button class="filter-chip active" id="wmTerrain" data-i18n="wm.terrain">Terrain</button>
               <button class="filter-chip active" id="wmHillshade" data-i18n="wm.hillshade">Hillshade</button>
-              <button class="filter-chip" id="wmSlime" data-i18n="wm.slime">Slime chunks</button>
-              <button class="filter-chip active" id="wmStructures" data-i18n="wm.structures">Structures</button>
+              <button class="filter-chip" id="wmSlime" data-i18n="wm.slime" hidden>Slime chunks</button>
+              <button class="filter-chip" id="wmStructures" data-i18n="wm.structures" hidden>Structures</button>
               <button class="filter-chip" id="wmGrid" data-i18n="wm.grid">Grid</button>
-              <button class="filter-chip" id="wmNetherLink" data-i18n="wm.netherLink">Portal link</button>
-              <span class="wm-slice-ctrl">
+              <button class="filter-chip" id="wmNetherLink" data-i18n="wm.netherLink" hidden>Portal link</button>
+              <span class="wm-slice-ctrl" id="wmSliceCtrl" hidden>
                 <label id="wmSliceLabel" class="wm-slice-badge">Y: Surface</label>
                 <input type="range" id="wmSliceSlider" min="-64" max="320" value="320" class="wm-slice-slider" title="Vertical elevation slice">
                 <button type="button" class="btn sm secondary" id="wmSliceReset" title="Reset to surface">↺</button>
@@ -771,6 +771,18 @@
                   <div class="sir-control">
                     <label class="switch">
                       <input type="checkbox" id="beginnerModeInput">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="set-item-row" id="wmCheatRow">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="set.wmCheat">Cheat mode for world map</div>
+                    <div class="sir-desc" data-i18n="set.wmCheatSub">Reveal structures, slime chunks, cave layers, and Nether portal links. Disabled by default for fair exploration.</div>
+                  </div>
+                  <div class="sir-control">
+                    <label class="switch">
+                      <input type="checkbox" id="worldmapCheatModeInput">
                       <span class="slider"></span>
                     </label>
                   </div>
