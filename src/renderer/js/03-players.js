@@ -190,7 +190,7 @@ function applyIsometricBlockIfNeeded(img) {
       dataUrl = renderIsometricBlock(img);
     }
     if (dataUrl) {
-      isoBlockCache.set(origSrc, dataUrl);
+      lruSet(isoBlockCache, origSrc, dataUrl, 256);
       img.dataset.iso = '1';
       img.src = dataUrl;
     }

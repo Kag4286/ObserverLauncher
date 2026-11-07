@@ -553,11 +553,15 @@ function wmVisible() {
 }
 
 function wmClearCaches() {
+  clearTimeout(wm.biomeTimer);
   for (const cv of wmTileCache.values()) {
     try { cv.width = 0; cv.height = 0; } catch {}
   }
   wm.biomes.clear();
   wmColorCache.clear();
+  wm.structures.clear();
+  headImgCache.clear();
+  wm.selectedPos = null;
   wmTileCache.clear();
   wm.lastBiomeRect = '';
   wm.biomeTooWide = false;

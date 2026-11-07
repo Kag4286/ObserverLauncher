@@ -1002,7 +1002,7 @@ async function readBiomes(root, levelName, dim, rect) {
         let entry = biomeRegionCache.get(key);
         if (!entry || entry.mtime !== stat.mtimeMs) {
           entry = { mtime: stat.mtimeMs, chunks: new Map(), header: null };
-          lruSet(biomeRegionCache, key, entry, 64);
+          lruSet(biomeRegionCache, key, entry, 16);
         }
         // PERF: the 4 KB region header is read once per region and cached with the entry, so
         // repeated pans over the same region don't re-open + re-read it on every readBiomes call.
