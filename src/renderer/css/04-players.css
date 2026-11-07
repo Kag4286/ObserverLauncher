@@ -164,8 +164,8 @@ html.motion-lite .inv-cell.enchanted::after{animation:none;opacity:.8}
 .player-manual[open] .player-manual-summary{border-radius:var(--r-sm) var(--r-sm) 0 0;border-bottom-color:transparent}
 .player-manual .player-manual-row{margin-top:0;border-radius:0 0 var(--r-sm) var(--r-sm);border-top:0}
 
-/* ============ Player Inspector 2.0 Spatial Stage (v8.0.0) ============ */
-.pd-stage-overview{display:grid;grid-template-columns:minmax(310px, 350px) minmax(0, 1fr);gap:var(--space-5);align-items:start;width:100%}
+/* ============ Player Overview Harmonized Editorial Design (v8.0.0) ============ */
+.pd-stage-overview{display:grid;grid-template-columns:minmax(310px, 350px) minmax(0, 1fr);gap:var(--space-4);align-items:start;width:100%}
 @media (max-width: 860px){.pd-stage-overview{grid-template-columns:1fr}}
 .pd-stage-wrap{display:flex !important;flex-direction:row !important;align-items:center;justify-content:center;gap:14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);padding:16px 12px;box-shadow:inset 0 0 24px rgba(0,0,0,0.25)}
 .pd-stage-rail{display:flex;flex-direction:column;gap:9px;align-items:center;flex-shrink:0;z-index:2}
@@ -176,9 +176,9 @@ html.motion-lite .inv-cell.enchanted::after{animation:none;opacity:.8}
 .pd-slot-wrap .inv-cell.empty{background:rgba(255,255,255,0.02);border:1px dashed var(--border);opacity:0.4}
 .pd-slot-wrap .inv-cell.empty:hover{opacity:0.75;border-color:var(--border-strong);transform:none}
 .pd-slot-wrap .inv-cell img{width:34px;height:34px;image-rendering:pixelated;object-fit:contain}
-.pd-slot-tag{font:700 8.5px/1 var(--font-mono);letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;user-select:none}
-.pd-stage-wrap .pd-3d-container{width:185px;height:295px;aspect-ratio:auto;background:radial-gradient(circle, var(--surface-3) 0%, var(--surface) 100%);border-radius:var(--r-sm);border:1px solid var(--border);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.pd-defense-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:var(--r-xs);background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.28);color:#60a5fa;font:700 11.5px var(--font-mono);margin-top:6px;user-select:none;cursor:default}
+.pd-slot-tag{font:600 9px/1.2 var(--font-ui);letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase;user-select:none}
+.pd-stage-wrap .pd-3d-container{width:185px;height:305px;aspect-ratio:auto;background:radial-gradient(circle, var(--surface-3) 0%, var(--surface) 100%);border-radius:var(--r-sm);border:1px solid var(--border);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pd-defense-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:var(--r-xs);background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.28);color:#60a5fa;font:600 11.5px var(--font-mono);margin-top:6px;user-select:none;cursor:default}
 .pd-defense-badge svg{flex-shrink:0}
 .pd-map-jump-btn{display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;border-radius:var(--r-xs);background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;margin-left:6px;vertical-align:middle;transition:all var(--dur-micro) var(--ease-out)}
 .pd-map-jump-btn:hover{color:var(--brand);border-color:var(--brand);background:var(--surface-3);transform:translateY(-1px)}
@@ -187,14 +187,56 @@ html.motion-lite .inv-cell.enchanted::after{animation:none;opacity:.8}
 .pd-effect-name{font-weight:600}
 .pd-effect-dur{font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
 
-/* Key Telemetry in Overview */
-.pd-overview-stats{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px}
-.pd-overview-stats .eyebrow{font:700 9.5px var(--font-mono);letter-spacing:.08em;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase}
+/* Facts Column & Unified Editorial Cards */
+.pd-facts{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pd-vitals-card,.pd-telemetry-card,.pd-effects-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.pd-pills-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pd-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font:600 11.5px var(--font-ui);border:1px solid var(--border);background:var(--surface-3);color:var(--text-2)}
+.pd-pill .pd-dot{width:6px;height:6px;border-radius:999px;background:currentColor}
+.pd-pill.online{color:#34d399;background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.3)}
+.pd-pill.offline{color:#fbbf24;background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.3)}
+.pd-pill.gm-survival{color:#34d399;background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.3)}
+.pd-pill.gm-creative{color:#a78bfa;background:rgba(167,139,250,0.12);border-color:rgba(167,139,250,0.3)}
+.pd-pill.gm-adventure{color:#fb923c;background:rgba(251,146,60,0.12);border-color:rgba(251,146,60,0.3)}
+.pd-pill.gm-spectator{color:var(--text-muted)}
+.pd-pill.pd-dim-overworld{color:#86efac;border-color:rgba(134,239,172,0.3);background:rgba(134,239,172,0.08)}
+.pd-pill.pd-dim-nether{color:#fca5a5;border-color:rgba(252,165,165,0.3);background:rgba(252,165,165,0.08)}
+.pd-pill.pd-dim-end{color:#d8b4fe;border-color:rgba(216,180,254,0.3);background:rgba(216,180,254,0.08)}
+.pd-pill.pd-dim-other{color:var(--text-muted)}
+
+/* Gauges Grid: Health & Food */
+.pd-gauges-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width: 640px){.pd-gauges-grid{grid-template-columns:1fr}}
+.pd-gauge-item{display:flex;flex-direction:column;gap:6px;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px}
+.pd-gauge-header{display:flex;align-items:center;justify-content:space-between}
+.pd-gauge-name{font:600 11.5px var(--font-ui);color:var(--text-muted)}
+.pd-gauge-value{font:700 13px var(--font-mono);color:var(--text)}
+.pd-gauge-value small{font:500 11px var(--font-ui);color:var(--text-dim)}
+.pd-meter{display:flex;gap:3px;height:6px}
+.pd-meter i{flex:1;height:100%;border-radius:2px;background:rgba(255,255,255,0.08);transition:background var(--dur-micro) var(--ease-out)}
+.pd-meter i.hp{background:#ef4444}
+.pd-meter i.food{background:#f59e0b}
+
+/* XP Deck */
+.pd-xp-deck{display:flex;align-items:center;gap:12px;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px}
+.pd-xp-left{display:inline-flex;align-items:center;gap:6px}
+.pd-xp-lvl-tag{font:700 9px var(--font-mono);padding:1px 4px;border-radius:3px;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35)}
+.pd-xp-lvl-num{font:700 13px var(--font-mono);color:var(--text);white-space:nowrap}
+.pd-xp-bar-wrap{flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;position:relative}
+.pd-xp-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#10b981 0%,#34d399 100%);transition:width var(--dur-fast) var(--ease-out)}
+.pd-xp-total-text{font:500 11.5px var(--font-mono);color:var(--text-muted);white-space:nowrap}
+
+/* Telemetry Card: Statistics */
+.pd-telemetry-head{display:flex;align-items:center;justify-content:space-between}
+.pd-card-title{font:700 12.5px var(--font-ui);color:var(--text);letter-spacing:.01em}
+.pd-link-btn{background:transparent;border:0;padding:0;color:var(--brand);font:600 11.5px var(--font-ui);cursor:pointer;transition:opacity var(--dur-micro) var(--ease-out)}
+.pd-link-btn:hover{opacity:0.8;text-decoration:underline}
 .pd-stats-mini-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-@media (max-width: 1100px){.pd-stats-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.pd-mini-stat{display:flex;flex-direction:column;gap:2px;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px 10px}
-.pd-mini-stat span{font:600 10px var(--font-mono);color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pd-mini-stat b{font:700 14px var(--font-ui);color:var(--text);font-family:var(--font-mono)}
+@media (max-width: 1050px){.pd-stats-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pd-mini-stat{display:flex;flex-direction:column;gap:3px;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px 10px}
+.pd-stat-label{font:500 11px var(--font-ui);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-stat-num{font:700 14px var(--font-mono);color:var(--text)}
+.pd-stat-num small{font:500 11px var(--font-mono);color:var(--text-dim)}
 
 /* ============ Unified Inventory Toolbar & Matrix (v8.0.0) ============ */
 .inv-unified-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}

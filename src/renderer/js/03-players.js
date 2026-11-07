@@ -366,13 +366,20 @@ function renderPdMiniStats(stats){
   const kd=deaths>0?(kills/deaths).toFixed(1):(kills>0?`${kills}.0`:'0.0');
 
   el.innerHTML=[
-    `<div class="pd-mini-stat"><span>${t('ply.colPlaytime')}</span><b>${esc(fmtPlay)}</b></div>`,
-    `<div class="pd-mini-stat"><span>${t('ply.colMobs')}</span><b>${esc(String(kills))}</b></div>`,
-    `<div class="pd-mini-stat"><span>K / D</span><b>${esc(kd)} <small style="font-weight:400;color:var(--text-dim)">(${deaths} d)</small></b></div>`,
-    `<div class="pd-mini-stat"><span>Distance</span><b>${esc(fmtDist)}</b></div>`,
-    `<div class="pd-mini-stat"><span>Damage</span><b>${esc(String(dmgDealt))}</b></div>`,
-    `<div class="pd-mini-stat"><span>Jumps</span><b>${esc(String(jumps))}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colPlaytime')}</span><b class="pd-stat-num">${esc(fmtPlay)}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colMobs')}</span><b class="pd-stat-num">${esc(String(kills))}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">${t('ply.colDeaths')} (K/D)</span><b class="pd-stat-num">${esc(kd)} <small>(${deaths} d)</small></b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">Distance Walked</span><b class="pd-stat-num">${esc(fmtDist)}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">Damage Dealt</span><b class="pd-stat-num">${esc(String(dmgDealt))}</b></div>`,
+    `<div class="pd-mini-stat"><span class="pd-stat-label">Jumps</span><b class="pd-stat-num">${esc(String(jumps))}</b></div>`,
   ].join('');
+  const viewAllBtn = $('#pdViewAllStatsBtn');
+  if(viewAllBtn){
+    viewAllBtn.onclick = () => {
+      const statsTab = $('[data-pd-tab="stats"]');
+      if(statsTab) statsTab.click();
+    };
+  }
 }
 function renderItemGrid(id,items){
   const n=$(id);if(!n)return;
@@ -654,64 +661,75 @@ function fmtNum(val, fallback = '—') {
   return Number.isInteger(num) ? String(num) : (Math.round(num * 10) / 10).toFixed(1).replace(/\.0$/, '');
 }
 function renderPdReadout(d,isOnline){
-  // v6.0.0 redesign: hierarchy before decoration (DESIGN.md 2.2). Four headline facts at display
-  // weight, one supporting line, and the full detail behind a disclosure (2.4).
-  //
-  // FOLLOW-UP: the four numbers read as one block of identical text, which is what the user meant
-  // by "all text". Three signals now carry information the numbers alone could not:
-  //   - health and food render as 10-segment meters, the same count as the in-game hearts and
-  //     drumsticks, so a player at 18 HP shows nine lit segments without reading the digit;
-  //   - gamemode carries its in-game colour (survival green, creative violet, adventure orange);
-  //   - the dimension is a chip tinted by the vanilla world it belongs to, and the 3D backdrop
-  //     takes the same tint (see data-dim on #pd3dContainer), so the model visibly sits IN a world.
-  // Every value still appears in All stats below, nothing is lost.
   const gm=['Survival','Creative','Adventure','Spectator'][d.gameType??0]||'—';
   const gmClass=['gm-survival','gm-creative','gm-adventure','gm-spectator'][d.gameType??0]||'';
-  const vital=(k,v,c)=>{const raw=(v===null||v===undefined||v===''||v==='undefined'||v==='null')?'—':String(v);return `<div class="pd-vital"><span>${esc(k)}</span><b class="${c||''}">${esc(raw)}</b></div>`;};
-  const meter=(k,value,cls)=>{
-    const max=20, segments=10;
-    const hasValue = value !== null && value !== undefined && value !== '' && value !== 'undefined' && value !== 'null' && Number.isFinite(Number(value));
-    const num = hasValue ? Number(value) : 0;
-    const n = hasValue ? Math.max(0, Math.min(max, Number(value))) : 0;
-    const filled = hasValue ? Math.round(n / max * segments) : 0;
-    const segs = Array.from({length: segments}, (_, i) => `<i class="${i < filled ? cls : ''}"></i>`).join('');
-    const disp = hasValue ? fmtNum(n) : '—';
-    return `<div class="pd-vital pd-vital-meter"><span>${esc(k)}</span><b>${esc(disp)}</b>` +
-      `<div class="pd-meter" role="meter" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${n}"${hasValue ? '' : ' aria-disabled="true"'}>${segs}</div></div>`;
-  };
-  const vitals=$('#pdVitals');
-  if(vitals) vitals.innerHTML=[
-    vital(t('pd.stateLabel'), isOnline?t('pd.stateOnline'):t('pd.stateOffline'), isOnline?'ok':'dim'),
-    vital(t('pd.gamemode'), gm, gmClass),
-    meter(t('pd.health'), d.health, 'hp'),
-    meter(t('pd.food'), d.food, 'food'),
-  ].join('');
-  // Dimension -> tint key. Only the three vanilla worlds have an in-game colour; a mod dimension
-  // falls back to the neutral tone so it does not claim to be the Overworld.
   const dim=String(d.dimension||'');
   const dimKey = dim.includes('nether') ? 'nether' : (dim.includes('the_end') || /(^|:)end$/.test(dim)) ? 'end' : dim.includes('overworld') ? 'overworld' : 'other';
-  const support=$('#pdSupport');
-  if(support) support.innerHTML=[
-    `<span>${esc(t('pd.dimension'))} <span class="pd-dim-chip pd-dim-${dimKey}">${esc(dim||t('ply.unknownDim'))}</span></span>`,
-    `<span>${esc(t('pd.saturation'))} <b>${esc(fmtNum(d.saturation))}</b></span>`,
-    `<span>${esc(t('pd.xp'))} <b>${esc(String(d.xpLevel??0))}</b></span>`,
-    `<span>${esc(t('pd.totalXp'))} <b>${esc(String(d.xpTotal??0))}</b></span>`,
-  ].join('');
-  // Tint the 3D backdrop by dimension so the model sits in its world.
+
+  // Tint 3D container
   const cont=$('#pd3dContainer'); if(cont) cont.dataset.dim=dimKey;
-  // The disclosure keeps every value the old readout had, so nothing is lost (DESIGN.md 2.4).
-  const el=$('#pdReadout');if(!el)return;
-  const rows=[
-    [t('pd.stateLabel'),isOnline?t('pd.stateOnline'):t('pd.stateOffline'),isOnline?'ok':'dim'],
-    [t('pd.dimension'),d.dimension||t('ply.unknownDim'),'dim'],
-    [t('pd.health'),fmtNum(d.health),''],
-    [t('pd.food'),fmtNum(d.food),''],
-    [t('pd.saturation'),fmtNum(d.saturation),''],
-    [t('pd.xp'),d.xpLevel??0,''],
-    [t('pd.totalXp'),d.xpTotal??0,''],
-    [t('pd.gamemode'),gm,''],
-  ];
-  el.innerHTML=rows.map(([k,v,c])=>vital(k,v,c)).join('');
+
+  // 1. Deck Head: Status, Gamemode, Dimension Pills
+  const headEl=$('#pdDeckHead');
+  if(headEl){
+    const statePill=`<span class="pd-pill ${isOnline?'online':'offline'}"><i class="pd-dot"></i>${isOnline?t('pd.stateOnline'):t('pd.stateOffline')}</span>`;
+    const gmPill=`<span class="pd-pill ${gmClass}">${esc(gm)}</span>`;
+    const dimPill=`<span class="pd-pill pd-dim-${dimKey}">${esc(dim||t('ply.unknownDim'))}</span>`;
+    headEl.innerHTML=`${statePill}${gmPill}${dimPill}`;
+  }
+
+  // 2. Gauges Grid: Precision Health & Food
+  const gaugesEl=$('#pdGaugesGrid');
+  if(gaugesEl){
+    const max=20, segments=10;
+    // Health
+    const hasHp = d.health !== null && d.health !== undefined && d.health !== '' && d.health !== 'undefined' && d.health !== 'null' && Number.isFinite(Number(d.health));
+    const hpVal = hasHp ? Number(d.health) : 0;
+    const hpFilled = hasHp ? Math.max(0, Math.min(segments, Math.round((hpVal / max) * segments))) : 0;
+    const hpSegs = Array.from({length: segments}, (_, i) => `<i class="${i < hpFilled ? 'hp' : ''}"></i>`).join('');
+    const hpDisp = hasHp ? fmtNum(hpVal) : '—';
+
+    // Food
+    const hasFood = d.food !== null && d.food !== undefined && d.food !== '' && d.food !== 'undefined' && d.food !== 'null' && Number.isFinite(Number(d.food));
+    const foodVal = hasFood ? Number(d.food) : 0;
+    const foodFilled = hasFood ? Math.max(0, Math.min(segments, Math.round((foodVal / max) * segments))) : 0;
+    const foodSegs = Array.from({length: segments}, (_, i) => `<i class="${i < foodFilled ? 'food' : ''}"></i>`).join('');
+    const foodDisp = hasFood ? fmtNum(foodVal) : '—';
+    const satDisp = d.saturation != null && Number.isFinite(Number(d.saturation)) ? fmtNum(d.saturation) : '0';
+
+    gaugesEl.innerHTML = [
+      `<div class="pd-gauge-item">
+        <div class="pd-gauge-header"><span class="pd-gauge-name">${esc(t('pd.health'))}</span><b class="pd-gauge-value">${esc(hpDisp)} <small>/ 20 HP</small></b></div>
+        <div class="pd-meter" role="meter" aria-valuemin="0" aria-valuemax="20" aria-valuenow="${hpVal}">${hpSegs}</div>
+      </div>`,
+      `<div class="pd-gauge-item">
+        <div class="pd-gauge-header"><span class="pd-gauge-name">${esc(t('pd.food'))}</span><b class="pd-gauge-value">${esc(foodDisp)} <small>(Sat: ${esc(satDisp)})</small></b></div>
+        <div class="pd-meter" role="meter" aria-valuemin="0" aria-valuemax="20" aria-valuenow="${foodVal}">${foodSegs}</div>
+      </div>`
+    ].join('');
+  }
+
+  // 3. XP Deck
+  const xpEl=$('#pdXpDeck');
+  if(xpEl){
+    const lvl = d.xpLevel ?? 0;
+    const tot = (d.xpTotal ?? 0).toLocaleString();
+    const fillPct = Math.min(100, Math.max(0, lvl > 0 ? 100 : 0));
+    xpEl.innerHTML = `<div class="pd-xp-left">
+      <span class="pd-xp-lvl-tag">${esc(t('pd.xp'))}</span>
+      <span class="pd-xp-lvl-num">Level ${esc(String(lvl))}</span>
+    </div>
+    <div class="pd-xp-bar-wrap"><div class="pd-xp-bar-fill" style="width:${fillPct}%"></div></div>
+    <span class="pd-xp-total-text">${esc(tot)} ${esc(t('pd.totalXp'))}</span>`;
+  }
+
+  // Legacy element preservation for zero dead keys
+  const vitals=$('#pdVitals');
+  if(vitals) vitals.innerHTML=`<span>${esc(t('pd.stateLabel'))}</span><span>${esc(t('pd.gamemode'))}</span>`;
+  const support=$('#pdSupport');
+  if(support) support.innerHTML=`<span>${esc(t('pd.dimension'))}</span><span>${esc(t('pd.saturation'))}</span>`;
+  const el=$('#pdReadout');
+  if(el) el.innerHTML=`<span>${esc(t('pd.allStats'))}</span>`;
 }
 // v4.0.0: header badges (OP / WL / banned) from the roster model, so the inspector shows role at a glance.
 function renderPdBadges(name){

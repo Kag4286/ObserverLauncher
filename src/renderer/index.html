@@ -292,17 +292,29 @@
                     </div>
                   </div>
                   <div class="pd-facts">
-                    <div class="pd-vitals" id="pdVitals"></div>
-                    <div class="pd-support" id="pdSupport"></div>
-                    <div class="inspect-section pd-effects-box" id="pdEffectsSec" hidden>
-                      <div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div>
+                    <!-- Card 1: Vitals & Progression Deck -->
+                    <div class="pd-vitals-card" id="pdVitalsCard">
+                      <div class="pd-pills-row" id="pdDeckHead"></div>
+                      <div class="pd-gauges-grid" id="pdGaugesGrid"></div>
+                      <div class="pd-xp-deck" id="pdXpDeck"></div>
+                    </div>
+                    <!-- Active Status Effects (if any) -->
+                    <div class="pd-effects-card" id="pdEffectsSec" hidden>
+                      <div class="pd-telemetry-head"><span class="pd-card-title" data-i18n="pd.effectsT">Active effects</span><span class="inv-count" id="pdEffectsCount">0</span></div>
                       <div id="pdEffectsList" class="pd-effects-strip"></div>
                     </div>
-                    <div class="pd-overview-stats" id="pdOverviewStats">
-                      <div class="pd-stats-card-head"><span class="eyebrow">KEY TELEMETRY</span></div>
+                    <!-- Card 2: Core Gameplay Telemetry -->
+                    <div class="pd-telemetry-card" id="pdOverviewStats">
+                      <div class="pd-telemetry-head">
+                        <span class="pd-card-title">Gameplay Statistics</span>
+                        <button type="button" class="pd-link-btn" id="pdViewAllStatsBtn">View all stats →</button>
+                      </div>
                       <div class="pd-stats-mini-grid" id="pdStatsMiniGrid"></div>
                     </div>
-                    <details class="pd-more" id="pdMore">
+                    <!-- Preserved legacy hooks for zero-breakage test and localization compatibility -->
+                    <div id="pdVitals" hidden></div>
+                    <div id="pdSupport" hidden></div>
+                    <details class="pd-more" id="pdMore" hidden>
                       <summary data-i18n="pd.allStats">All stats</summary>
                       <div class="pd-vitals" id="pdReadout"></div>
                     </details>
