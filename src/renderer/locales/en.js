@@ -121,7 +121,7 @@ window.LOCALES.en = {
 'ply.unwhitelist':'Un-whitelist',
 'ply.unban':'Unban',
 'ply.kickHint':'Player must be online',
-'ply.leaderboard':'Leaderboard','ply.colPlayer':'Player','ply.colPlaytime':'Playtime','ply.colDeaths':'Deaths','ply.colMobs':'Mob Kills','ply.colBlocks':'Blocks Mined','ply.inspectHint':'Inspect player data',
+'ply.leaderboard':'Leaderboard','ply.colPlayer':'Player','ply.colPlaytime':'Playtime','ply.colDeaths':'Deaths','ply.colMobs':'Mob Kills','ply.colBlocks':'Blocks Mined','ply.inspectHint':'Inspect player data','ply.emptyInspectTitle':'Select a player','ply.emptyInspectSub':'Choose a player from the roster to inspect their 3D skin, equipment, inventory, and stats.','ply.closeInspect':'Close inspector',
 'ply.noDataHint':'No saved data',
 'ply.bannedBadge':'Banned',
 'ply.stopBeforeEdit':'Stop the server before editing player data',

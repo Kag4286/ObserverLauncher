@@ -14,9 +14,10 @@
 .manual-btns{display:flex;gap:6px;flex-wrap:wrap}
 .players-table{margin-top:var(--space-3);display:grid;gap:var(--space-2)}
 /* Entity card (DESIGN.md 16.3): a player is a card, not a table row. */
-.player-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-3);align-items:center;padding:var(--space-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.player-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-3);align-items:center;padding:var(--space-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
 .player-row:hover{background:var(--surface-3);border-color:var(--border-strong)}
 .player-row.online{border-color:var(--success-weak)}
+.player-row.is-selected{background:var(--surface-3);border-color:var(--brand);box-shadow:0 0 0 1px var(--brand), 0 2px 8px rgba(0,229,160,0.12)}
 .player-avatar{width:42px;height:42px;border-radius:50%;background:var(--surface-3);border:2px solid var(--border);object-fit:cover;flex-shrink:0}
 .player-row.online .player-avatar{border-color:var(--success);box-shadow:0 0 0 3px var(--success-weak)}
 .player-main{display:flex;flex-direction:column;gap:3px;min-width:0}
@@ -36,6 +37,25 @@
 .btn.is-active{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);box-shadow:0 0 0 3px var(--brand-soft)}
 .btn.is-active:hover{background:var(--brand);border-color:var(--brand)}
 /* INSPECT MODAL — professional */
+/* Master-Detail Split Layout */
+.players-split-layout{display:grid;grid-template-columns:minmax(320px, 390px) minmax(0, 1fr);gap:var(--space-4);align-items:start;margin-top:var(--space-3)}
+@media (max-width: 960px){.players-split-layout{grid-template-columns:1fr}}
+.players-roster-pane{display:flex;flex-direction:column;min-width:0}
+.players-roster-pane .players-table{max-height:calc(100vh - 270px);overflow-y:auto;padding-right:4px}
+.players-roster-pane .players-table::-webkit-scrollbar{width:6px}
+.players-roster-pane .players-table::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px}
+.players-detail-pane{min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:var(--space-4);box-shadow:var(--shadow-sm);position:sticky;top:16px;max-height:calc(100vh - 140px);overflow-y:auto}
+.players-detail-pane::-webkit-scrollbar{width:6px}
+.players-detail-pane::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px}
+.players-detail-pane #playerInspector{display:flex;flex-direction:column}
+.players-detail-pane .workspace-empty{padding:48px 24px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:var(--r);background:rgba(255,255,255,.01)}
+.players-detail-pane .workspace-empty svg{width:48px;height:48px;stroke:var(--text-dim);margin:0 auto 12px;display:block}
+.players-detail-pane .workspace-empty h3{font-size:16px;color:var(--text);margin-bottom:6px}
+.players-detail-pane .workspace-empty p{font-size:12.5px;max-width:340px;margin:0 auto;line-height:1.5}
+.inspect-header-actions{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.inspect-header-actions .btn{flex-shrink:0}
+#playerInspectClose{width:28px;height:28px;display:inline-grid;place-items:center;padding:0;font-size:14px;border-radius:var(--r-xs);color:var(--text-muted);border:1px solid var(--border);background:var(--field);cursor:pointer;transition:all var(--dur-micro) var(--ease-out)}
+#playerInspectClose:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface-3)}
 .player-modal{width:min(760px,100%);max-height:88vh;display:flex;flex-direction:column}
 .player-modal #playerInspector{flex:1;min-height:0;overflow:auto;padding-right:4px}
 /* v6.0.0 Track B: 3D Player Model */

@@ -121,7 +121,7 @@ window.LOCALES.de = {
 'ply.unwhitelist':'Whitelist entfernen',
 'ply.unban':'Entbannen',
 'ply.kickHint':'Spieler muss online sein',
-'ply.leaderboard':'Bestenliste','ply.colPlayer':'Spieler','ply.colPlaytime':'Spielzeit','ply.colDeaths':'Tode','ply.colMobs':'Mob-Kills','ply.colBlocks':'Blöcke abgebaut','ply.inspectHint':'Spielerdaten ansehen',
+'ply.leaderboard':'Bestenliste','ply.colPlayer':'Spieler','ply.colPlaytime':'Spielzeit','ply.colDeaths':'Tode','ply.colMobs':'Mob-Kills','ply.colBlocks':'Blöcke abgebaut','ply.inspectHint':'Spielerdaten ansehen','ply.emptyInspectTitle':'Spieler auswählen','ply.emptyInspectSub':'Wähle einen Spieler aus der Liste, um 3D-Skin, Ausrüstung, Inventar und Statistiken einzusehen.','ply.closeInspect':'Inspector schließen',
 'ply.noDataHint':'Keine gespeicherten Daten',
 'ply.bannedBadge':'Gebannt',
 'ply.stopBeforeEdit':'Server stoppen, bevor Spielerdaten bearbeitet werden',

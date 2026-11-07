@@ -1115,7 +1115,10 @@ function wmShowPopup(px, py, data) {
   wmPopEl.innerHTML = `<button type="button" class="wm-pop-x" aria-label="Close">✕</button>
     <div class="wm-pop-title"><b>${esc(data.title)}</b></div>
     ${data.lines.map(l => `<div class="wm-pop-line">${esc(l)}</div>`).join('')}
-    ${data.copy ? `<button type="button" class="btn sm secondary wm-pop-copy">${esc(t('wm.copyTp'))}</button>` : ''}`;
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      ${data.copy ? `<button type="button" class="btn sm secondary wm-pop-copy">${esc(t('wm.copyTp'))}</button>` : ''}
+      ${data.action ? `<button type="button" class="btn sm primary wm-pop-act">${esc(data.action.label)}</button>` : ''}
+    </div>`;
   wrap.appendChild(wmPopEl);
 
   wmPopEl.querySelector('.wm-pop-x').onclick = wmHidePopup;
@@ -1128,6 +1131,13 @@ function wmShowPopup(px, py, data) {
       } catch {
         toast(data.copy);
       }
+    };
+  }
+  const actBtn = wmPopEl.querySelector('.wm-pop-act');
+  if (actBtn && data.action) {
+    actBtn.onclick = () => {
+      wmHidePopup();
+      try { data.action.fn(); } catch {}
     };
   }
 
@@ -1157,7 +1167,17 @@ function wmMapClick(px, py, wx, wz) {
       if (m.health !== undefined) lines.push(`❤ Health: ${m.health} / 20`);
       if (m.food !== undefined) lines.push(`🍗 Food: ${m.food} / 20`);
       const tpCmd = `/tp @s ${Math.round(m.x)} ${Math.round(m.y || 64)} ${Math.round(m.z)}`;
-      wmShowPopup(px, py, { title: m.name, lines, copy: tpCmd });
+      const popData = { title: m.name, lines, copy: tpCmd };
+      if (m.type === 'player') {
+        popData.action = {
+          label: t('ply.inspect'),
+          fn: () => {
+            if (typeof switchTab === 'function') switchTab('players');
+            if (typeof openPlayerInspector === 'function') openPlayerInspector(m.uuid, m.name);
+          }
+        };
+      }
+      wmShowPopup(px, py, popData);
       return;
     }
   }

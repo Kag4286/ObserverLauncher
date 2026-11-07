@@ -415,7 +415,7 @@ function renderPlayers(){
   // BUGFIX: include the avatar cache size in the signature. getHeadAvatarHtml() fetches the skin
   // asynchronously and then calls renderPlayers() to swap the placeholder for the real face, but the
   // signature did not change, so the early-return below left every row on person.svg forever.
-  const sig=JSON.stringify([currentLocale,playerPage,playerFilter,q,totalPages,list.length,Object.keys(headAvatarCache).length,page.map(p=>[p.name,p.uuid,p.online,p.hasData,p.op,p.whitelisted,p.banned])]);
+  const sig=JSON.stringify([currentLocale,playerPage,playerFilter,q,totalPages,list.length,Object.keys(headAvatarCache).length,selectedPlayer?.name,page.map(p=>[p.name,p.uuid,p.online,p.hasData,p.op,p.whitelisted,p.banned])]);
   if(sig===lastPlayersSig)return;
   lastPlayersSig=sig;
   const pager=$('#playersPager');
@@ -425,7 +425,9 @@ function renderPlayers(){
     const attrs=`data-player="${esc(p.name)}" data-uuid="${esc(p.uuid||'')}"`;
     const avatar = getHeadAvatarHtml(p.uuid, p.name);
     const meta=[p.online?`<span style="color:var(--success)">${t('ply.online')}</span>`:`<span>${t('ply.offline')}</span>`, p.hasData?t('ply.hasData'):t('ply.noData'), p.uuid?`UUID ${esc(p.uuid.slice(0,8))}…`:null].filter(Boolean).join(' • ');
-    return `<div class="player-row ${p.online?'online':''}" tabindex="0" role="listitem">
+    const isSelected = selectedPlayer && (selectedPlayer.name === p.name || (selectedPlayer.uuid && selectedPlayer.uuid === p.uuid));
+    const rowCls = `player-row ${p.online?'online':''} ${isSelected?'is-selected':''}`.trim();
+    return `<div class="${rowCls}" tabindex="0" role="listitem" ${attrs}>
       ${avatar}
       <div class="player-main">
         <div class="player-name"><i class="player-row-dot"></i><b>${esc(p.name)}</b>${badgeHtml(p)}</div>
@@ -444,14 +446,22 @@ function renderPlayers(){
 async function togglePlayerOp(p,on){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerOpToggle({uuid:p.uuid,name:p.name,op:on});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(on?'toast.nowOp':'toast.noLongerOp',{n:p.name}))}
 async function togglePlayerWhitelist(p,add){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerWhitelistToggle({uuid:p.uuid,name:p.name,add});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(add?'toast.addedWl':'toast.removedWl',{n:p.name}))}
 async function togglePlayerBan(p,ban){const bad=playerNameError(p.name);if(bad)return toast(bad);if(!p.uuid&&!state.running)return toast(t('toast.noUuid'));const r=await window.observer.playerBanToggle({uuid:p.uuid,name:p.name,ban});if(!r.ok)return toast(r.error);state.files=r.files;refreshUI();toast(t(ban?'toast.banned':'toast.unbanned',{n:p.name}))}
-function openPlayerInspectModal(){const m=$('#playerInspectModal'); m.classList.remove('closing'); m.hidden=false; void m.offsetWidth; trapFocus(m);
-  // BUGFIX: the Live actions and Saved data selects were plain <select> elements, so the OS drew
-  // their popup and it looked foreign next to the animated dropdowns elsewhere. They now carry
-  // .ol-select; this call covers a case where the modal was rebuilt after enhanceAll() ran at load.
-  if(window.enhanceAllSelects)try{window.enhanceAllSelects(m)}catch{} }
-// Fade-out is handled by the universal .modal-overlay [hidden] transition (08-motion.css) — just
-// flip the attribute and drop the transient class after the fade finishes.
-function closePlayerInspectModal(){const m=$('#playerInspectModal'); if(m.hidden) return; const cv=$('#pd3dCanvas'); if(cv&&cv._playerRenderer&&typeof cv._playerRenderer.destroy==='function') cv._playerRenderer.destroy(); releaseFocus(); m.classList.add('closing'); m.hidden=true; setTimeout(()=>m.classList.remove('closing'),220);}
+function openPlayerInspectModal(){
+  const m=$('#playerInspectModal'); if(m){ m.classList.remove('closing'); m.hidden=false; }
+  const insp=$('#playerInspector');
+  if(window.enhanceAllSelects&&insp)try{window.enhanceAllSelects(insp)}catch{}
+}
+function deselectPlayer(){
+  selectedPlayer=null;
+  const cv=$('#pd3dCanvas'); if(cv&&cv._playerRenderer&&typeof cv._playerRenderer.destroy==='function') cv._playerRenderer.destroy();
+  const form=$('#playerDataForm'), empty=$('#playerDataEmpty'), err=$('#playerDataError');
+  if(form) form.hidden=true;
+  if(empty) empty.hidden=false;
+  if(err) err.textContent=t('ply.emptyInspectSub');
+  $$('#playersList .player-row').forEach(r=>r.classList.remove('is-selected'));
+  const headerName=$('#inspectName'); if(headerName) headerName.textContent='Player';
+}
+function closePlayerInspectModal(){ deselectPlayer(); }
 // ============ PLAYER INSPECTOR (3-tab rework) ============
 // Overview (always read-only) · Live actions (console commands while the server runs) ·
 // Saved data (edit the .dat — server must be stopped). Separating these keeps reading, live
@@ -927,6 +937,10 @@ async function openPlayerInspector(uuid,name){
   selectedPlayer={uuid:uuid||null,name};
   openPlayerInspectModal();
   pdSetTab('overview');
+  $$('#playersList .player-row').forEach(r => {
+    const isThis = r.dataset.player === name || (uuid && r.dataset.uuid === uuid);
+    r.classList.toggle('is-selected', isThis);
+  });
 
   const isOnline=pdIsOnline(name,uuid);
   const stEl=$('#inspectState');
@@ -938,6 +952,44 @@ async function openPlayerInspector(uuid,name){
   if(saveBtn){saveBtn.disabled=state.running;if(state.running)saveBtn.setAttribute('data-tip',t('ply.stopBeforeEdit'));else saveBtn.removeAttribute('data-tip')}
   if(offHint)offHint.textContent=state.running?t('pd.stopToEdit'):'';
   $('#playerDataForm').hidden=true;$('#playerDataEmpty').hidden=false;$('#playerDataError').textContent=t('ply.loadingData');
+
+  // Header quick action toolbar bindings
+  const f = state.files || {};
+  const isOp = (f.ops || []).some(x => (typeof x==='string'?x:x?.name)?.toLowerCase() === name.toLowerCase());
+  const isWl = (f.whitelist || []).some(x => (typeof x==='string'?x:x?.name)?.toLowerCase() === name.toLowerCase());
+  const opBtn = $('#inspectHeaderOpBtn');
+  if (opBtn) {
+    opBtn.textContent = isOp ? t('ply.removeOp') : t('ply.makeOp');
+    opBtn.classList.toggle('active', isOp);
+    opBtn.onclick = () => withBusy(opBtn, () => togglePlayerOp({ uuid, name }, !isOp));
+  }
+  const wlBtn = $('#inspectHeaderWlBtn');
+  if (wlBtn) {
+    wlBtn.textContent = isWl ? t('ply.unwhitelist') : t('ply.whitelist');
+    wlBtn.classList.toggle('active', isWl);
+    wlBtn.onclick = () => withBusy(wlBtn, () => togglePlayerWhitelist({ uuid, name }, !isWl));
+  }
+  const tpBtn = $('#inspectHeaderTpBtn');
+  if (tpBtn) {
+    tpBtn.disabled = !state.running || !isOnline;
+    tpBtn.setAttribute('data-tip', isOnline ? `/tp @s ${name}` : t('ply.kickHint'));
+    tpBtn.onclick = () => { if (state.running && isOnline) command(`tp @s ${name}`); };
+  }
+  const kickBtn = $('#inspectHeaderKickBtn');
+  if (kickBtn) {
+    kickBtn.disabled = !state.running || !isOnline;
+    kickBtn.setAttribute('data-tip', isOnline ? '' : t('ply.kickHint'));
+    kickBtn.onclick = () => withBusy(kickBtn, async () => {
+      const bad = playerNameError(name);
+      if (bad) return toast(bad);
+      if (await confirmDialog({ title: t('ply.kick'), body: t('ply.confirmKick', { n: name }), ok: t('ply.kick'), danger: true })) {
+        command(`kick ${name}`);
+      }
+    });
+  }
+  const closeBtn = $('#playerInspectClose');
+  if (closeBtn) closeBtn.onclick = deselectPlayer;
+
   let r;
   try{r=await window.observer.playerRead(uuid, name)}catch(e){$('#playerDataError').textContent=t('ply.readError',{m:e?.message||e});return}
   if(!r||!r.ok){
@@ -1045,15 +1097,23 @@ async function renderLeaderboard() {
 }
 
 $('#playersList').addEventListener('click',async e=>{
-  const btn=e.target.closest('[data-row-action]');if(!btn||btn.disabled)return;
-  const action=btn.dataset.rowAction,name=btn.dataset.player,uuid=btn.dataset.uuid||null,p={uuid,name};
-  // UX (2.6.0): disable the row button for the duration of the async action so a double-click
-  // cannot fire op/whitelist/ban/kick twice against the server files or the console.
-  if(action==='op')return withBusy(btn,()=>togglePlayerOp(p,btn.dataset.value==='on'));
-  if(action==='whitelist')return withBusy(btn,()=>togglePlayerWhitelist(p,btn.dataset.value==='on'));
-  if(action==='ban')return withBusy(btn,async()=>{if(btn.dataset.value==='on'&&!await confirmDialog({title:t('ply.ban'),body:t('ply.confirmBan',{n:name}),ok:t('ply.ban'),danger:true}))return;return togglePlayerBan(p,btn.dataset.value==='on')});
-  if(action==='kick')return withBusy(btn,async()=>{const bad=playerNameError(name);if(bad)return toast(bad);if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))command(`kick ${name}`)});
-  if(action==='inspect')openPlayerInspector(uuid,name);
+  const btn=e.target.closest('[data-row-action]');
+  if(btn){
+    if(btn.disabled)return;
+    const action=btn.dataset.rowAction,name=btn.dataset.player,uuid=btn.dataset.uuid||null,p={uuid,name};
+    // UX (2.6.0): disable the row button for the duration of the async action so a double-click
+    // cannot fire op/whitelist/ban/kick twice against the server files or the console.
+    if(action==='op')return withBusy(btn,()=>togglePlayerOp(p,btn.dataset.value==='on'));
+    if(action==='whitelist')return withBusy(btn,()=>togglePlayerWhitelist(p,btn.dataset.value==='on'));
+    if(action==='ban')return withBusy(btn,async()=>{if(btn.dataset.value==='on'&&!await confirmDialog({title:t('ply.ban'),body:t('ply.confirmBan',{n:name}),ok:t('ply.ban'),danger:true}))return;return togglePlayerBan(p,btn.dataset.value==='on')});
+    if(action==='kick')return withBusy(btn,async()=>{const bad=playerNameError(name);if(bad)return toast(bad);if(await confirmDialog({title:t('ply.kick'),body:t('ply.confirmKick',{n:name}),ok:t('ply.kick'),danger:true}))command(`kick ${name}`)});
+    if(action==='inspect')return openPlayerInspector(uuid,name);
+  }
+  const row=e.target.closest('.player-row');
+  if(row){
+    const name=row.dataset.player,uuid=row.dataset.uuid||null;
+    if(name) openPlayerInspector(uuid,name);
+  }
 });
 $('#invSearch')?.addEventListener('input',e=>{invSearchQuery=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});
 // v4.0.0: the hotbar shares invShowEmpty + invSort, so a change re-renders both grids.
@@ -1102,7 +1162,7 @@ window.observer.onIconsUpdate(()=>{
   _iconUpdateTimer = setTimeout(() => {
     _iconUpdateTimer = null;
   iconEpoch++;
-  if($('#playerInspectModal').hidden||!lastInspectData)return;
+  if(!selectedPlayer||$('#playerDataForm')?.hidden||!lastInspectData)return;
   renderEquipment(lastInspectData.armor,lastInspectData.offhand);
   renderItemGrid('#inventoryList',lastInspectData.inventory);
   renderItemGrid('#enderChestList',lastInspectData.enderChest);

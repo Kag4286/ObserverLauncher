@@ -236,9 +236,6 @@
         <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/person.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.players">ROSTER</p><h2 data-i18n="ply.title">Players</h2><p class="sub" data-i18n="ply.sub">Manage online, offline, whitelisted and banned — works even while stopped.</p></div></div>
         <div class="tab-head-actions"><span class="roster-count" id="rosterCount">— players</span><button class="btn secondary sm" id="toggleLeaderboardBtn" data-i18n="ply.leaderboard">Leaderboard</button><button class="btn secondary sm" id="refreshPlayersBtn" data-i18n="ply.refresh">Refresh list</button></div>
       </header>
-      <div class="roster-toolbar"><div class="player-filters" role="group" aria-label="Player filters"><button class="filter-chip active" data-player-filter="online" aria-pressed="true" data-i18n="ply.filterOnline">Online</button><button class="filter-chip" data-player-filter="offline" aria-pressed="false" data-i18n="ply.filterOffline">Offline</button><button class="filter-chip" data-player-filter="whitelist" aria-pressed="false" data-i18n="ply.filterWhitelist">Whitelisted</button><button class="filter-chip" data-player-filter="banned" aria-pressed="false" data-i18n="ply.filterBanned">Banned</button><button class="filter-chip" data-player-filter="ops" aria-pressed="false" data-i18n="ply.filterOps">Operators</button><button class="filter-chip" data-player-filter="all" aria-pressed="false" data-i18n="ply.filterAll">All</button></div><div class="roster-search"><input id="playerSearch" data-i18n-placeholder="ply.searchPh" placeholder="Search player…" aria-label="Search players" autocomplete="off"><span aria-hidden="true">⌕</span></div></div>
-      <div id="playersList" class="players-table" role="list" aria-label="Players list"></div>
-      <div id="playersPager" class="player-pager" hidden><button class="btn secondary" id="playersPrevPage" aria-label="Previous page" data-i18n="mkt.prev">← Previous</button><span id="playersPageLabel" aria-live="polite">Page 1</span><button class="btn secondary" id="playersNextPage" aria-label="Next page" data-i18n="mkt.next">Next →</button></div>
       <!-- v6.0.0 Track B - B2: Leaderboard -->
       <div id="playersLeaderboard" class="leaderboard-wrap" hidden>
         <table class="leaderboard-table">
@@ -246,10 +243,159 @@
           <tbody id="leaderboardBody"></tbody>
         </table>
       </div>
-      <details class="player-manual" id="playerManual">
-        <summary class="player-manual-summary"><span data-i18n="ply.quick">Manage by name</span></summary>
-        <div class="player-manual-row" role="group" aria-label="Quick player actions"><input id="playerActionName" data-i18n-placeholder="ply.namePh" placeholder="Player name — e.g. Notch" aria-label="Player name for quick action" autocomplete="off"><div class="manual-btns"><button class="btn secondary sm" id="manualOpBtn" aria-label="Make player operator" data-i18n="ply.op">OP</button><button class="btn secondary sm" id="manualWhitelistBtn" aria-label="Whitelist player" data-i18n="ply.whitelist">Whitelist</button><button class="btn danger sm" id="manualBanBtn" aria-label="Ban player" data-i18n="ply.ban">Ban</button><button class="btn danger sm" id="manualKickBtn" aria-label="Kick player" data-i18n="ply.kick">Kick</button></div></div>
-      </details>
+      <div class="players-split-layout" id="playersSplitLayout">
+        <aside class="players-roster-pane">
+          <div class="roster-toolbar"><div class="player-filters" role="group" aria-label="Player filters"><button class="filter-chip active" data-player-filter="online" aria-pressed="true" data-i18n="ply.filterOnline">Online</button><button class="filter-chip" data-player-filter="offline" aria-pressed="false" data-i18n="ply.filterOffline">Offline</button><button class="filter-chip" data-player-filter="whitelist" aria-pressed="false" data-i18n="ply.filterWhitelist">Whitelisted</button><button class="filter-chip" data-player-filter="banned" aria-pressed="false" data-i18n="ply.filterBanned">Banned</button><button class="filter-chip" data-player-filter="ops" aria-pressed="false" data-i18n="ply.filterOps">Operators</button><button class="filter-chip" data-player-filter="all" aria-pressed="false" data-i18n="ply.filterAll">All</button></div><div class="roster-search"><input id="playerSearch" data-i18n-placeholder="ply.searchPh" placeholder="Search player…" aria-label="Search players" autocomplete="off"><span aria-hidden="true">⌕</span></div></div>
+          <div id="playersList" class="players-table" role="list" aria-label="Players list"></div>
+          <div id="playersPager" class="player-pager" hidden><button class="btn secondary" id="playersPrevPage" aria-label="Previous page" data-i18n="mkt.prev">← Previous</button><span id="playersPageLabel" aria-live="polite">Page 1</span><button class="btn secondary" id="playersNextPage" aria-label="Next page" data-i18n="mkt.next">Next →</button></div>
+          <details class="player-manual" id="playerManual">
+            <summary class="player-manual-summary"><span data-i18n="ply.quick">Manage by name</span></summary>
+            <div class="player-manual-row" role="group" aria-label="Quick player actions"><input id="playerActionName" data-i18n-placeholder="ply.namePh" placeholder="Player name — e.g. Notch" aria-label="Player name for quick action" autocomplete="off"><div class="manual-btns"><button class="btn secondary sm" id="manualOpBtn" aria-label="Make player operator" data-i18n="ply.op">OP</button><button class="btn secondary sm" id="manualWhitelistBtn" aria-label="Whitelist player" data-i18n="ply.whitelist">Whitelist</button><button class="btn danger sm" id="manualBanBtn" aria-label="Ban player" data-i18n="ply.ban">Ban</button><button class="btn danger sm" id="manualKickBtn" aria-label="Kick player" data-i18n="ply.kick">Kick</button></div></div>
+          </details>
+        </aside>
+        <main class="players-detail-pane">
+          <div id="playerInspector">
+            <div id="playerDataEmpty" class="workspace-empty"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><h3 data-i18n="ply.emptyInspectTitle">Select a player</h3><p id="playerDataError" class="text-muted" data-i18n="ply.emptyInspectSub">Choose a player from the roster to inspect their 3D skin, equipment, inventory, and stats.</p></div>
+            <div id="playerDataForm" hidden>
+              <div class="inspect-header"><img id="inspectAvatar" class="inspect-avatar" alt=""><div class="inspect-title"><div class="inspect-name-row"><b id="inspectName">Player</b><span class="inspect-badge" id="inspectState" data-i18n="pd.stateOffline">Offline data</span><span class="inspect-badges" id="inspectBadges"></span></div><span id="inspectDim">unknown dimension</span><span id="inspectPos" class="inspect-pos" hidden></span><small id="inspectUuid" class="inspect-uuid" data-tip="Click to copy full UUID">UUID: —</small></div><div class="inspect-header-actions"><button type="button" class="btn secondary sm" id="inspectHeaderOpBtn" data-i18n="ply.op">OP</button><button type="button" class="btn secondary sm" id="inspectHeaderWlBtn" data-i18n="ply.whitelist">Whitelist</button><button type="button" class="btn secondary sm" id="inspectHeaderTpBtn" data-i18n="pd.teleport">Teleport</button><button type="button" class="btn danger sm" id="inspectHeaderKickBtn" data-i18n="ply.kick">Kick</button><button type="button" class="btn icon-btn sm" id="playerInspectClose" data-i18n-title="ply.closeInspect" title="Close inspector" aria-label="Close inspector">✕</button></div></div>
+              <div class="inspect-tabs" role="tablist">
+                <button type="button" class="inspect-tab active" data-pd-tab="overview" role="tab" data-i18n="pd.tabOverview">Overview</button>
+                <button type="button" class="inspect-tab" data-pd-tab="inventory" role="tab" data-i18n="pd.tabInventory">Inventory</button>
+                <button type="button" class="inspect-tab" data-pd-tab="stats" role="tab" data-i18n="pd.tabStats">Stats</button>
+                <button type="button" class="inspect-tab" data-pd-tab="live" role="tab" data-i18n="pd.tabLive">Live actions</button>
+                <button type="button" class="inspect-tab" data-pd-tab="edit" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
+              </div>
+              <div class="inspect-panel active" id="pdPanelOverview">
+                <div class="pd-hero">
+                  <div class="pd-3d-container" id="pd3dContainer">
+                    <canvas id="pd3dCanvas"></canvas>
+                    <div id="pd3dStatus" class="pd-3d-status" hidden></div>
+                    <button type="button" class="pd-3d-toggle active" id="pd3dToggleArmor" hidden data-i18n-title="pd.toggleArmor" title="Toggle 3D armor preview">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      <span data-i18n="pd.armorBtn">Armor</span>
+                    </button>
+                  </div>
+                  <div class="pd-facts">
+                    <div class="pd-vitals" id="pdVitals"></div>
+                    <div class="pd-support" id="pdSupport"></div>
+                    <details class="pd-more" id="pdMore">
+                      <summary data-i18n="pd.allStats">All stats</summary>
+                      <div class="pd-vitals" id="pdReadout"></div>
+                    </details>
+                  </div>
+                </div>
+                <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="pd-equipment"></div></div>
+                <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
+              </div>
+              <div class="inspect-panel" id="pdPanelInventory">
+                <div id="invItemDetail" class="inv-item-detail" hidden></div>
+                <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div><div id="hotbarList" class="inv-grid"></div></div>
+                <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><span class="inv-count" id="invCount">0 / 36</span><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory"><label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="invSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="inventoryList" class="inv-grid"></div></div>
+                <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="inv-grid"></div></div>
+              </div>
+              <div class="inspect-panel" id="pdPanelStats">
+                <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>
+                <div class="pd-stats-hero" id="pdStatsHero" hidden>
+                  <div class="pd-hero-stat pd-hero-playtime">
+                    <div class="pd-hero-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"/>
+                        <path d="M12 7v5l3.5 2"/>
+                      </svg>
+                    </div>
+                    <div class="pd-hero-body">
+                      <span class="pd-hero-label" data-i18n="pd.heroPlaytime">Playtime</span>
+                      <b class="pd-hero-val" id="pdHeroPlaytime">—</b>
+                      <span class="pd-hero-sub" id="pdHeroPlaytimeSub">0 sessions</span>
+                    </div>
+                  </div>
+                  <div class="pd-hero-stat pd-hero-combat">
+                    <div class="pd-hero-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/>
+                        <line x1="13" y1="19" x2="19" y2="13"/>
+                        <line x1="16" y1="16" x2="20" y2="20"/>
+                        <line x1="19" y1="21" x2="21" y2="19"/>
+                        <polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/>
+                        <line x1="5" y1="14" x2="9" y2="18"/>
+                        <line x1="7" y1="17" x2="4" y2="20"/>
+                        <line x1="3" y1="19" x2="5" y2="21"/>
+                      </svg>
+                    </div>
+                    <div class="pd-hero-body">
+                      <span class="pd-hero-label" data-i18n="pd.heroCombat">Combat & K/D</span>
+                      <b class="pd-hero-val" id="pdHeroKd">—</b>
+                      <span class="pd-hero-sub" id="pdHeroCombatSub">0 kills · 0 deaths</span>
+                    </div>
+                  </div>
+                  <div class="pd-hero-stat pd-hero-travel">
+                    <div class="pd-hero-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+                      </svg>
+                    </div>
+                    <div class="pd-hero-body">
+                      <span class="pd-hero-label" data-i18n="pd.heroTravel">Total Travel</span>
+                      <b class="pd-hero-val" id="pdHeroTravel">—</b>
+                      <span class="pd-hero-sub" id="pdHeroTravelSub">walk + sprint + fly</span>
+                    </div>
+                  </div>
+                  <div class="pd-hero-stat pd-hero-damage">
+                    <div class="pd-hero-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2L4 14h6l-1 8 9-12h-6z"/>
+                      </svg>
+                    </div>
+                    <div class="pd-hero-body">
+                      <span class="pd-hero-label" data-i18n="pd.heroDamage">Damage</span>
+                      <b class="pd-hero-val" id="pdHeroDamage">—</b>
+                      <span class="pd-hero-sub" id="pdHeroDamageSub">dealt / taken</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="pd-stats-toolbar" id="pdStatsToolbar" hidden>
+                  <div class="pd-stats-chips" id="pdStatsChips" role="tablist">
+                    <button type="button" class="pd-stat-chip is-active" data-cat="all"><span data-i18n="pd.statCatAll">All</span><i id="pdCatCountAll" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="survival"><span data-i18n="pd.statCatSurvival">Survival</span><i id="pdCatCountSurvival" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="combat"><span data-i18n="pd.statCatCombat">Combat</span><i id="pdCatCountCombat" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="movement"><span data-i18n="pd.statCatMovement">Movement</span><i id="pdCatCountMovement" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="interaction"><span data-i18n="pd.statCatInteraction">Interactions</span><i id="pdCatCountInteraction" class="chip-count">0</i></button>
+                  </div>
+                  <div class="pd-stats-search-wrap">
+                    <input type="search" id="pdStatsSearch" class="pd-stats-search-input" placeholder="Search stats…" data-i18n-placeholder="pd.searchStatsPh" aria-label="Search statistics">
+                    <span class="pd-stats-search-count" id="pdStatsCount"></span>
+                  </div>
+                </div>
+                <div class="pd-stats-grid" id="pdStatsGrid"><div class="inv-empty"><b data-i18n="pd.loadingStats">Loading stats…</b><span data-i18n="pd.loadingStatsSub">Reading the player's saved statistics.</span></div></div>
+              </div>
+              <div class="inspect-panel" id="pdPanelLive">
+                <div class="inspect-note" data-i18n="pd.liveNote">Live actions run as server commands and work while the server is running — the player must be online.</div>
+                <div class="pd-live-panel">
+                  <div class="pd-live-form">
+                    <label class="pd-live-field"><span data-i18n="pd.gamemode">Gamemode</span><div class="pd-live-row"><select id="liveGameType" class="ol-select"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div></label>
+                    <label class="pd-live-field"><span data-i18n="pd.xp">XP level</span><div class="pd-live-row"><input id="liveXp" type="number" min="0" max="2000000"><button type="button" class="btn primary sm" data-live-cmd="xp">Set</button></div></label>
+                    <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.giveItem">Give item (id)</span><div class="pd-live-row"><input id="liveGiveId" placeholder="minecraft:diamond"><input id="liveGiveCount" class="pd-live-count" type="number" min="1" max="6400" value="1" data-i18n-title="pd.giveCount" title="Count" aria-label="Count"><button type="button" class="btn primary sm" data-live-cmd="give">Give</button></div></label>
+                    <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.teleport">Teleport (X Y Z)</span><div class="pd-live-row"><input id="liveTp" placeholder="100 64 -200"><button type="button" class="btn primary sm" data-live-cmd="tp">Teleport</button></div></label>
+                  </div>
+                  <div class="pd-live-quick">
+                    <button type="button" class="btn secondary sm" data-live-cmd="heal" data-i18n="pd.heal">Heal</button>
+                    <button type="button" class="btn secondary sm" data-live-cmd="feed" data-i18n="pd.feed">Feed</button>
+                    <button type="button" class="btn secondary sm" data-live-cmd="clear" data-i18n="pd.clearInvBtn">Clear inventory</button>
+                    <button type="button" class="btn danger sm pd-live-danger" data-live-cmd="kick" data-i18n="ply.kick">Kick</button>
+                  </div>
+                </div>
+              </div>
+              <div class="inspect-panel" id="pdPanelEdit">
+                <div class="inspect-note" data-i18n="pd.editNote">Stop the server before editing saved data. A backup of the original .dat is saved automatically. While the server is running, use the Live actions tab instead.</div>
+                <div class="inspect-stats"><label><span data-i18n="pd.health">Health</span><input id="pdHealth" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.food">Food</span><input id="pdFood" type="number" min="0" max="20" placeholder="0–20"></label><label><span data-i18n="pd.saturation">Saturation</span><input id="pdSaturation" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.xp">XP level</span><input id="pdXpLevel" type="number" min="0"></label><label><span data-i18n="pd.totalXp">Total XP</span><input id="pdXpTotal" type="number" min="0"></label><label><span data-i18n="pd.gamemode">Gamemode</span><select id="pdGameType" class="ol-select"><option value="0">Survival</option><option value="1">Creative</option><option value="2">Adventure</option><option value="3">Spectator</option></select></label></div>
+                <label class="inspect-check"><input id="pdClearInventory" type="checkbox"><span data-i18n="pd.clearInv">Clear inventory, armor and offhand (Ender chest untouched)</span></label>
+                <div class="pd-offline-actions"><button class="btn primary" id="savePlayerData" data-i18n="pd.apply">Apply changes</button><span class="text-muted" id="pdOfflineHint"></span></div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     </section>
     <section id="performance" class="tab">
       <header class="tab-head">
@@ -1265,158 +1411,7 @@
   </main>
   </div>
 </div>
-<div id="playerInspectModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="inspectName">
-  <div class="modal wide player-modal">
-    <button class="modal-close" id="playerInspectClose" aria-label="Close player details">&times;</button>
-    <div id="playerInspector">
-      <div id="playerDataEmpty" class="workspace-empty" hidden><svg class="empty-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><h3>Couldn't load player data</h3><p id="playerDataError" class="text-muted">Pick a player with saved data to inspect their equipment, inventory, ender chest and stats.</p></div>
-      <div id="playerDataForm" hidden>
-        <div class="inspect-header"><img id="inspectAvatar" class="inspect-avatar" alt=""><div class="inspect-title"><div class="inspect-name-row"><b id="inspectName">Player</b><span class="inspect-badge" id="inspectState" data-i18n="pd.stateOffline">Offline data</span><span class="inspect-badges" id="inspectBadges"></span></div><span id="inspectDim">unknown dimension</span><span id="inspectPos" class="inspect-pos" hidden></span><small id="inspectUuid" class="inspect-uuid" data-tip="Click to copy full UUID">UUID: —</small></div></div>
-        <div class="inspect-tabs" role="tablist">
-          <button type="button" class="inspect-tab active" data-pd-tab="overview" role="tab" data-i18n="pd.tabOverview">Overview</button>
-          <button type="button" class="inspect-tab" data-pd-tab="inventory" role="tab" data-i18n="pd.tabInventory">Inventory</button>
-          <button type="button" class="inspect-tab" data-pd-tab="stats" role="tab" data-i18n="pd.tabStats">Stats</button>
-          <button type="button" class="inspect-tab" data-pd-tab="live" role="tab" data-i18n="pd.tabLive">Live actions</button>
-          <button type="button" class="inspect-tab" data-pd-tab="edit" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
-        </div>
-        <div class="inspect-panel active" id="pdPanelOverview">
-        <!-- v6.0.0 redesign: 3D model is the dominant element (DESIGN.md 2.2). Facts sit beside it
-             at display weight; secondary numbers collapse into a disclosure (2.4); equipment is a
-             row of real icon tiles, not text rows. -->
-        <div class="pd-hero">
-          <div class="pd-3d-container" id="pd3dContainer">
-            <canvas id="pd3dCanvas"></canvas>
-            <div id="pd3dStatus" class="pd-3d-status" hidden></div>
-            <button type="button" class="pd-3d-toggle active" id="pd3dToggleArmor" hidden data-i18n-title="pd.toggleArmor" title="Toggle 3D armor preview">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span data-i18n="pd.armorBtn">Armor</span>
-            </button>
-          </div>
-          <div class="pd-facts">
-            <div class="pd-vitals" id="pdVitals"></div>
-            <div class="pd-support" id="pdSupport"></div>
-            <details class="pd-more" id="pdMore">
-              <summary data-i18n="pd.allStats">All stats</summary>
-              <div class="pd-vitals" id="pdReadout"></div>
-            </details>
-          </div>
-        </div>
-        <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="pd-equipment"></div></div>
-        <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
-        </div>
-        <div class="inspect-panel" id="pdPanelInventory">
-        <div id="invItemDetail" class="inv-item-detail" hidden></div>
-        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div><div id="hotbarList" class="inv-grid"></div></div>
-        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><span class="inv-count" id="invCount">0 / 36</span><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory"><label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="invSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="inventoryList" class="inv-grid"></div></div>
-        <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="inv-grid"></div></div>
-        </div>
-        <div class="inspect-panel" id="pdPanelStats">
-          <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>
-          <div class="pd-stats-hero" id="pdStatsHero" hidden>
-            <div class="pd-hero-stat pd-hero-playtime">
-              <div class="pd-hero-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="9"/>
-                  <path d="M12 7v5l3.5 2"/>
-                </svg>
-              </div>
-              <div class="pd-hero-body">
-                <span class="pd-hero-label" data-i18n="pd.heroPlaytime">Playtime</span>
-                <b class="pd-hero-val" id="pdHeroPlaytime">—</b>
-                <span class="pd-hero-sub" id="pdHeroPlaytimeSub">0 sessions</span>
-              </div>
-            </div>
-            <div class="pd-hero-stat pd-hero-combat">
-              <div class="pd-hero-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/>
-                  <line x1="13" y1="19" x2="19" y2="13"/>
-                  <line x1="16" y1="16" x2="20" y2="20"/>
-                  <line x1="19" y1="21" x2="21" y2="19"/>
-                  <polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/>
-                  <line x1="5" y1="14" x2="9" y2="18"/>
-                  <line x1="7" y1="17" x2="4" y2="20"/>
-                  <line x1="3" y1="19" x2="5" y2="21"/>
-                </svg>
-              </div>
-              <div class="pd-hero-body">
-                <span class="pd-hero-label" data-i18n="pd.heroCombat">Combat & K/D</span>
-                <b class="pd-hero-val" id="pdHeroKd">—</b>
-                <span class="pd-hero-sub" id="pdHeroCombatSub">0 kills · 0 deaths</span>
-              </div>
-            </div>
-            <div class="pd-hero-stat pd-hero-travel">
-              <div class="pd-hero-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
-                </svg>
-              </div>
-              <div class="pd-hero-body">
-                <span class="pd-hero-label" data-i18n="pd.heroTravel">Total Travel</span>
-                <b class="pd-hero-val" id="pdHeroTravel">—</b>
-                <span class="pd-hero-sub" id="pdHeroTravelSub">walk + sprint + fly</span>
-              </div>
-            </div>
-            <div class="pd-hero-stat pd-hero-damage">
-              <div class="pd-hero-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M13 2L4 14h6l-1 8 9-12h-6z"/>
-                </svg>
-              </div>
-              <div class="pd-hero-body">
-                <span class="pd-hero-label" data-i18n="pd.heroDamage">Damage</span>
-                <b class="pd-hero-val" id="pdHeroDamage">—</b>
-                <span class="pd-hero-sub" id="pdHeroDamageSub">dealt / taken</span>
-              </div>
-            </div>
-          </div>
-          <div class="pd-stats-toolbar" id="pdStatsToolbar" hidden>
-            <div class="pd-stats-chips" id="pdStatsChips" role="tablist">
-              <button type="button" class="pd-stat-chip is-active" data-cat="all"><span data-i18n="pd.statCatAll">All</span><i id="pdCatCountAll" class="chip-count">0</i></button>
-              <button type="button" class="pd-stat-chip" data-cat="survival"><span data-i18n="pd.statCatSurvival">Survival</span><i id="pdCatCountSurvival" class="chip-count">0</i></button>
-              <button type="button" class="pd-stat-chip" data-cat="combat"><span data-i18n="pd.statCatCombat">Combat</span><i id="pdCatCountCombat" class="chip-count">0</i></button>
-              <button type="button" class="pd-stat-chip" data-cat="movement"><span data-i18n="pd.statCatMovement">Movement</span><i id="pdCatCountMovement" class="chip-count">0</i></button>
-              <button type="button" class="pd-stat-chip" data-cat="interaction"><span data-i18n="pd.statCatInteraction">Interactions</span><i id="pdCatCountInteraction" class="chip-count">0</i></button>
-            </div>
-            <div class="pd-stats-search-wrap">
-              <input type="search" id="pdStatsSearch" class="pd-stats-search-input" placeholder="Search stats…" data-i18n-placeholder="pd.searchStatsPh" aria-label="Search statistics">
-              <span class="pd-stats-search-count" id="pdStatsCount"></span>
-            </div>
-          </div>
-          <div class="pd-stats-grid" id="pdStatsGrid"><div class="inv-empty"><b data-i18n="pd.loadingStats">Loading stats…</b><span data-i18n="pd.loadingStatsSub">Reading the player's saved statistics.</span></div></div>
-        </div>
-        <div class="inspect-panel" id="pdPanelLive">
-          <div class="inspect-note" data-i18n="pd.liveNote">Live actions run as server commands and work while the server is running — the player must be online.</div>
-          <!-- v6.0.0 redesign: five equal-weight cards left four narrow columns and one lonely action
-               card floating on its own row. This is ONE panel with a two-column form and a
-               separated quick-action strip, so the width is used and the dangerous action sits
-               away from the everyday ones. Element ids are unchanged; the JS reads them as before. -->
-          <div class="pd-live-panel">
-            <div class="pd-live-form">
-              <label class="pd-live-field"><span data-i18n="pd.gamemode">Gamemode</span><div class="pd-live-row"><select id="liveGameType" class="ol-select"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div></label>
-              <label class="pd-live-field"><span data-i18n="pd.xp">XP level</span><div class="pd-live-row"><input id="liveXp" type="number" min="0" max="2000000"><button type="button" class="btn primary sm" data-live-cmd="xp">Set</button></div></label>
-              <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.giveItem">Give item (id)</span><div class="pd-live-row"><input id="liveGiveId" placeholder="minecraft:diamond"><input id="liveGiveCount" class="pd-live-count" type="number" min="1" max="6400" value="1" data-i18n-title="pd.giveCount" title="Count" aria-label="Count"><button type="button" class="btn primary sm" data-live-cmd="give">Give</button></div></label>
-              <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.teleport">Teleport (X Y Z)</span><div class="pd-live-row"><input id="liveTp" placeholder="100 64 -200"><button type="button" class="btn primary sm" data-live-cmd="tp">Teleport</button></div></label>
-            </div>
-            <div class="pd-live-quick">
-              <button type="button" class="btn secondary sm" data-live-cmd="heal" data-i18n="pd.heal">Heal</button>
-              <button type="button" class="btn secondary sm" data-live-cmd="feed" data-i18n="pd.feed">Feed</button>
-              <button type="button" class="btn secondary sm" data-live-cmd="clear" data-i18n="pd.clearInvBtn">Clear inventory</button>
-              <button type="button" class="btn danger sm pd-live-danger" data-live-cmd="kick" data-i18n="ply.kick">Kick</button>
-            </div>
-          </div>
-        </div>
-        <div class="inspect-panel" id="pdPanelEdit">
-        <div class="inspect-note" data-i18n="pd.editNote">Stop the server before editing saved data. A backup of the original .dat is saved automatically. While the server is running, use the Live actions tab instead.</div>
-        <div class="inspect-stats"><label><span data-i18n="pd.health">Health</span><input id="pdHealth" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.food">Food</span><input id="pdFood" type="number" min="0" max="20" placeholder="0–20"></label><label><span data-i18n="pd.saturation">Saturation</span><input id="pdSaturation" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.xp">XP level</span><input id="pdXpLevel" type="number" min="0"></label><label><span data-i18n="pd.totalXp">Total XP</span><input id="pdXpTotal" type="number" min="0"></label><label><span data-i18n="pd.gamemode">Gamemode</span><select id="pdGameType" class="ol-select"><option value="0">Survival</option><option value="1">Creative</option><option value="2">Adventure</option><option value="3">Spectator</option></select></label></div>
-        <label class="inspect-check"><input id="pdClearInventory" type="checkbox"><span data-i18n="pd.clearInv">Clear inventory, armor and offhand (Ender chest untouched)</span></label>
-        <div class="pd-offline-actions"><button class="btn primary" id="savePlayerData" data-i18n="pd.apply">Apply changes</button><span class="text-muted" id="pdOfflineHint"></span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+<div id="playerInspectModal" hidden style="display:none"></div>
 <div id="onboardingModal" class="modal-overlay" hidden>
   <div class="modal glass onboarding-modal">
     <button type="button" class="modal-close" id="onboardingClose" aria-label="Close">×</button>

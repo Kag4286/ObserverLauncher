@@ -121,7 +121,7 @@ window.LOCALES.es = {
 'ply.unwhitelist':'Quitar whitelist',
 'ply.unban':'Desbanear',
 'ply.kickHint':'El jugador debe estar en línea',
-'ply.leaderboard':'Clasificación','ply.colPlayer':'Jugador','ply.colPlaytime':'Tiempo jugado','ply.colDeaths':'Muertes','ply.colMobs':'Mobs eliminados','ply.colBlocks':'Bloques picados','ply.inspectHint':'Inspeccionar datos del jugador',
+'ply.leaderboard':'Clasificación','ply.colPlayer':'Jugador','ply.colPlaytime':'Tiempo jugado','ply.colDeaths':'Muertes','ply.colMobs':'Mobs eliminados','ply.colBlocks':'Bloques picados','ply.inspectHint':'Inspeccionar datos del jugador','ply.emptyInspectTitle':'Selecciona un jugador','ply.emptyInspectSub':'Elige un jugador de la lista para ver su aspecto 3D, equipo, inventario y estadísticas.','ply.closeInspect':'Cerrar inspector',
 'ply.noDataHint':'Sin datos guardados',
 'ply.bannedBadge':'Baneado',
 'ply.stopBeforeEdit':'Detén el servidor antes de editar datos del jugador',

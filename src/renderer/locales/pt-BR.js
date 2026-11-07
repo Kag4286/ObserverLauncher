@@ -121,7 +121,7 @@ window.LOCALES['pt-BR'] = {
 'ply.unwhitelist':'Remover whitelist',
 'ply.unban':'Desbanir',
 'ply.kickHint':'O jogador precisa estar online',
-'ply.leaderboard':'Placar','ply.colPlayer':'Jogador','ply.colPlaytime':'Tempo de jogo','ply.colDeaths':'Mortes','ply.colMobs':'Mobs mortos','ply.colBlocks':'Blocos minerados','ply.inspectHint':'Inspecionar dados do jogador',
+'ply.leaderboard':'Placar','ply.colPlayer':'Jogador','ply.colPlaytime':'Tempo de jogo','ply.colDeaths':'Mortes','ply.colMobs':'Mobs mortos','ply.colBlocks':'Blocos minerados','ply.inspectHint':'Inspecionar dados do jogador','ply.emptyInspectTitle':'Selecione um jogador','ply.emptyInspectSub':'Escolha um jogador da lista para inspecionar sua skin 3D, equipamentos, inventário e estatísticas.','ply.closeInspect':'Fechar inspetor',
 'ply.noDataHint':'Sem dados salvos',
 'ply.bannedBadge':'Banido',
 'ply.stopBeforeEdit':'Pare o servidor antes de editar os dados do jogador',

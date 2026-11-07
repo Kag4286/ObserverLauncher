@@ -77,6 +77,7 @@ $('#logOutput')?.addEventListener('click',e=>{
       if(hit&&typeof hit==='object'&&hit.uuid){ uuid=hit.uuid; break; }
     }
   }catch{}
+  if(typeof switchTab==='function') switchTab('players');
   if(typeof openPlayerInspector==='function') openPlayerInspector(uuid,name);
 });
 function addLog(line){ logQueue.push(line); if(!logFlushScheduled){ logFlushScheduled=true; requestAnimationFrame(flushLogs); } }

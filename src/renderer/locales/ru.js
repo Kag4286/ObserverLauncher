@@ -121,7 +121,7 @@ window.LOCALES.ru = {
 'ply.unwhitelist':'Убрать из whitelist',
 'ply.unban':'Разбанить',
 'ply.kickHint':'Игрок должен быть онлайн',
-'ply.leaderboard':'Таблица лидеров','ply.colPlayer':'Игрок','ply.colPlaytime':'Время в игре','ply.colDeaths':'Смерти','ply.colMobs':'Убийства мобов','ply.colBlocks':'Блоков добыто','ply.inspectHint':'Просмотр данных игрока',
+'ply.leaderboard':'Таблица лидеров','ply.colPlayer':'Игрок','ply.colPlaytime':'Время в игре','ply.colDeaths':'Смерти','ply.colMobs':'Убийства мобов','ply.colBlocks':'Блоков добыто','ply.inspectHint':'Просмотр данных игрока','ply.emptyInspectTitle':'Выберите игрока','ply.emptyInspectSub':'Выберите игрока из списка для просмотра 3D-скина, снаряжения, инвентаря и статистики.','ply.closeInspect':'Закрыть инспектор',
 'ply.noDataHint':'Нет сохранённых данных',
 'ply.bannedBadge':'Забанен',
 'ply.stopBeforeEdit':'Остановите сервер перед редактированием данных игрока',
