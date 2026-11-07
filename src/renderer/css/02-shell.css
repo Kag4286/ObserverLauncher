@@ -30,15 +30,28 @@ body.beginner-mode .nav-item[data-tab="worldmap"]{display:none}
 body.beginner-mode .nav-group[data-grp="content"]{display:none}
 /* the RAM/JVM panel on Overview is advanced -> hidden for beginners */
 body.beginner-mode .ov-adv{display:none}
-.rail-showall{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px;padding:9px;border:1px dashed var(--border-strong);border-radius:var(--r-sm);background:transparent;color:var(--text-muted);font:600 12px var(--font-ui);cursor:pointer;transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast)}
-.rail-showall:hover{background:var(--panel-raised);color:var(--text);border-color:var(--brand)}
+/* Hide advanced/developer sub-panes in Settings under beginner mode */
+body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="ai"],
+body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="advanced"]{display:none}
+.rail-showall,
+.rail-showbeginner{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px;padding:9px;border:1px dashed var(--border-strong);border-radius:var(--r-sm);background:transparent;color:var(--text-muted);font:600 12px var(--font-ui);cursor:pointer;transition:background var(--dur-fast),color var(--dur-fast),border-color var(--dur-fast)}
+.rail-showall:hover,
+.rail-showbeginner:hover{background:var(--panel-raised);color:var(--text);border-color:var(--brand)}
 /* Beginner "share this address" card on Overview (shown only when running + beginner mode) */
-.beginner-share{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--brand-soft);animation:heroIn var(--dur-slow) var(--ease-out) both}
+.beginner-share{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--brand-soft);animation:heroIn var(--dur-slow) var(--ease-out) both}
+.beginner-share-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;width:100%}
 .beginner-share-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .beginner-share-text b{font:700 15px var(--font-ui);color:var(--text)}
 .beginner-share-text span{font:500 13px var(--font-ui);color:var(--text-muted)}
-.beginner-share-row{display:flex;gap:8px;align-items:center;flex:1 1 280px;min-width:0;justify-content:flex-end}
+.beginner-share-tabs{display:inline-flex;align-items:center;gap:4px;padding:3px;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--border)}
+.bshare-tab{border:none;background:transparent;color:var(--text-muted);font:600 11.5px var(--font-ui);padding:4px 10px;border-radius:calc(var(--r-sm) - 2px);cursor:pointer;transition:all var(--dur-fast) var(--ease)}
+.bshare-tab:hover{color:var(--text)}
+.bshare-tab.active{background:var(--brand);color:#fff}
+.beginner-share-row{display:flex;gap:8px;align-items:center;width:100%;min-width:0}
 .beginner-share-row input{flex:1;min-width:0;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font:600 14px var(--font-mono)}
+.beginner-share-hint{width:100%;margin-top:2px}
+.bshare-hint-btn{border:none;background:transparent;color:var(--text-muted);font:500 12px var(--font-ui);cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px;transition:color var(--dur-fast)}
+.bshare-hint-btn:hover{color:var(--brand)}
 @media (prefers-reduced-motion:reduce){.beginner-share{animation:none}}
 html.motion-lite .beginner-share{animation:none}
 .rail-nav .nav-item{width:100%;display:flex;align-items:center;gap:12px;padding:12px 12px;border:1px solid transparent;background:transparent;color:var(--text-muted);font:600 14px var(--font-ui);cursor:pointer;border-radius:var(--r-sm);text-align:left;transition:all .12s var(--ease)}

@@ -55,6 +55,9 @@
     <button type="button" class="rail-showall" id="railShowAll" hidden>
       <span aria-hidden="true">＋</span> <span data-i18n="nav.showAll">Show all tools</span>
     </button>
+    <button type="button" class="rail-showbeginner" id="railShowBeginner" hidden>
+      <span aria-hidden="true">🌿</span> <span data-i18n="nav.showBeginner">Beginner mode</span>
+    </button>
     <div class="rail-foot"></div>
     <span class="channel-indicator" id="channelIndicator" aria-hidden="true" hidden></span>
   </aside>
@@ -109,13 +112,22 @@
            server is running and beginner-mode is on. Turns the hardest beginner step (inviting
            friends) into one visible action. Hidden for everyone else. -->
       <div class="beginner-share" id="beginnerShare" hidden>
-        <div class="beginner-share-text">
-          <b data-i18n="ov.shareTitle">Your server is running!</b>
-          <span data-i18n="ov.shareSub">Send this address to your friends so they can join.</span>
+        <div class="beginner-share-top">
+          <div class="beginner-share-text">
+            <b data-i18n="ov.shareTitle">Your server is running!</b>
+            <span id="beginnerShareSub" data-i18n="ov.shareSub">Send this address to your friends so they can join.</span>
+          </div>
+          <div class="beginner-share-tabs" id="beginnerShareTabs" hidden>
+            <button type="button" class="bshare-tab active" id="bShareTabLan" data-i18n="ov.shareWifi">Same Wi-Fi</button>
+            <button type="button" class="bshare-tab" id="bShareTabTun" data-i18n="ov.shareTunnel">Internet (Tunnel)</button>
+          </div>
         </div>
         <div class="beginner-share-row">
           <input id="beginnerShareAddr" readonly value="—" aria-label="Server address">
           <button class="btn secondary" data-copy="#beginnerShareAddr" data-i18n="conn.copy">Copy</button>
+        </div>
+        <div class="beginner-share-hint" id="beginnerShareHint" hidden>
+          <button type="button" class="bshare-hint-btn" id="bShareHintBtn" data-i18n="ov.shareTunnelHint">Playing with friends over the internet? Set up tunnel ↗</button>
         </div>
       </div>
       <div class="proxy-notice ed-conflict" id="javaWarnBanner" hidden style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">

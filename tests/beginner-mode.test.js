@@ -25,6 +25,8 @@ check('obFinish persists the picked mode', /saveBeginnerMode\(obMode==='beginner
 check('create-new calls obFinish', /obCreateNew'\).onclick=async\(\)=>\{[\s\S]*?obFinish\(\)/.test(sh));
 check('onboarding has language select', /obLangSelect/.test(sh));
 check('show-all button wired', /railShowAll'\).onclick=\(\)=>saveBeginnerMode\(false\)/.test(sh));
+check('show-beginner button wired', /railShowBeginner'\).onclick=\(\)=>saveBeginnerMode\(true\)/.test(sh));
+check('refreshFromState updates connect info', /refreshFromState\(\)[\s\S]*?loadConnectInfo\(\)/.test(sh));
 
 // CSS hides the advanced tabs under body.beginner-mode
 const css = fs.readFileSync(path.join(root, 'src', 'renderer', 'css', '02-shell.css'), 'utf8');
@@ -35,13 +37,16 @@ const css = fs.readFileSync(path.join(root, 'src', 'renderer', 'css', '02-shell.
 check('CSS does NOT hide properties tab', !/body\.beginner-mode \.nav-item\[data-tab="properties"\]/.test(css));
 check('CSS hides ov-adv', /body\.beginner-mode \.ov-adv\{display:none\}/.test(css));
 check('CSS hides content group', /body\.beginner-mode \.nav-group\[data-grp="content"\]/.test(css));
+check('CSS hides AI and advanced settings in beginner mode', /body\.beginner-mode \.settings-nav \.seg-switch-btn\[data-set-view="ai"\]/.test(css));
 
 // HTML wiring
 const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
 check('HTML has beginnerModeInput', /id="beginnerModeInput"/.test(html));
 check('HTML has railShowAll', /id="railShowAll"/.test(html));
+check('HTML has railShowBeginner', /id="railShowBeginner"/.test(html));
 check('HTML has beginnerShare', /id="beginnerShare"/.test(html));
 check('HTML has beginnerShareAddr', /id="beginnerShareAddr"/.test(html));
+check('HTML has beginnerShareTabs', /id="beginnerShareTabs"/.test(html));
 check('content group has data-grp', /data-grp="content"/.test(html));
 
 console.log(`\n${pass} passed, ${fail} failed`);

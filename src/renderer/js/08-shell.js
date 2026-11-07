@@ -461,6 +461,7 @@ async function refreshFromState(){
   refreshUI();
   try{ window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{}); }catch{}
   try{ refreshTunnelUI(); }catch{}
+  try{ loadConnectInfo(); }catch{}
 }
 // F1 (3.2.5): per-instance views must be dropped when the active instance changes, or they keep
 // showing the PREVIOUS instance's data - the editor held an open file whose Save would then write
@@ -858,14 +859,57 @@ $('#showWelcomeAgain').onclick=()=>showOnboarding();
 // user look up their public IP on demand. Both are just the IP; the port is read from server.properties
 // (or the Velocity default) so the whole thing stays correct if the user changes server-port.
 let launcherPlatform='win32';
+let lastLanAddr='';
+let lastTunAddr='';
+let bShareMode='auto'; // 'lan' | 'tunnel' | 'auto'
+
+function updateBeginnerShareCard(){
+  const bs=$('#beginnerShareAddr');if(!bs)return;
+  const tunVal=(($('#tunnelManual')?.value)||'').trim();
+  const pinggyVal=(($('#pinggyAddr')?.value)||'').trim();
+  const actTun=tunVal||pinggyVal||lastTunAddr;
+  const hasTun=!!(actTun&&actTun!=='—');
+
+  const tabs=$('#beginnerShareTabs');
+  const hint=$('#beginnerShareHint');
+  const tabLan=$('#bShareTabLan');
+  const tabTun=$('#bShareTabTun');
+
+  if(hasTun){
+    if(tabs)tabs.hidden=false;
+    if(hint)hint.hidden=true;
+    const effMode=(bShareMode==='auto')?'tunnel':bShareMode;
+    if(effMode==='tunnel'){
+      bs.value=actTun;
+      if(tabTun)tabTun.classList.add('active');
+      if(tabLan)tabLan.classList.remove('active');
+    } else {
+      bs.value=lastLanAddr||t('conn.noLan');
+      if(tabLan)tabLan.classList.add('active');
+      if(tabTun)tabTun.classList.remove('active');
+    }
+  } else {
+    if(tabs)tabs.hidden=true;
+    bs.value=lastLanAddr||t('conn.noLan');
+    if(hint)hint.hidden=false;
+  }
+}
+
+$('#bShareTabLan')&&($('#bShareTabLan').onclick=()=>{bShareMode='lan';updateBeginnerShareCard()});
+$('#bShareTabTun')&&($('#bShareTabTun').onclick=()=>{bShareMode='tunnel';updateBeginnerShareCard()});
+$('#bShareHintBtn')&&($('#bShareHintBtn').onclick=()=>{
+  const cp=$('#connectPanel');if(cp)cp.open=true;
+  const tb=$('#tunnelBox');if(tb){tb.open=true;try{tb.scrollIntoView({behavior:'smooth'})}catch{}}
+});
+
 async function loadConnectInfo(){
   const r=await window.observer.networkInfo();if(!r.ok)return;
   const port=r.port;
   launcherPlatform=r.platform||'win32';
   const localAddr=r.localIps.length?r.localIps.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
   $('#connectLocal').value=localAddr;
-  // 5.2.0: mirror the LAN address into the beginner share card (first address only — one thing to copy).
-  const bs=$('#beginnerShareAddr');if(bs)bs.value=r.localIps.length?`${r.localIps[0]}:${port}`:t('conn.noLan');
+  lastLanAddr=r.localIps.length?`${r.localIps[0]}:${port}`:t('conn.noLan');
+  updateBeginnerShareCard();
   $('#allowFirewall').dataset.port=port;
   // Linux cannot auto-open the firewall without sudo; relabel the button so it copies the command.
   const fw=$('#allowFirewall'); if(fw){ fw.textContent = launcherPlatform==='linux' ? t('conn.copyFwCmd') : t('conn.firewall'); }
@@ -883,7 +927,8 @@ function applyPinggyStatus(s){s=s||{};const pill=$('#pinggyPill'),start=$('#ping
   if(pill){pill.textContent=st==='running'?t('pg.running'):st==='starting'?t('pg.starting'):st==='error'?t('pg.error'):t('pg.off');pill.className='tunnel-pill '+(st==='running'?'running':st==='error'?'error':'')}
   if(start){start.hidden=st==='running'||st==='starting';start.disabled=st==='starting'}
   if(stop)stop.hidden=!(st==='running'||st==='starting')
-  if(s.address){if(addr)addr.value=s.address;if(row)row.hidden=false;if(copy)copy.hidden=false;if(hint)hint.textContent=t('pg.shareHint')}else{if(row)row.hidden=true;if(copy)copy.hidden=true}
+  if(s.address){if(addr)addr.value=s.address;if(row)row.hidden=false;if(copy)copy.hidden=false;if(hint)hint.textContent=t('pg.shareHint');lastTunAddr=s.address;}else{if(row)row.hidden=true;if(copy)copy.hidden=true}
+  updateBeginnerShareCard();
   if(msg){if(st==='error'){msg.hidden=false;msg.textContent=s.error||t('pg.startFail')}else{msg.hidden=true;msg.textContent=''}}
 }
 $('#pinggyStartBtn')?.addEventListener('click',()=>withBusy($('#pinggyStartBtn'),async()=>{const r=await window.observer.pinggyStart('udp');if(!r||!r.ok)return toast((r&&r.error)||t('pg.startFail'),'error');toast(t('pg.started'),'success');applyPinggyStatus({status:'running',address:r.address})}));
@@ -922,7 +967,9 @@ async function refreshTunnelUI(){try{const s=await window.observer.tunnelGet();a
 function applyTunnelStatus(s){const pill=$('#tunnelPill'),startBtn=$('#tunnelStart'),msg=$('#tunnelMsg');if(!pill)return;
   const st=s?.status||'stopped';pill.textContent=st==='running'?t('tun.live'):st==='installing'?t('tun.installing'):st==='starting'?t('tun.starting'):st==='error'?t('tun.error'):t('tun.off');pill.className='tunnel-pill '+st;
   if(startBtn)startBtn.disabled=st==='installing'||st==='starting';
-  if(msg){if(st==='installing'){msg.hidden=false;msg.textContent=t('tun.downloading')}else if(st==='error'){msg.hidden=false;msg.textContent=t('tun.serviceError')}else{msg.hidden=true;msg.textContent=''}}}
+  if(msg){if(st==='installing'){msg.hidden=false;msg.textContent=t('tun.downloading')}else if(st==='error'){msg.hidden=false;msg.textContent=t('tun.serviceError')}else{msg.hidden=true;msg.textContent=''}}
+  if(s?.address)lastTunAddr=s.address;
+  updateBeginnerShareCard();}
 window.observer.onTunnelStatus(applyTunnelStatus);
 refreshTunnelUI();
 setInterval(()=>{ try{ const tBox=$('#tunnelBox'), ov=$('#overview'); if((tBox && tBox.open) || (ov && ov.classList.contains('active'))) refreshTunnelUI(); }catch{} }, 15000);
@@ -983,14 +1030,21 @@ $('#javaAutoInstall').onclick=async()=>{
 // existing server folder, or skip to explore on your own. Doesn't ask again once completed
 // (settings.onboarded).
 let showOnboarding=function(){const m=$('#onboardingModal');m.hidden=false;trapFocus(m)};
-function hideOnboarding(){const m=$('#onboardingModal');if(m.hidden)return;releaseFocus();m.hidden=true}
+async function hideOnboarding(){
+  const m=$('#onboardingModal');if(m.hidden)return;
+  if(!state.settings?.onboarded||$('#onboardingDontShow')?.checked){
+    await saveBeginnerMode(obMode==='beginner');
+    await markOnboarded();
+  }
+  releaseFocus();m.hidden=true;
+}
 async function markOnboarded(){await window.observer.onboardingComplete();state.settings={...state.settings,onboarded:true}}
 // BUGFIX: this modal had no way to dismiss it besides picking one of the 3 onboarding choices — fine
 // on a genuinely first run, but "Show welcome guide again" (Settings) reopens this same modal on an
 // ALREADY-configured install, and there was no way back out except re-running one of those 3 actions.
 // A close (×) button, Escape, and clicking the dimmed backdrop now all dismiss any open modal — added
 // once, generically, so this can't quietly happen again for a future modal either.
-$('#onboardingClose').onclick=()=>hideOnboarding();
+$('#onboardingClose').onclick=async()=>{await hideOnboarding()};
 // 5.2.0 onboarding: an explicit mode picker (Beginner / Advanced) + a language dropdown at the top.
 // The MODE chosen drives the app layout; the ACTION card below only decides what happens next. So
 // "Explore on my own" as a Beginner still turns Beginner mode on (the user picked that mode).
@@ -1019,7 +1073,8 @@ $('#obLangSelect')&&($('#obLangSelect').onchange=async e=>{
 async function obFinish(){
   fillObLanguages();
   await saveBeginnerMode(obMode==='beginner');
-  hideOnboarding();await markOnboarded();
+  await markOnboarded();
+  const m=$('#onboardingModal');if(!m.hidden){releaseFocus();m.hidden=true;}
 }
 $('#obSkip').onclick=async()=>{await obFinish()};
 $('#obPickExisting').onclick=async()=>{await obFinish();await addExistingInstance()};
@@ -1040,9 +1095,20 @@ function applyBeginnerMode(on){
   const on_=!!on;
   document.body.classList.toggle('beginner-mode',on_);
   // Never leave the user stranded on a tab that just got hidden.
-  if(on_){const cur=document.querySelector('.tab.active');if(cur&&!BEGINNER_TABS.has(cur.id))switchTab('overview')}
+  if(on_){
+    const cur=document.querySelector('.tab.active');if(cur&&!BEGINNER_TABS.has(cur.id))switchTab('overview');
+    const curPane=document.querySelector('.set-pane:not([hidden])');
+    if(curPane&&(curPane.dataset.setPane==='ai'||curPane.dataset.setPane==='advanced')){
+      const setupBtn=document.querySelector('.settings-nav .seg-switch-btn[data-set-view="setup"]');
+      if(setupBtn)setupBtn.click();
+    }
+  }
   const sa=$('#railShowAll');if(sa)sa.hidden=!on_;
-  const share=$('#beginnerShare');if(share)share.hidden=!(on_&&state.running);
+  const sb=$('#railShowBeginner');if(sb)sb.hidden=on_;
+  const share=$('#beginnerShare');if(share){
+    share.hidden=!(on_&&state.running);
+    if(on_&&state.running)updateBeginnerShareCard();
+  }
 }
 async function saveBeginnerMode(on){
   let r;try{r=await window.observer.saveSettings({...getSettings(),beginnerMode:!!on});}catch{return false}
@@ -1053,6 +1119,7 @@ async function saveBeginnerMode(on){
 }
 // "Show all tools" is a QUICK ESCAPE (not a settings form field): apply + persist immediately.
 $('#railShowAll')&&($('#railShowAll').onclick=()=>saveBeginnerMode(false));
+$('#railShowBeginner')&&($('#railShowBeginner').onclick=()=>saveBeginnerMode(true));
 // The Settings toggle follows the normal edit -> Apply flow: changing it only marks the form dirty
 // (the section-level input/change listener in 07-overview.js does that). It is actually applied when
 // the user clicks "Apply settings", which calls refreshUI() -> applyBeginnerMode(state.settings...).
