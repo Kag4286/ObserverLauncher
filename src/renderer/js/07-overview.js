@@ -430,7 +430,7 @@ function updatePromStatus(){
   else { pl.textContent=live.enabled?t('prom.notRunning'):t('prom.pendingSave'); if(copyBtn)copyBtn.hidden=true; }
 }
 $('#prometheusEnabledInput')?.addEventListener('change',updatePromStatus);
-$('#prometheusPortInput')?.addEventListener('input',updatePromStatus);
+$('#prometheusPortInput')?.addEventListener('input',updatePromStatus); $('#worldmapCheatModeInput')?.addEventListener('change',async()=>{const on=!!$('#worldmapCheatModeInput').checked;if(!state.settings)state.settings={};state.settings.worldmapCheatMode=on;if(typeof wmSyncCheatMode==='function')wmSyncCheatMode();try{const next={...getSettings(),worldmapCheatMode:on};const r=await window.observer.saveSettings(next);if(r&&r.ok){state={...state,settings:r.settings||next};markSettingsSaved();}}catch{}});
 $('#promCopyUrl')?.addEventListener('click',()=>{const p=$('#promCopyUrl')?.dataset.port;if(!p)return;const url=`http://127.0.0.1:${p}/metrics`;try{navigator.clipboard.writeText(url);toast(t('prom.copied'));}catch{}});
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
 function markSettingsSaved(){settingsDirty=false;try{_settingsBaseline=JSON.stringify(getSettings())}catch{}updateApplyDirty()}

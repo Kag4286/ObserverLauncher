@@ -293,7 +293,7 @@ function biomeColor(id) {
 const WM_BIOME_MAX_CHUNKS = 1600;
 const WM_BIOME_MIN_ZOOM = 0.06;
 const WM_LABEL_MIN_ZOOM = 0.15;
-const WM_BIOME_CACHE_MAX = 6000;
+const WM_BIOME_CACHE_MAX = 2000;
 
 function wmSetBiome(ck, row, dim) {
   lruSet(wm.biomes, (dim || wm.dim) + ':' + ck, row, WM_BIOME_CACHE_MAX);
@@ -405,7 +405,7 @@ const WM_COLORS = ['#FF3B5C', '#00E5FF', '#FFD23F', '#00E5A0', '#C792EA', '#FF8C
 
 // ============ 60 FPS GPU-ACCELERATED TILE BITMAP CACHE ============
 const WM_TILE_BLOCKS = 256; // 16 chunks = 256 blocks per tile
-const WM_TILE_CACHE_MAX = 120;
+const WM_TILE_CACHE_MAX = 36;
 const wmTileCache = new Map();
 
 function wmGetTile(tx, tz) {
@@ -458,11 +458,12 @@ function wmGetTile(tx, tz) {
 function wmShow(view) { $('#wmNoWorld').hidden = view !== 'none'; $('#wmApp').hidden = view !== 'app'; }
 
 function wmSyncCheatMode() {
-  const isCheat = !!(window.state?.settings?.worldmapCheatMode);
+  const curState = (typeof state !== 'undefined' ? state : window.state) || {};
+  const isCheat = !!(curState.settings && curState.settings.worldmapCheatMode);
   wm.cheatMode = isCheat;
   const cheatElements = [$('#wmSlime'), $('#wmStructures'), $('#wmNetherLink'), $('#wmSliceCtrl')];
   for (const el of cheatElements) {
-    if (el) el.hidden = !isCheat;
+    if (el) { el.hidden = !isCheat; el.style.display = isCheat ? '' : 'none'; }
   }
   if (!isCheat) {
     wm.layers.slime = false;
@@ -552,6 +553,9 @@ function wmVisible() {
 }
 
 function wmClearCaches() {
+  for (const cv of wmTileCache.values()) {
+    try { cv.width = 0; cv.height = 0; } catch {}
+  }
   wm.biomes.clear();
   wmColorCache.clear();
   wmTileCache.clear();
@@ -863,7 +867,11 @@ function wmDraw() {
 
     ctx.fillStyle = 'rgba(232, 244, 248, 0.85)';
     ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(t('wm.emptyChunksSub'), W / 2, cardY + 42);
+    const curState = (typeof state !== 'undefined' ? state : window.state) || {};
+    const f = curState.files || {};
+    const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
+    const emptySub = isPumpkin ? t('wm.emptyChunksSubPumpkin') : t('wm.emptyChunksSub');
+    ctx.fillText(emptySub, W / 2, cardY + 42);
 
     ctx.fillStyle = 'rgba(184, 194, 204, 0.7)';
     ctx.font = '11px system-ui, -apple-system, sans-serif';

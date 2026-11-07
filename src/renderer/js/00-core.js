@@ -71,6 +71,7 @@ document.querySelectorAll('.kpi-help').forEach(h=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeKpiTip()});
 window.addEventListener('resize',closeKpiTip);
 let state = { settings:{serverPath:'',javaPath:'',memoryMin:2,memoryMax:6,autoEula:true}, files:{plugins:[],mods:[],datapacks:[],worlds:[],backups:[],properties:{}}, running:false, live:{players:[]} };
+try { window.state = state; window.getState = () => state; } catch {}
 let samples = Array.from({length:38},()=>({tps:null,mspt:null,cpu:null,ram:null}));
 // v5.3.0: Performance range selector. `samples` stays the 38-point ring that feeds the sparkline and
 // the 15m view. `samplesLong` is a client-side 10s-resolution ring (seeded from state.metricsLong) so
@@ -220,7 +221,7 @@ async function withBusy(btn, fn){
 function rafCoalesce(fn){ let pending=0; return function(){ if(pending)return; pending=requestAnimationFrame(()=>{ pending=0; fn(); }); }; }
 // CORE (3.2.5): insert into a Map and evict the oldest entry (FIFO) once it exceeds max. Shared by the
 // world map's colour/biome/explored caches so the eviction rule cannot drift between them.
-function lruSet(map,key,val,max){ map.set(key,val); if(map.size>max)map.delete(map.keys().next().value); return map; }
+function lruSet(map,key,val,max){ map.set(key,val); if(map.size>max){ const k=map.keys().next().value; const v=map.get(k); if(v&&typeof v==='object'&&'width' in v&&typeof v.getContext==='function'){ try{v.width=0;v.height=0}catch{} } map.delete(k); } return map; }
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 function focusablesIn(root){ return [...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetParent!==null||el===document.activeElement); }
 let _trapRoot=null,_trapPrev=null;

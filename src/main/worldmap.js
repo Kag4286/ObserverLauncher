@@ -163,7 +163,7 @@ function getRegionDirs(root, levelName, dim) {
 // offset, so when the world is small enough we also read each chunk's NBT and keep only those
 // with Status 'minecraft:full' (or 'full' in 1.16.5). Above FULL_SCAN_BUDGET chunks we skip the per-chunk parse (it
 // would block the main process for seconds) and fall back to the header-only approximation.
-const FULL_SCAN_BUDGET = 3000;
+const FULL_SCAN_BUDGET = 800;
 // W5 (3.2.5): scanExploredChunks is called SYNCHRONOUSLY from an IPC handler, and the live-refresh
 // re-runs it every 45s. Reading + NBT-parsing every region file each time blocked the main process
 // on big worlds. Cache the result keyed by a cheap signature (region file names + mtime + size): if
@@ -223,17 +223,33 @@ function scanExploredChunks(root, levelName, dim) {
     return chunks;
   }
   // Small enough: verify each chunk actually finished generating.
-  for (const [cx, cz, fp, off] of present) {
-    const nbtData = readChunkNbtSync(fp, off);
-    const st = nbtData && nbtData.Status ? String(nbtData.Status).replace(/^minecraft:/, '') : null;
-    const isHorizon = fs.existsSync(path.join(root, 'server.toml'))
-      || fs.existsSync(path.join(root, 'horizon-server.exe'))
-      || fs.existsSync(path.join(root, 'horizon-server'))
-      || fs.existsSync(path.join(root, String(levelName || 'world').replace(/[\\/]/g, '') || 'world', 'dimensions', 'minecraft', 'overworld', 'region'));
-    const isFinished = isHorizon
-      ? (VALID_GENERATED_STATUSES.has(st) || st === null)
-      : (st === 'full' || st === 'postprocessed' || st === null);
-    if (!nbtData || isFinished) chunks.add(cx + ',' + cz);
+  const isHorizon = fs.existsSync(path.join(root, 'server.toml'))
+    || fs.existsSync(path.join(root, 'horizon-server.exe'))
+    || fs.existsSync(path.join(root, 'horizon-server'))
+    || fs.existsSync(path.join(root, String(levelName || 'world').replace(/[\\/]/g, '') || 'world', 'dimensions', 'minecraft', 'overworld', 'region'));
+  const byFile = new Map();
+  for (const item of present) {
+    let list = byFile.get(item[2]);
+    if (!list) { list = []; byFile.set(item[2], list); }
+    list.push(item);
+  }
+  for (const [fp, items] of byFile) {
+    let fd;
+    try {
+      fd = fs.openSync(fp, 'r');
+      for (const [cx, cz, , off] of items) {
+        const nbtData = readChunkNbtSyncFd(fd, off);
+        const st = nbtData && nbtData.Status ? String(nbtData.Status).replace(/^minecraft:/, '') : null;
+        const isFinished = isHorizon
+          ? (VALID_GENERATED_STATUSES.has(st) || st === null)
+          : (st === 'full' || st === 'postprocessed' || st === null);
+        if (!nbtData || isFinished) chunks.add(cx + ',' + cz);
+      }
+    } catch {
+      for (const [cx, cz] of items) chunks.add(cx + ',' + cz);
+    } finally {
+      try { if (fd) fs.closeSync(fd); } catch {}
+    }
   }
   lruSet(exploredCache, cacheKey, { sig, chunks }, 8);
   return chunks;
@@ -310,10 +326,8 @@ function decompressLz4(comp) {
   return comp;
 }
 
-function readChunkRaw(fp, sectorOff) {
-  let fd;
+function readChunkRawFd(fd, sectorOff) {
   try {
-    fd = fs.openSync(fp, 'r');
     const head = Buffer.alloc(5);
     fs.readSync(fd, head, 0, 5, sectorOff * 4096);
     const len = head.readUInt32BE(0), ct = head.readUInt8(4);
@@ -324,17 +338,20 @@ function readChunkRaw(fp, sectorOff) {
     if (ct === 2) return zlib.inflateSync(comp);
     if (ct === 4) return decompressLz4(comp);
     return comp;
+  } catch { return null; }
+}
+
+function readChunkRaw(fp, sectorOff) {
+  let fd;
+  try {
+    fd = fs.openSync(fp, 'r');
+    return readChunkRawFd(fd, sectorOff);
   } catch { return null; } finally { try { if (fd) fs.closeSync(fd); } catch {} }
 }
 
-// Synchronous twin of readChunkNbt — needed because scanExploredChunks is sync (its IPC handler
-// and the wiring test both call it without awaiting). Returns null when the chunk is unreadable.
-// Handles 1.18+ root Status, 1.16/1.13 Level.Status, and 1.12.2- Level.TerrainPopulated.
-function readChunkNbtSync(fp, sectorOff) {
-  const raw = readChunkRaw(fp, sectorOff);
+function readChunkNbtSyncFd(fd, sectorOff) {
+  const raw = readChunkRawFd(fd, sectorOff);
   if (!raw) return null;
-  // We only need the Status tag. nbt.parse is async, so it is useless inside this sync function —
-  // use parseUncompressed (synchronous) instead. Java-edition chunks are big-endian.
   let parsed;
   try { parsed = nbt.parseUncompressed(raw); }
   catch { try { parsed = nbt.parseUncompressed(raw, 'little'); } catch { return null; } }
@@ -350,6 +367,17 @@ function readChunkNbtSync(fp, sectorOff) {
     }
   }
   return { Status: status };
+}
+
+// Synchronous twin of readChunkNbt — needed because scanExploredChunks is sync (its IPC handler
+// and the wiring test both call it without awaiting). Returns null when the chunk is unreadable.
+// Handles 1.18+ root Status, 1.16/1.13 Level.Status, and 1.12.2- Level.TerrainPopulated.
+function readChunkNbtSync(fp, sectorOff) {
+  let fd;
+  try {
+    fd = fs.openSync(fp, 'r');
+    return readChunkNbtSyncFd(fd, sectorOff);
+  } catch { return null; } finally { try { if (fd) fs.closeSync(fd); } catch {} }
 }
 
 // ============ REAL BIOME PREVIEW (1.18+ paletted containers & 1.16 Level biomes) ============

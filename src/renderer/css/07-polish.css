@@ -187,6 +187,7 @@ html.motion-lite .ol-tip{animation:none}
 .wm-hud-metric{font-family:var(--font-mono);font-size:11px;color:var(--brand)}
 .wm-hud-tip{color:var(--text-muted);font-size:11px}
 .wm-slice-ctrl{display:inline-flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:2px 8px}
+.wm-slice-ctrl[hidden]{display:none!important}
 .wm-slice-badge{font:600 11px var(--font-mono);color:var(--text);min-width:76px;white-space:nowrap}
 .wm-slice-slider{width:80px;height:4px;accent-color:var(--brand);cursor:pointer}
 #worldmap.wm-fullscreen{position:fixed;inset:0;z-index:900;background:var(--bg);margin:0;padding:12px;overflow:hidden;border-radius:0}

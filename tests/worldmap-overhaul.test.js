@@ -86,8 +86,8 @@ test('extractStructureStarts extracts valid structures and ignores INVALID', () 
 
 // 4. Cheat mode default setting
 test('worldmapCheatMode defaults to false (fair survival mode)', () => {
-  const { loadSettingsStore } = require('../src/main/settings.js');
-  const s = loadSettingsStore();
+  const { defaultGlobal } = require('../src/main/settings.js');
+  const s = defaultGlobal();
   assert.strictEqual(s.worldmapCheatMode, false);
 });
 
