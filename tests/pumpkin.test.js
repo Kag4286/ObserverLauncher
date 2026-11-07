@@ -119,6 +119,26 @@ function ck(name, condition) {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 
+  // 5. Pumpkin World Map & LZ4 chunk decoding
+  const { decompressLz4, readBiomes } = require('../src/main/worldmap.js');
+  const dummyStr = 'Hello Pumpkin World Map!';
+  const dummyBuf = Buffer.from(dummyStr, 'utf8');
+  const lz4Header = Buffer.alloc(21);
+  lz4Header.write('LZ4Block', 0, 8, 'ascii');
+  lz4Header.writeUInt8(0x10, 8); // raw uncompressed
+  lz4Header.writeUInt32LE(dummyBuf.length, 9);
+  lz4Header.writeUInt32LE(dummyBuf.length, 13);
+  lz4Header.writeUInt32LE(0, 17);
+  const syntheticStream = Buffer.concat([lz4Header, dummyBuf]);
+  const decompressedRaw = decompressLz4(syntheticStream);
+  ck('decompressLz4 extracts uncompressed block', decompressedRaw.toString('utf8') === dummyStr);
+
+  const livePumpkin = 'C:\\Users\\PC\\Downloads\\PumpkinMC';
+  if (fs.existsSync(path.join(livePumpkin, 'world', 'dimensions', 'minecraft', 'overworld', 'region'))) {
+    const liveBiomes = await readBiomes(livePumpkin, 'world', 'overworld', { cx0: -5, cz0: 100, cx1: 5, cz1: 110 });
+    ck('readBiomes successfully parses live Pumpkin LZ4 chunks', Array.isArray(liveBiomes.biomes) && liveBiomes.biomes.length > 0);
+  }
+
   console.log(`\n${pass} passed, 0 failed`);
 })().catch(err => {
   console.error(err);

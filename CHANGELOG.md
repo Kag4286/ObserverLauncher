@@ -33,8 +33,12 @@ All notable changes to ObserverLauncher are documented here. Format follows
   - Enhanced `applyLocale()` and `refreshUI()` to dynamically update native engine headings and notice text to distinguish Pumpkin from Horizon Dedicated Server.
   - Updated `isNatSave` in `08-shell.js` to recognize Pumpkin instances, bypassing inappropriate Java heap allocation checks when saving settings.
   - Dynamically updates the native server notice banner in the Content tab (`#contentNativeNoticeText`) to explain Pumpkin's native architecture.
+  - Polished Content tab UX for native engines: automatically hides the Java-only `Mods` subtab and `Modpack tools` when inspecting native servers. Replaced inappropriate prompts to install Java plugins (EssentialsX, LuckPerms, Vault) or import `.jar` files with clean empty-state guidance and a direct `[Open plugins folder ↗]` action button.
   - Added localized strings across all 7 supported languages (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
 - **World Map & Chunk Cartography Hardening (`src/main/worldmap.js`, `src/main/pumpkin-config.js`, `src/main/gamerules.js`, `src/renderer/js/02-worldmap.js`):**
+  - Resolved `PartialReadError: Read error for undefined: Missing characters in string` and infinite `loading biomes…` hang on Pumpkin worlds by implementing a pure JavaScript decompressor for Minecraft Anvil compression algorithm 4 (`LZ4Block` container format used by `lz4-java` and Pumpkin).
+  - Integrated LZ4 decompression directly into `readChunkRaw` and `readChunkNbtSync`, enabling seamless chunk NBT parsing for all explored Pumpkin chunks.
+  - Wrapped `readChunkNbt` in safe `try/catch` handlers inside `readBiomes` so unreadable or corrupt chunks never crash viewport queries or lock the UI in endless retry loops.
   - Configured default chunk format to standard Minecraft Anvil (`[world.chunk] type = "anvil"`), ensuring `.mca` files are generated in `world/dimensions/minecraft/overworld/region` for map terrain and biome visualization.
   - Enhanced `longToBigInt` using `BigInt.asIntN(64, ...)` to ensure signed 64-bit seed strings match `Pumpkin.toml` and vanilla seeds.
   - Added fallback in `readGameRules` to read modern 26.x/Pumpkin game rules from `world/data/minecraft/game_rules.dat`.

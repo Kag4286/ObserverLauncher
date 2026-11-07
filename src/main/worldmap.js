@@ -233,6 +233,73 @@ function scanExploredChunks(root, levelName, dim) {
 // Opens + closes its own fd. Returns the raw NBT buffer, or null when the chunk is missing or
 // unreadable. Shared by the sync and async readers so the header parse and the compression branch
 // cannot drift apart (gotcha #20).
+function readLz4VarLen(src, cur, initial) {
+  let len = initial;
+  if ((initial & 15) === 15 || initial === 19) {
+    while (cur.pos < src.length) {
+      const b = src[cur.pos++];
+      len += b;
+      if (b !== 255) break;
+    }
+  }
+  return len;
+}
+
+function decompressLz4Block(src, uncompressedSize) {
+  const dst = Buffer.alloc(uncompressedSize);
+  const cur = { pos: 0 };
+  let dstPos = 0;
+  while (cur.pos < src.length && dstPos < uncompressedSize) {
+    const token = src[cur.pos++];
+    const literalLen = readLz4VarLen(src, cur, token >> 4);
+    const copyLen = Math.min(literalLen, src.length - cur.pos, uncompressedSize - dstPos);
+    src.copy(dst, dstPos, cur.pos, cur.pos + copyLen);
+    cur.pos += literalLen;
+    dstPos += copyLen;
+
+    if (cur.pos >= src.length || dstPos >= uncompressedSize) break;
+
+    const offset = src.readUInt16LE(cur.pos);
+    cur.pos += 2;
+    if (offset === 0) break;
+
+    const matchLen = readLz4VarLen(src, cur, (token & 0x0F) + 4);
+    let matchSrc = dstPos - offset;
+    for (let i = 0; i < matchLen && dstPos < uncompressedSize; i++) {
+      dst[dstPos++] = dst[matchSrc++];
+    }
+  }
+  return dst.slice(0, dstPos);
+}
+
+function decompressLz4(comp) {
+  if (comp.length >= 21 && comp.slice(0, 8).toString('ascii') === 'LZ4Block') {
+    const chunks = [];
+    let pos = 0;
+    while (pos + 21 <= comp.length) {
+      if (comp.slice(pos, pos + 8).toString('ascii') !== 'LZ4Block') break;
+      const token = comp[pos + 8];
+      const method = token & 0xF0;
+      const compLen = comp.readUInt32LE(pos + 9);
+      const decompLen = comp.readUInt32LE(pos + 13);
+      pos += 21;
+      if (compLen === 0 && decompLen === 0) break;
+      if (pos + compLen > comp.length) break;
+      const slice = comp.slice(pos, pos + compLen);
+      pos += compLen;
+      if (method === 0x10) {
+        chunks.push(slice);
+      } else if (method === 0x20) {
+        chunks.push(decompressLz4Block(slice, decompLen));
+      } else {
+        chunks.push(slice);
+      }
+    }
+    return chunks.length === 1 ? chunks[0] : Buffer.concat(chunks);
+  }
+  return comp;
+}
+
 function readChunkRaw(fp, sectorOff) {
   let fd;
   try {
@@ -243,7 +310,10 @@ function readChunkRaw(fp, sectorOff) {
     if (len <= 0) return null;
     const comp = Buffer.alloc(len - 1);
     fs.readSync(fd, comp, 0, len - 1, sectorOff * 4096 + 5);
-    return ct === 1 ? zlib.gunzipSync(comp) : ct === 2 ? zlib.inflateSync(comp) : comp;
+    if (ct === 1) return zlib.gunzipSync(comp);
+    if (ct === 2) return zlib.inflateSync(comp);
+    if (ct === 4) return decompressLz4(comp);
+    return comp;
   } catch { return null; } finally { try { if (fd) fs.closeSync(fd); } catch {} }
 }
 
@@ -398,10 +468,15 @@ function biomeGridFromSection(sec) {
   }
   return grid;
 }
-function readChunkNbt(fp, sectorOff) {
+async function readChunkNbt(fp, sectorOff) {
   const raw = readChunkRaw(fp, sectorOff);
   if (!raw) return null;
-  return nbt.parse(raw).then(p => nbt.simplify(p.parsed));
+  try {
+    const p = await nbt.parse(raw);
+    return nbt.simplify(p.parsed);
+  } catch {
+    return null;
+  }
 }
 
 // ============ 1.16 / 1.15 / LEGACY CHUNK & BIOME SUPPORT ============
@@ -856,7 +931,8 @@ async function readBiomes(root, levelName, dim, rect) {
           if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
           const ck = cx + ',' + cz;
           if (entry.chunks.has(ck)) { const rec = entry.chunks.get(ck); if (rec) { const row = [cx, cz, rec.b]; if (rec.h) { row.push(rec.h, rec.w, rec.g || null, rec.s || null); } out.push(row); } continue; }
-          const nbtData = await readChunkNbt(fp, v >>> 8);
+          let nbtData;
+          try { nbtData = await readChunkNbt(fp, v >>> 8); } catch { nbtData = null; }
           // BUGFIX (3.2.5): only a FULLY generated chunk carries real biome data. An early-stage chunk
           // (status 'minecraft:structure_starts' or similar) still ships a PLACEHOLDER biome palette
           // (minecraft:plains) that was read as if real - so The End rendered with overworld colours.
@@ -913,4 +989,4 @@ function listDimensions(root, levelName) {
   return out;
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry };
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry, decompressLz4Block, decompressLz4, readChunkRaw };

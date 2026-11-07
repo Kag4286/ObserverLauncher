@@ -126,15 +126,30 @@ function jumpToMarket(kind){
 }
 // Show only the list for `kind`, re-point the toolbar import/open/market buttons, and re-apply filter.
 function setContentKind(kind){
+  const f = (window.state && window.state.files) || {};
+  const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
+  if (isNat && kind === 'mod') kind = 'plugin';
   contentKind=kind;
   $$('#contentSeg .seg').forEach(b=>b.classList.toggle('active',b.dataset.ckind===kind));
   $('#pluginsList').hidden=kind!=='plugin';
   $('#modsList').hidden=kind!=='mod';
   $('#datapacksList').hidden=kind!=='datapack';
   const imp=$('#contentImport'),open=$('#contentOpen'),mkt=$('#contentMarket');
-  if(imp){imp.dataset.import=kind;imp.textContent=t(kind==='datapack'?'cnt.importZip':'cnt.importJar')}
+  if(imp){
+    if(isNat && kind === 'plugin'){
+      imp.textContent=t('cnt.openPluginsFolder')+' ↗';
+      imp.onclick=()=>window.observer.openFiles('plugins');
+    } else {
+      imp.onclick=null;
+      imp.dataset.import=kind;
+      imp.textContent=t(kind==='datapack'?'cnt.importZip':'cnt.importJar');
+    }
+  }
   if(open)open.dataset.open=CONTENT_META[kind].folder;
-  if(mkt)mkt.dataset.marketJump=kind;
+  if(mkt){
+    mkt.dataset.marketJump=kind;
+    mkt.hidden = isNat && kind === 'plugin';
+  }
   // v6.0.0 C5c: the load-order panel is datapack-only. Hide it elsewhere so it cannot be confused
   // with the mod/plugin lists.
   const dpBox=$('#dpOrderBox'); if(dpBox) dpBox.hidden=kind!=='datapack';
@@ -220,6 +235,11 @@ function cleanModTitle(fileName, metaName) {
 
 function syncContentKindAuto() {
   const f = state.files || {};
+  const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
+  if (isNat) {
+    if (contentKind === 'mod') setContentKind('plugin');
+    return;
+  }
   const pCount = (f.plugins || []).length;
   const mCount = (f.mods || []).length;
   const dCount = (f.datapacks || []).length;
@@ -311,8 +331,21 @@ async function jumpToModConfig(fileName, kind) {
 }
 
 function updateContentToolbarState() {
-  const kind = contentKind || 'plugin';
   const f = state.files || {};
+  const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
+  const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
+
+  const modSegBtn = $('[data-ckind="mod"]');
+  if (modSegBtn) modSegBtn.hidden = isNat;
+
+  const mpTools = $('#modpackTools');
+  if (mpTools) mpTools.hidden = isNat;
+
+  if (isNat && contentKind === 'mod') {
+    setContentKind('plugin');
+  }
+
+  const kind = contentKind || 'plugin';
   const files = (kind === 'plugin' ? f.plugins : kind === 'mod' ? f.mods : f.datapacks) || [];
   const total = files.length;
   const enabled = files.filter(x => !/\.disabled$/i.test(x)).length;
@@ -347,13 +380,27 @@ function updateContentToolbarState() {
 
   const cnn = $('#contentNativeNotice');
   if (cnn) {
-    const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
     cnn.hidden = !isNat;
     if (isNat) {
-      const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
       const cnnText = $('#contentNativeNoticeText');
       if (cnnText) cnnText.textContent = isPumpkin ? t('cnt.nativeNoticePumpkin') : t('cnt.nativeNotice');
     }
+  }
+
+  const imp = $('#contentImport'), mkt = $('#contentMarket');
+  if (isNat && kind === 'plugin') {
+    if (imp) {
+      imp.textContent = t('cnt.openPluginsFolder') + ' ↗';
+      imp.onclick = () => window.observer.openFiles('plugins');
+    }
+    if (mkt) mkt.hidden = true;
+  } else {
+    if (imp) {
+      imp.onclick = null;
+      imp.dataset.import = kind;
+      imp.textContent = t(kind === 'datapack' ? 'cnt.importZip' : 'cnt.importJar');
+    }
+    if (mkt) mkt.hidden = false;
   }
 }
 
@@ -408,21 +455,32 @@ function renderFiles(id, files, kind) {
   if (!node) return;
   if (!files.length) {
     node._renderedHtml = '';
-    const [tk, sk] = CONTENT_HINTS[kind] || ['cnt.emptyPT', 'cnt.emptyPS'];
-    const importLabel = kind === 'datapack' ? t('cnt.importZip') : t('cnt.importJar');
-    node.innerHTML = `<li class="empty"><div><b>${esc(t(tk))}</b><span>${esc(t(sk))}</span></div><div class="empty-actions"><button class="btn sm primary" data-empty-import="${esc(kind)}">${esc(importLabel)}</button><button class="text-btn" data-market-jump="${esc(kind)}">${esc(t('cnt.market'))}</button></div></li>`;
-    if (kind) {
-      node.querySelectorAll('[data-empty-import]').forEach(b => b.onclick = async () => {
-        if (state.running && !await confirmDialog({ title: t('cnt.importJar'), body: t('cnt.confirmRunningImport'), ok: t('cnt.import') })) return;
-        window.observer.importContent(kind).then(r => {
-          if (r.ok) {
-            state.files = r.files;
-            refreshUI();
-            toast(t('toast.imported'), 'success');
-          } else if (!r.cancelled) toast(r.error, 'error');
+    const f = state.files || {};
+    const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
+    const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
+
+    if (isNat && kind === 'plugin') {
+      const tk = 'cnt.emptyNativePT';
+      const sk = isPumpkin ? 'cnt.emptyPumpkinPS' : 'cnt.emptyHorizonPS';
+      node.innerHTML = `<li class="empty"><div><b>${esc(t(tk))}</b><span>${esc(t(sk))}</span></div><div class="empty-actions"><button type="button" class="btn sm secondary" data-open="plugins">${esc(t('cnt.openPluginsFolder'))} ↗</button></div></li>`;
+      node.querySelectorAll('[data-open="plugins"]').forEach(b => b.onclick = () => window.observer.openFiles('plugins'));
+    } else {
+      const [tk, sk] = CONTENT_HINTS[kind] || ['cnt.emptyPT', 'cnt.emptyPS'];
+      const importLabel = kind === 'datapack' ? t('cnt.importZip') : t('cnt.importJar');
+      node.innerHTML = `<li class="empty"><div><b>${esc(t(tk))}</b><span>${esc(t(sk))}</span></div><div class="empty-actions"><button class="btn sm primary" data-empty-import="${esc(kind)}">${esc(importLabel)}</button><button class="text-btn" data-market-jump="${esc(kind)}">${esc(t('cnt.market'))}</button></div></li>`;
+      if (kind) {
+        node.querySelectorAll('[data-empty-import]').forEach(b => b.onclick = async () => {
+          if (state.running && !await confirmDialog({ title: t('cnt.importJar'), body: t('cnt.confirmRunningImport'), ok: t('cnt.import') })) return;
+          window.observer.importContent(kind).then(r => {
+            if (r.ok) {
+              state.files = r.files;
+              refreshUI();
+              toast(t('toast.imported'), 'success');
+            } else if (!r.cancelled) toast(r.error, 'error');
+          });
         });
-      });
-      node.querySelectorAll('[data-market-jump]').forEach(b => b.onclick = () => jumpToMarket(b.dataset.marketJump));
+        node.querySelectorAll('[data-market-jump]').forEach(b => b.onclick = () => jumpToMarket(b.dataset.marketJump));
+      }
     }
     updateContentToolbarState();
     return;
