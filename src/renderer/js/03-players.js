@@ -347,7 +347,7 @@ function badgeHtml(p){const b=[];if(p.op)b.push('<span class="player-badge op">O
 function rowActionBtn(action,label,active,cls='',extra=''){return `<button class="row-action ${cls} ${active?'active':''}" data-row-action="${action}" ${extra}>${label}</button>`}
 let lastPlayersSig='';
 // v6.0.0 Track B: local avatar cache to avoid CSP-blocked external images.
-const headAvatarCache = {};
+const headAvatarCache = (window.headAvatarCache = window.headAvatarCache || {});
 const pendingHeadFetches = new Set();
 // A colored square with the player's initial, used whenever no Mojang skin is available
 // (offline UUID, failed fetch). This replaces the faint generic person icon so the roster

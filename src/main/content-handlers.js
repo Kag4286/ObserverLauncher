@@ -405,13 +405,15 @@ function registerContent(ipcMain, ctx) {
     try {
       const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
       const dim = rect?.dim || 'overworld';
+      const sliceY = (rect?.sliceY !== undefined && rect?.sliceY !== null) ? Number(rect.sliceY) : null;
       const out = await worldmap.readBiomes(ctx.currentServerPath, lvlName, dim, {
         cx0: Number(rect?.cx0) || 0, cz0: Number(rect?.cz0) || 0,
         cx1: Number(rect?.cx1) || 0, cz1: Number(rect?.cz1) || 0,
+        sliceY
       });
       return { ok: true, ...out };
     } catch (error) {
-      return { ok: false, error: error?.message || 'Could not read biome data.', biomes: [] };
+      return { ok: false, error: error?.message || 'Could not read biome data.', biomes: [], structures: [] };
     }
   });
 

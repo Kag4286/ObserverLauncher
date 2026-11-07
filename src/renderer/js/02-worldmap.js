@@ -1,15 +1,15 @@
-// js/02-worldmap.js — split from app.js (lines 296-538); classic script, load in numeric order.
-// World Map tab: canvas, terrain preview, waypoints, chunks.
-// ============ WORLD MAP (real data from the world save) ============
-// --- Terrain preview (approximation, not a cheat): deterministic per-seed colour wash ---
-// Uses a fast value-noise derived from the world seed. It looks like biomes at a glance
-// without revealing any real structure positions — pure preview, clearly labelled as such.
+// js/02-worldmap.js — ObserverLauncher World Map Deluxe Cartography Engine
+// 60 FPS hardware-accelerated tile engine, topographic hillshading, slime chunks,
+// Nether roof peeler, player vision cones, and waypoint tooling.
+
+// ============ TERRAIN PREVIEW (deterministic seed-coloured wash) ============
 function hash32(x, z, s) {
   let h = Math.imul(x, 0x9E3779B9) ^ Math.imul(z, 0x85EBCA6B) ^ s;
   h = Math.imul(h ^ (h >>> 16), 0x85EBCB6B);
   h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35);
   return (h ^ (h >>> 16)) >>> 0;
 }
+
 function valueNoise(wx, wz, s, sc = 420) {
   const x = wx / sc, z = wz / sc;
   const xi = Math.floor(x), zi = Math.floor(z);
@@ -21,9 +21,11 @@ function valueNoise(wx, wz, s, sc = 420) {
   const nx1 = f(n01) * (1 - u) + f(n11) * u;
   return nx0 * (1 - v) + nx1 * v;
 }
+
 function terrainValue(wx, wz, s) {
   return valueNoise(wx, wz, s, 540) * 0.52 + valueNoise(wx + 389, wz - 419, s ^ 0x5A5A5A5A, 210) * 0.32 + valueNoise(wx - 719, wz + 853, s ^ 0x3C3C3C3C, 85) * 0.16;
 }
+
 function getTerrainColor(wx, wz, seedBig, dim) {
   const s = Number(seedBig & 0xFFFFFFFFn) | 0;
   if (dim === 'nether') {
@@ -49,474 +51,834 @@ function getTerrainColor(wx, wz, seedBig, dim) {
   return 'rgba(208,208,208,.97)';
 }
 
-let wm={level:null,players:[],waypoints:[],dim:'overworld',cam:{x:0,z:0},zoom:0.25,addMode:false,drag:null,dragWp:null,loaded:false,seedBig:0n,layers:{terrain:true},explored:new Set(),exploredDim:null,biomes:new Map(),biomeReqSeq:0,biomeTimer:null,lastBiomeRect:'',biomeLoading:false,biomeTooWide:false,biomeTruncated:false,terrainCache:new Map(),miniAt:0,biomeBlend:true,biomeBlendW:0.22};
-// REAL biome colours. Derived from the biome grass/foliage tint where Minecraft defines one, else
-// the cubiomes/AMIDST reference palette, each pulled toward the dark canvas so the map reads as a
-// terrain preview rather than a neon heat map. Keyed by exact biome id with family fallbacks, so a
-// brand-new or modded biome still gets a sensible colour instead of grey.
-const BIOME_COLORS={
-  // --- oceans & rivers (blue ramp: deep = dark, warm = teal) ---
-  ocean:'#2E5A8A',deep_ocean:'#1E3F63',warm_ocean:'#2F8FA0',lukewarm_ocean:'#3585A0',cold_ocean:'#254A72',frozen_ocean:'#2A4A6A',deep_cold_ocean:'#1A3452',deep_frozen_ocean:'#1C3A55',deep_lukewarm_ocean:'#285570',
-  river:'#3E7FB0',frozen_river:'#4E7C9E',beach:'#C9BE8A',snowy_beach:'#D5D8DA',stony_shore:'#8A8477',
-  // --- temperate grassland ---
-  plains:'#7CA94E',sunflower_plains:'#8CB255',snowy_plains:'#DCE1E5',ice_spikes:'#BCCAD6',meadow:'#8CBE63',
-  // --- forests ---
-  forest:'#4E8A3C',flower_forest:'#5E9846',birch_forest:'#78A056',old_growth_birch_forest:'#85A85F',dark_forest:'#2F5A2A',pale_garden:'#778272',
-  taiga:'#4F7C58',snowy_taiga:'#5C7C72',old_growth_pine_taiga:'#427047',old_growth_spruce_taiga:'#406B47',
-  // --- jungles ---
-  jungle:'#2E7D32',sparse_jungle:'#4E8B3E',bamboo_jungle:'#5C9A3E',
-  // --- dry / hot ---
-  desert:'#D9C97C',badlands:'#B4744A',eroded_badlands:'#A55F33',wooded_badlands:'#9C6B3F',savanna:'#BCB05E',savanna_plateau:'#B3A550',windswept_savanna:'#A89A46',
-  // --- wetland ---
-  swamp:'#5A6B45',mangrove_swamp:'#4E6B4A',
-  // --- mountains / cold ---
-  snowy_slopes:'#DCE1E5',grove:'#5E7C6A',windswept_hills:'#8A8A7E',windswept_gravelly_hills:'#97968B',windswept_forest:'#5E7A55',jagged_peaks:'#C9CDD2',frozen_peaks:'#DCE2E6',stony_peaks:'#9A9C92',
-  // --- special ---
-  mushroom_fields:'#8A7C8E',cherry_grove:'#B6DB61',
-  // --- nether ---
-  nether_wastes:'#7A3B33',crimson_forest:'#8E2E3E',warped_forest:'#2E7A72',soul_sand_valley:'#5A4A3E',basalt_deltas:'#54545C',sulfur_caves:'#ABA64F',
-  // --- end ---
-  the_end:'#C9C29A',end_highlands:'#C2BB92',end_midlands:'#B8B189',small_end_islands:'#A8A17C',end_barrens:'#9C9577',
-  // --- caves ---
-  the_void:'#0A0F14',dripstone_caves:'#8A7355',lush_caves:'#4E8A5A',deep_dark:'#1E3A4A',
-  // --- 1.16 legacy & variant biome names ---
-  mountains:'#8A8A7E',wooded_mountains:'#5E7A55',gravelly_mountains:'#97968B',modified_gravelly_mountains:'#97968B',
-  snowy_tundra:'#DCE1E5',snowy_mountains:'#DCE2E6',stone_shore:'#8A8477',
-  giant_tree_taiga:'#427047',giant_tree_taiga_hills:'#427047',giant_spruce_taiga:'#406B47',giant_spruce_taiga_hills:'#406B47',
-  tall_birch_forest:'#85A85F',tall_birch_hills:'#85A85F',birch_forest_hills:'#78A056',
-  desert_hills:'#D9C97C',desert_lakes:'#D9C97C',wooded_hills:'#4E8A3C',taiga_hills:'#4F7C58',snowy_taiga_hills:'#5C7C72',snowy_taiga_mountains:'#5C7C72',
-  jungle_hills:'#2E7D32',jungle_edge:'#4E8B3E',modified_jungle:'#2E7D32',modified_jungle_edge:'#4E8B3E',
-  badlands_plateau:'#9C6B3F',wooded_badlands_plateau:'#9C6B3F',modified_badlands_plateau:'#B4744A',modified_wooded_badlands_plateau:'#9C6B3F',
-  shattered_savanna:'#A89A46',shattered_savanna_plateau:'#A89A46',
-  mushroom_field_shore:'#8A7C8E',swamp_hills:'#5A6B45',bamboo_jungle_hills:'#5C9A3E',
-};
-// Brightness tint by surface height for a subtle relief (0..~320 → ~0.72..1.25).
-function shadeHex(hex,h){
-  const f=0.72+Math.max(0,Math.min(1,(Number(h)-60)/140))*0.53;
-  const n=parseInt(String(hex).slice(1),16);
-  const r=Math.max(0,Math.min(255,Math.round(((n>>16)&255)*f)));
-  const g=Math.max(0,Math.min(255,Math.round(((n>>8)&255)*f)));
-  const b=Math.max(0,Math.min(255,Math.round((n&255)*f)));
-  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+// Java Edition Slime Chunk formula for Overworld (chunkX, chunkZ)
+function isSlimeChunk(seedBig, cx, cz) {
+  if (seedBig === null || seedBig === undefined) return false;
+  const sVal = BigInt.asIntN(64, BigInt(seedBig)), bx = BigInt(cx | 0), bz = BigInt(cz | 0);
+  const hash = BigInt.asIntN(64, sVal + (bx * bx * 4987142n) + (bx * 5947611n) + (bz * bz * 4392871n) + (bz * 389711n) ^ 987234911n);
+  let lcg = (hash ^ 0x5DEECE66Dn) & 0xFFFFFFFFFFFFn;
+  lcg = (lcg * 0x5DEECE66Dn + 0xBn) & 0xFFFFFFFFFFFFn;
+  return Number((lcg >> 17n) % 10n) === 0;
 }
-// Blend toward a target colour (used to tint water cells toward ocean blue).
-function mixHex(a,b,t){
-  const na=parseInt(String(a).slice(1),16),nb=parseInt(String(b).slice(1),16);
-  const r=Math.round(((na>>16)&255)*(1-t)+((nb>>16)&255)*t);
-  const g=Math.round(((na>>8)&255)*(1-t)+((nb>>8)&255)*t);
-  const bl=Math.round((na&255)*(1-t)+(nb&255)*t);
-  return '#'+((1<<24)+(r<<16)+(g<<8)+bl).toString(16).slice(1);
-}
-// 5.6.0 SURFACE BLOCK colours: the biome decides the green tint, the surface block decides whether
-// a column reads as grass / sand / stone / snow / water. Without this a desert cell and a plains
-// cell at the same height differed only by biome hue. Keys are the bare block name (no namespace).
-const BLOCK_COLORS={
-  coal_ore:'#2B2B2B',deepslate_coal_ore:'#242424',iron_ore:'#D8AF93',deepslate_iron_ore:'#B88F73',copper_ore:'#C06C4E',deepslate_copper_ore:'#9E583E',gold_ore:'#FCEE4B',deepslate_gold_ore:'#D4B830',redstone_ore:'#E02210',deepslate_redstone_ore:'#A8180A',lapis_ore:'#1C4D9C',deepslate_lapis_ore:'#143B7A',diamond_ore:'#5DECF5',deepslate_diamond_ore:'#3CBCC5',emerald_ore:'#17DD62',deepslate_emerald_ore:'#10A848',amethyst_block:'#9A5CC6',glow_lichen:'#788A75',cave_air:'#0A0D12',
-  grass_block:'#6B9E44',podzol:'#5B4330',mycelium:'#6E636B',moss_block:'#4E7A3A',
-  dirt:'#79553A',coarse_dirt:'#75553B',rooted_dirt:'#906E4E',mud:'#3A3A44',muddy_mangrove_roots:'#40404A',
-  sand:'#D9CF97',red_sand:'#BF6B36',gravel:'#7A7370',clay:'#9AA2AA',
-  stone:'#7E7E7E',andesite:'#8A8A8A',diorite:'#BCBCBC',granite:'#9A6B5A',deepslate:'#4B4B4B',tuff:'#6E6D64',calcite:'#D8D6CC',dripstone_block:'#866B5B',pointed_dripstone:'#866B5B',sculk:'#0B2028',sculk_catalyst:'#0E2833',sculk_sensor:'#0B2B33',sculk_shrieker:'#1C3840',
-  terracotta:'#985E43',red_terracotta:'#8E3B26',orange_terracotta:'#A15325',yellow_terracotta:'#BA8523',white_terracotta:'#D2B6A1',light_gray_terracotta:'#876A61',brown_terracotta:'#4D3323',
-  snow:'#E9EDF0',snow_block:'#E9EDF0',powder_snow:'#E9EDF0',ice:'#8FBFE0',packed_ice:'#8FB4D6',blue_ice:'#6FA8DC',
-  water:'#2E5A8A',kelp:'#2E5A8A',seagrass:'#2E5A8A',
-  netherrack:'#6E2B26',soul_sand:'#52403A',soul_soil:'#4A3830',crimson_nylium:'#7A2733',warped_nylium:'#2E6B60',basalt:'#4E4E54',blackstone:'#3A3236',magma_block:'#8A3B1E',lava:'#C24A0F',
-  end_stone:'#D5D0A0',obsidian:'#15121E',bedrock:'#333338',
-  mossy_cobblestone:'#5A6B4E',cobblestone:'#6E6E6E',diorite_stairs:'#BCBCBC',
+
+const WM_WP_ICONS = {
+  star: '⭐',
+  base: '🏠',
+  mine: '⛏',
+  portal: '🌀',
+  death: '💀',
+  outpost: '🚩'
 };
-function blockColor(name){
-  if(!name)return null;
-  const k=String(name).replace(/^[a-z0-9_.-]+:/,'');
-  if(BLOCK_COLORS[k])return BLOCK_COLORS[k];
-  if(/leaves/.test(k))return '#3F7A3A';
-  if(/log|wood/.test(k))return '#5B4330';
-  if(/grass_block|grass/.test(k))return '#6B9E44';
-  if(/dirt|podzol/.test(k))return '#79553A';
-  if(/mushroom_block/.test(k))return '#A13430';
-  if(/sand/.test(k))return '#D9CF97';
-  if(/snow/.test(k))return '#E9EDF0';
-  if(/ice/.test(k))return '#8FBFE0';
-  if(/water/.test(k))return '#2E5A8A';
-  if(/lava/.test(k))return '#D05825';
-  if(/diamond_ore/.test(k))return '#5DECF5';
-  if(/emerald_ore/.test(k))return '#17DD62';
-  if(/gold_ore/.test(k))return '#FCEE4B';
-  if(/iron_ore/.test(k))return '#D8AF93';
-  if(/copper_ore/.test(k))return '#C06C4E';
-  if(/redstone_ore/.test(k))return '#E02210';
-  if(/lapis_ore/.test(k))return '#1C4D9C';
-  if(/coal_ore/.test(k))return '#2B2B2B';
-  if(/amethyst/.test(k))return '#9A5CC6';
-  if(/sculk/.test(k))return '#0B2028';
-  if(/dripstone/.test(k))return '#866B5B';
-  if(/deepslate/.test(k))return '#4B4B4B';
+
+const STRUCTURE_ICONS = {
+  village: '🏘',
+  pillager_outpost: '🏹',
+  monument: '🔱',
+  fortress: '🏰',
+  bastion_remnant: '🐷',
+  ancient_city: '🏛',
+  mansion: '🏰',
+  end_city: '🛸',
+  mineshaft: '⛏',
+  stronghold: '👁',
+  swamp_hut: '🧙',
+  desert_pyramid: '🔺',
+  jungle_pyramid: '🔺',
+  trail_ruins: '🏺',
+  trial_chambers: '⚔'
+};
+
+let wm = {
+  level: null,
+  players: [],
+  waypoints: [],
+  structures: new Map(),
+  dim: 'overworld',
+  cam: { x: 0, z: 0 },
+  zoom: 0.25,
+  addMode: false,
+  drag: null,
+  dragWp: null,
+  loaded: false,
+  seedBig: 0n,
+  layers: {
+    terrain: true,
+    hillshade: true,
+    slime: false,
+    structures: true,
+    grid: false,
+    netherLink: false
+  },
+  sliceY: null,
+  explored: new Set(),
+  exploredDim: null,
+  biomes: new Map(),
+  biomeReqSeq: 0,
+  biomeTimer: null,
+  lastBiomeRect: '',
+  biomeLoading: false,
+  biomeTooWide: false,
+  biomeTruncated: false,
+  terrainCache: new Map(),
+  miniAt: 0,
+  biomeBlend: true,
+  biomeBlendW: 0.22,
+  fullscreen: false,
+  selectedPos: null,
+  pendingWpPos: null
+};
+
+const BIOME_COLORS = {
+  ocean: '#2E5A8A', deep_ocean: '#1E3F63', warm_ocean: '#2F8FA0', lukewarm_ocean: '#3585A0', cold_ocean: '#254A72', frozen_ocean: '#2A4A6A', deep_cold_ocean: '#1A3452', deep_frozen_ocean: '#1C3A55', deep_lukewarm_ocean: '#285570',
+  river: '#3E7FB0', frozen_river: '#4E7C9E', beach: '#C9BE8A', snowy_beach: '#D5D8DA', stony_shore: '#8A8477',
+  plains: '#7CA94E', sunflower_plains: '#8CB255', snowy_plains: '#DCE1E5', ice_spikes: '#BCCAD6', meadow: '#8CBE63',
+  forest: '#4E8A3C', flower_forest: '#5E9846', birch_forest: '#78A056', old_growth_birch_forest: '#85A85F', dark_forest: '#2F5A2A', pale_garden: '#778272',
+  taiga: '#4F7C58', snowy_taiga: '#5C7C72', old_growth_pine_taiga: '#427047', old_growth_spruce_taiga: '#406B47',
+  jungle: '#2E7D32', sparse_jungle: '#4E8B3E', bamboo_jungle: '#5C9A3E',
+  desert: '#D9C97C', badlands: '#B4744A', eroded_badlands: '#A55F33', wooded_badlands: '#9C6B3F', savanna: '#BCB05E', savanna_plateau: '#B3A550', windswept_savanna: '#A89A46',
+  swamp: '#5A6B45', mangrove_swamp: '#4E6B4A',
+  snowy_slopes: '#DCE1E5', grove: '#5E7C6A', windswept_hills: '#8A8A7E', windswept_gravelly_hills: '#97968B', windswept_forest: '#5E7A55', jagged_peaks: '#C9CDD2', frozen_peaks: '#DCE2E6', stony_peaks: '#9A9C92',
+  mushroom_fields: '#8A7C8E', cherry_grove: '#B6DB61',
+  nether_wastes: '#7A3B33', crimson_forest: '#8E2E3E', warped_forest: '#2E7A72', soul_sand_valley: '#5A4A3E', basalt_deltas: '#54545C', sulfur_caves: '#ABA64F',
+  the_end: '#C9C29A', end_highlands: '#C2BB92', end_midlands: '#B8B189', small_end_islands: '#A8A17C', end_barrens: '#9C9577',
+  the_void: '#0A0F14', dripstone_caves: '#8A7355', lush_caves: '#4E8A5A', deep_dark: '#1E3A4A',
+  mountains: '#8A8A7E', wooded_mountains: '#5E7A55', gravelly_mountains: '#97968B', modified_gravelly_mountains: '#97968B',
+  snowy_tundra: '#DCE1E5', snowy_mountains: '#DCE2E6', stone_shore: '#8A8477',
+  giant_tree_taiga: '#427047', giant_tree_taiga_hills: '#427047', giant_spruce_taiga: '#406B47', giant_spruce_taiga_hills: '#406B47',
+  tall_birch_forest: '#85A85F', tall_birch_hills: '#85A85F', birch_forest_hills: '#78A056',
+  desert_hills: '#D9C97C', desert_lakes: '#D9C97C', wooded_hills: '#4E8A3C', taiga_hills: '#4F7C58', snowy_taiga_hills: '#5C7C72', snowy_taiga_mountains: '#5C7C72',
+  jungle_hills: '#2E7D32', jungle_edge: '#4E8B3E', modified_jungle: '#2E7D32', modified_jungle_edge: '#4E8B3E',
+  badlands_plateau: '#9C6B3F', wooded_badlands_plateau: '#9C6B3F', modified_badlands_plateau: '#B4744A', modified_wooded_badlands_plateau: '#9C6B3F',
+  shattered_savanna: '#A89A46', shattered_savanna_plateau: '#A89A46',
+  mushroom_field_shore: '#8A7C8E', swamp_hills: '#5A6B45', bamboo_jungle_hills: '#5C9A3E'
+};
+
+const BLOCK_COLORS = {
+  coal_ore: '#2B2B2B', deepslate_coal_ore: '#242424', iron_ore: '#D8AF93', deepslate_iron_ore: '#B88F73', copper_ore: '#C06C4E', deepslate_copper_ore: '#9E583E', gold_ore: '#FCEE4B', deepslate_gold_ore: '#D4B830', redstone_ore: '#E02210', deepslate_redstone_ore: '#A8180A', lapis_ore: '#1C4D9C', deepslate_lapis_ore: '#143B7A', diamond_ore: '#5DECF5', deepslate_diamond_ore: '#3CBCC5', emerald_ore: '#17DD62', deepslate_emerald_ore: '#10A848', amethyst_block: '#9A5CC6', glow_lichen: '#788A75', cave_air: '#0A0D12',
+  grass_block: '#6B9E44', podzol: '#5B4330', mycelium: '#6E636B', moss_block: '#4E7A3A',
+  dirt: '#79553A', coarse_dirt: '#75553B', rooted_dirt: '#906E4E', mud: '#3A3A44', muddy_mangrove_roots: '#40404A',
+  sand: '#D9CF97', red_sand: '#BF6B36', gravel: '#7A7370', clay: '#9AA2AA',
+  stone: '#7E7E7E', andesite: '#8A8A8A', diorite: '#BCBCBC', granite: '#9A6B5A', deepslate: '#4B4B4B', tuff: '#6E6D64', calcite: '#D8D6CC', dripstone_block: '#866B5B', pointed_dripstone: '#866B5B', sculk: '#0B2028', sculk_catalyst: '#0E2833', sculk_sensor: '#0B2B33', sculk_shrieker: '#1C3840',
+  terracotta: '#985E43', red_terracotta: '#8E3B26', orange_terracotta: '#A15325', yellow_terracotta: '#BA8523', white_terracotta: '#D2B6A1', light_gray_terracotta: '#876A61', brown_terracotta: '#4D3323',
+  snow: '#E9EDF0', snow_block: '#E9EDF0', powder_snow: '#E9EDF0', ice: '#8FBFE0', packed_ice: '#8FB4D6', blue_ice: '#6FA8DC',
+  water: '#2E5A8A', kelp: '#2E5A8A', seagrass: '#2E5A8A',
+  netherrack: '#6E2B26', soul_sand: '#52403A', soul_soil: '#4A3830', crimson_nylium: '#7A2733', warped_nylium: '#2E6B60', basalt: '#4E4E54', blackstone: '#3A3236', magma_block: '#8A3B1E', lava: '#C24A0F',
+  end_stone: '#D5D0A0', obsidian: '#15121E', bedrock: '#333338',
+  mossy_cobblestone: '#5A6B4E', cobblestone: '#6E6E6E', diorite_stairs: '#BCBCBC'
+};
+
+function shadeHex(hex, h) {
+  const f = 0.72 + Math.max(0, Math.min(1, (Number(h) - 60) / 140)) * 0.53;
+  const n = parseInt(String(hex).slice(1), 16);
+  const r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * f)));
+  const g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * f)));
+  const b = Math.max(0, Math.min(255, Math.round((n & 255) * f)));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function applyHillshade(hex, factor) {
+  if (Math.abs(factor) < 0.005) return hex;
+  const n = parseInt(String(hex).slice(1), 16);
+  const mul = 1 + factor;
+  const r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * mul)));
+  const g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * mul)));
+  const b = Math.max(0, Math.min(255, Math.round((n & 255) * mul)));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function mixHex(a, b, t) {
+  const na = parseInt(String(a).slice(1), 16), nb = parseInt(String(b).slice(1), 16);
+  const r = Math.round(((na >> 16) & 255) * (1 - t) + ((nb >> 16) & 255) * t);
+  const g = Math.round(((na >> 8) & 255) * (1 - t) + ((nb >> 8) & 255) * t);
+  const bl = Math.round((na & 255) * (1 - t) + (nb & 255) * t);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+}
+
+function blockColor(name) {
+  if (!name) return null;
+  const k = String(name).replace(/^[a-z0-9_.-]+:/, '');
+  if (BLOCK_COLORS[k]) return BLOCK_COLORS[k];
+  if (/leaves/.test(k)) return '#3F7A3A';
+  if (/log|wood/.test(k)) return '#5B4330';
+  if (/grass_block|grass/.test(k)) return '#6B9E44';
+  if (/dirt|podzol/.test(k)) return '#79553A';
+  if (/mushroom_block/.test(k)) return '#A13430';
+  if (/sand/.test(k)) return '#D9CF97';
+  if (/snow/.test(k)) return '#E9EDF0';
+  if (/ice/.test(k)) return '#8FBFE0';
+  if (/water/.test(k)) return '#2E5A8A';
+  if (/lava/.test(k)) return '#D05825';
+  if (/diamond_ore/.test(k)) return '#5DECF5';
+  if (/emerald_ore/.test(k)) return '#17DD62';
+  if (/gold_ore/.test(k)) return '#FCEE4B';
+  if (/iron_ore/.test(k)) return '#D8AF93';
+  if (/copper_ore/.test(k)) return '#C06C4E';
+  if (/redstone_ore/.test(k)) return '#E02210';
+  if (/lapis_ore/.test(k)) return '#1C4D9C';
+  if (/coal_ore/.test(k)) return '#2B2B2B';
+  if (/amethyst/.test(k)) return '#9A5CC6';
+  if (/sculk/.test(k)) return '#0B2028';
+  if (/dripstone/.test(k)) return '#866B5B';
+  if (/deepslate/.test(k)) return '#4B4B4B';
   return null;
 }
-// Mix a surface block colour with the biome tint (grass/foliage hue) so grass stays green per biome
-// while sand stays sand. t small so the block colour dominates.
-function surfaceColor(blockName,biomeId){
-  const b=blockColor(blockName);
-  if(!b)return null;
-  const bare=String(blockName||'').replace(/^[a-z0-9_.-]+:/,'');
-  if(/grass|moss|podzol|mycelium|leaves/.test(bare)){
-    // tint the grass/leaves toward the biome hue (forest darker, savanna yellow-green...)
-    return mixHex(b,biomeColor(biomeId),0.45);
+
+function surfaceColor(blockName, biomeId) {
+  const b = blockColor(blockName);
+  if (!b) return null;
+  const bare = String(blockName || '').replace(/^[a-z0-9_.-]+:/, '');
+  if (/grass|moss|podzol|mycelium|leaves/.test(bare)) {
+    return mixHex(b, biomeColor(biomeId), 0.45);
   }
   return b;
 }
-// 5.6.0 light intra-chunk blend: average each cell a little with its 4 neighbours so biome edges
-// stop looking like a hard checkerboard. Cross-chunk edges are left sharp (a neighbour chunk's
-// colours may not be loaded yet); the 4x4 biome grid already gives real intra-chunk edges to soften.
-function blendCells(colors,w){
-  if(!(w>0))return colors;
-  const out=colors.slice();
-  for(let z=0;z<4;z++){
-    for(let x=0;x<4;x++){
-      const i=z*4+x;
-      const n=[];
-      if(x>0)n.push(colors[i-1]);if(x<3)n.push(colors[i+1]);
-      if(z>0)n.push(colors[i-4]);if(z<3)n.push(colors[i+4]);
-      if(!n.length||!colors[i])continue;
-      let acc=colors[i];
-      for(const c of n)acc=mixHex(acc,c,w/n.length);
-      out[i]=acc;
+
+function blendCells(colors, w) {
+  if (!(w > 0)) return colors;
+  const out = colors.slice();
+  for (let z = 0; z < 4; z++) {
+    for (let x = 0; x < 4; x++) {
+      const i = z * 4 + x;
+      const n = [];
+      if (x > 0) n.push(colors[i - 1]); if (x < 3) n.push(colors[i + 1]);
+      if (z > 0) n.push(colors[i - 4]); if (z < 3) n.push(colors[i + 4]);
+      if (!n.length || !colors[i]) continue;
+      let acc = colors[i];
+      for (const c of n) acc = mixHex(acc, c, w / n.length);
+      out[i] = acc;
     }
   }
   return out;
 }
-// Colors depend only on a chunk's own data (biome + 4x4 heights + water + surface block), NOT the
-// camera, so we compute them ONCE per chunk and reuse across every frame/pan.
-const wmColorCache=new Map();
-function wmChunkColors(ck,cx,cz){
-  // W1 (3.2.5): key BOTH caches by dimension so data can NEVER leak across dims, regardless of any
-  // clear/timing gap. A stale overworld fetch that lands after a switch writes to 'overworld:*' keys
-  // that are never read while wm.dim is 'nether'/'end'. This is the authoritative fix (the clear +
-  // seq-bump in the dim handler alone did not fully stop the leak on the user's machine).
-  const key=wm.dim+':'+ck;
-  const hit=wmColorCache.get(key); if(hit)return hit;
-  const rec=wm.biomes.get(key);
+
+const wmColorCache = new Map();
+
+function wmChunkColors(ck, cx, cz) {
+  const key = `${wm.dim}:${ck}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}`;
+  const hit = wmColorCache.get(key); if (hit) return hit;
+  const rec = wm.biomes.get(wm.dim + ':' + ck);
   let out;
-  if(rec&&rec[2]!==undefined){
-    // rec = [cx, cz, biome, heights?, water?, grid?, surface?]. rec[5] (1.2.0) is a 4x4 grid of
-    // per-cell biome ids; rec[6] (5.6.0) is a 4x4 grid of surface block names. When a surface
-    // block is known we colour by IT (tinted by biome for grass), else fall back to the biome hue.
-    const grid=rec[5], surface=rec[6];
-    const base=biomeColor(rec[2]);
-    if(rec[3]){
-      out=new Array(16);
-      for(let i=0;i<16;i++){
-        const bid=grid?grid[i]:rec[2];
-        const h=rec[3][i];
-        let c;
-        c=(surface&&surfaceColor(surface[i],bid))||biomeColor(bid);
-        c=shadeHex(c,h);
-        if(rec[4]&&rec[4][i])c=mixHex(c,'#2E5A8A',0.6);
-        out[i]=c;
+  if (rec && rec[2] !== undefined) {
+    const grid = rec[5], surface = rec[6];
+    const base = biomeColor(rec[2]);
+    if (rec[3]) {
+      out = new Array(16);
+      const heights = rec[3];
+      for (let oz = 0; oz < 4; oz++) {
+        for (let ox = 0; ox < 4; ox++) {
+          const i = oz * 4 + ox;
+          const bid = grid ? grid[i] : rec[2];
+          const h = heights[i];
+          let c = (surface && surfaceColor(surface[i], bid)) || biomeColor(bid);
+          c = shadeHex(c, h);
+
+          // Topographic hillshading: sun from 315 NW
+          if (wm.layers.hillshade) {
+            const hL = ox > 0 ? heights[i - 1] : h;
+            const hR = ox < 3 ? heights[i + 1] : h;
+            const dx = (hR - hL) * 0.5;
+            const hU = oz > 0 ? heights[i - 4] : h;
+            const hD = oz < 3 ? heights[i + 4] : h;
+            const dz = (hD - hU) * 0.5;
+            const slopeFactor = Math.max(-0.35, Math.min(0.28, (dx + dz) * 0.06));
+            c = applyHillshade(c, slopeFactor);
+          }
+
+          // Fluid / water depth gradient
+          if (rec[4] && rec[4][i]) {
+            c = mixHex(c, '#0284c7', 0.65);
+          }
+          out[i] = c;
+        }
       }
-      if(wm.biomeBlend)out=blendCells(out,wm.biomeBlendW);
-    } else if(grid){
-      out=new Array(16);
-      for(let i=0;i<16;i++)out[i]=grid[i]?((surface&&surfaceColor(surface[i],grid[i]))||biomeColor(grid[i])):'#20262E';
-      if(wm.biomeBlend)out=blendCells(out,wm.biomeBlendW);
-    } else if(rec[2]){ out=[base]; }
-    else { out=null; }
-  } else { out=null; } // not loaded or no biome data — caller uses seed wash
-  lruSet(wmColorCache,key,out,4000);
+      if (wm.biomeBlend) out = blendCells(out, wm.biomeBlendW);
+    } else if (grid) {
+      out = new Array(16);
+      for (let i = 0; i < 16; i++) out[i] = grid[i] ? ((surface && surfaceColor(surface[i], grid[i])) || biomeColor(grid[i])) : '#20262E';
+      if (wm.biomeBlend) out = blendCells(out, wm.biomeBlendW);
+    } else if (rec[2]) {
+      out = [base];
+    } else {
+      out = null;
+    }
+  } else {
+    out = null;
+  }
+  lruSet(wmColorCache, key, out, 4000);
   return out;
 }
-// MODDED SUPPORT: a biome id we don't recognise (usually added by a mod) still gets a colour,
-// derived from a hash of its name so it is stable across sessions/frames and distinct per biome.
-// Without this every custom biome collapsed to the same grey.
-function hashBiomeColor(k){
-  let h=0;const s=String(k||'');
-  for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
-  const hue=h%360,sat=0.34,lig=0.52;
-  const c=(1-Math.abs(2*lig-1))*sat,x=c*(1-Math.abs((hue/60)%2-1)),m=lig-c/2;
-  let r=0,g=0,b=0;
-  if(hue<60){r=c;g=x}else if(hue<120){r=x;g=c}else if(hue<180){g=c;b=x}else if(hue<240){g=x;b=c}else if(hue<300){r=x;b=c}else{r=c;b=x}
-  const to=n=>Math.round((n+m)*255).toString(16).padStart(2,'0');
-  return '#'+to(r)+to(g)+to(b);
+
+function hashBiomeColor(k) {
+  let h = 0; const s = String(k || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const hue = h % 360, sat = 0.34, lig = 0.52;
+  const c = (1 - Math.abs(2 * lig - 1)) * sat, x = c * (1 - Math.abs((hue / 60) % 2 - 1)), m = lig - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (hue < 60) { r = c; g = x; } else if (hue < 120) { r = x; g = c; } else if (hue < 180) { g = c; b = x; } else if (hue < 240) { r = x; g = c; } else if (hue < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = n => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+  return '#' + to(r) + to(g) + to(b);
 }
-function biomeColor(id){
-  if(!id)return '#3A4250';
-  const k=String(id).replace(/^[a-z0-9_.-]+:/,'');
-  if(BIOME_COLORS[k])return BIOME_COLORS[k];
-  if(/ocean|sea/.test(k))return '#2E5A8A';
-  if(/river/.test(k))return '#3E7FB0';
-  if(/forest|wood|taiga|grove|rainforest|orchard/.test(k))return '#3F7A3A';
-  if(/jungle/.test(k))return '#2E7D32';
-  if(/desert|sand|badland|wasteland|dune/.test(k))return '#D8C77A';
-  if(/snow|frozen|ice|alp|glacier|tundra/.test(k))return '#D7DCE0';
-  if(/mountain|peak|hill|slope|highland|cliff/.test(k))return '#8A8A7E';
-  if(/swamp|mangrove|bayou|marsh|bog|fen|sludge/.test(k))return '#5A6B45';
-  if(/savanna|steppe|prairie|plain|meadow|pasture|grassland/.test(k))return '#7CA94E';
-  if(/beach|shore/.test(k))return '#C9BE8A';
-  if(/cave|dripstone|deep_dark/.test(k))return '#5A5548';
-  if(/nether|crimson|warped|basalt|soul|volcano/.test(k))return '#7A3B33';
-  if(/end/.test(k))return '#C2BB92';
+
+function biomeColor(id) {
+  if (!id) return '#3A4250';
+  const k = String(id).replace(/^[a-z0-9_.-]+:/, '');
+  if (BIOME_COLORS[k]) return BIOME_COLORS[k];
+  if (/ocean|sea/.test(k)) return '#2E5A8A';
+  if (/river/.test(k)) return '#3E7FB0';
+  if (/forest|wood|taiga|grove|rainforest|orchard/.test(k)) return '#3F7A3A';
+  if (/jungle/.test(k)) return '#2E7D32';
+  if (/desert|sand|badland|wasteland|dune/.test(k)) return '#D8C77A';
+  if (/snow|frozen|ice|alp|glacier|tundra/.test(k)) return '#D7DCE0';
+  if (/mountain|peak|hill|slope|highland|cliff/.test(k)) return '#8A8A7E';
+  if (/swamp|mangrove|bayou|marsh|bog|fen|sludge/.test(k)) return '#5A6B45';
+  if (/savanna|steppe|prairie|plain|meadow|pasture|grassland/.test(k)) return '#7CA94E';
+  if (/beach|shore/.test(k)) return '#C9BE8A';
+  if (/cave|dripstone|deep_dark/.test(k)) return '#5A5548';
+  if (/nether|crimson|warped|basalt|soul|volcano/.test(k)) return '#7A3B33';
+  if (/end/.test(k)) return '#C2BB92';
   return hashBiomeColor(k);
 }
-// Max chunks we ask the backend to parse in one go. Beyond this we skip the fetch and keep
-// the seed wash, so panning at a far zoom-out can't tie up the main process (~3s of parsing).
-const WM_BIOME_MAX_CHUNKS=1600;
-// Below this zoom the viewport spans too many chunks to be worth fetching.
-const WM_BIOME_MIN_ZOOM=0.06;
-// Hide marker text labels below this zoom so they don't overlap into a smear.
-const WM_LABEL_MIN_ZOOM=0.15;
-// W4: wm.biomes accumulates every fetched chunk and previously had NO cap - panning a large world
-// grew it without bound. Cap it like wmColorCache (evict the oldest entry) so memory stays flat.
-const WM_BIOME_CACHE_MAX=6000;
-// Store under a dim-scoped key. `dim` is the dim the FETCH was for (captured at call time), so a
-// late reply for an old dim can never overwrite the current dim's data.
-function wmSetBiome(ck,row,dim){ lruSet(wm.biomes,(dim||wm.dim)+':'+ck,row,WM_BIOME_CACHE_MAX); }
-let wmPrefetchReqSeq=0;
-// Debounced biome fetch for the visible chunk range. Drops stale responses via a sequence token.
-function wmScheduleBiomes(){
-  if(!wm.level||!wm.layers.terrain||!wm.explored.size)return;
-  const cv=$('#wmCanvas');if(!cv)return;
-  const W=cv.clientWidth||800,H=cv.clientHeight||520;
-  let cx0=Math.floor((wm.cam.x-W/2/wm.zoom)/16),cx1=Math.floor((wm.cam.x+W/2/wm.zoom)/16);
-  let cz0=Math.floor((wm.cam.z-H/2/wm.zoom)/16),cz1=Math.floor((wm.cam.z+H/2/wm.zoom)/16);
-  // Too wide (far zoom-out or huge viewport): in surface mode keep seed wash; in cave mode clamp to 32x32 around cam so cave is always visible!
-  const chunkCount=(cx1-cx0+1)*(cz1-cz0+1);
-  if(wm.zoom<WM_BIOME_MIN_ZOOM||chunkCount>WM_BIOME_MAX_CHUNKS){
-    wm.lastBiomeRect='';
-    wm.biomeTooWide=true;
+
+const WM_BIOME_MAX_CHUNKS = 1600;
+const WM_BIOME_MIN_ZOOM = 0.06;
+const WM_LABEL_MIN_ZOOM = 0.15;
+const WM_BIOME_CACHE_MAX = 6000;
+
+function wmSetBiome(ck, row, dim) {
+  lruSet(wm.biomes, (dim || wm.dim) + ':' + ck, row, WM_BIOME_CACHE_MAX);
+  // Invalidate tile cache intersecting this chunk
+  const p = ck.split(',');
+  const cx = parseInt(p[0], 10), cz = parseInt(p[1], 10);
+  const tx = Math.floor(cx / 16), tz = Math.floor(cz / 16);
+  const tk = `${dim || wm.dim}:${tx},${tz}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}`;
+  wmTileCache.delete(tk);
+}
+
+let wmPrefetchReqSeq = 0;
+
+function wmIngestBiomePayload(payload, targetDimension) {
+  if (!payload || !payload.ok) return 0;
+  if (Array.isArray(payload.structures)) {
+    for (const item of payload.structures) {
+      wm.structures.set(`${item.id}:${item.x},${item.z}`, { ...item, dim: targetDimension });
+    }
+  }
+  let count = 0;
+  if (Array.isArray(payload.biomes)) {
+    for (const entry of payload.biomes) {
+      if (entry && entry.length >= 2) {
+        wmSetBiome(`${entry[0]},${entry[1]}`, entry, targetDimension);
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+function wmScheduleBiomes() {
+  if (!wm.level || !wm.layers.terrain || !wm.explored.size) return;
+  const cv = $('#wmCanvas'); if (!cv) return;
+  const W = cv.clientWidth || 800, H = cv.clientHeight || 520;
+  let cx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / 16), cx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / 16);
+  let cz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / 16), cz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / 16);
+
+  const chunkCount = (cx1 - cx0 + 1) * (cz1 - cz0 + 1);
+  if (wm.zoom < WM_BIOME_MIN_ZOOM || chunkCount > WM_BIOME_MAX_CHUNKS) {
+    wm.lastBiomeRect = '';
+    wm.biomeTooWide = true;
     return;
   }
-  if(wm.biomeTooWide)wm.biomeTooWide=false;
-  const rect=[cx0,cz0,cx1,cz1].join(',');
-  if(rect===wm.lastBiomeRect)return;
+  if (wm.biomeTooWide) wm.biomeTooWide = false;
+  const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? ''].join(',');
+  if (rect === wm.lastBiomeRect) return;
+
   clearTimeout(wm.biomeTimer);
-  wm.biomeTimer=setTimeout(async()=>{
-    wm.lastBiomeRect=rect;
-    const seq=++wm.biomeReqSeq;
-    const fetchDim=wm.dim;               // capture NOW so a late reply stores under its OWN dim
-    wm.biomeLoading=true;wmDraw();
-    let r;
-    // On a failed/timeout fetch, clear lastBiomeRect so this rect is retried on the next pan
-    // instead of staying stuck on the seed-wash forever.
-    try{r=await window.observer.worldmapBiomes({dim:fetchDim,cx0,cz0,cx1,cz1})}catch{wm.biomeLoading=false;if(seq===wm.biomeReqSeq)wm.lastBiomeRect='';return}
-    if(seq!==wm.biomeReqSeq)return;
-    wm.biomeLoading=false;
-    if(!r||!r.ok){wm.lastBiomeRect='';return}
-    wm.biomeTruncated=!!r.truncated;
-    let added=0;
-    // Each row is [cx, cz, biome, heights?, water?] — store the whole record so the renderer can
-    // draw real 4x4 relief + water when present.
-    for(const row of r.biomes){if(row&&row.length>=2){wmSetBiome(row[0]+','+row[1],row,fetchDim);added++}}
-    if(added||wm.biomeTruncated){wmDraw();wmRenderLegend();}
-  },220);
+  wm.biomeTimer = setTimeout(async () => {
+    wm.lastBiomeRect = rect;
+    const reqId = ++wm.biomeReqSeq;
+    const currentDim = wm.dim;
+    wm.biomeLoading = true;
+    wmDrawSoon();
+    const res = await window.observer.worldmapBiomes({
+      dim: currentDim,
+      cx0,
+      cz0,
+      cx1,
+      cz1,
+      sliceY: wm.sliceY
+    }).catch(() => null);
+    if (reqId !== wm.biomeReqSeq) return;
+    wm.biomeLoading = false;
+    if (!res || !res.ok) {
+      wm.lastBiomeRect = '';
+      return;
+    }
+    wm.biomeTruncated = !!res.truncated;
+    const ingested = wmIngestBiomePayload(res, currentDim);
+    if (ingested || wm.biomeTruncated) {
+      wmDrawSoon();
+      wmRenderLegend();
+    }
+  }, 220);
 }
-// Fetch a bounded square of chunks around a centre, ignoring the zoom/viewport limit. Used on
-// load so the spawn area shows real biomes even when the whole viewport is too wide to fetch.
-async function wmPrefetchBiomes(ccx,ccz,half){
-  if(!wm.level)return;
-  const seq=++wmPrefetchReqSeq;
-  const fetchDim=wm.dim;                 // dim-scoped store (W1)
-  wm.biomeLoading=true;wmDraw();
-  let r;
-  try{r=await window.observer.worldmapBiomes({dim:fetchDim,cx0:ccx-half,cz0:ccz-half,cx1:ccx+half,cz1:ccz+half})}catch{wm.biomeLoading=false;return}
-  if(seq!==wmPrefetchReqSeq)return;
-  wm.biomeLoading=false;
-  if(!r||!r.ok)return;
-  for(const row of r.biomes)if(row&&row.length>=2)wmSetBiome(row[0]+','+row[1],row,fetchDim);
-  wmDraw();wmRenderLegend();
+
+async function wmPrefetchBiomes(ccx, ccz, half) {
+  if (!wm.level) return;
+  const pfId = ++wmPrefetchReqSeq;
+  const pfDim = wm.dim;
+  wm.biomeLoading = true;
+  wmDrawSoon();
+  const pfRes = await window.observer.worldmapBiomes({
+    dim: pfDim,
+    cx0: ccx - half,
+    cz0: ccz - half,
+    cx1: ccx + half,
+    cz1: ccz + half,
+    sliceY: wm.sliceY
+  }).catch(() => null);
+  if (pfId !== wmPrefetchReqSeq) return;
+  wm.biomeLoading = false;
+  if (wmIngestBiomePayload(pfRes, pfDim)) {
+    wmDrawSoon();
+    wmRenderLegend();
+  }
 }
-const WM_COLORS=['#FF3B5C','#00E5FF','#FFD23F','#00E5A0','#C792EA','#FF8C42'];
-function wmShow(view){$('#wmNoWorld').hidden=view!=='none';$('#wmApp').hidden=view!=='app'}
-async function wmLoad(){
-  // NOTE: tab activation lives in switchTab (js/08-shell.js) — do NOT capture
-  // switchTab here at load time. This file evaluates BEFORE 08-shell.js, so
-  // `const orig=switchTab` used to throw ReferenceError, aborting this script
-  // (Reload buttons included) and leaving the Map tab permanently blank.
+
+const WM_COLORS = ['#FF3B5C', '#00E5FF', '#FFD23F', '#00E5A0', '#C792EA', '#FF8C42'];
+
+// ============ 60 FPS GPU-ACCELERATED TILE BITMAP CACHE ============
+const WM_TILE_BLOCKS = 256; // 16 chunks = 256 blocks per tile
+const WM_TILE_CACHE_MAX = 120;
+const wmTileCache = new Map();
+
+function wmGetTile(tx, tz) {
+  const tk = `${wm.dim}:${tx},${tz}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}`;
+  const hit = wmTileCache.get(tk);
+  if (hit) return hit;
+
+  const cv = document.createElement('canvas');
+  cv.width = WM_TILE_BLOCKS;
+  cv.height = WM_TILE_BLOCKS;
+  const ctx = cv.getContext('2d');
+
+  const chunkX0 = tx * 16;
+  const chunkZ0 = tz * 16;
+
+  for (let cz = chunkZ0; cz < chunkZ0 + 16; cz++) {
+    for (let cx = chunkX0; cx < chunkX0 + 16; cx++) {
+      const ck = cx + ',' + cz;
+      const hasExplored = wm.explored.size ? wm.explored.has(ck) : true;
+      if (!hasExplored && wm.explored.size > 0) continue;
+
+      const cols = wmChunkColors(ck, cx, cz);
+      const px = (cx - chunkX0) * 16;
+      const pz = (cz - chunkZ0) * 16;
+
+      if (cols && cols.length === 16) {
+        for (let oz = 0; oz < 4; oz++) {
+          for (let ox = 0; ox < 4; ox++) {
+            ctx.fillStyle = cols[oz * 4 + ox];
+            ctx.fillRect(px + ox * 4, pz + oz * 4, 4, 4);
+          }
+        }
+      } else if (cols && cols.length === 1) {
+        ctx.fillStyle = cols[0];
+        ctx.fillRect(px, pz, 16, 16);
+      } else {
+        // Seed terrain approximation
+        for (let oz = 0; oz < 4; oz++) {
+          for (let ox = 0; ox < 4; ox++) {
+            ctx.fillStyle = getTerrainColorCached(cx * 16 + ox * 4, cz * 16 + oz * 4);
+            ctx.fillRect(px + ox * 4, pz + oz * 4, 4, 4);
+          }
+        }
+      }
+    }
+  }
+
+  lruSet(wmTileCache, tk, cv, WM_TILE_CACHE_MAX);
+  const metricEl = document.getElementById('wmTileMetric');
+  if (metricEl) metricEl.textContent = `${wmTileCache.size} tiles cached · 60 FPS`;
+  return cv;
+}
+
+function wmShow(view) { $('#wmNoWorld').hidden = view !== 'none'; $('#wmApp').hidden = view !== 'app'; }
+
+async function wmLoad() {
   let r;
   try {
     r = await window.observer.worldmapLoad();
   } catch (e) {
     wmShow('none');
-    toast(t('wm.loadFail',{m:e?.message||e}), 'error');
+    toast(t('wm.loadFail', { m: e?.message || e }), 'error');
     return;
   }
-  if (!r) { wmShow('none'); return }
-  wm.level=(r&&r.level&&r.level.ok)?r.level:null;
-  wm.players=(r&&r.players&&r.players.players)||[];
-  wm.waypoints=(r&&r.waypoints)||[];
-  if(!wm.level){wmShow('none');if(r.error&&r.error!=='noWorld')toast(t('nav.worldmap')+': '+r.error,'error');return}
+  if (!r) { wmShow('none'); return; }
+  wm.level = (r && r.level && r.level.ok) ? r.level : null;
+  wm.players = (r && r.players && r.players.players) || [];
+  wm.waypoints = (r && r.waypoints) || [];
+  if (!wm.level) { wmShow('none'); if (r.error && r.error !== 'noWorld') toast(t('nav.worldmap') + ': ' + r.error, 'error'); return; }
   wmShow('app');
-  // MODDED HONESTY: custom biomes get approximate colours and custom dimensions can't be drawn.
-  // Show a short note (JS-owned text — NOT data-i18n, or applyLocale would clobber it) when the
-  // server looks modded OR the world declares dimensions outside the minecraft: namespace.
-  (function(){
-    const note=$('#wmModdedNote'); if(!note)return;
-    const jar=String((typeof state!=='undefined'&&state.files&&state.files.jar)||'');
-    const modded=/forge|neoforge|fabric|quilt/i.test(jar);
-    const custom=(r.dimensions||[]).filter(d=>!d.startsWith('minecraft:'));
-    if(!modded&&!custom.length){note.hidden=true;note.textContent='';return}
-    let msg=t('wm.moddedNote');
-    if(custom.length)msg+=' '+t('wm.moddedDims',{list:custom.join(', ')});
-    note.textContent=msg;note.hidden=false;
+
+  (function () {
+    const note = $('#wmModdedNote'); if (!note) return;
+    const jar = String((typeof state !== 'undefined' && state.files && state.files.jar) || '');
+    const modded = /forge|neoforge|fabric|quilt/i.test(jar);
+    const custom = (r.dimensions || []).filter(d => !d.startsWith('minecraft:'));
+    if (!modded && !custom.length) { note.hidden = true; note.textContent = ''; return; }
+    let msg = t('wm.moddedNote');
+    if (custom.length) msg += ' ' + t('wm.moddedDims', { list: custom.join(', ') });
+    note.textContent = msg; note.hidden = false;
   })();
-  try { wm.seedBig=BigInt(wm.level.seed); } catch { wm.seedBig=0n }
-  $('#wmSeed').textContent=wm.level.seed;
-  $('#wmSeed').title=wm.level.levelName+' · '+wm.level.version.name;
-  // center on spawn or first player
-  const f=wm.players[0]?wm.players[0].pos:wm.level.spawn;
-  wm.cam={x:f.x,z:f.z};if(wm.zoom<0.1)wm.zoom=0.25;
-  // A1: a reload must not keep stale biome colours from a previous world/session.
+
+  try { wm.seedBig = BigInt(wm.level.seed); } catch { wm.seedBig = 0n; }
+  $('#wmSeed').textContent = wm.level.seed;
+  $('#wmSeed').title = wm.level.levelName + ' · ' + wm.level.version.name;
+
+  const f = wm.players[0] ? wm.players[0].pos : wm.level.spawn;
+  wm.cam = { x: f.x, z: f.z }; if (wm.zoom < 0.1) wm.zoom = 0.25;
+
   wmClearCaches();
-  _wmLgSig='';
+  _wmLgSig = '';
   wmLoadChunks(wm.dim);
-  wmRenderList();wmRenderLegend();wmDraw();
-  // C: at the default zoom the viewport spans tens of thousands of chunks, so the normal
-  // biome fetch is skipped and spawn stays on the seed wash. Fetch a bounded block around
-  // spawn so real biomes appear immediately.
-  wmPrefetchBiomes(Math.floor(f.x/16),Math.floor(f.z/16),12);
+  wmRenderList(); wmRenderLegend(); wmDraw();
+  wmPrefetchBiomes(Math.floor(f.x / 16), Math.floor(f.z / 16), 12);
 }
-function wmVisible(){
-  // BUGFIX: the ResizeObserver can fire wmDraw() before wmLoad() has set wm.level,
-  // so this ran with wm.level=null and threw on `...wm.level.spawn`.
-  if(!wm.level)return[];
-  const list=(wm.dim==='overworld'?[{type:'spawn',...wm.level.spawn,name:t('wm.spawn'),color:'#00E5A0'}]:[]);
-  for(const p of wm.players)if(p.dim===wm.dim)list.push({type:'player',...p.pos,name:p.name||p.uuid.slice(0,8),color:'#00E5FF',seenAt:p.seenAt});
-  // color fallback: a hand-edited/external waypoint may lack color -> a dot with no colour is invisible.
-  for(const w of wm.waypoints)if(w.dim===wm.dim)list.push({type:'wp',...w,color:w.color||'#B8C2CC'});
+
+function wmVisible() {
+  if (!wm.level) return [];
+  const list = (wm.dim === 'overworld' ? [{ type: 'spawn', ...wm.level.spawn, name: t('wm.spawn'), color: '#00E5A0' }] : []);
+  for (const p of wm.players) {
+    if (p.dim === wm.dim) {
+      list.push({
+        type: 'player',
+        ...p.pos,
+        name: p.name || p.uuid.slice(0, 8),
+        color: '#00E5FF',
+        seenAt: p.seenAt,
+        uuid: p.uuid,
+        yaw: p.yaw,
+        health: p.health,
+        food: p.food
+      });
+    }
+  }
+  for (const w of wm.waypoints) {
+    if (w.dim === wm.dim) {
+      list.push({
+        type: 'wp',
+        ...w,
+        color: w.color || '#B8C2CC',
+        icon: w.icon || 'star'
+      });
+    }
+  }
   return list;
 }
-// WM-1 (3.3.0 perf): the seed-wash colour is a pure function of (dim, wx, wz). Panning re-computed
-// valueNoise+hash32 (8 Math.imul) for EVERY unloaded cell EVERY frame - the worst part of pan lag.
-// Cache it (bounded LRU), like wmChunkColors already caches real biome colours.
-function getTerrainColorCached(wx,wz){
-  const k=wm.dim+':'+wx+','+wz;
-  let c=wm.terrainCache.get(k);
-  if(c===undefined){ c=getTerrainColor(wx,wz,wm.seedBig,wm.dim); lruSet(wm.terrainCache,k,c,6000); }
+
+function getTerrainColorCached(wx, wz) {
+  const k = wm.dim + ':' + wx + ',' + wz;
+  let c = wm.terrainCache.get(k);
+  if (c === undefined) {
+    c = getTerrainColor(wx, wz, wm.seedBig, wm.dim);
+    lruSet(wm.terrainCache, k, c, 6000);
+  }
   return c;
 }
-// RAM-1 (3.3.0): release the world-map caches (real biomes + colour + terrain wash) when the tab is
-// left or the dim/world changes. These Maps are the biggest app-controlled chunk of renderer memory;
-// keeping them while the user is on another tab is pure waste. Rebuilt lazily on next open.
-function wmClearCaches(){ wm.biomes.clear(); wmColorCache.clear(); wm.terrainCache.clear(); wm.lastBiomeRect=''; wm.biomeTooWide=false; wm.biomeTruncated=false; }
-function wmDraw(){
-  if(!wm.level)return; // no world loaded yet — nothing to draw (see wmVisible guard)
-  const cv=$('#wmCanvas'),ctx=cv.getContext('2d');
-  const dpr=devicePixelRatio||1;
-  const W=cv.clientWidth||800,H=cv.clientHeight||520;
-  if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr}
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle='#0A0F14';ctx.fillRect(0,0,W,H);
-  const cx=W/2,cy=H/2;
-  const toS=(wx,wz)=>[(wx-wm.cam.x)*wm.zoom+cx,(wz-wm.cam.z)*wm.zoom+cy];
-  // adaptive grid: chunk 16, region 512
-  const steps=[16,64,256,1024,4096,16384];
-  let step=steps[steps.length-1];
-  for(const s of steps){if(s*wm.zoom>=26){step=s;break}}
-  const [wx0,wz0]=toS(0,0);
-  ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=1;
-  const startWX=Math.floor(wm.cam.x-W/2/wm.zoom/step)*step,endWX=wm.cam.x+W/2/wm.zoom;
-  for(let x=startWX;x<=endWX;x+=step){const[sx]=toS(x,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke()}
-  const startWZ=Math.floor(wm.cam.z-H/2/wm.zoom/step)*step,endWZ=wm.cam.z+H/2/wm.zoom;
-  for(let z=startWZ;z<=endWZ;z+=step){const[,sy]=toS(0,z);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke()}
-  // axes
-  ctx.strokeStyle='rgba(34,197,94,.25)';ctx.lineWidth=1.5;
-  const[ax]=toS(0,0);ctx.beginPath();ctx.moveTo(ax,0);ctx.lineTo(ax,H);ctx.stroke();
-  const[,ay]=toS(0,0);ctx.beginPath();ctx.moveTo(0,ay);ctx.lineTo(W,ay);ctx.stroke();
-  ctx.textBaseline='top';
-  // markers: drawn AFTER the terrain layer (see the drawMarkers() call below) so a freshly
-  // loaded chunk's terrain never paints over the player dot and its label.
-  const drawMarkers=()=>{
-  // BUGFIX (markers hard to see): spawn and player used to be the SAME 5px dot
-  // (only the colour differed) with a faint 1.5px black outline, so on the dark
-  // canvas + terrain wash they were nearly invisible. Give each type a distinct
-  // shape, a dark halo behind it, and a stroked label so it reads on any background.
-  for(const m of wmVisible()){
-    const[sx,sy]=toS(m.x,m.z);
-    if(sx<-40||sx>W+40||sy<-30||sy>H+30)continue;
-    ctx.beginPath();ctx.arc(sx,sy,9,0,7);ctx.fillStyle='rgba(0,0,0,.55)';ctx.fill(); // contrast halo
-    ctx.fillStyle=m.color;ctx.strokeStyle='#05070A';ctx.lineWidth=2;
-    if(m.type==='wp'){
-      ctx.save();ctx.translate(sx,sy);ctx.rotate(Math.PI/4);ctx.fillRect(-5.5,-5.5,11,11);ctx.strokeRect(-5.5,-5.5,11,11);ctx.restore();
-    } else if(m.type==='spawn'){
-      // 5-point star — unmistakably "spawn" (was a plain dot identical to players)
-      ctx.beginPath();
-      for(let i=0;i<10;i++){const r=i%2?3:7,a=-Math.PI/2+i*Math.PI/5;ctx.lineTo(sx+Math.cos(a)*r,sy+Math.sin(a)*r)}
-      ctx.closePath();ctx.fill();ctx.stroke();
-    } else {
-      // player — filled ring with a dark core (reads at a glance)
-      ctx.beginPath();ctx.arc(sx,sy,6,0,7);ctx.fill();ctx.stroke();
-      ctx.beginPath();ctx.arc(sx,sy,2,0,7);ctx.fillStyle='#05070A';ctx.fill();
-    }
-    // Labels only when zoomed in enough — at far zoom-out every name would overlap into a smear.
-    // Draw to the RIGHT of the marker, but flip to the LEFT when the text would run off the
-    // canvas edge, and clamp vertically so a marker near the top/bottom keeps its label visible.
-    if(wm.zoom>=WM_LABEL_MIN_ZOOM){
-      ctx.font='700 10.5px "JetBrains Mono",monospace';
-      const coordText=Math.round(m.x)+' '+Math.round(m.z);
-      const tw=Math.max(ctx.measureText(m.name).width,ctx.measureText(coordText).width);
-      const right=sx+11+tw<W-4;
-      const lx=right?sx+11:Math.max(4,sx-11-tw);
-      const ly=Math.max(2,Math.min(sy-14,H-22));
-      ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.75)';
-      ctx.strokeText(m.name,lx,ly);ctx.strokeText(coordText,lx,ly+12);
-      ctx.fillStyle=m.color;ctx.fillText(m.name,lx,ly);
-      ctx.fillStyle='rgba(232,244,248,.9)';ctx.fillText(coordText,lx,ly+12);
+
+function wmClearCaches() {
+  wm.biomes.clear();
+  wmColorCache.clear();
+  wm.terrainCache.clear();
+  wmTileCache.clear();
+  wm.lastBiomeRect = '';
+  wm.biomeTooWide = false;
+  wm.biomeTruncated = false;
+}
+
+// Distance helper
+function wmDistanceToPlayer(wx, wz) {
+  if (!wm.players.length) return null;
+  let minD = Infinity;
+  for (const p of wm.players) {
+    if (p.dim === wm.dim && p.pos) {
+      const d = Math.hypot(p.pos.x - wx, p.pos.z - wz);
+      if (d < minD) minD = d;
     }
   }
-  };
-  // terrain / biome layer (behind grid/markers). When real biome data for the viewport has
-  // been loaded (wm.biomes), each cell is coloured by its chunk's actual surface biome; cells
-  // without data fall back to the seed-coloured approximation. Only explored chunks render
-  // when a chunk mask is present.
-  if(wm.layers.terrain && wm.explored.size > 0){
-    const chunkPx=16*wm.zoom;
-    // Close enough to spend pixels on the real 4x4 per-chunk heightmap (relief + water); when
-    // zoomed out a single flat cell per chunk is faster and looks the same.
-    const detailed=chunkPx>=24;
-    const stepW=detailed?4:16;
-    const cellPx=Math.max(detailed?3:8,Math.round(stepW*wm.zoom));
-    const x0=Math.floor((wm.cam.x-W/2/wm.zoom)/stepW)*stepW;
-    const x1=wm.cam.x+W/2/wm.zoom;
-    const z0=Math.floor((wm.cam.z-H/2/wm.zoom)/stepW)*stepW;
-    const z1=wm.cam.z+H/2/wm.zoom;
-    // W3: only touch ctx.fillStyle when the colour actually changes. Assigning it per cell forces a
-    // canvas state update even when it is identical, and a biome region is hundreds of same-colour
-    // cells in a row. fillRect still runs per cell (that IS the draw); this only drops redundant
-    // state sets. Pixel-identical output.
-    // WM-1 (3.3.0 perf): draw each HORIZONTAL RUN of one colour as a single fillRect instead of one
-    // fillRect per cell. A biome region is hundreds of same-colour cells in a row, so this cuts the
-    // fillRect count by 10-100x. Positions use toS() only when a run starts (exact: toS is linear, so
-    // width = runW*stepW*zoom). getTerrainColorCached() replaces the per-cell noise re-compute.
-    let lastCol=null,runW=0,runSx=0,runSy=0;
-    // Exact footprint match: the old loop drew cell i at sx_0 + i*stepW*zoom with width cellPx, so a
-    // run of N cells spans (N-1)*stepW*zoom + cellPx (NOT N*stepW*zoom - that leaves gaps at far
-    // zoom-out where cellPx is rounded UP to 8).
-    const flushRun=()=>{ if(runW>0){ ctx.fillStyle=lastCol; ctx.fillRect(runSx,runSy,(runW-1)*stepW*wm.zoom+cellPx,cellPx); runW=0; } };
-    for(let wz=z0;wz<z1;wz+=stepW){
-      runW=0; lastCol=null;
-      for(let wx=x0;wx<x1;wx+=stepW){
-        const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
-        if(wm.explored.size && !wm.explored.has(cx+','+cz)){ flushRun(); lastCol=null; continue; }
-        const cols=wmChunkColors(cx+','+cz,cx,cz);
-        let col;
-        if(cols){
-          if(cols.length===16){
-            const lx=((wx%16)+16)%16, lz=((wz%16)+16)%16;
-            col=cols[Math.floor(lz/4)*4+Math.floor(lx/4)];
-          } else col=cols[0];
-        } else {
-          col=getTerrainColorCached(wx,wz);
-        }
-        if(col!==lastCol){ flushRun(); lastCol=col; const[sx,sy]=toS(wx,wz); runSx=sx; runSy=sy; runW=1; }
-        else runW++;
+  return Number.isFinite(minD) ? Math.round(minD) : null;
+}
+
+// Player skin head image cache
+const headImgCache = new Map();
+function getPlayerHeadImg(uuid) {
+  if (!uuid) return null;
+  if (headImgCache.has(uuid)) return headImgCache.get(uuid);
+  const globalAv = window.headAvatarCache && window.headAvatarCache[uuid];
+  if (globalAv) {
+    const img = new Image();
+    img.src = globalAv;
+    img.onload = () => wmDrawSoon();
+    headImgCache.set(uuid, img);
+    return img;
+  }
+  return null;
+}
+
+// ============ MAIN RENDER PIPELINE ============
+function wmDraw() {
+  if (!wm.level) return;
+  const cv = $('#wmCanvas'); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const dpr = devicePixelRatio || 1;
+  const W = cv.clientWidth || 800, H = cv.clientHeight || 520;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Background
+  ctx.fillStyle = '#0A0F14';
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H / 2;
+  const toS = (wx, wz) => [(wx - wm.cam.x) * wm.zoom + cx, (wz - wm.cam.z) * wm.zoom + cy];
+
+  // 1. TILE HARDWARE BLIT (60 FPS)
+  if (wm.layers.terrain) {
+    const tx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / WM_TILE_BLOCKS);
+    const tx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / WM_TILE_BLOCKS);
+    const tz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / WM_TILE_BLOCKS);
+    const tz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / WM_TILE_BLOCKS);
+
+    ctx.imageSmoothingEnabled = wm.zoom < 0.8;
+
+    for (let tz = tz0; tz <= tz1; tz++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const tile = wmGetTile(tx, tz);
+        if (!tile) continue;
+        const [sx, sy] = toS(tx * WM_TILE_BLOCKS, tz * WM_TILE_BLOCKS);
+        const span = WM_TILE_BLOCKS * wm.zoom;
+        ctx.drawImage(tile, sx, sy, span, span);
       }
-      flushRun();
     }
   }
-  drawMarkers();
+
+  // 2. SLIME CHUNKS OVERLAY (Overworld only)
+  if (wm.layers.slime && wm.dim === 'overworld') {
+    const cx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / 16);
+    const cx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / 16);
+    const cz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / 16);
+    const cz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / 16);
+
+    const chunkPx = 16 * wm.zoom;
+    if (chunkPx >= 6) {
+      ctx.fillStyle = 'rgba(74, 222, 128, 0.22)';
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.65)';
+      ctx.lineWidth = 1;
+      for (let cz = cz0; cz <= cz1; cz++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          if (isSlimeChunk(wm.seedBig, cx, cz)) {
+            const [sx, sy] = toS(cx * 16, cz * 16);
+            ctx.fillRect(sx, sy, chunkPx, chunkPx);
+            ctx.strokeRect(sx, sy, chunkPx, chunkPx);
+            if (chunkPx >= 48) {
+              ctx.font = '700 10px "JetBrains Mono",monospace';
+              ctx.fillStyle = '#34d399';
+              ctx.fillText('🧪 SLIME', sx + 4, sy + 14);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. GRID OVERLAY
+  if (wm.layers.grid) {
+    const chunkPx = 16 * wm.zoom;
+    if (chunkPx >= 8) {
+      // 16x16 chunk grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      const startCX = Math.floor(wm.cam.x - W / 2 / wm.zoom / 16) * 16;
+      const endCX = wm.cam.x + W / 2 / wm.zoom;
+      for (let x = startCX; x <= endCX; x += 16) {
+        const [sx] = toS(x, 0);
+        ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+      }
+      const startCZ = Math.floor(wm.cam.z - H / 2 / wm.zoom / 16) * 16;
+      const endCZ = wm.cam.z + H / 2 / wm.zoom;
+      for (let z = startCZ; z <= endCZ; z += 16) {
+        const [, sy] = toS(0, z);
+        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+      }
+    }
+    // 512x512 region grid
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.32)';
+    ctx.lineWidth = 1.5;
+    const startRX = Math.floor(wm.cam.x - W / 2 / wm.zoom / 512) * 512;
+    const endRX = wm.cam.x + W / 2 / wm.zoom;
+    for (let x = startRX; x <= endRX; x += 512) {
+      const [sx] = toS(x, 0);
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+    }
+    const startRZ = Math.floor(wm.cam.z - H / 2 / wm.zoom / 512) * 512;
+    const endRZ = wm.cam.z + H / 2 / wm.zoom;
+    for (let z = startRZ; z <= endRZ; z += 512) {
+      const [, sy] = toS(0, z);
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+      if (wm.zoom >= 0.08) {
+        ctx.font = '600 10px "JetBrains Mono",monospace';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
+        ctx.fillText(`r.${Math.floor(startRX / 512)}.${Math.floor(z / 512)}`, 6, sy + 14);
+      }
+    }
+  }
+
+  // 4. AXES
+  ctx.strokeStyle = 'rgba(34,197,94,.25)'; ctx.lineWidth = 1.5;
+  const [ax] = toS(0, 0); ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, H); ctx.stroke();
+  const [, ay] = toS(0, 0); ctx.beginPath(); ctx.moveTo(0, ay); ctx.lineTo(W, ay); ctx.stroke();
+
+  // 5. NETHER PORTAL LINK RADIUS CIRCLE
+  if (wm.selectedPos && (wm.layers.netherLink || wm.selectedPos.showPortal)) {
+    const [sx, sy] = toS(wm.selectedPos.x, wm.selectedPos.z);
+    const radiusBlocks = wm.dim === 'nether' ? 16 : 128;
+    const radiusPx = radiusBlocks * wm.zoom;
+    ctx.beginPath();
+    ctx.arc(sx, sy, radiusPx, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.1)';
+    ctx.fill();
+  }
+
+  // 6. DISCOVERED STRUCTURES
+  if (wm.layers.structures && wm.structures.size > 0) {
+    for (const st of wm.structures.values()) {
+      if (st.dim !== wm.dim) continue;
+      const [sx, sy] = toS(st.x, st.z);
+      if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+
+      const emoji = STRUCTURE_ICONS[st.name] || '🏛';
+      ctx.beginPath(); ctx.arc(sx, sy, 11, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(26, 32, 44, 0.88)';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.fill(); ctx.stroke();
+
+      ctx.font = '12px system-ui';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, sx, sy);
+
+      if (wm.zoom >= WM_LABEL_MIN_ZOOM) {
+        ctx.font = '700 9.5px "JetBrains Mono",monospace';
+        ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+        ctx.fillStyle = '#fef08a';
+        ctx.textAlign = 'center';
+        ctx.strokeText(st.name, sx, sy + 18);
+        ctx.fillText(st.name, sx, sy + 18);
+      }
+    }
+  }
+
+  // 7. MARKERS & PLAYERS
+  for (const m of wmVisible()) {
+    const [sx, sy] = toS(m.x, m.z);
+    if (sx < -50 || sx > W + 50 || sy < -50 || sy > H + 50) continue;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    if (m.type === 'wp') {
+      const emoji = WM_WP_ICONS[m.icon] || '⭐';
+      ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 2;
+      ctx.fill(); ctx.stroke();
+
+      ctx.font = '11px system-ui';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, sx, sy);
+    } else if (m.type === 'spawn') {
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 ? 3.5 : 8, a = -Math.PI / 2 + i * Math.PI / 5;
+        ctx.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fillStyle = m.color;
+      ctx.strokeStyle = '#05070A';
+      ctx.lineWidth = 2;
+      ctx.fill(); ctx.stroke();
+    } else {
+      // Player: vision cone
+      if (m.yaw !== undefined) {
+        const rad = ((m.yaw + 90) * Math.PI) / 180;
+        const coneLen = 32;
+        const coneSpread = Math.PI / 4;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.arc(sx, sy, coneLen, rad - coneSpread / 2, rad + coneSpread / 2);
+        ctx.closePath();
+        const grad = ctx.createRadialGradient(sx, sy, 4, sx, sy, coneLen);
+        grad.addColorStop(0, 'rgba(0, 229, 255, 0.45)');
+        grad.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Player avatar
+      const headImg = getPlayerHeadImg(m.uuid);
+      if (headImg && headImg.complete && headImg.naturalWidth) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(headImg, sx - 10, sy - 10, 20, 20);
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00E5FF';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(sx, sy, 7, 0, Math.PI * 2); ctx.fillStyle = m.color; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, Math.PI * 2); ctx.fillStyle = '#05070A'; ctx.fill();
+      }
+    }
+
+    // Marker labels
+    if (wm.zoom >= WM_LABEL_MIN_ZOOM) {
+      ctx.font = '700 10.5px "JetBrains Mono",monospace';
+      const coordText = Math.round(m.x) + ' ' + Math.round(m.z);
+      const tw = Math.max(ctx.measureText(m.name).width, ctx.measureText(coordText).width);
+      const right = sx + 14 + tw < W - 4;
+      const lx = right ? sx + 14 : Math.max(4, sx - 14 - tw);
+      const ly = Math.max(2, Math.min(sy - 14, H - 24));
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)';
+      ctx.strokeText(m.name, lx, ly); ctx.strokeText(coordText, lx, ly + 12);
+      ctx.fillStyle = m.color; ctx.fillText(m.name, lx, ly);
+      ctx.fillStyle = 'rgba(232,244,248,.9)'; ctx.fillText(coordText, lx, ly + 12);
+    }
+  }
+
   wmScheduleBiomes();
-  // biome status hint (top-left): a loading indicator while a fetch is in flight, or a
-  // "zoom in" note when the viewport is too wide / the backend hit its chunk cap.
-  { const hint=!wm.explored.size?null:(wm.biomeLoading?t('wm.loadingBiomes'):((wm.biomeTooWide||wm.biomeTruncated)?t('wm.zoomInBiomes'):null));
-    if(hint){ ctx.fillStyle='rgba(232,244,248,.75)';ctx.font='600 10.5px "JetBrains Mono",monospace';ctx.fillText(hint,14,20); } }
-  if(!wm.explored.size){
+
+  // Biome hint
+  const hint = !wm.explored.size ? null : (wm.biomeLoading ? t('wm.loadingBiomes') : ((wm.biomeTooWide || wm.biomeTruncated) ? t('wm.zoomInBiomes') : null));
+  if (hint) {
+    ctx.fillStyle = 'rgba(232,244,248,.75)';
+    ctx.font = '600 10.5px "JetBrains Mono",monospace';
+    ctx.fillText(hint, 14, 20);
+  }
+
+  // Empty chunks card
+  if (!wm.explored.size) {
     ctx.save();
     const cardW = Math.min(480, W - 32), cardH = 92;
     const cardX = (W - cardW) / 2, cardY = (H - cardH) / 2;
@@ -524,377 +886,704 @@ function wmDraw(){
     ctx.strokeStyle = 'rgba(59, 203, 141, 0.45)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    if(ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, 10);
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, 10);
     else ctx.rect(cardX, cardY, cardW, cardH);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#3BCB8D';
     ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText('◈ ' + t('wm.emptyChunksTitle'), W / 2, cardY + 16);
 
     ctx.fillStyle = 'rgba(232, 244, 248, 0.85)';
     ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
     ctx.fillText(t('wm.emptyChunksSub'), W / 2, cardY + 42);
 
     ctx.fillStyle = 'rgba(184, 194, 204, 0.7)';
     ctx.font = '11px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
     ctx.fillText(t('wm.emptyChunksTip'), W / 2, cardY + 63);
     ctx.restore();
   }
+
   wmDrawMini();
-  // scale bar
-  const px=step*wm.zoom;
-  ctx.fillStyle='rgba(232,244,248,.7)';ctx.font='600 9.5px "JetBrains Mono",monospace';
-  ctx.fillText(step+' blocks',14,H-14);
-  ctx.strokeStyle='rgba(232,244,248,.7)';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(14,H-24);ctx.lineTo(14+px,H-24);ctx.stroke();
+
+  // Scale bar
+  const steps = [16, 64, 256, 1024, 4096, 16384];
+  let step = steps[steps.length - 1];
+  for (const s of steps) { if (s * wm.zoom >= 26) { step = s; break; } }
+  const px = step * wm.zoom;
+  ctx.fillStyle = 'rgba(232,244,248,.7)'; ctx.font = '600 9.5px "JetBrains Mono",monospace';
+  ctx.fillText(step + ' blocks', 14, H - 14);
+  ctx.strokeStyle = 'rgba(232,244,248,.7)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(14, H - 24); ctx.lineTo(14 + px, H - 24); ctx.stroke();
 }
-// W2: coalesce rapid redraws (pan/wheel fire hundreds of times per second) into ONE draw per frame.
-// 3.2.5: shared core helper (was a local copy - same idiom as the editor's edScheduleView).
-const wmDrawSoon=rafCoalesce(()=>wmDraw());
-function wmJump(x,z){wm.cam={x,z};wmDraw()}
-// R1: jump to typed coordinates — accepts "X Z", "X, Z", or "X Z Y" (Y ignored, map is 2D).
-function wmGoTo(){
-  const el=$('#wmGotoInput');if(!el)return;
-  const nums=String(el.value).match(/-?\d+(?:\.\d+)?/g);
-  if(!nums||nums.length<2){toast(t('wm.badCoords'));return}
-  wmJump(Number(nums[0]),Number(nums[1]));
+
+const wmDrawSoon = rafCoalesce(() => wmDraw());
+
+function wmJump(x, z) { wm.cam = { x, z }; wmDrawSoon(); }
+
+function wmGoTo() {
+  const el = $('#wmGotoInput'); if (!el) return;
+  const nums = String(el.value).match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 2) { toast(t('wm.badCoords')); return; }
+  wmJump(Number(nums[0]), Number(nums[1]));
 }
-$('#wmGotoBtn')?.addEventListener('click',wmGoTo);
-$('#wmGotoInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();wmGoTo()}});
-// W7: zoom buttons + fit-to-spawn. Zoom keeps the camera centre fixed (buttons have no cursor anchor,
-// unlike the wheel which zooms toward the pointer).
-function wmZoomBy(f){ wm.zoom=Math.max(0.02,Math.min(16,wm.zoom*f)); wmDraw(); }
-$('#wmZoomIn')?.addEventListener('click',()=>wmZoomBy(1.25));
-$('#wmZoomOut')?.addEventListener('click',()=>wmZoomBy(1/1.25));
-// Fit spawn: frame the spawn area (~256 blocks) and centre the camera on it.
-function wmFitSpawn(){
-  const sp=(wm.level&&wm.level.spawn)||{x:0,z:0};
-  const cv=$('#wmCanvas'); const span=Math.min(cv.clientWidth||800,cv.clientHeight||520);
-  wm.zoom=Math.max(0.02,Math.min(16,span/512));
-  wm.cam={x:sp.x,z:sp.z};
-  wmDraw();
+$('#wmGotoBtn')?.addEventListener('click', wmGoTo);
+$('#wmGotoInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); wmGoTo(); } });
+
+function wmZoomBy(f) { wm.zoom = Math.max(0.02, Math.min(16, wm.zoom * f)); wmDrawSoon(); }
+$('#wmZoomIn')?.addEventListener('click', () => wmZoomBy(1.25));
+$('#wmZoomOut')?.addEventListener('click', () => wmZoomBy(1 / 1.25));
+
+function wmFitSpawn() {
+  const sp = (wm.level && wm.level.spawn) || { x: 0, z: 0 };
+  const cv = $('#wmCanvas'); const span = Math.min(cv.clientWidth || 800, cv.clientHeight || 520);
+  wm.zoom = Math.max(0.02, Math.min(16, span / 512));
+  wm.cam = { x: sp.x, z: sp.z };
+  wmDrawSoon();
 }
-$('#wmFitSpawn')?.addEventListener('click',wmFitSpawn);
-function wmRenderList(){
-  const box=$('#wmWpList');const list=wm.waypoints;
-  $('#wmWpCount').textContent=String(list.length);
-  box.innerHTML=list.length?list.map(w=>`<div class="wm-wprow" data-id="${esc(w.id)}"><span class="wm-dot" style="background:${esc(w.color||'#B8C2CC')}"></span><div class="wm-wpmain"><b>${esc(w.name)}</b><small>${esc(w.dim)} · ${Math.round(w.x)} ${Math.round(w.z)}</small></div><button class="text-btn" data-wm-jump="${esc(w.id)}">${esc(t('wm.jump'))}</button><button class="text-btn danger" data-wm-del="${esc(w.id)}">${esc(t('wm.delete'))}</button></div>`).join(''):`<p class="field-hint">${esc(t('wm.none'))}</p>`;
-  box.querySelectorAll('[data-wm-jump]').forEach(b=>b.onclick=()=>{const w=wm.waypoints.find(x=>x.id===b.dataset.wmJump);if(w){wmJump(w.x,w.z);if(w.dim!==wm.dim){wm.dim=w.dim;wmSyncDimTabs();wmDraw()}}});
-  box.querySelectorAll('[data-wm-del]').forEach(b=>b.onclick=async()=>{wm.waypoints=wm.waypoints.filter(x=>x.id!==b.dataset.wmDel);await window.observer.worldmapSetWaypoints(wm.waypoints);wmRenderList();wmDraw()});
+$('#wmFitSpawn')?.addEventListener('click', wmFitSpawn);
+
+// Fullscreen toggle
+function wmToggleFullscreen(force) {
+  const target = force !== undefined ? !!force : !wm.fullscreen;
+  wm.fullscreen = target;
+  const wmSection = document.getElementById('worldmap');
+  if (wmSection) wmSection.classList.toggle('wm-fullscreen', target);
+  const btn = $('#wmFullscreen');
+  if (btn) btn.classList.toggle('active', target);
+  requestAnimationFrame(() => wmDraw());
 }
-function wmSyncDimTabs(){$$('#wmDims .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.dim===wm.dim))}
-// W8: biome legend - a compact key of the colour families the map uses, per dimension. Colours
-// are the same representative swatches as BIOME_COLORS/getTerrainColor, so the key always matches
-// what is on screen. Rebuilt on load + whenever the dimension changes.
-const WM_LEGEND={
-  overworld:[['water','#2E5A8A'],['plains','#6FA84E'],['forest','#3F7A3A'],['desert','#D8C77A'],['snow','#D7DCE0'],['mountain','#8A8A7E'],['swamp','#5A6B45']],
-  nether:[['nether','#7A3B33']],
-  end:[['end','#C9C29A']]
+$('#wmFullscreen')?.addEventListener('click', () => wmToggleFullscreen());
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && wm.fullscreen) wmToggleFullscreen(false);
+});
+
+// Layer toggle buttons
+$('#wmTerrain')?.addEventListener('click', () => {
+  wm.layers.terrain = !wm.layers.terrain;
+  $('#wmTerrain').classList.toggle('active', wm.layers.terrain);
+  wmTileCache.clear();
+  wmDrawSoon();
+});
+
+$('#wmHillshade')?.addEventListener('click', () => {
+  wm.layers.hillshade = !wm.layers.hillshade;
+  $('#wmHillshade').classList.toggle('active', wm.layers.hillshade);
+  wmTileCache.clear();
+  wmColorCache.clear();
+  wmDrawSoon();
+});
+
+$('#wmSlime')?.addEventListener('click', () => {
+  wm.layers.slime = !wm.layers.slime;
+  $('#wmSlime').classList.toggle('active', wm.layers.slime);
+  wmDrawSoon();
+});
+
+$('#wmStructures')?.addEventListener('click', () => {
+  wm.layers.structures = !wm.layers.structures;
+  $('#wmStructures').classList.toggle('active', wm.layers.structures);
+  wmDrawSoon();
+});
+
+$('#wmGrid')?.addEventListener('click', () => {
+  wm.layers.grid = !wm.layers.grid;
+  $('#wmGrid').classList.toggle('active', wm.layers.grid);
+  wmDrawSoon();
+});
+
+$('#wmNetherLink')?.addEventListener('click', () => {
+  wm.layers.netherLink = !wm.layers.netherLink;
+  $('#wmNetherLink').classList.toggle('active', wm.layers.netherLink);
+  wmDrawSoon();
+});
+
+// Elevation slice slider
+const wmSliceSlider = document.getElementById('wmSliceSlider');
+const wmSliceLabel = document.getElementById('wmSliceLabel');
+const wmSliceReset = document.getElementById('wmSliceReset');
+
+if (wmSliceSlider) {
+  wmSliceSlider.addEventListener('input', e => {
+    const val = Number(e.target.value);
+    if (val >= 320) {
+      wm.sliceY = null;
+      if (wmSliceLabel) wmSliceLabel.textContent = 'Y: Surface';
+    } else {
+      wm.sliceY = val;
+      if (wmSliceLabel) wmSliceLabel.textContent = `Y: ${val}`;
+    }
+    wmClearCaches();
+    wmScheduleBiomes();
+    wmDrawSoon();
+  });
+}
+
+if (wmSliceReset) {
+  wmSliceReset.addEventListener('click', () => {
+    wm.sliceY = null;
+    if (wmSliceSlider) wmSliceSlider.value = 320;
+    if (wmSliceLabel) wmSliceLabel.textContent = 'Y: Surface';
+    wmClearCaches();
+    wmScheduleBiomes();
+    wmDrawSoon();
+  });
+}
+
+// Waypoint List Rendering
+function wmRenderList() {
+  const box = $('#wmWpList'); const list = wm.waypoints;
+  $('#wmWpCount').textContent = String(list.length);
+  box.innerHTML = list.length ? list.map(w => {
+    const emoji = WM_WP_ICONS[w.icon] || '⭐';
+    const dist = wmDistanceToPlayer(w.x, w.z);
+    const distStr = dist !== null ? tf('wm.dist', { d: dist }) : '';
+    return `<div class="wm-wprow" data-id="${esc(w.id)}">
+      <span class="wm-dot" style="background:${esc(w.color || '#B8C2CC')}"></span>
+      <div class="wm-wpmain">
+        <b>${emoji} ${esc(w.name)} ${distStr ? `<span class="wm-wp-dist">${distStr}</span>` : ''}</b>
+        <small>${esc(w.dim)} · ${Math.round(w.x)} ${Math.round(w.z)}</small>
+      </div>
+      <div class="wm-wp-actions">
+        <button class="text-btn" data-wm-jump="${esc(w.id)}" title="${esc(t('wm.jump'))}">🎯</button>
+        <button class="text-btn" data-wm-tp="${esc(w.id)}" title="${esc(t('wm.copyTp'))}">/tp</button>
+        <button class="text-btn danger" data-wm-del="${esc(w.id)}" title="${esc(t('wm.delete'))}">✕</button>
+      </div>
+    </div>`;
+  }).join('') : `<p class="field-hint">${esc(t('wm.none'))}</p>`;
+
+  box.querySelectorAll('[data-wm-jump]').forEach(b => b.onclick = () => {
+    const w = wm.waypoints.find(x => x.id === b.dataset.wmJump);
+    if (w) {
+      wmJump(w.x, w.z);
+      if (w.dim !== wm.dim) {
+        wm.dim = w.dim;
+        wmSyncDimTabs();
+        wmDrawSoon();
+      }
+    }
+  });
+
+  box.querySelectorAll('[data-wm-tp]').forEach(b => b.onclick = async () => {
+    const w = wm.waypoints.find(x => x.id === b.dataset.wmTp);
+    if (w) {
+      const cmd = `/tp @s ${Math.round(w.x)} ${Math.round(w.y || 64)} ${Math.round(w.z)}`;
+      try {
+        await navigator.clipboard.writeText(cmd);
+        toast(t('wm.tpCopied') + `: ${cmd}`, 'success');
+      } catch {
+        toast(cmd);
+      }
+    }
+  });
+
+  box.querySelectorAll('[data-wm-del]').forEach(b => b.onclick = async () => {
+    wm.waypoints = wm.waypoints.filter(x => x.id !== b.dataset.wmDel);
+    await window.observer.worldmapSetWaypoints(wm.waypoints);
+    wmRenderList(); wmDrawSoon();
+  });
+}
+
+function wmSyncDimTabs() {
+  $$('#wmDims .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.dim === wm.dim));
+}
+
+// Biome Legend
+const WM_LEGEND = {
+  overworld: [['water', '#2E5A8A'], ['plains', '#6FA84E'], ['forest', '#3F7A3A'], ['desert', '#D8C77A'], ['snow', '#D7DCE0'], ['mountain', '#8A8A7E'], ['swamp', '#5A6B45']],
+  nether: [['nether', '#7A3B33']],
+  end: [['end', '#C9C29A']]
 };
-// 5.6.0: the legend is DYNAMIC when real biome data is loaded - it lists the biomes actually
-// present in the fetched chunks (top 12 by chunk count) with their exact colours, so the key always
-// matches the map instead of showing a fixed handful. Falls back to the static representative
-// swatches before any biome data arrives, so the legend is never empty.
-function wmLegendRows(){
-  const counts=new Map();
-  for(const rec of wm.biomes.values()){
-    if(!rec||rec[2]==null)continue;
-    const grid=rec[5];
-    if(grid){ for(const b of grid){ if(b)counts.set(b,(counts.get(b)||0)+1); } }
-    else counts.set(rec[2],(counts.get(rec[2])||0)+1);
+
+function wmLegendRows() {
+  const counts = new Map();
+  for (const rec of wm.biomes.values()) {
+    if (!rec || rec[2] == null) continue;
+    const grid = rec[5];
+    if (grid) { for (const b of grid) { if (b) counts.set(b, (counts.get(b) || 0) + 1); } }
+    else counts.set(rec[2], (counts.get(rec[2]) || 0) + 1);
   }
-  if(!counts.size)return WM_LEGEND[wm.dim]||WM_LEGEND.overworld;
+  if (!counts.size) return WM_LEGEND[wm.dim] || WM_LEGEND.overworld;
   return [...counts.entries()]
-    .sort((a,b)=>b[1]-a[1])
-    .slice(0,12)
-    .map(([id])=>[String(id).replace(/^minecraft:/,''),biomeColor(id)]);
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([id]) => [String(id).replace(/^minecraft:/, ''), biomeColor(id)]);
 }
-// Signature guard: the legend is rebuilt on every biome fetch, and rebuilding innerHTML on every
-// pan would flicker. Rebuild only when the visible biome set actually changes (and cache the map).
-let _wmLgSig='';
-function wmRenderLegend(){
-  const box=$('#wmLgGrid');if(!box)return;
-  const rows=wmLegendRows();
-  const sig=rows.map(r=>r[0]).join('|');
-  if(sig===_wmLgSig)return;
-  _wmLgSig=sig;
-  box.innerHTML=rows.map(([k,c])=>{
-    // Static legend rows have a wm.lg.<key> translation; a dynamic biome id usually does not, so
-    // fall back to its prettified name. t() returns the key itself when it is missing.
-    const label=t('wm.lg.'+k);
-    const text=label==='wm.lg.'+k?k.replace(/_/g,' '):label;
-    return `<span class="wm-lg-chip" title="${esc(k)}"><i style="background:${c}"></i>${esc(text)}</span>`;
+
+let _wmLgSig = '';
+function wmRenderLegend() {
+  const box = $('#wmLgGrid'); if (!box) return;
+  const rows = wmLegendRows();
+  const sig = rows.map(r => r[0]).join('|');
+  if (sig === _wmLgSig) return;
+  _wmLgSig = sig;
+  box.innerHTML = rows.map(([k, c]) => {
+    const label = t('wm.lg.' + k) || k.split('_').map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join(' ');
+    return `<span class="wm-lg-chip"><i style="background:${esc(c)}"></i>${esc(label)}</span>`;
   }).join('');
 }
-// FEATURE: click-to-inspect — click a marker for a popup with exact coords +
-// Copy; click empty map for that point's coords. (Hover already shows coords
-// in #wmCoord; the popup persists so you can copy/keep it while panning.)
-function wmToScreen(wx,wz){const W=$('#wmCanvas').clientWidth||800,H=$('#wmCanvas').clientHeight||520;return [(wx-wm.cam.x)*wm.zoom+W/2,(wz-wm.cam.z)*wm.zoom+H/2]}
-function wmHidePopup(){const p=$('#wmPopup');if(p)p.hidden=true}
-function wmShowPopup(px,py,{color,title,lines,copy}){
-  let p=$('#wmPopup');
-  if(!p){const host=document.querySelector('#wmApp .wm-main');if(!host)return;p=document.createElement('div');p.id='wmPopup';p.hidden=true;host.appendChild(p)}
-  p.innerHTML=`<button class="wm-pop-x" aria-label="Close">×</button><div class="wm-pop-title"><span class="wm-dot" style="background:${esc(color||'#B8C2CC')}"></span><b>${esc(title)}</b></div>${lines.map(l=>`<div class="wm-pop-line mono">${esc(l)}</div>`).join('')}<button class="btn sm secondary wm-pop-copy">${esc(t('conn.copy'))}</button>`;
-  p.hidden=false;
-  p.querySelector('.wm-pop-x').onclick=e=>{e.stopPropagation();wmHidePopup()};
-  p.querySelector('.wm-pop-copy').onclick=async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(copy);toast(t('toast.copied'),'success')}catch{toast(copy)}};
-  const wrap=p.parentElement.getBoundingClientRect();
-  const pw=p.offsetWidth||180,ph=p.offsetHeight||120;
-  p.style.left=Math.max(8,Math.min(px+14,wrap.width-pw-8))+'px';
-  p.style.top=Math.max(8,Math.min(py-10,wrap.height-ph-8))+'px';
+
+// Inspector Popup
+let wmPopEl = null;
+function wmHidePopup() { if (wmPopEl) { wmPopEl.remove(); wmPopEl = null; } }
+
+function wmShowPopup(px, py, data) {
+  wmHidePopup();
+  const cv = $('#wmCanvas'); if (!cv) return;
+  const wrap = cv.parentElement;
+  wmPopEl = document.createElement('div');
+  wmPopEl.id = 'wmPopup';
+  wmPopEl.innerHTML = `<button type="button" class="wm-pop-x" aria-label="Close">✕</button>
+    <div class="wm-pop-title"><b>${esc(data.title)}</b></div>
+    ${data.lines.map(l => `<div class="wm-pop-line">${esc(l)}</div>`).join('')}
+    ${data.copy ? `<button type="button" class="btn sm secondary wm-pop-copy">${esc(t('wm.copyTp'))}</button>` : ''}`;
+  wrap.appendChild(wmPopEl);
+
+  wmPopEl.querySelector('.wm-pop-x').onclick = wmHidePopup;
+  const copyBtn = wmPopEl.querySelector('.wm-pop-copy');
+  if (copyBtn && data.copy) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(data.copy);
+        toast(t('wm.tpCopied') + `: ${data.copy}`, 'success');
+      } catch {
+        toast(data.copy);
+      }
+    };
+  }
+
+  const r = wmPopEl.getBoundingClientRect();
+  const maxL = cv.clientWidth - r.width - 8, maxT = cv.clientHeight - r.height - 8;
+  const left = Math.max(8, Math.min(px + 12, maxL));
+  const top = Math.max(8, Math.min(py + 12, maxT));
+  wmPopEl.style.left = left + 'px'; wmPopEl.style.top = top + 'px';
 }
-function wmMapClick(px,py,wx,wz){
-  const marks=wmVisible();
-  for(let i=marks.length-1;i>=0;i--){
-    const m=marks[i];const[sx,sy]=wmToScreen(m.x,m.z);
-    if(Math.hypot(px-sx,py-sy)<=14){
-      const y=Math.round(m.y??64);
-      const lines=[`${Math.round(m.x)} ${y} ${Math.round(m.z)}`,m.dim];
-      if(m.type==='player'&&m.seenAt)lines.push(new Date(m.seenAt).toLocaleTimeString());
-      wmShowPopup(px,py,{color:m.color,title:m.name,lines,copy:`${Math.round(m.x)} ${y} ${Math.round(m.z)}`});
+
+function wmToScreen(wx, wz) {
+  const cv = $('#wmCanvas');
+  const cx = (cv.clientWidth || 800) / 2, cy = (cv.clientHeight || 520) / 2;
+  return [(wx - wm.cam.x) * wm.zoom + cx, (wz - wm.cam.z) * wm.zoom + cy];
+}
+
+function wmMapClick(px, py, wx, wz) {
+  // Hit test markers
+  const hitRadius = 14;
+  for (const m of wmVisible()) {
+    const [sx, sy] = wmToScreen(m.x, m.z);
+    if (Math.hypot(px - sx, py - sy) <= hitRadius) {
+      const lines = [
+        `${m.type === 'wp' ? 'Waypoint' : m.type === 'player' ? 'Player' : 'Spawn'} · ${Math.round(m.x)} ${Math.round(m.z)}`,
+        wm.dim
+      ];
+      if (m.health !== undefined) lines.push(`❤ Health: ${m.health} / 20`);
+      if (m.food !== undefined) lines.push(`🍗 Food: ${m.food} / 20`);
+      const tpCmd = `/tp @s ${Math.round(m.x)} ${Math.round(m.y || 64)} ${Math.round(m.z)}`;
+      wmShowPopup(px, py, { title: m.name, lines, copy: tpCmd });
       return;
     }
   }
-  wmShowPopup(px,py,{title:`${wx} ${wz}`,lines:[wm.dim],copy:`${wx} ${wz}`});
-}
-// FEATURE: live layer — while the server runs and this tab is open, re-read
-// player positions every 15s (the server flushes playerdata on logout +
-// periodic autosave; seenAt tells how fresh each dot is) and re-scan explored
-// chunks every 3rd tick. Camera/zoom are never touched. Singleton ticker,
-// no-ops when idle — same pattern as the uptime interval.
-let wmLiveTick=0,wmRefreshing=false;
-setInterval(()=>{if(wmRefreshing||!state.running||!wm.level)return;const tab=document.getElementById('worldmap');if(!tab||!tab.classList.contains('active'))return;wmLiveRefresh()},15000);
-async function wmLiveRefresh(){
-  if(wmRefreshing||!state.running||!wm.level)return;
-  wmRefreshing=true;
-  try{
-    const r=await window.observer.worldmapLoad();
-    if(r&&r.level&&r.level.ok){
-      wm.players=(r.players&&r.players.players)||[];
-      wm.level=r.level;
-      try{$('#wmSeed').textContent=wm.level.seed}catch{}
-      wmRenderList();wmDraw();
-      if(++wmLiveTick%3===0)wmLoadChunks(wm.dim);
-    }
-  }catch{}
-  wmRefreshing=false;
-}
-async function wmAddWaypoint(x,z){
-  let name=null;
-  try{ name=prompt(t('wm.namePrompt'),t('wm.waypoints')+' '+(wm.waypoints.length+1)); }catch{ name=''; }
-  if(name===null) return;
-  name=String(name).trim()||('Waypoint '+(wm.waypoints.length+1));
-  const wp={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,x:Math.round(x),y:64,z:Math.round(z),dim:wm.dim,color:WM_COLORS[wm.waypoints.length%WM_COLORS.length]};
-  wm.waypoints.push(wp);
-  const r=await window.observer.worldmapSetWaypoints(wm.waypoints);
-  if(!r||!r.ok) toast(t('toast.wpSaveFail'),'error');
-  else toast(name+' ✓','success');
-  wmRenderList();wmDraw();
-  wmJump(x,z);
-}
-// (Tab activation hook lives in switchTab — see js/08-shell.js.)
-$('#wmReload').onclick=wmLoad;
-$('#wmReload2').onclick=wmLoad;
-$('#wmCopySeed').onclick=async()=>{if(!wm.level)return;try{await navigator.clipboard.writeText(wm.level.seed);toast(t('toast.copied'),'success')}catch{toast(wm.level.seed)}};
-// W1: switching dimension MUST clear wmColorCache too. Its key is 'cx,cz' with no dim, so a chunk
-// viewed in one dimension kept that dimension's colour after switching (until the 4000-entry LRU
-// evicted it). wmLoad() already clears both; this path must match.
-// W1: switching dimension must (a) clear BOTH caches and (b) INVALIDATE any in-flight/queued biome
-// fetch from the OLD dimension, or its response lands after the switch and paints old-dimension
-// biome colours into the new one. Bump the request seq + cancel the debounce timer so a late reply
-// is dropped (the seq check in wmScheduleBiomes/wmPrefetchBiomes discards stale responses).
-$$('#wmDims .filter-chip').forEach(c=>c.onclick=()=>{
-  const oldDim=wm.dim;
-  const newDim=c.dataset.dim;
-  if(oldDim!==newDim){
-    if(oldDim==='overworld'&&newDim==='nether'){wm.cam={x:Math.round(wm.cam.x/8),z:Math.round(wm.cam.z/8)};}
-    else if(oldDim==='nether'&&newDim==='overworld'){wm.cam={x:Math.round(wm.cam.x*8),z:Math.round(wm.cam.z*8)};}
-    else if(newDim==='end'){wm.cam={x:0,z:0};}
-  }
-  wm.dim=newDim;clearTimeout(wm.biomeTimer);wm.biomeReqSeq++;wm.biomeLoading=false;wmClearCaches();wm.explored=new Set();wm.exploredDim=null;wmSyncDimTabs();wmRenderLegend();wmLoadChunks(wm.dim);wmDraw();
-});
-$('#wmAdd').onclick=()=>{wm.addMode=!wm.addMode;$('#wmAdd').classList.toggle('active',wm.addMode)};
-async function wmLoadChunks(dim){
-  if(!dim)dim=wm.dim; // defensive: default to the ACTIVE dim so an undefined caller can't null wm.exploredDim
-  try{
-    const r=await window.observer.worldmapChunks(dim);
-    if(r&&r.ok&&r.dim===dim){wm.explored=new Set(r.chunks);wm.exploredDim=dim;wmDraw()}
-  }catch{}
-}
-$('#wmTerrain').onclick=()=>{wm.layers.terrain=!wm.layers.terrain;$('#wmTerrain').classList.toggle('active',wm.layers.terrain);wmDraw()};
 
-$('#wmWpImport')?.addEventListener('click',async()=>{
-  const raw=await promptDialog({title:t('wm.wpImportTitle'),body:t('wm.wpImportDesc'),placeholder:'waypoint:Name:N:X:Y:Z:9... or JourneyMap JSON',ok:t('wm.wpImportBtn')});
-  if(!raw)return;
-  const r=await window.observer.waypointsImport({data:raw,dim:wm.dim});
-  if(!r.ok)return toast(r.error||'Failed');
-  wm.waypoints=r.waypoints||[];
-  wmRenderWaypoints();wmDraw();
-  toast(t('wm.wpImportSuccess',{n:r.added}));
+  // Hit test structures
+  for (const st of wm.structures.values()) {
+    if (st.dim !== wm.dim) continue;
+    const [sx, sy] = wmToScreen(st.x, st.z);
+    if (Math.hypot(px - sx, py - sy) <= hitRadius) {
+      const tpCmd = `/tp @s ${st.x} ~ ${st.z}`;
+      wmShowPopup(px, py, {
+        title: st.name.toUpperCase(),
+        lines: [`Coordinates: ${st.x} ${st.z}`, `Dimension: ${st.dim}`],
+        copy: tpCmd
+      });
+      return;
+    }
+  }
+
+  // Terrain inspect & portal calculation
+  const cx = Math.floor(wx / 16), cz = Math.floor(wz / 16);
+  const rec = wm.biomes.get(wm.dim + ':' + cx + ',' + cz);
+  const lines = [`${wm.dim} · Chunk ${cx}, ${cz}`];
+
+  if (rec && rec[2]) {
+    lines.push(`Biome: ${rec[2].replace(/^minecraft:/, '')}`);
+    if (rec[3]) {
+      const lx = ((wx % 16) + 16) % 16, lz = ((wz % 16) + 16) % 16;
+      const cellIdx = Math.floor(lz / 4) * 4 + Math.floor(lx / 4);
+      lines.push(`Elevation Y: ${rec[3][cellIdx]}`);
+      if (rec[6] && rec[6][cellIdx]) lines.push(`Block: ${rec[6][cellIdx].replace(/^minecraft:/, '')}`);
+    }
+  }
+
+  // Slime chunk indicator
+  if (wm.dim === 'overworld') {
+    const isSlime = isSlimeChunk(wm.seedBig, cx, cz);
+    lines.push(`Slime Chunk: ${isSlime ? '✅ YES' : '❌ NO'}`);
+  }
+
+  // Nether portal link calculation
+  if (wm.dim === 'overworld') {
+    const nx = Math.floor(wx / 8), nz = Math.floor(wz / 8);
+    lines.push(`🌀 ${t('wm.inspectPortal')}: ${nx} ${nz}`);
+    lines.push(t('wm.safetyRadius'));
+  } else if (wm.dim === 'nether') {
+    const ox = wx * 8, oz = wz * 8;
+    lines.push(`🌀 ${t('wm.inspectPortal')}: ${ox} ${oz}`);
+  }
+
+  wm.selectedPos = { x: wx, z: wz, showPortal: true };
+  wmDrawSoon();
+
+  const copyTp = `/tp @s ${wx} ~ ${wz}`;
+  wmShowPopup(px, py, { title: `${wx} ${wz}`, lines, copy: copyTp });
+}
+
+// Live refresh ticker
+let wmLiveTick = 0, wmRefreshing = false;
+setInterval(() => {
+  if (wmRefreshing || !state.running || !wm.level) return;
+  const tab = document.getElementById('worldmap');
+  if (!tab || !tab.classList.contains('active')) return;
+  wmLiveRefresh();
+}, 15000);
+
+async function wmLiveRefresh() {
+  if (wmRefreshing || !state.running || !wm.level) return;
+  wmRefreshing = true;
+  try {
+    const r = await window.observer.worldmapLoad();
+    if (r && r.level && r.level.ok) {
+      wm.players = (r.players && r.players.players) || [];
+      wm.level = r.level;
+      try { $('#wmSeed').textContent = wm.level.seed; } catch {}
+      wmRenderList(); wmDrawSoon();
+      if (++wmLiveTick % 3 === 0) wmLoadChunks(wm.dim);
+    }
+  } catch {}
+  wmRefreshing = false;
+}
+
+// Waypoint Modal Management
+let selectedWpIcon = 'star';
+let selectedWpColor = WM_COLORS[0];
+
+function wmOpenAddWaypointModal(x, z) {
+  wm.pendingWpPos = { x: Math.round(x), z: Math.round(z) };
+  const modal = $('#wmWpModal'); if (!modal) return;
+  const nameInput = $('#wmWpNameInput');
+  if (nameInput) {
+    nameInput.value = `${t('wm.waypoints')} ${wm.waypoints.length + 1}`;
+    nameInput.focus();
+  }
+  const preview = $('#wmWpCoordsPreview');
+  if (preview) preview.textContent = `${wm.dim.toUpperCase()} · X: ${Math.round(x)}, Z: ${Math.round(z)}`;
+
+  // Populate color swatches
+  const colorBox = $('#wmColorSelector');
+  if (colorBox) {
+    colorBox.innerHTML = WM_COLORS.map((c, i) =>
+      `<span class="wm-color-circle ${i === 0 ? 'active' : ''}" style="background:${c}" data-color="${c}"></span>`
+    ).join('');
+    selectedWpColor = WM_COLORS[0];
+    colorBox.querySelectorAll('.wm-color-circle').forEach(el => {
+      el.onclick = () => {
+        colorBox.querySelectorAll('.wm-color-circle').forEach(s => s.classList.remove('active'));
+        el.classList.add('active');
+        selectedWpColor = el.dataset.color;
+      };
+    });
+  }
+
+  // Icon selector
+  const iconBox = $('#wmIconSelector');
+  if (iconBox) {
+    iconBox.querySelectorAll('.filter-chip').forEach(b => {
+      b.onclick = () => {
+        iconBox.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        b.classList.add('active');
+        selectedWpIcon = b.dataset.icon || 'star';
+      };
+    });
+  }
+
+  modal.hidden = false;
+}
+
+function wmCloseAddWaypointModal() {
+  const modal = $('#wmWpModal');
+  if (modal) modal.hidden = true;
+  wm.pendingWpPos = null;
+}
+
+$('#wmWpModalClose')?.addEventListener('click', wmCloseAddWaypointModal);
+$('#wmWpModalCancel')?.addEventListener('click', wmCloseAddWaypointModal);
+
+$('#wmWpModalSave')?.addEventListener('click', async () => {
+  if (!wm.pendingWpPos) return;
+  const nameInput = $('#wmWpNameInput');
+  const name = String(nameInput?.value || '').trim() || (`Waypoint ${wm.waypoints.length + 1}`);
+  const wp = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name,
+    x: wm.pendingWpPos.x,
+    y: 64,
+    z: wm.pendingWpPos.z,
+    dim: wm.dim,
+    icon: selectedWpIcon,
+    color: selectedWpColor
+  };
+  wm.waypoints.push(wp);
+  const r = await window.observer.worldmapSetWaypoints(wm.waypoints);
+  if (!r || !r.ok) toast(t('toast.wpSaveFail'), 'error');
+  else toast(`${name} ✓`, 'success');
+  wmCloseAddWaypointModal();
+  wmRenderList();
+  wmDrawSoon();
+  wmJump(wp.x, wp.z);
 });
-$('#wmWpExport')?.addEventListener('click',async()=>{
-  const r=await window.observer.waypointsExport({format:'xaero',dim:wm.dim});
-  if(!r.ok)return toast(r.error||'Failed');
-  if(!r.count)return toast(t('wm.wpNoWaypoints'));
-  const blob=new Blob([r.data],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`waypoints-${wm.dim}-${Date.now()}.txt`;
+
+$('#wmReload').onclick = wmLoad;
+$('#wmReload2').onclick = wmLoad;
+
+$('#wmCopySeed').onclick = async () => {
+  if (!wm.level) return;
+  try {
+    await navigator.clipboard.writeText(wm.level.seed);
+    toast(t('toast.copied'), 'success');
+  } catch {
+    toast(wm.level.seed);
+  }
+};
+
+// Switch dimension
+$$('#wmDims .filter-chip').forEach(c => c.onclick = () => {
+  const oldDim = wm.dim;
+  const newDim = c.dataset.dim;
+  if (oldDim !== newDim) {
+    if (oldDim === 'overworld' && newDim === 'nether') {
+      wm.cam = { x: Math.round(wm.cam.x / 8), z: Math.round(wm.cam.z / 8) };
+    } else if (oldDim === 'nether' && newDim === 'overworld') {
+      wm.cam = { x: Math.round(wm.cam.x * 8), z: Math.round(wm.cam.z * 8) };
+    } else if (newDim === 'end') {
+      wm.cam = { x: 0, z: 0 };
+    }
+  }
+  wm.dim = newDim;
+  // Nether auto-peel: default Y=126 in Nether to peel bedrock roof
+  if (newDim === 'nether') {
+    wm.sliceY = 126;
+    if (wmSliceSlider) wmSliceSlider.value = 126;
+    if (wmSliceLabel) wmSliceLabel.textContent = 'Y: 126';
+  } else {
+    wm.sliceY = null;
+    if (wmSliceSlider) wmSliceSlider.value = 320;
+    if (wmSliceLabel) wmSliceLabel.textContent = 'Y: Surface';
+  }
+
+  clearTimeout(wm.biomeTimer);
+  wm.biomeReqSeq++;
+  wm.biomeLoading = false;
+  wmClearCaches();
+  wm.explored = new Set();
+  wm.exploredDim = null;
+  wmSyncDimTabs();
+  wmRenderLegend();
+  wmLoadChunks(wm.dim);
+  wmDrawSoon();
+});
+
+$('#wmAdd').onclick = () => {
+  wm.addMode = !wm.addMode;
+  $('#wmAdd').classList.toggle('active', wm.addMode);
+};
+
+async function wmLoadChunks(dim) {
+  if (!dim) dim = wm.dim;
+  try {
+    const r = await window.observer.worldmapChunks(dim);
+    if (r && r.ok && r.dim === dim) {
+      wm.explored = new Set(r.chunks);
+      wm.exploredDim = dim;
+      wmTileCache.clear();
+      wmDrawSoon();
+    }
+  } catch {}
+}
+
+$('#wmWpImport')?.addEventListener('click', async () => {
+  const raw = await promptDialog({
+    title: t('wm.wpImportTitle'),
+    body: t('wm.wpImportDesc'),
+    placeholder: 'waypoint:Name:N:X:Y:Z:9... or JourneyMap JSON',
+    ok: t('wm.wpImportBtn')
+  });
+  if (!raw) return;
+  const r = await window.observer.waypointsImport({ data: raw, dim: wm.dim });
+  if (!r.ok) return toast(r.error || 'Failed');
+  wm.waypoints = r.waypoints || [];
+  wmRenderList(); wmDrawSoon();
+  toast(t('wm.wpImportSuccess', { n: r.added }));
+});
+
+$('#wmWpExport')?.addEventListener('click', async () => {
+  const r = await window.observer.waypointsExport({ format: 'xaero', dim: wm.dim });
+  if (!r.ok) return toast(r.error || 'Failed');
+  if (!r.count) return toast(t('wm.wpNoWaypoints'));
+  const blob = new Blob([r.data], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `waypoints-${wm.dim}-${Date.now()}.txt`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast(t('wm.wpExportSuccess',{n:r.count}));
+  toast(t('wm.wpExportSuccess', { n: r.count }));
 });
-wm.layers.terrain=true;
-$('#wmExport').onclick=()=>{
-  const cv=$('#wmCanvas');
-  cv.toBlob(b=>{
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(b);
-    a.download='observerlauncher-map-'+(wm.level?.seed?.slice(-6)||'map')+'.png';
-    a.click();URL.revokeObjectURL(a.href);
-    toast(t('wm.exported'),'success');
+
+$('#wmExport').onclick = () => {
+  const cv = $('#wmCanvas');
+  cv.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = 'observerlauncher-map-' + (wm.level?.seed?.slice(-6) || 'map') + '.png';
+    a.click(); URL.revokeObjectURL(a.href);
+    toast(t('wm.exported'), 'success');
   });
 };
-(function(){
-  const cv=$('#wmCanvas');
-  let dragging=false,lx=0,ly=0,downPos=null;
-  // W6: Pointer Events (not mouse-only) so touch + pen pan/click work too. touch-action:none
-  // (CSS) stops the browser from scrolling instead of panning. pointerdown/up fire for every
-  // pointer type; hover coords still update for a mouse (pointermove without a pressed button).
-  cv.addEventListener('pointerdown',e=>{
-    if(e.button!==0&&e.pointerType==='mouse')return; // left button / any touch or pen
-    try{cv.focus({preventScroll:true})}catch{} // W8: focus the canvas so keyboard pan/zoom works
-    // W8: grabbing a waypoint marker DRAGS it instead of panning. Only a marker in the current
-    // dimension, and never in add mode (there a click places a NEW waypoint). Hit test is the
-    // same 14px radius as click-to-inspect, done newest-first so overlapping pins pick the top one.
-    if(!wm.addMode&&wm.level){
-      const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
-      const wps=wm.waypoints.filter(w=>w.dim===wm.dim);
-      for(let i=wps.length-1;i>=0;i--){
-        const[sx,sy]=wmToScreen(wps[i].x,wps[i].z);
-        if(Math.hypot(px-sx,py-sy)<=14){wm.dragWp=wps[i];downPos=null;try{cv.setPointerCapture(e.pointerId)}catch{};wmHidePopup();return}
+
+// Pointer Events: pan, zoom, click
+(function () {
+  const cv = $('#wmCanvas');
+  let dragging = false, lx = 0, ly = 0, downPos = null;
+
+  cv.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    try { cv.focus({ preventScroll: true }); } catch {}
+
+    if (!wm.addMode && wm.level) {
+      const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+      const wps = wm.waypoints.filter(w => w.dim === wm.dim);
+      for (let i = wps.length - 1; i >= 0; i--) {
+        const [sx, sy] = wmToScreen(wps[i].x, wps[i].z);
+        if (Math.hypot(px - sx, py - sy) <= 14) {
+          wm.dragWp = wps[i];
+          downPos = null;
+          try { cv.setPointerCapture(e.pointerId); } catch {}
+          wmHidePopup();
+          return;
+        }
       }
     }
-    dragging=true;lx=e.clientX;ly=e.clientY;downPos={x:e.clientX,y:e.clientY};
-    try{cv.setPointerCapture(e.pointerId)}catch{}
+
+    dragging = true; lx = e.clientX; ly = e.clientY; downPos = { x: e.clientX, y: e.clientY };
+    try { cv.setPointerCapture(e.pointerId); } catch {}
     wmHidePopup();
   });
-  cv.addEventListener('pointerup',e=>{
-    if(wm.dragWp){
-      wm.dragWp=null;
-      try{cv.releasePointerCapture(e.pointerId)}catch{}
-      // Persist the moved waypoint; refresh the side list so its coords update. No toast - the
-      // marker visibly moved and a toast per drag would be noisy.
-      window.observer.worldmapSetWaypoints(wm.waypoints).catch(()=>{});
+
+  cv.addEventListener('pointerup', e => {
+    if (wm.dragWp) {
+      wm.dragWp = null;
+      try { cv.releasePointerCapture(e.pointerId); } catch {}
+      window.observer.worldmapSetWaypoints(wm.waypoints).catch(() => {});
       wmRenderList();
       return;
     }
-    if(!dragging)return;
-    dragging=false;
-    try{cv.releasePointerCapture(e.pointerId)}catch{}
-    // A drag-pan also fires pointerup — only treat near-stationary presses as clicks so
-    // panning never pops the inspector open.
-    if(!wm.level){downPos=null;return}
-    if(downPos&&Math.hypot(e.clientX-downPos.x,e.clientY-downPos.y)>5){downPos=null;return}
-    downPos=null;
-    const r=cv.getBoundingClientRect();
-    const x=Math.round((e.clientX-r.left-WM_CX())/wm.zoom+wm.cam.x);
-    const z=Math.round((e.clientY-r.top-WM_CY())/wm.zoom+wm.cam.z);
-    if(wm.addMode){
-      wmAddWaypoint(x,z);
-      wm.addMode=false;$('#wmAdd').classList.remove('active');
+    if (!dragging) return;
+    dragging = false;
+    try { cv.releasePointerCapture(e.pointerId); } catch {}
+
+    if (!wm.level) { downPos = null; return; }
+    if (downPos && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) { downPos = null; return; }
+    downPos = null;
+
+    const r = cv.getBoundingClientRect();
+    const x = Math.round((e.clientX - r.left - WM_CX()) / wm.zoom + wm.cam.x);
+    const z = Math.round((e.clientY - r.top - WM_CY()) / wm.zoom + wm.cam.z);
+
+    if (wm.addMode) {
+      wmOpenAddWaypointModal(x, z);
+      wm.addMode = false; $('#wmAdd').classList.remove('active');
       return;
     }
-    wmMapClick(e.clientX-r.left,e.clientY-r.top,x,z);
+    wmMapClick(e.clientX - r.left, e.clientY - r.top, x, z);
   });
-  cv.addEventListener('pointercancel',()=>{dragging=false;downPos=null;wm.dragWp=null});
-  cv.addEventListener('pointermove',e=>{
-    const r=cv.getBoundingClientRect();
-    const wx=Math.round((e.clientX-r.left-WM_CX())/wm.zoom+wm.cam.x);
-    const wz=Math.round((e.clientY-r.top-WM_CY())/wm.zoom+wm.cam.z);
-    $('#wmCoord').textContent=wx+' '+wz;
-    if(wm.dragWp){wm.dragWp.x=wx;wm.dragWp.z=wz;wmDrawSoon();return}
-    if(!dragging)return;
-    wm.cam.x-=(e.clientX-lx)/wm.zoom;wm.cam.z-=(e.clientY-ly)/wm.zoom;
-    lx=e.clientX;ly=e.clientY;wmDrawSoon();
-  });
-  cv.addEventListener('wheel',e=>{
-    e.preventDefault();
-    const r=cv.getBoundingClientRect();
-    const wx=(e.clientX-r.left-WM_CX())/wm.zoom+wm.cam.x;
-    const wz=(e.clientY-r.top-WM_CY())/wm.zoom+wm.cam.z;
-    wm.zoom=Math.max(0.02,Math.min(16,wm.zoom*(e.deltaY<0?1.2:1/1.2)));
-    wm.cam={x:wx-(e.clientX-r.left-WM_CX())/wm.zoom,z:wz-(e.clientY-r.top-WM_CY())/wm.zoom};
+
+  cv.addEventListener('pointercancel', () => { dragging = false; downPos = null; wm.dragWp = null; });
+
+  cv.addEventListener('pointermove', e => {
+    const r = cv.getBoundingClientRect();
+    const wx = Math.round((e.clientX - r.left - WM_CX()) / wm.zoom + wm.cam.x);
+    const wz = Math.round((e.clientY - r.top - WM_CY()) / wm.zoom + wm.cam.z);
+    $('#wmCoord').textContent = wx + ' ' + wz;
+    if (wm.dragWp) { wm.dragWp.x = wx; wm.dragWp.z = wz; wmDrawSoon(); return; }
+    if (!dragging) return;
+    wm.cam.x -= (e.clientX - lx) / wm.zoom;
+    wm.cam.z -= (e.clientY - ly) / wm.zoom;
+    lx = e.clientX; ly = e.clientY;
     wmDrawSoon();
-  },{passive:false});
-  // W6: the old separate 'click' handler is GONE - pointerup now owns click-to-inspect and
-  // add-waypoint. Keeping both would fire the action twice (pointerup AND the synthetic click).
-  // W8: keyboard pan/zoom - canvas has tabindex=0 (index.html) so arrows move the camera,
-  // +/- zoom, 0 fits spawn. Skips when a modifier is held so it never fights browser shortcuts.
-  cv.addEventListener('keydown',e=>{
-    if(e.ctrlKey||e.metaKey||e.altKey)return;
-    const pan=80/wm.zoom;
-    switch(e.key){
-      case 'ArrowLeft':  wm.cam.x-=pan; break;
-      case 'ArrowRight': wm.cam.x+=pan; break;
-      case 'ArrowUp':    wm.cam.z-=pan; break;
-      case 'ArrowDown':  wm.cam.z+=pan; break;
-      case '+': case '=': wmZoomBy(1.25);   e.preventDefault(); return;
-      case '-': case '_': wmZoomBy(1/1.25); e.preventDefault(); return;
+  });
+
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = cv.getBoundingClientRect();
+    const wx = (e.clientX - r.left - WM_CX()) / wm.zoom + wm.cam.x;
+    const wz = (e.clientY - r.top - WM_CY()) / wm.zoom + wm.cam.z;
+    wm.zoom = Math.max(0.02, Math.min(16, wm.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+    wm.cam = { x: wx - (e.clientX - r.left - WM_CX()) / wm.zoom, z: wz - (e.clientY - r.top - WM_CY()) / wm.zoom };
+    wmDrawSoon();
+  }, { passive: false });
+
+  cv.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const pan = 80 / wm.zoom;
+    switch (e.key) {
+      case 'ArrowLeft': wm.cam.x -= pan; break;
+      case 'ArrowRight': wm.cam.x += pan; break;
+      case 'ArrowUp': wm.cam.z -= pan; break;
+      case 'ArrowDown': wm.cam.z += pan; break;
+      case '+': case '=': wmZoomBy(1.25); e.preventDefault(); return;
+      case '-': case '_': wmZoomBy(1 / 1.25); e.preventDefault(); return;
       case '0': wmFitSpawn(); e.preventDefault(); return;
       default: return;
     }
     e.preventDefault();
     wmDrawSoon();
   });
-  new ResizeObserver(()=>wmDraw()).observe(cv);
-})();
-function WM_CX(){return ($('#wmCanvas').clientWidth||800)/2}
-function WM_CY(){return ($('#wmCanvas').clientHeight||520)/2}
-// W8: overview minimap - a small fixed canvas showing explored chunks + the current viewport
-// rectangle, so panning a large world keeps a sense of where you are. Pointer-events:none
-// (CSS) so it never steals a map drag; redrawn from wmDraw so it always matches the main view.
-const WM_MINI_PX=160;
-// WM-2 (3.3.0 perf): two fixes. (1) Throttle: the minimap redraws at most every 400ms instead of
-// on EVERY pan frame (force:true for explicit redraws). (2) One pass instead of two: split+parse the
-// explored set ONCE, keep the bbox, and draw a SAMPLED subset (stride) rather than a hard 4000 cap
-// that just skipped the tail. Much cheaper on a big world.
-function wmDrawMini(force){
-  const cv=$('#wmMini');if(!cv||!wm.level)return;
-  const now=Date.now(); if(!force&&now-(wm.miniAt||0)<400)return; wm.miniAt=now;
-  const ctx=cv.getContext('2d'),S=WM_MINI_PX,dpr=devicePixelRatio||1;
-  if(cv.width!==S*dpr){cv.width=S*dpr;cv.height=S*dpr}
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,S,S);
-  // World extent: explored chunk bounds unioned with the current viewport (so the rect is always
-  // on the minimap). No explored data -> a fixed window around the camera.
-  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
-  const size=wm.explored.size, stride=size>4000?Math.ceil(size/4000):1;
-  const pts=[]; let idx=0;
-  for(const k of wm.explored){
-    const p=k.split(','),ax=Number(p[0]),az=Number(p[1]);
-    if(!isFinite(ax)||!isFinite(az))continue;
-    if(ax<minX)minX=ax;if(ax>maxX)maxX=ax;if(az<minZ)minZ=az;if(az>maxZ)maxZ=az;
-    if(idx++%stride===0)pts.push([ax,az]);
-  }
-  const vw=((($('#wmCanvas').clientWidth||800))/2)/wm.zoom,vh=((($('#wmCanvas').clientHeight||520))/2)/wm.zoom;
-  minX=Math.min(minX,wm.cam.x-vw);maxX=Math.max(maxX,wm.cam.x+vw);
-  minZ=Math.min(minZ,wm.cam.z-vh);maxZ=Math.max(maxZ,wm.cam.z+vh);
-  if(!isFinite(minX)){minX=wm.cam.x-1000;maxX=wm.cam.x+1000;minZ=wm.cam.z-1000;maxZ=wm.cam.z+1000}
-  const span=Math.max(maxX-minX,maxZ-minZ,32)*1.12,midX=(minX+maxX)/2,midZ=(minZ+maxZ)/2;
-  const toM=(wx,wz)=>[(wx-(midX-span/2))/span*S,(wz-(midZ-span/2))/span*S];
-  const dot=Math.max(1,(16/span)*S);
-  ctx.fillStyle='rgba(34,197,94,.28)';
-  for(const[ax,az]of pts){const[sx,sy]=toM(ax*16+8,az*16+8);if(sx<0||sx>S||sy<0||sy>S)continue;ctx.fillRect(sx,sy,dot,dot)}
-  for(const m of wmVisible()){const[sx,sy]=toM(m.x,m.z);ctx.fillStyle=m.color;ctx.beginPath();ctx.arc(sx,sy,1.8,0,7);ctx.fill()}
-  const[vx0,vy0]=toM(wm.cam.x-vw,wm.cam.z-vh),[vx1,vy1]=toM(wm.cam.x+vw,wm.cam.z+vh);
-  ctx.strokeStyle='rgba(232,244,248,.85)';ctx.lineWidth=1;
-  ctx.strokeRect(vx0,vy0,Math.max(2,vx1-vx0),Math.max(2,vy1-vy0));
-}
 
+  new ResizeObserver(() => wmDraw()).observe(cv);
+})();
+
+function WM_CX() { return ($('#wmCanvas').clientWidth || 800) / 2; }
+function WM_CY() { return ($('#wmCanvas').clientHeight || 520) / 2; }
+
+// Minimap
+const WM_MINI_PX = 160;
+function wmDrawMini(force) {
+  const cv = $('#wmMini'); if (!cv || !wm.level) return;
+  const now = Date.now(); if (!force && now - (wm.miniAt || 0) < 400) return; wm.miniAt = now;
+  const ctx = cv.getContext('2d'), S = WM_MINI_PX, dpr = devicePixelRatio || 1;
+  if (cv.width !== S * dpr) { cv.width = S * dpr; cv.height = S * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, S, S);
+
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const size = wm.explored.size, stride = size > 4000 ? Math.ceil(size / 4000) : 1;
+  const pts = []; let idx = 0;
+  for (const k of wm.explored) {
+    const p = k.split(','), ax = Number(p[0]), az = Number(p[1]);
+    if (!isFinite(ax) || !isFinite(az)) continue;
+    if (ax < minX) minX = ax; if (ax > maxX) maxX = ax; if (az < minZ) minZ = az; if (az > maxZ) maxZ = az;
+    if (idx++ % stride === 0) pts.push([ax, az]);
+  }
+  const vw = ((($('#wmCanvas').clientWidth || 800)) / 2) / wm.zoom, vh = ((($('#wmCanvas').clientHeight || 520)) / 2) / wm.zoom;
+  minX = Math.min(minX, wm.cam.x - vw); maxX = Math.max(maxX, wm.cam.x + vw);
+  minZ = Math.min(minZ, wm.cam.z - vh); maxZ = Math.max(maxZ, wm.cam.z + vh);
+  if (!isFinite(minX)) { minX = wm.cam.x - 1000; maxX = wm.cam.x + 1000; minZ = wm.cam.z - 1000; maxZ = wm.cam.z + 1000; }
+  const span = Math.max(maxX - minX, maxZ - minZ, 32) * 1.12, midX = (minX + maxX) / 2, midZ = (minZ + maxZ) / 2;
+  const toM = (wx, wz) => [(wx - (midX - span / 2)) / span * S, (wz - (midZ - span / 2)) / span * S];
+  const dot = Math.max(1, (16 / span) * S);
+  ctx.fillStyle = 'rgba(34,197,94,.28)';
+  for (const [ax, az] of pts) { const [sx, sy] = toM(ax * 16 + 8, az * 16 + 8); if (sx < 0 || sx > S || sy < 0 || sy > S) continue; ctx.fillRect(sx, sy, dot, dot); }
+  for (const m of wmVisible()) { const [sx, sy] = toM(m.x, m.z); ctx.fillStyle = m.color; ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, 7); ctx.fill(); }
+  const [vx0, vy0] = toM(wm.cam.x - vw, wm.cam.z - vh), [vx1, vy1] = toM(wm.cam.x + vw, wm.cam.z + vh);
+  ctx.strokeStyle = 'rgba(232,244,248,.85)'; ctx.lineWidth = 1;
+  ctx.strokeRect(vx0, vy0, Math.max(2, vx1 - vx0), Math.max(2, vy1 - vy0));
+}

@@ -185,6 +185,7 @@ function switchTab(tab){
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
   // hook switchTab itself: it evaluates before this file, so capturing
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
+  if(tab==='settings'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}})}
   if(tab==='worldmap'&&typeof wmLoad==='function')wmLoad().catch(e=>toast(`World Map failed to load: ${e?.message||e}`,'error'));
   // Restore this tab's scroll position (rAF so the panel is laid out first). Console is exempt —
   // it manages its own auto-scroll/tail behavior and should always pin to the newest line.
