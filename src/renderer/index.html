@@ -257,7 +257,7 @@
           <div id="playerInspector">
             <div id="playerDataEmpty" class="workspace-empty"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><h3 data-i18n="ply.emptyInspectTitle">Select a player</h3><p id="playerDataError" class="text-muted" data-i18n="ply.emptyInspectSub">Choose a player from the roster to inspect their 3D skin, equipment, inventory, and stats.</p></div>
             <div id="playerDataForm" hidden>
-              <div class="inspect-header"><img id="inspectAvatar" class="inspect-avatar" alt=""><div class="inspect-title"><div class="inspect-name-row"><b id="inspectName">Player</b><span class="inspect-badge" id="inspectState" data-i18n="pd.stateOffline">Offline data</span><span class="inspect-badges" id="inspectBadges"></span></div><div class="inspect-meta-row"><span id="inspectDim">unknown dimension</span><span id="inspectPos" class="inspect-pos" hidden></span><small id="inspectUuid" class="inspect-uuid" data-tip="Click to copy full UUID">UUID: —</small></div></div><div class="inspect-header-actions"><button type="button" class="btn secondary sm" id="inspectHeaderOpBtn" data-i18n="ply.op">OP</button><button type="button" class="btn secondary sm" id="inspectHeaderWlBtn" data-i18n="ply.whitelist">Whitelist</button><button type="button" class="btn secondary sm" id="inspectHeaderTpBtn" data-i18n="pd.teleport">Teleport</button><button type="button" class="btn danger sm" id="inspectHeaderKickBtn" data-i18n="ply.kick">Kick</button><button type="button" class="btn danger sm" id="inspectHeaderBanBtn" data-i18n="ply.ban">Ban</button><button type="button" class="btn icon-btn sm" id="playerInspectClose" data-i18n-title="ply.closeInspect" title="Close inspector" aria-label="Close inspector">✕</button></div></div>
+              <div class="inspect-header"><img id="inspectAvatar" class="inspect-avatar" alt=""><div class="inspect-title"><div class="inspect-name-row"><b id="inspectName">Player</b><span class="inspect-badge" id="inspectState" data-i18n="pd.stateOffline">Offline data</span><span class="inspect-badges" id="inspectBadges"></span></div><div class="inspect-meta-row"><span id="inspectDim">unknown dimension</span><span id="inspectPos" class="inspect-pos" hidden></span><button type="button" class="btn icon-btn xs pd-map-jump-btn" id="inspectMapJumpBtn" hidden title="View on map" aria-label="View on map"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></button><small id="inspectUuid" class="inspect-uuid" data-tip="Click to copy full UUID">UUID: —</small></div></div><div class="inspect-header-actions"><button type="button" class="btn secondary sm" id="inspectHeaderOpBtn" data-i18n="ply.op">OP</button><button type="button" class="btn secondary sm" id="inspectHeaderWlBtn" data-i18n="ply.whitelist">Whitelist</button><button type="button" class="btn secondary sm" id="inspectHeaderTpBtn" data-i18n="pd.teleport">Teleport</button><button type="button" class="btn danger sm" id="inspectHeaderKickBtn" data-i18n="ply.kick">Kick</button><button type="button" class="btn danger sm" id="inspectHeaderBanBtn" data-i18n="ply.ban">Ban</button><button type="button" class="btn icon-btn sm" id="playerInspectClose" data-i18n-title="ply.closeInspect" title="Close inspector" aria-label="Close inspector">✕</button></div></div>
               <div class="inspect-tabs" role="tablist">
                 <button type="button" class="inspect-tab active" data-pd-tab="overview" role="tab" data-i18n="pd.tabOverview">Overview</button>
                 <button type="button" class="inspect-tab" data-pd-tab="inventory" role="tab" data-i18n="pd.tabInventory">Inventory</button>
@@ -266,32 +266,92 @@
                 <button type="button" class="inspect-tab" data-pd-tab="edit" role="tab" data-i18n="pd.tabOffline">Saved data (edit)</button>
               </div>
               <div class="inspect-panel active" id="pdPanelOverview">
-                <div class="pd-hero">
-                  <div class="pd-3d-container" id="pd3dContainer">
-                    <canvas id="pd3dCanvas"></canvas>
-                    <div id="pd3dStatus" class="pd-3d-status" hidden></div>
-                    <button type="button" class="pd-3d-toggle active" id="pd3dToggleArmor" hidden data-i18n-title="pd.toggleArmor" title="Toggle 3D armor preview">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                      <span data-i18n="pd.armorBtn">Armor</span>
-                    </button>
+                <div class="pd-stage-overview">
+                  <div class="pd-stage-wrap">
+                    <div class="pd-stage-rail pd-rail-left" id="pdRailArmor" role="group" aria-label="Armor equipment">
+                      <div class="pd-slot-wrap" data-slot-key="Helmet"><div class="inv-cell empty" id="slotHelmet" data-tip="Helmet" tabindex="0"></div><span class="pd-slot-tag">HELM</span></div>
+                      <div class="pd-slot-wrap" data-slot-key="Chestplate"><div class="inv-cell empty" id="slotChestplate" data-tip="Chestplate" tabindex="0"></div><span class="pd-slot-tag">CHEST</span></div>
+                      <div class="pd-slot-wrap" data-slot-key="Leggings"><div class="inv-cell empty" id="slotLeggings" data-tip="Leggings" tabindex="0"></div><span class="pd-slot-tag">LEGS</span></div>
+                      <div class="pd-slot-wrap" data-slot-key="Boots"><div class="inv-cell empty" id="slotBoots" data-tip="Boots" tabindex="0"></div><span class="pd-slot-tag">FEET</span></div>
+                    </div>
+                    <div class="pd-3d-container" id="pd3dContainer">
+                      <canvas id="pd3dCanvas"></canvas>
+                      <div id="pd3dStatus" class="pd-3d-status" hidden></div>
+                      <button type="button" class="pd-3d-toggle active" id="pd3dToggleArmor" hidden data-i18n-title="pd.toggleArmor" title="Toggle 3D armor preview">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span data-i18n="pd.armorBtn">Armor</span>
+                      </button>
+                    </div>
+                    <div class="pd-stage-rail pd-rail-right" id="pdRailHands" role="group" aria-label="Hands and Defense">
+                      <div class="pd-slot-wrap" data-slot-key="Offhand"><div class="inv-cell empty" id="slotOffhand" data-tip="Offhand" tabindex="0"></div><span class="pd-slot-tag">OFFHAND</span></div>
+                      <div class="pd-slot-wrap" data-slot-key="Mainhand"><div class="inv-cell empty" id="slotMainhand" data-tip="Mainhand" tabindex="0"></div><span class="pd-slot-tag">MAIN</span></div>
+                      <div class="pd-defense-badge" id="pdDefenseBadge" title="Armor Defense Points">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span id="pdDefenseValue">0</span>
+                      </div>
+                    </div>
                   </div>
                   <div class="pd-facts">
                     <div class="pd-vitals" id="pdVitals"></div>
                     <div class="pd-support" id="pdSupport"></div>
+                    <div class="inspect-section pd-effects-box" id="pdEffectsSec" hidden>
+                      <div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div>
+                      <div id="pdEffectsList" class="pd-effects-strip"></div>
+                    </div>
                     <details class="pd-more" id="pdMore">
                       <summary data-i18n="pd.allStats">All stats</summary>
                       <div class="pd-vitals" id="pdReadout"></div>
                     </details>
                   </div>
                 </div>
-                <div class="inspect-section"><div class="inspect-section-head"><h3 data-i18n="pd.equipment">Equipment</h3><span class="inv-count" id="equipCount">5 slots</span></div><div id="equipmentGrid" class="pd-equipment"></div></div>
-                <div class="inspect-section" id="pdEffectsSec" hidden><div class="inspect-section-head"><h3 data-i18n="pd.effectsT">Active effects</h3><span class="inv-count" id="pdEffectsCount">0</span></div><div id="pdEffectsList" class="text-list"></div></div>
+                <div id="equipmentGrid" hidden data-i18n="pd.equipment"></div>
               </div>
               <div class="inspect-panel" id="pdPanelInventory">
+                <div class="inv-unified-toolbar">
+                  <div class="inv-view-switch" role="tablist">
+                    <button type="button" class="inv-switch-btn active" id="invSwitchInv" data-inv-view="inv">
+                      <span data-i18n="pd.inventory">Inventory</span>
+                      <span class="inv-count" id="invCount">0 / 36</span>
+                    </button>
+                    <button type="button" class="inv-switch-btn" id="invSwitchEnder" data-inv-view="ender">
+                      <span data-i18n="pd.ender">Ender Chest</span>
+                      <span class="inv-count" id="ecCount">0 / 27</span>
+                    </button>
+                  </div>
+                  <div class="inv-toolbar">
+                    <input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory">
+                    <input id="ecSearch" type="hidden">
+                    <label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label>
+                    <input type="checkbox" id="ecShowEmpty" hidden>
+                    <select id="invSort" class="ol-select" aria-label="Sort">
+                      <option value="slot" data-i18n="pd.sortSlot">Slot</option>
+                      <option value="name" data-i18n="pd.sortName">Name</option>
+                      <option value="count" data-i18n="pd.sortCount">Count</option>
+                    </select>
+                    <select id="ecSort" class="ol-select" aria-label="Sort" hidden>
+                      <option value="slot">Slot</option>
+                      <option value="name">Name</option>
+                      <option value="count">Count</option>
+                    </select>
+                  </div>
+                </div>
                 <div id="invItemDetail" class="inv-item-detail" hidden></div>
-                <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div><div id="hotbarList" class="inv-grid"></div></div>
-                <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><span class="inv-count" id="invCount">0 / 36</span><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory"><label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="invSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="inventoryList" class="inv-grid"></div></div>
-                <div class="inspect-section inv-sec"><div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><span class="inv-count" id="ecCount">0 / 27</span><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div><div class="inv-toolbar"><input id="ecSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter ender chest"><label class="chk"><input type="checkbox" id="ecShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label><select id="ecSort" class="ol-select" aria-label="Sort"><option value="slot" data-i18n="pd.sortSlot">Slot</option><option value="name" data-i18n="pd.sortName">Name</option><option value="count" data-i18n="pd.sortCount">Count</option></select></div><div id="enderChestList" class="inv-grid"></div></div>
+                <div id="invViewMain" class="inv-view-container">
+                  <div class="inspect-section inv-sec">
+                    <div class="inspect-section-head"><h3 data-i18n="pd.inventory">Inventory</h3><div class="inv-bar"><i id="invBar" style="width:0%"></i></div></div>
+                    <div id="inventoryList" class="inv-grid inv-matrix"></div>
+                  </div>
+                  <div class="inspect-section inv-sec" style="margin-top:12px">
+                    <div class="inspect-section-head"><h3 data-i18n="pd.hotbar">Hotbar</h3><span class="inv-count" id="hotbarCount">0 / 9</span></div>
+                    <div id="hotbarList" class="inv-grid inv-matrix inv-matrix-hotbar"></div>
+                  </div>
+                </div>
+                <div id="invViewEnder" class="inv-view-container" hidden>
+                  <div class="inspect-section inv-sec">
+                    <div class="inspect-section-head"><h3 data-i18n="pd.ender">Ender Chest</h3><div class="inv-bar"><i id="ecBar" style="width:0%"></i></div></div>
+                    <div id="enderChestList" class="inv-grid inv-matrix inv-matrix-ender"></div>
+                  </div>
+                </div>
               </div>
               <div class="inspect-panel" id="pdPanelStats">
                 <div class="inspect-note" data-i18n="pd.statsNote">Statistics come straight from the world save — no server command needed.</div>

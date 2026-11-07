@@ -242,15 +242,101 @@ const GRID_CFG={
   '#inventoryList':{slots:27,base:9,count:'#invCount',bar:'#invBar',getQ:()=>invSearchQuery,getShow:()=>invShowEmpty,getSort:()=>invSortBy},
   '#enderChestList':{slots:27,base:0,count:'#ecCount',bar:'#ecBar',getQ:()=>ecSearchQuery,getShow:()=>ecShowEmpty,getSort:()=>ecSortBy},
 };
+function parseMinecraftColors(str){
+  if(!str||typeof str!=='string') return '';
+  if(!str.includes('§')) return esc(str);
+  const colorMap={'0':'#000000','1':'#0000aa','2':'#00aa00','3':'#00aaaa','4':'#aa0000','5':'#aa00aa','6':'#ffaa00','7':'#aaaaaa','8':'#555555','9':'#5555ff','a':'#55ff55','b':'#55ffff','c':'#ff5555','d':'#ff55ff','e':'#ffff55','f':'#ffffff'};
+  const parts=str.split(/(§[0-9a-fk-or])/gi);
+  let curColor=''; let bold=false; let italic=false; let underline=false; let strike=false; let out='';
+  for(const p of parts){
+    if(!p) continue;
+    if(p.startsWith('§')){
+      const code=p[1].toLowerCase();
+      if(colorMap[code]){ curColor=colorMap[code]; }
+      else if(code==='l') bold=true;
+      else if(code==='o') italic=true;
+      else if(code==='n') underline=true;
+      else if(code==='m') strike=true;
+      else if(code==='r'){ curColor=''; bold=false; italic=false; underline=false; strike=false; }
+    } else {
+      let styles=[];
+      if(curColor) styles.push(`color:${curColor}`);
+      if(bold) styles.push('font-weight:700');
+      if(italic) styles.push('font-style:italic');
+      if(underline&&strike) styles.push('text-decoration:underline line-through');
+      else if(underline) styles.push('text-decoration:underline');
+      else if(strike) styles.push('text-decoration:line-through');
+      out+=`<span${styles.length?` style="${styles.join(';')}"`:''}>${esc(p)}</span>`;
+    }
+  }
+  return out;
+}
+
+function calculateDefensePoints(armor){
+  if(!Array.isArray(armor)) return 0;
+  let total=0;
+  const BASE_DEF={
+    netherite_helmet:3,diamond_helmet:3,iron_helmet:2,golden_helmet:2,chainmail_helmet:2,turtle_helmet:2,leather_helmet:1,
+    netherite_chestplate:8,diamond_chestplate:8,iron_chestplate:6,golden_chestplate:5,chainmail_chestplate:5,leather_chestplate:3,
+    netherite_leggings:6,diamond_leggings:6,iron_leggings:5,golden_leggings:3,chainmail_leggings:4,leather_leggings:2,
+    netherite_boots:3,diamond_boots:3,iron_boots:2,golden_boots:1,chainmail_boots:1,leather_boots:1
+  };
+  for(const it of armor){
+    if(!it||!it.id) continue;
+    const cleanId=it.id.replace(/^minecraft:/,'').toLowerCase();
+    if(BASE_DEF[cleanId]){ total+=BASE_DEF[cleanId]; }
+    else {
+      const slot=it.slot||(cleanId.includes('helmet')?'Helmet':cleanId.includes('chestplate')?'Chestplate':cleanId.includes('leggings')?'Leggings':cleanId.includes('boots')?'Boots':'');
+      const isHighTier=/dragon|diamond|netherite|black|scale/i.test(cleanId);
+      if(slot==='Helmet') total+=isHighTier?3:2;
+      else if(slot==='Chestplate') total+=isHighTier?8:6;
+      else if(slot==='Leggings') total+=isHighTier?6:5;
+      else if(slot==='Boots') total+=isHighTier?3:2;
+      else total+=2;
+    }
+  }
+  return total;
+}
+
+function populateSlotCell(el, it, defaultLabel){
+  if(!el) return;
+  const isEnch=it&&(it.enchantments?.length||it.storedEnchantments?.length);
+  const enchCls=isEnch?' enchanted':'';
+  if(it&&it.id){
+    let dur='';
+    if(it.durability){
+      dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
+    }
+    el.className=`inv-cell${enchCls}`;
+    el.innerHTML=itemCellInner(itemIconUrl(it.id),itemLabel(it.id),it.id)+dur;
+    const tipHtml=itemTooltipHtml(it,itemLabel(it.id));
+    const tip=itemTooltip(it,itemLabel(it.id));
+    el.setAttribute('data-tip', tip);
+    if(tipHtml) el.setAttribute('data-tip-html', tipHtml); else el.removeAttribute('data-tip-html');
+    el.onclick=()=>showInvItemDetail(it);
+  } else {
+    el.className='inv-cell empty';
+    el.innerHTML='';
+    el.setAttribute('data-tip', `${defaultLabel} (${t('ply.emptySlot')})`);
+    el.removeAttribute('data-tip-html');
+    el.onclick=null;
+  }
+}
+
 function showInvItemDetail(x){
   const d=$('#invItemDetail');if(!d)return;
-  const label=x.customName||itemLabel(x.id);
+  const rawLabel=x.customName||itemLabel(x.id);
+  const formattedLabel=parseMinecraftColors(rawLabel);
   const iconUrl=itemIconUrl(x.id);
   const enchs=[...(x.enchantments||[]),...(x.storedEnchantments||[])];
   const enchHtml=enchs.length?`<div class="inv-item-detail-enchs">${enchs.map(e=>`<span class="pd-ench-pill">✨ ${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}</div>`:'';
   const durHtml=x.durability?`<div class="inv-item-detail-meta"><span style="color:${durColor(x.durability)}">Durability: ${x.durability.remaining} / ${x.durability.max} (${Math.round(x.durability.remaining/x.durability.max*100)}%)</span></div>`:'';
+  let loreHtml='';
+  if(Array.isArray(x.lore)&&x.lore.length){
+    loreHtml=`<div class="inv-item-lore">${x.lore.map(l=>`<div class="inv-lore-line">${parseMinecraftColors(l)}</div>`).join('')}</div>`;
+  }
   d.hidden=false;
-  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,label,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${esc(label)}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==label?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true">✕</button>`;
+  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,rawLabel,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${formattedLabel}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==rawLabel?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${loreHtml}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="$('#invItemDetail').hidden=true" aria-label="Close details">✕</button>`;
   scanAndApplyIsoBlocks(d);
 }
 function renderItemGrid(id,items){
@@ -288,40 +374,74 @@ function renderItemGrid(id,items){
   }).join('');
   scanAndApplyIsoBlocks(n);
 }
-function renderEquipment(armor,offhand){
-  const n=$('#equipmentGrid');if(!n)return;
+function renderEquipment(armor,offhand,mainhand){
   const slots=[...(armor||[]),...(offhand?[{slot:'Offhand',...offhand}]:[])];
-  const order=['Helmet','Chestplate','Leggings','Boots','Offhand'];
-  n.innerHTML=order.map(label=>{
-    const it=slots.find(x=>x.slot===label);
-    let cell='';
-    const isEnch=it&&(it.enchantments?.length||it.storedEnchantments?.length);
-    const enchCls=isEnch?' enchanted':'';
-    let dur='';
-    let enchList='';
-    if(it&&it.id){
-      cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id),it.id);
-      if(it.durability){
-        dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
+  const helm=slots.find(x=>x.slot==='Helmet');
+  const chest=slots.find(x=>x.slot==='Chestplate');
+  const legs=slots.find(x=>x.slot==='Leggings');
+  const feet=slots.find(x=>x.slot==='Boots');
+  const off=slots.find(x=>x.slot==='Offhand')||offhand;
+  const main=mainhand||null;
+
+  populateSlotCell($('#slotHelmet'), helm, 'Helmet');
+  populateSlotCell($('#slotChestplate'), chest, 'Chestplate');
+  populateSlotCell($('#slotLeggings'), legs, 'Leggings');
+  populateSlotCell($('#slotBoots'), feet, 'Boots');
+  populateSlotCell($('#slotOffhand'), off, 'Offhand');
+  populateSlotCell($('#slotMainhand'), main, 'Mainhand');
+
+  const defVal=$('#pdDefenseValue');
+  if(defVal) defVal.textContent=calculateDefensePoints(armor);
+
+  const n=$('#equipmentGrid');
+  if(n){
+    const order=['Helmet','Chestplate','Leggings','Boots','Offhand'];
+    n.innerHTML=order.map(label=>{
+      const it=slots.find(x=>x.slot===label);
+      let cell='';
+      const isEnch=it&&(it.enchantments?.length||it.storedEnchantments?.length);
+      const enchCls=isEnch?' enchanted':'';
+      let dur='';
+      let enchList='';
+      if(it&&it.id){
+        cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id),it.id);
+        if(it.durability){
+          dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
+        }
+        const enchs=[...(it.enchantments||[]),...(it.storedEnchantments||[])];
+        if(enchs.length){
+          const show=enchs.slice(0,2);
+          const rem=enchs.length-show.length;
+          const allTip=esc(enchs.map(e=>`${itemLabel(e.id)} ${romanNum(e.level)}`).join(', '));
+          enchList=`<div class="pd-equip-ench-list">${show.map(e=>`<span class="pd-ench-pill" title="${esc(itemLabel(e.id))} ${romanNum(e.level)}">${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}${rem>0?`<span class="pd-ench-pill" title="${allTip}">+${rem} more</span>`:''}</div>`;
+        }
       }
-      const enchs=[...(it.enchantments||[]),...(it.storedEnchantments||[])];
-      if(enchs.length){
-        const show=enchs.slice(0,2);
-        const rem=enchs.length-show.length;
-        const allTip=esc(enchs.map(e=>`${itemLabel(e.id)} ${romanNum(e.level)}`).join(', '));
-        enchList=`<div class="pd-equip-ench-list">${show.map(e=>`<span class="pd-ench-pill" title="${esc(itemLabel(e.id))} ${romanNum(e.level)}">${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}${rem>0?`<span class="pd-ench-pill" title="${allTip}">+${rem} more</span>`:''}</div>`;
-      }
+      const tipHtml=it&&it.id?itemTooltipHtml(it,itemLabel(it.id)):'';
+      const tip=it&&it.id?itemTooltip(it,itemLabel(it.id)):t('ply.emptySlot');
+      return `<div class="pd-equip">
+        <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipHtml?`data-tip-html="${tipHtml}"`:''} tabindex="0">${cell}${dur}</div>
+        <span class="pd-equip-slot">${esc(label)}</span>
+        ${it&&it.id?`<span class="pd-equip-name" title="${esc(it.customName||itemLabel(it.id))}">${esc(it.customName||itemLabel(it.id))}</span>`:''}
+        ${enchList}
+      </div>`;
+    }).join('');
+  }
+  const stage=$('#pdStageOverview');
+  if(stage) scanAndApplyIsoBlocks(stage);
+  if(n) scanAndApplyIsoBlocks(n);
+}
+
+function jumpToPlayerMap(x,z,dim){
+  if(typeof switchTab==='function') switchTab('worldmap');
+  setTimeout(()=>{
+    if(dim&&typeof wmSwitchDim==='function'){
+      const dimKey=dim.includes('nether')?'nether':(dim.includes('the_end')||/(^|:)end$/.test(dim))?'end':'overworld';
+      wmSwitchDim(dimKey);
     }
-    const tipHtml=it&&it.id?itemTooltipHtml(it,itemLabel(it.id)):'';
-    const tip=it&&it.id?itemTooltip(it,itemLabel(it.id)):t('ply.emptySlot');
-    return `<div class="pd-equip">
-      <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipHtml?`data-tip-html="${tipHtml}"`:''} tabindex="0">${cell}${dur}</div>
-      <span class="pd-equip-slot">${esc(label)}</span>
-      ${it&&it.id?`<span class="pd-equip-name" title="${esc(it.customName||itemLabel(it.id))}">${esc(it.customName||itemLabel(it.id))}</span>`:''}
-      ${enchList}
-    </div>`;
-  }).join('');
-  scanAndApplyIsoBlocks(n);
+    if(typeof wmJump==='function'){
+      wmJump(Math.round(x),Math.round(z));
+    }
+  },120);
 }
 let playerFilter='online';
 const PLAYERS_PAGE_SIZE=14;
@@ -1027,6 +1147,8 @@ async function openPlayerInspector(uuid,name){
   const invCb=$('#invShowEmpty');if(invCb)invCb.checked=true;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=true;
   const invSel=$('#invSort');if(invSel)invSel.value='slot';const ecSel=$('#ecSort');if(ecSel)ecSel.value='slot';
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
+  $('#invSwitchInv')?.classList.add('active');$('#invSwitchEnder')?.classList.remove('active');
+  const _vm=$('#invViewMain');if(_vm)_vm.hidden=false;const _ve=$('#invViewEnder');if(_ve)_ve.hidden=true;
   // BUGFIX: the header avatar used an external mc-heads.net URL, which shows a broken image when
   // offline or when that request is slow. Reuse the 8x8 face we already cached for the roster, then
   // the full skin data URI, then the local placeholder, so the header never shows a broken image.
@@ -1046,13 +1168,23 @@ async function openPlayerInspector(uuid,name){
   $('#inspectName').textContent=name;$('#inspectDim').textContent=d.dimension||t('ply.unknownDim');
   renderPdBadges(name);
   const posEl=$('#inspectPos');
-  if(posEl){const p=d.pos||[];if(p.length>=3){posEl.hidden=false;posEl.textContent=`X ${Math.round(p[0])}  Y ${Math.round(p[1])}  Z ${Math.round(p[2])}`}else{posEl.hidden=true}}
+  const mapJump=$('#inspectMapJumpBtn');
+  const p=d.pos||[];
+  if(p.length>=3){
+    if(posEl){posEl.hidden=false;posEl.textContent=`X ${Math.round(p[0])}  Y ${Math.round(p[1])}  Z ${Math.round(p[2])}`}
+    if(mapJump){mapJump.hidden=false;mapJump.onclick=()=>jumpToPlayerMap(p[0],p[2],d.dimension)}
+  }else{
+    if(posEl)posEl.hidden=true;
+    if(mapJump)mapJump.hidden=true;
+  }
   renderPdReadout(d,isOnline);
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
   $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtNum(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtNum(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   iconEpoch++;
-  lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
-  renderEquipment(d.armor,d.offhand);
+  const selSlot=d.selectedItemSlot??0;
+  const mainhand=(d.inventory||[]).find(x=>x.slot===selSlot)||null;
+  lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest,mainhand};
+  renderEquipment(d.armor,d.offhand,mainhand);
   renderItemGrid('#hotbarList',d.inventory);renderItemGrid('#inventoryList',d.inventory);renderItemGrid('#enderChestList',d.enderChest);
   renderPdEffects(d.effects);
   renderPdStats(d.stats);
@@ -1133,11 +1265,34 @@ $('#playersList').addEventListener('click',async e=>{
     if(name) openPlayerInspector(uuid,name);
   }
 });
-$('#invSearch')?.addEventListener('input',e=>{invSearchQuery=e.target.value;renderItemGrid('#inventoryList',lastInspectData?.inventory||[])});
+$('#invSearch')?.addEventListener('input',e=>{
+  invSearchQuery=e.target.value;ecSearchQuery=e.target.value;
+  renderItemGrid('#inventoryList',lastInspectData?.inventory||[]);
+  renderItemGrid('#enderChestList',lastInspectData?.enderChest||[]);
+});
 // v4.0.0: the hotbar shares invShowEmpty + invSort, so a change re-renders both grids.
 const rerenderInv=()=>{renderItemGrid('#hotbarList',lastInspectData?.inventory||[]);renderItemGrid('#inventoryList',lastInspectData?.inventory||[])};
-$('#invShowEmpty')?.addEventListener('change',e=>{invShowEmpty=e.target.checked;rerenderInv()});
-$('#invSort')?.addEventListener('change',e=>{invSortBy=e.target.value;rerenderInv()});$('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});$('#playerInspectClose').onclick=closePlayerInspectModal;
+$('#invShowEmpty')?.addEventListener('change',e=>{
+  invShowEmpty=e.target.checked;ecShowEmpty=e.target.checked;
+  rerenderInv();
+  renderItemGrid('#enderChestList',lastInspectData?.enderChest||[]);
+});
+$('#invSort')?.addEventListener('change',e=>{
+  invSortBy=e.target.value;ecSortBy=e.target.value;
+  rerenderInv();
+  renderItemGrid('#enderChestList',lastInspectData?.enderChest||[]);
+});
+$('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});
+$('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});
+$('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});
+$('#invSwitchInv')?.addEventListener('click',()=>{
+  $('#invSwitchInv')?.classList.add('active');$('#invSwitchEnder')?.classList.remove('active');
+  const vm=$('#invViewMain');if(vm)vm.hidden=false;const ve=$('#invViewEnder');if(ve)ve.hidden=true;
+});
+$('#invSwitchEnder')?.addEventListener('click',()=>{
+  $('#invSwitchEnder')?.classList.add('active');$('#invSwitchInv')?.classList.remove('active');
+  const vm=$('#invViewMain');if(vm)vm.hidden=true;const ve=$('#invViewEnder');if(ve)ve.hidden=false;
+});$('#playerInspectClose').onclick=closePlayerInspectModal;
 $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
   playerFilter=b.dataset.playerFilter;playerPage=0;
   $$('[data-player-filter]').forEach(x=>{ const on=x===b; x.classList.toggle('active',on); x.setAttribute('aria-pressed', on?'true':'false'); });
@@ -1187,7 +1342,7 @@ window.observer.onIconsUpdate(()=>{
     _iconUpdateTimer = null;
   iconEpoch++;
   if(!selectedPlayer||$('#playerDataForm')?.hidden||!lastInspectData)return;
-  renderEquipment(lastInspectData.armor,lastInspectData.offhand);
+  renderEquipment(lastInspectData.armor,lastInspectData.offhand,lastInspectData.mainhand);
   renderItemGrid('#inventoryList',lastInspectData.inventory);
   renderItemGrid('#enderChestList',lastInspectData.enderChest);
   renderItemGrid('#hotbarList',lastInspectData.inventory);

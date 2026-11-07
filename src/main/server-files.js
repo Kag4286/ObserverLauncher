@@ -430,7 +430,7 @@ async function readPlayerData(root, uuid, name) {
   const xpLevel = simple.XpLevel ?? simple.xpLevel ?? simple.xp_level ?? 0;
   const xpTotal = simple.XpTotal ?? simple.xpTotal ?? simple.xp_total ?? 0;
   const gameType = simple.playerGameType ?? simple.PlayerGameType ?? simple.player_game_type ?? simple.gameType ?? 0;
-  return { file, parsed, type: parsed.type, data: { health, food, saturation, xpLevel, xpTotal, gameType, dimension: dim, pos: simple.Pos || simple.pos || [], inventory: mainInventory, armor, offhand, enderChest, effects, stats } };
+  return { file, parsed, type: parsed.type, data: { health, food, saturation, xpLevel, xpTotal, gameType, dimension: dim, pos: simple.Pos || simple.pos || [], inventory: mainInventory, armor, offhand, selectedItemSlot: simple.SelectedItemSlot ?? simple.selectedItemSlot ?? 0, enderChest, effects, stats } };
 }
 function parseServerLine(text, live, send) {
   // Strip Minecraft color codes (§a) AND ANSI escape codes (\u001b[31m etc.) that servers/plugins inject.

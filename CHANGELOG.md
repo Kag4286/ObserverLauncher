@@ -10,6 +10,33 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [8.0.0] - 2026-11-07
+
+**Player Inspector 2.0: Spatial Character Stage, High-Legibility Telemetry HUD, Unified Inventory Matrix, World Map Bridge, and Intention-Clustered Live Admin.**
+
+### Player Inspector 2.0 Architecture & Design System:
+- **Spatial Character Stage (`src/renderer/js/03-players.js`, `src/renderer/index.html`, `src/renderer/css/04-players.css`, `src/renderer/css/07-polish.css`):**
+  - Replaced bottom 5-card equipment spam with an integrated Character Stage centering the 3D player canvas.
+  - Flanked model laterally with sleek 38px equipment brackets: left rail houses vertical armor slots (`Helmet`, `Chestplate`, `Leggings`, `Boots`), while right rail presents `Mainhand`, `Offhand`, and total Armor Defense points.
+  - Dynamically computes total player armor defense rating from equipped armor attributes.
+  - Retained ambient spatial aura reacting to player world dimension (Overworld, Nether, The End).
+- **High-Legibility Telemetry HUD & World Map Bridge (`src/renderer/js/03-players.js`, `src/renderer/index.html`):**
+  - Implemented 10-segment precision visual meters for Health (with absorption highlights) and Food (with saturation ratings).
+  - Added in-game styled XP progress bar with neon level numeral.
+  - Added direct World Map jump bridge (`[↗ Map]`) on player coordinates that transitions to the World Map and centers the viewport on player's position.
+  - Rendered active potion effects as a clean horizontal pill strip with Roman numeral amplifiers and countdown timers.
+- **Unified Inventory Matrix & Editorial Lore Drawer (`src/renderer/js/03-players.js`, `src/renderer/index.html`):**
+  - Integrated 9×3 Main Inventory and 9×1 Hotbar into a single 9-column matrix.
+  - Added segmented view switch between Player Inventory (36 slots) and Ender Chest (27 slots).
+  - Built editorial item inspection drawer with full support for Minecraft section-sign (`§`) color formatting codes, enchantments, durability, and NBT tags.
+- **Dense Statistics Telemetry & Modular Admin (`src/renderer/js/03-players.js`, `src/renderer/index.html`):**
+  - Converted oversized stat card grid into a high-density, searchable, and sortable telemetry table with category filtering.
+  - Clustered live admin actions into intention tiles (Vitals Recovery, Gamemode Switch, XP Controls, Teleportation, Item Giver) with dangerous actions (Kick, Ban, Clear) isolated in a safety zone.
+  - Validated offline `.dat` NBT editor with range constraints and automated safety backup.
+- **Localization & Integrity:**
+  - Synchronized new strings across all 7 supported locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
+  - Updated `package.json` version to `8.0.0`.
+
 ## [7.0.2] - 2026-11-05
 
 **Native Pumpkin Server Integration, Authentic 3D Block/Item Procedural Rendering, and Player Inspector Loop Stabilization.**
