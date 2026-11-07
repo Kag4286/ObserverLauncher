@@ -267,7 +267,7 @@ html.motion-lite .ol-tip{animation:none}
 .inspect-avatar{width:48px;height:48px;border-radius:var(--r);border:1px solid var(--border);background:var(--field);image-rendering:pixelated;flex-shrink:0}
 .inspect-title{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
 .inspect-name-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
-.inspect-title b{font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.inspect-title b{font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%} .inspect-meta-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:2px}
 /* BUGFIX: this rule matched EVERY direct <span> child of .inspect-title, which includes
    #inspectDim, #inspectPos and any badge span -- so the brand-coloured coordinates and the mono
    dimension were both rewritten to 11px --text-muted, and #inspectPos (a separate element right
@@ -393,7 +393,7 @@ html.motion-lite .ol-tip{animation:none}
 .pd-hero{display:grid;grid-template-columns:minmax(180px,260px) minmax(0,1fr);gap:var(--space-5);align-items:start}
 @media(max-width:720px){.pd-hero{grid-template-columns:1fr}}
 .pd-facts{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
-.pd-vitals{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--space-4)}
+.pd-vitals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4)} @media(min-width:1200px){.pd-vitals{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .pd-vital{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pd-vital>span{font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-4)}
 .pd-vital>b{font:700 22px var(--font-ui);color:var(--text);line-height:1.1;overflow-wrap:anywhere}

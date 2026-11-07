@@ -14,17 +14,17 @@
 .manual-btns{display:flex;gap:6px;flex-wrap:wrap}
 .players-table{margin-top:var(--space-3);display:grid;gap:var(--space-2)}
 /* Entity card (DESIGN.md 16.3): a player is a card, not a table row. */
-.player-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-3);align-items:center;padding:var(--space-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
-.player-row:hover{background:var(--surface-3);border-color:var(--border-strong)}
-.player-row.online{border-color:var(--success-weak)}
+.player-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;position:relative;transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out),transform var(--dur-micro) var(--ease-out)}
+.player-row:hover{background:var(--surface-3);border-color:var(--border-strong);transform:translateY(-1px)}
+.player-row.online{border-color:rgba(0,229,160,0.2)}
 .player-row.is-selected{background:var(--surface-3);border-color:var(--brand);box-shadow:0 0 0 1px var(--brand), 0 2px 8px rgba(0,229,160,0.12)}
-.player-avatar{width:42px;height:42px;border-radius:50%;background:var(--surface-3);border:2px solid var(--border);object-fit:cover;flex-shrink:0}
-.player-row.online .player-avatar{border-color:var(--success);box-shadow:0 0 0 3px var(--success-weak)}
-.player-main{display:flex;flex-direction:column;gap:3px;min-width:0}
-.player-name{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
-.player-name b{font:700 15px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-meta{font:500 12px var(--font-ui);color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
-.player-name .player-row-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);flex-shrink:0} .player-row.online .player-row-dot{background:var(--success);box-shadow:0 0 0 4px var(--success-weak)}
+.player-avatar-wrap{position:relative;width:42px;height:42px;flex-shrink:0} .player-avatar{width:42px;height:42px;border-radius:var(--r-sm);background:var(--surface-3);border:1px solid var(--border);object-fit:cover;image-rendering:pixelated;display:block}
+.player-row.online .player-avatar{border-color:rgba(0,229,160,0.4)} .player-status-dot{position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;border:2px solid var(--surface-2);background:var(--text-dim)} .player-status-dot.online{background:var(--success);box-shadow:0 0 6px var(--success)}
+.player-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.player-name{display:flex;align-items:center;gap:6px;min-width:0}
+.player-name b{font:700 14px var(--font-ui);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player-meta{font:500 11.5px var(--font-ui);color:var(--text-muted);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ply-online-txt{color:var(--success);font-weight:600} .ply-offline-txt{color:var(--text-muted)} .ply-meta-dot{color:var(--text-dim);font-size:10px} .ply-uuid-snip{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim)} .player-row-select{margin-left:auto;color:var(--text-dim);display:flex;align-items:center;flex-shrink:0;transition:transform var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)} .player-row:hover .player-row-select{color:var(--text-muted);transform:translateX(2px)} .player-row.is-selected .player-row-select{color:var(--brand);transform:translateX(2px)}
 .player-badge{font:700 10px var(--font-mono);padding:3px 8px;border-radius:999px;letter-spacing:.04em} .player-badge.op{background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand-soft)} .player-badge.whitelisted{background:var(--surface);border:1px solid var(--border);color:var(--text-muted)} .player-badge.banned{background:var(--danger-weak);color:var(--danger);border:1px solid var(--danger-weak)}
 .player-row-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .row-action{border:1px solid var(--border);background:var(--surface-2);color:var(--text-muted);border-radius:var(--r-xs);padding:7px 10px;font:600 12px var(--font-ui);cursor:pointer;white-space:nowrap;transition:color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}

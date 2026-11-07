@@ -424,21 +424,27 @@ function renderPlayers(){
   if(!page.length){n.innerHTML=`<div class="player-empty"><b>${t('ply.empty')}</b><span>${t('ply.emptySub')}</span></div>`}else{n.innerHTML=page.map(p=>{
     const attrs=`data-player="${esc(p.name)}" data-uuid="${esc(p.uuid||'')}"`;
     const avatar = getHeadAvatarHtml(p.uuid, p.name);
-    const meta=[p.online?`<span style="color:var(--success)">${t('ply.online')}</span>`:`<span>${t('ply.offline')}</span>`, p.hasData?t('ply.hasData'):t('ply.noData'), p.uuid?`UUID ${esc(p.uuid.slice(0,8))}…`:null].filter(Boolean).join(' • ');
+    const meta=[
+      p.online ? `<span class="ply-online-txt">${t('ply.online')}</span>` : `<span class="ply-offline-txt">${t('ply.offline')}</span>`,
+      `<span>${p.hasData ? t('ply.hasData') : t('ply.noData')}</span>`,
+      p.uuid ? `<span class="ply-uuid-snip">UUID ${esc(p.uuid.slice(0,8))}…</span>` : null
+    ].filter(Boolean).join('<span class="ply-meta-dot">•</span>');
     const isSelected = selectedPlayer && (selectedPlayer.name === p.name || (selectedPlayer.uuid && selectedPlayer.uuid === p.uuid));
     const rowCls = `player-row ${p.online?'online':''} ${isSelected?'is-selected':''}`.trim();
-    return `<div class="${rowCls}" tabindex="0" role="listitem" ${attrs}>
-      ${avatar}
+    return `<div class="${rowCls}" tabindex="0" role="listitem" ${attrs} data-tip="${p.hasData?t('ply.inspectHint'):t('ply.noDataHint')}">
+      <div class="player-avatar-wrap">
+        ${avatar}
+        <i class="player-status-dot ${p.online?'online':'offline'}"></i>
+      </div>
       <div class="player-main">
-        <div class="player-name"><i class="player-row-dot"></i><b>${esc(p.name)}</b>${badgeHtml(p)}</div>
+        <div class="player-name">
+          <b title="${esc(p.name)}">${esc(p.name)}</b>
+          ${badgeHtml(p)}
+        </div>
         <div class="player-meta">${meta}</div>
       </div>
-      <div class="player-row-actions">
-        ${rowActionBtn('op',p.op?t('ply.removeOp'):t('ply.makeOp'),p.op,'',`${attrs} data-value="${p.op?'off':'on'}"`)}
-        ${rowActionBtn('whitelist',p.whitelisted?t('ply.unwhitelist'):t('ply.whitelist'),p.whitelisted,'',`${attrs} data-value="${p.whitelisted?'off':'on'}"`)}
-        ${rowActionBtn('ban',p.banned?t('ply.unban'):t('ply.ban'),p.banned,'danger',`${attrs} data-value="${p.banned?'off':'on'}"`)}
-        <button class="row-action danger" data-row-action="kick" ${attrs} ${p.online?'':`disabled data-tip="${t('ply.kickHint')}"`}>${t('ply.kick')}</button>
-        <button class="row-action ${p.hasData?'':'muted'}" data-row-action="inspect" ${attrs} data-tip="${p.hasData?t('ply.inspectHint'):t('ply.noDataHint')}">${t('ply.inspect')}</button>
+      <div class="player-row-select" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>`;
   }).join('')}
@@ -478,7 +484,7 @@ function pdIsOnline(name,uuid){
   const n=String(name||'').toLowerCase();
   return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid===uuid));
 }
-function fmtStat(val, fallback = '—') {
+function fmtNum(val, fallback = '—') {
   if (val === null || val === undefined || val === '' || val === 'undefined' || val === 'null') return fallback;
   const num = Number(val);
   if (!Number.isFinite(num)) return fallback;
@@ -506,7 +512,7 @@ function renderPdReadout(d,isOnline){
     const n = hasValue ? Math.max(0, Math.min(max, Number(value))) : 0;
     const filled = hasValue ? Math.round(n / max * segments) : 0;
     const segs = Array.from({length: segments}, (_, i) => `<i class="${i < filled ? cls : ''}"></i>`).join('');
-    const disp = hasValue ? fmtStat(n) : '—';
+    const disp = hasValue ? fmtNum(n) : '—';
     return `<div class="pd-vital pd-vital-meter"><span>${esc(k)}</span><b>${esc(disp)}</b>` +
       `<div class="pd-meter" role="meter" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${n}"${hasValue ? '' : ' aria-disabled="true"'}>${segs}</div></div>`;
   };
@@ -524,7 +530,7 @@ function renderPdReadout(d,isOnline){
   const support=$('#pdSupport');
   if(support) support.innerHTML=[
     `<span>${esc(t('pd.dimension'))} <span class="pd-dim-chip pd-dim-${dimKey}">${esc(dim||t('ply.unknownDim'))}</span></span>`,
-    `<span>${esc(t('pd.saturation'))} <b>${esc(fmtStat(d.saturation))}</b></span>`,
+    `<span>${esc(t('pd.saturation'))} <b>${esc(fmtNum(d.saturation))}</b></span>`,
     `<span>${esc(t('pd.xp'))} <b>${esc(String(d.xpLevel??0))}</b></span>`,
     `<span>${esc(t('pd.totalXp'))} <b>${esc(String(d.xpTotal??0))}</b></span>`,
   ].join('');
@@ -535,9 +541,9 @@ function renderPdReadout(d,isOnline){
   const rows=[
     [t('pd.stateLabel'),isOnline?t('pd.stateOnline'):t('pd.stateOffline'),isOnline?'ok':'dim'],
     [t('pd.dimension'),d.dimension||t('ply.unknownDim'),'dim'],
-    [t('pd.health'),fmtStat(d.health),''],
-    [t('pd.food'),fmtStat(d.food),''],
-    [t('pd.saturation'),fmtStat(d.saturation),''],
+    [t('pd.health'),fmtNum(d.health),''],
+    [t('pd.food'),fmtNum(d.food),''],
+    [t('pd.saturation'),fmtNum(d.saturation),''],
     [t('pd.xp'),d.xpLevel??0,''],
     [t('pd.totalXp'),d.xpTotal??0,''],
     [t('pd.gamemode'),gm,''],
@@ -987,6 +993,18 @@ async function openPlayerInspector(uuid,name){
       }
     });
   }
+  const isBanned = (f.banned || []).some(x => (typeof x==='string'?x:x?.name)?.toLowerCase() === name.toLowerCase());
+  const banBtn = $('#inspectHeaderBanBtn');
+  if (banBtn) {
+    banBtn.textContent = isBanned ? t('ply.unban') : t('ply.ban');
+    banBtn.classList.toggle('active', isBanned);
+    banBtn.onclick = () => withBusy(banBtn, async () => {
+      const bad = playerNameError(name);
+      if (bad) return toast(bad);
+      if (!isBanned && !await confirmDialog({ title: t('ply.ban'), body: t('ply.confirmBan', { n: name }), ok: t('ply.ban'), danger: true })) return;
+      togglePlayerBan({ uuid, name }, !isBanned);
+    });
+  }
   const closeBtn = $('#playerInspectClose');
   if (closeBtn) closeBtn.onclick = deselectPlayer;
 
@@ -1031,7 +1049,7 @@ async function openPlayerInspector(uuid,name){
   if(posEl){const p=d.pos||[];if(p.length>=3){posEl.hidden=false;posEl.textContent=`X ${Math.round(p[0])}  Y ${Math.round(p[1])}  Z ${Math.round(p[2])}`}else{posEl.hidden=true}}
   renderPdReadout(d,isOnline);
   const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
-  $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtStat(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtStat(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
+  $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtNum(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtNum(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   iconEpoch++;
   lastInspectData={armor:d.armor,offhand:d.offhand,inventory:d.inventory,enderChest:d.enderChest};
   renderEquipment(d.armor,d.offhand);
@@ -1128,6 +1146,12 @@ $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
 // UX (2.6.0) a11y: arrow keys move focus between roster rows (like the rail nav). Enter/Space on a
 // focused row is left to the inner action buttons; the row itself is a focus target only.
 $('#playersList')?.addEventListener('keydown',e=>{
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('player-row')){
+    e.preventDefault();
+    const name=e.target.dataset.player,uuid=e.target.dataset.uuid||null;
+    if(name) openPlayerInspector(uuid,name);
+    return;
+  }
   if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;
   const rows=[...$$('#playersList .player-row')]; if(!rows.length)return;
   const cur=rows.indexOf(document.activeElement); if(cur<0)return;
