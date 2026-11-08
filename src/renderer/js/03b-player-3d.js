@@ -67,7 +67,7 @@ const PLAYER_FS = `
   uniform sampler2D uSampler;
   void main() {
     vec4 color = texture2D(uSampler, vTex);
-    if (color.a < 0.1) discard; // Transparency for outer layers
+    if (color.a < 0.5) discard; // Cutout transparency matches Minecraft Java Edition
     gl_FragColor = color;
   }
 `;
@@ -117,6 +117,9 @@ UV.rightSleeveSlim = { top:[44,32,3,4], bottom:[47,32,3,4], right:[40,36,4,12], 
 UV.leftArmSlim = { top:[36,48,3,4], bottom:[39,48,3,4], right:[32,52,4,12], front:[36,52,3,12], left:[39,52,3,12], back:[42,52,4,12] };
 UV.leftSleeveSlim = { top:[52,48,3,4], bottom:[55,48,3,4], right:[48,52,4,12], front:[52,52,3,12], left:[55,52,3,12], back:[58,52,4,12] };
 UV.horn = { top:[0,16,2,2], bottom:[2,16,2,2], front:[0,18,2,5], back:[2,18,2,5], left:[4,18,2,5], right:[6,18,2,5] };
+UV.boot = { top:[4,16,4,4], bottom:[8,16,4,4], right:[0,26,4,6], front:[4,26,4,6], left:[8,26,4,6], back:[12,26,4,6] };
+UV.belt = { top:[20,16,8,4], bottom:[28,16,8,4], right:[16,26,4,6], front:[20,26,8,6], left:[28,26,4,6], back:[32,26,8,6] };
+UV.collar = { top:[20,20,2,2], bottom:[20,20,2,2], right:[20,20,2,2], front:[20,20,2,2], left:[20,20,2,2], back:[20,20,2,2] };
 
 // Build the 6 UV quads of one body part.
 //
@@ -334,11 +337,11 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const armW = isSlim ? 3 : 4;
   const SKIN = 64;
 
-  // Level 0: Base skin
+  // Level 0: Base skin (micro-overlap 0.04..0.06 seals coplanar seams between adjacent limbs)
   const cHead = buildCube(8, 8, 8, uvc(UV.head, SKIN, SKIN));
-  const cBody = buildCube(8, 12, 4, uvc(UV.body, SKIN, SKIN));
-  const cRArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, SKIN));
-  const cRLeg = buildCube(4, 12, 4, uvc(UV.rightLeg, SKIN, SKIN));
+  const cBody = buildCube(8.04, 12.06, 4.04, uvc(UV.body, SKIN, SKIN));
+  const cRArm = buildCube(armW + 0.04, 12.04, 4.04, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, SKIN));
+  const cRLeg = buildCube(4.06, 12.04, 4.04, uvc(UV.rightLeg, SKIN, SKIN));
 
   // Level 1: Outer skin parts (+0.25..+0.35 inflation)
   const cHat = buildCube(8.5, 8.5, 8.5, uvc(UV.hat, SKIN, SKIN));
@@ -347,35 +350,39 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const cRPants = buildCube(4.25, 12.25, 4.25, uvc(UV.rightPants, SKIN, SKIN));
 
   // Legacy skin support
-  let cLArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.leftArmSlim : UV.leftArm, SKIN, SKIN));
+  let cLArm = buildCube(armW + 0.04, 12.04, 4.04, uvc(isSlim ? UV.leftArmSlim : UV.leftArm, SKIN, SKIN));
   let cLSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.leftSleeveSlim : UV.leftSleeve, SKIN, SKIN));
-  let cLLeg = buildCube(4, 12, 4, uvc(UV.leftLeg, SKIN, SKIN));
+  let cLLeg = buildCube(4.06, 12.04, 4.04, uvc(UV.leftLeg, SKIN, SKIN));
   let cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.leftPants, SKIN, SKIN));
 
-  // Level 2: Inner armor parts (Leggings, +0.6..+0.7 inflation)
-  const cLeggings32 = buildCube(8.7, 12.4, 4.7, uvc(UV.body, SKIN, 32));
-  const cLeggings64 = buildCube(8.7, 12.4, 4.7, uvc(UV.body, SKIN, 64));
-  const cRightLeggings32 = buildCube(4.55, 12.35, 4.55, uvc(UV.rightLeg, SKIN, 32));
-  const cRightLeggings64 = buildCube(4.55, 12.35, 4.55, uvc(UV.rightLeg, SKIN, 64));
-  const cLeftLeggings32 = buildCube(4.55, 12.35, 4.55, uvcMirrored(UV.rightLeg, SKIN, 32));
-  const cLeftLeggings64 = buildCube(4.55, 12.35, 4.55, uvcMirrored(UV.rightLeg, SKIN, 64));
+  // Level 2: Inner armor parts (Leggings: waist belt height 5.0 at y=14.5, legs height 12.2)
+  const cLeggings32 = buildCube(8.7, 5.0, 4.7, uvc(UV.belt, SKIN, 32));
+  const cLeggings64 = buildCube(8.7, 5.0, 4.7, uvc(UV.belt, SKIN, 64));
+  const cRightLeggings32 = buildCube(4.55, 12.2, 4.55, uvc(UV.rightLeg, SKIN, 32));
+  const cRightLeggings64 = buildCube(4.55, 12.2, 4.55, uvc(UV.rightLeg, SKIN, 64));
+  const cLeftLeggings32 = buildCube(4.55, 12.2, 4.55, uvcMirrored(UV.rightLeg, SKIN, 32));
+  const cLeftLeggings64 = buildCube(4.55, 12.2, 4.55, uvcMirrored(UV.rightLeg, SKIN, 64));
 
-  // Level 3: Outer armor parts (Helmet, Chestplate, Boots, +1.0..+1.2 inflation)
+  // Level 3: Outer armor parts (Boots: height 6.3; Chestplate: height 12.8; Helmet + Horns)
+  const cRightBoot32 = buildCube(4.75, 6.3, 4.75, uvc(UV.boot, SKIN, 32));
+  const cRightBoot64 = buildCube(4.75, 6.3, 4.75, uvc(UV.boot, SKIN, 64));
+  const cLeftBoot32 = buildCube(4.75, 6.3, 4.75, uvcMirrored(UV.boot, SKIN, 32));
+  const cLeftBoot64 = buildCube(4.75, 6.3, 4.75, uvcMirrored(UV.boot, SKIN, 64));
+
   const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32));
   const cHelmet64 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 64));
   const cHelmetOverlay32 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 32));
   const cHelmetOverlay64 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 64));
   const cHorn = buildCube(1.8, 1.8, 4.5, uvc(UV.horn, SKIN, 64));
+
+  const cNeckCollar32 = buildCube(5.2, 2.6, 4.2, uvc(UV.collar, SKIN, 32));
+  const cNeckCollar64 = buildCube(5.2, 2.6, 4.2, uvc(UV.collar, SKIN, 64));
   const cChestplate32 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 32));
   const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
   const cRightArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
   const cRightArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
   const cLeftArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvcMirrored(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
   const cLeftArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvcMirrored(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
-  const cRightBoot32 = buildCube(4.9, 12.6, 4.9, uvc(UV.rightLeg, SKIN, 32));
-  const cRightBoot64 = buildCube(4.9, 12.6, 4.9, uvc(UV.rightLeg, SKIN, 64));
-  const cLeftBoot32 = buildCube(4.9, 12.6, 4.9, uvcMirrored(UV.rightLeg, SKIN, 32));
-  const cLeftBoot64 = buildCube(4.9, 12.6, 4.9, uvcMirrored(UV.rightLeg, SKIN, 64));
 
   let rotX = 0, rotY = 0;
   let dragging = false, lastX = 0, lastY = 0;
@@ -503,21 +510,24 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
         setOffset(-1.0, -2.0);
         gl.bindTexture(gl.TEXTURE_2D, texLegs);
         const is64 = texLegsH === 64;
-        drawPart(is64 ? cLeggings64 : cLeggings32, p('body').x, p('body').y, 0);
+        drawPart(is64 ? cLeggings64 : cLeggings32, p('body').x, HIP_Y + 2.5, 0);
         drawPart(is64 ? cRightLeggings64 : cRightLeggings32, p('legR').x, p('legR').y, 0);
         drawPart(is64 ? cLeftLeggings64 : cLeftLeggings32, p('legL').x, p('legL').y, 0);
       }
 
-      setOffset(-2.0, -3.0);
       if (texBoots && equipment && equipment.boots) {
+        setOffset(-1.8, -2.8);
         gl.bindTexture(gl.TEXTURE_2D, texBoots);
         const is64 = texBootsH === 64;
-        drawPart(is64 ? cRightBoot64 : cRightBoot32, p('legR').x, p('legR').y, 0);
-        drawPart(is64 ? cLeftBoot64 : cLeftBoot32, p('legL').x, p('legL').y, 0);
+        drawPart(is64 ? cRightBoot64 : cRightBoot32, p('legR').x, 3.15, 0);
+        drawPart(is64 ? cLeftBoot64 : cLeftBoot32, p('legL').x, 3.15, 0);
       }
       if (texChest && equipment && equipment.chest) {
         gl.bindTexture(gl.TEXTURE_2D, texChest);
         const is64 = texChestH === 64;
+        setOffset(-2.2, -3.2);
+        drawPart(is64 ? cNeckCollar64 : cNeckCollar32, p('body').x, SHOULDER_Y - 1.0, 0);
+        setOffset(-2.4, -3.4);
         drawPart(is64 ? cChestplate64 : cChestplate32, p('body').x, p('body').y, 0);
         drawPart(is64 ? cRightArmArmor64 : cRightArmArmor32, p('armR').x, p('armR').y, 0);
         drawPart(is64 ? cLeftArmArmor64 : cLeftArmArmor32, p('armL').x, p('armL').y, 0);
@@ -525,12 +535,14 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
       if (texHelmet && equipment && equipment.helmet) {
         gl.bindTexture(gl.TEXTURE_2D, texHelmet);
         const is64 = texHelmetH === 64;
+        setOffset(-2.8, -3.8);
         drawPart(is64 ? cHelmet64 : cHelmet32, p('head').x, p('head').y, 0);
-        setOffset(-2.5, -3.5);
+        setOffset(-3.2, -4.2);
         drawPart(is64 ? cHelmetOverlay64 : cHelmetOverlay32, p('head').x, p('head').y, 0);
 
         const isDragonHelmet = Boolean(helmetMat && helmetMat.isMod && helmetMat.ns === 'iceandfire' && (helmetMat.mat.includes('armor_') || helmetMat.mat.includes('dragon')));
         if (isDragonHelmet && is64) {
+          setOffset(-3.5, -4.5);
           const headMat = mat4Translate(p('head').x, p('head').y, 0);
           const leftMat = mat4Multiply(headMat, mat4Multiply(mat4Translate(3.6, 2.0, -3.8), mat4Multiply(mat4RotateY(0.35), mat4Multiply(mat4RotateX(-0.35), mat4Translate(0, 0, -2.0)))));
           drawPartTransform(cHorn, leftMat);

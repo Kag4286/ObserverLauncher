@@ -19,11 +19,12 @@
 // root; net/BrowserWindow are required LAZILY inside the GUI-only paths that actually use them.
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { dataDir } = require('./data-dir.js');
 const { singleton: modsIndex } = require('./mods-index.js');
 const { openJar } = require('./jar-reader.js');
 const { readPackTexture } = require('./resource-pack.js');
-const { renderCustomModItem, renderCustomVanillaItem } = require('./custom-item-renders.js');
+const { renderCustomModItem, renderCustomVanillaItem, encodePng } = require('./custom-item-renders.js');
 
 // Hybrid CDN: jsDelivr is Cloudflare-backed, high-speed, and accessible worldwide (not blocked by
 // ISPs that block raw.githubusercontent.com). raw.githubusercontent is retained as a second fallback.
@@ -652,9 +653,65 @@ function readModTexture(file) {
   return modsIndex.readTexture(parts.namespace, parts.name);
 }
 
+function decodePngRgba(png) {
+  let off = 8, w, h, idats = [];
+  while (off < png.length) {
+    const l = png.readUInt32BE(off), t = png.toString('ascii', off + 4, off + 8);
+    if (t === 'IHDR') { w = png.readUInt32BE(off + 8); h = png.readUInt32BE(off + 12); }
+    else if (t === 'IDAT') idats.push(png.subarray(off + 8, off + 8 + l));
+    off += 12 + l;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idats)), stride = w * 4, img = Buffer.alloc(w * h * 4);
+  let rOff = 0;
+  for (let y = 0; y < h; y++) {
+    const f = raw[rOff++], prev = y > 0 ? (y - 1) * stride : null, curr = y * stride;
+    for (let x = 0; x < stride; x++) {
+      let val = raw[rOff++], a = x >= 4 ? img[curr + x - 4] : 0, b = prev !== null ? img[prev + x] : 0, c = (prev !== null && x >= 4) ? img[prev + x - 4] : 0;
+      if (f === 1) val = (val + a) & 0xff;
+      else if (f === 2) val = (val + b) & 0xff;
+      else if (f === 3) val = (val + Math.floor((a + b) / 2)) & 0xff;
+      else if (f === 4) { const pr = a + b - c, pa = Math.abs(pr - a), pb = Math.abs(pr - b), pc = Math.abs(pr - c); val = (val + ((pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c))) & 0xff; }
+      img[curr + x] = val;
+    }
+  }
+  return { w, h, img };
+}
+
+function patchIceAndFireArmorBlack(blackBuf) {
+  try {
+    const grayBuf = modsIndex.readArmorTexture('iceandfire', 'armor_gray', 1);
+    if (!grayBuf) return blackBuf;
+    const black = decodePngRgba(blackBuf);
+    const gray = decodePngRgba(grayBuf);
+    if (!black || !gray || black.w !== 64 || black.h !== 64 || gray.w !== 64 || gray.h !== 64) return blackBuf;
+    const combined = Buffer.from(black.img);
+    for (let y = 17; y < 64; y++) {
+      for (let x = 0; x < 64; x++) {
+        const idx = (y * 64 + x) * 4;
+        const ga = gray.img[idx + 3];
+        if (ga > 10) {
+          combined[idx] = Math.round(gray.img[idx] * 0.5);
+          combined[idx + 1] = Math.round(gray.img[idx + 1] * 0.5);
+          combined[idx + 2] = Math.round(gray.img[idx + 2] * 0.5);
+          combined[idx + 3] = ga;
+        }
+      }
+    }
+    return encodePng(64, 64, combined);
+  } catch {
+    return blackBuf;
+  }
+}
+
 function readModArmorTexture(file, layer) {
   const parts = prepareModLookup(file);
-  return parts ? modsIndex.readArmorTexture(parts.namespace, parts.name, layer) : null;
+  if (!parts) return null;
+  const buf = modsIndex.readArmorTexture(parts.namespace, parts.name, layer);
+  if (!buf) return null;
+  if (parts.namespace === 'iceandfire' && Number(layer) === 1 && parts.name === 'armor_black') {
+    return patchIceAndFireArmorBlack(buf);
+  }
+  return buf;
 }
 
 module.exports = { init, handle, setActiveResourcePackPath, getActiveResourcePackPath, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf, readModArmorTexture };

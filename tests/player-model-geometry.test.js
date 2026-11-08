@@ -188,5 +188,10 @@ ck('mArm east has flipped U order', mArm.east[0][0] > mArm.east[1][0]);
 ck('mArm west samples rightArm.left', Math.round(mArm.west[1][0] * 64) === UV.rightArm.left[0]);
 ck('mArm west has flipped U order', mArm.west[0][0] > mArm.west[1][0]);
 
+// --- Seam sealing & anatomy assertions ---
+ck('UV.boot defined', Boolean(UV.boot && UV.boot.front && UV.boot.front[1] === 26));
+ck('UV.belt defined', Boolean(UV.belt && UV.belt.front && UV.belt.front[1] === 26));
+ck('UV.collar defined', Boolean(UV.collar && UV.collar.front && UV.collar.front[1] === 20));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
