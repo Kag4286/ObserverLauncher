@@ -293,25 +293,37 @@ class ModsIndex {
     const cacheKey = `${ns}:${nm}`;
     if (this.extractCache.has(cacheKey)) return this.extractCache.get(cacheKey);
     const isCommonTag = ns === 'c' || ns === 'forge' || ns === 'common';
-    const wanted = isCommonTag ? [] : candidateEntries(namespace, name);
-    const invertedNm = nm.includes('_') ? nm.split('_').reverse().join('_') : '';
-    const matcher = e => {
-      const lower = e.toLowerCase();
-      if (!lower.includes('/textures/') || !lower.endsWith('.png')) return false;
-      if (!isCommonTag && !lower.startsWith(`assets/${ns}/`)) return false;
-      const base = path.basename(lower, '.png');
-      return base === nm || (invertedNm && base === invertedNm);
-    };
-    const directBuf = this._findInJars(ns, wanted, cacheKey, matcher);
-    if (directBuf) return directBuf;
 
+    // 1. Minecraft standard: model JSON descriptors (assets/<ns>/models/item/<name>.json)
+    // define the exact layer0 / texture mapping chosen by the mod author.
     if (!isCommonTag) {
       const modelCandidates = candidateModelEntries(namespace, name);
       const modelBuf = this._findModelTexture(ns, modelCandidates, cacheKey);
       if (modelBuf) return modelBuf;
+    }
 
-      const entityCandidates = [`assets/${ns}/textures/entity/${nm}.png`];
-      if (nm.includes('backpack')) entityCandidates.push(`assets/${ns}/textures/entity/backpack.png`);
+    // 2. Direct texture entry under textures/item/ or textures/block/
+    const wanted = isCommonTag ? [] : candidateEntries(namespace, name);
+    const directBuf = this._findInJars(ns, wanted, cacheKey, null);
+    if (directBuf) return directBuf;
+
+    // 3. Fallback: match texture filename in subdirectories, but NEVER match entity textures
+    // (entity textures are unwrapped 3D mob/vehicle UV skins, not inventory icons).
+    const invertedNm = nm.includes('_') ? nm.split('_').reverse().join('_') : '';
+    const matcher = e => {
+      const lower = e.toLowerCase();
+      if (!lower.includes('/textures/') || !lower.endsWith('.png')) return false;
+      if (lower.includes('/entity/') || lower.includes('/entities/')) return false;
+      if (!isCommonTag && !lower.startsWith(`assets/${ns}/`)) return false;
+      const base = path.basename(lower, '.png');
+      return base === nm || (invertedNm && base === invertedNm);
+    };
+    const matchedBuf = this._findInJars(ns, [], cacheKey, matcher);
+    if (matchedBuf) return matchedBuf;
+
+    // 4. Entity fallback for specific wearable containers like backpacks
+    if (!isCommonTag && (nm.includes('backpack') || nm.includes('bag'))) {
+      const entityCandidates = [`assets/${ns}/textures/entity/${nm}.png`, `assets/${ns}/textures/entity/backpack.png`];
       const entityBuf = this._findInJars(ns, entityCandidates, cacheKey);
       if (entityBuf) return entityBuf;
     }

@@ -155,17 +155,47 @@ function renderIsometricAnvil(id) {
   return canvas.toDataURL();
 }
 
-function isPreRenderedIcon(img) {
+function cropAnimatedSpriteIfNeeded(img) {
   if (!img || !img.naturalWidth || !img.naturalHeight) return false;
-  if (img.naturalWidth > 32) return false;
+  if (img.naturalHeight > img.naturalWidth && img.naturalHeight % img.naturalWidth === 0 && !img.dataset.frameCropped) {
+    try {
+      const w = img.naturalWidth;
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = w;
+      const cx = cv.getContext('2d');
+      if (cx) {
+        cx.imageSmoothingEnabled = false;
+        cx.drawImage(img, 0, 0, w, w, 0, 0, w, w);
+        img.dataset.frameCropped = '1';
+        img.src = cv.toDataURL();
+        return true;
+      }
+    } catch (_) {}
+  }
+  return false;
+}
+
+function isSolidBlockTile(img) {
+  if (!img || !img.naturalWidth || !img.naturalHeight) return false;
+  if (img.naturalWidth !== img.naturalHeight) return false;
   try {
     const { canvas, ctx } = createIsoCanvas(16);
     if (!ctx) return false;
     ctx.drawImage(img, 0, 0, 16, 16);
-    const d = ctx.getImageData(0, 0, 16, 1).data;
-    if (d[3] === 0 && d[15 * 4 + 3] === 0) return true;
-  } catch (_) {}
-  return false;
+    const idata = ctx.getImageData(0, 0, 16, 16).data;
+    const cornerIndices = [0, 15 * 4, (15 * 16) * 4, (15 * 16 + 15) * 4];
+    for (const idx of cornerIndices) {
+      if (idata[idx + 3] < 200) return false;
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isPreRenderedIcon(img) {
+  return !isSolidBlockTile(img);
 }
 
 function applyIsometricBlockIfNeeded(img) {
@@ -178,17 +208,13 @@ function applyIsometricBlockIfNeeded(img) {
       img.src = cached;
       return;
     }
-    if (isPreRenderedIcon(img)) {
+    const id = img.dataset.id;
+    const isAnvil = id && (id.includes('anvil') || id.endsWith('anvil'));
+    if (!isAnvil && !isSolidBlockTile(img)) {
       img.dataset.iso = '1';
       return;
     }
-    const id = img.dataset.id;
-    let dataUrl;
-    if (id && (id.includes('anvil') || id.endsWith('anvil'))) {
-      dataUrl = renderIsometricAnvil(id);
-    } else {
-      dataUrl = renderIsometricBlock(img);
-    }
+    const dataUrl = isAnvil ? renderIsometricAnvil(id) : renderIsometricBlock(img);
     if (dataUrl) {
       lruSet(isoBlockCache, origSrc, dataUrl, 256);
       img.dataset.iso = '1';
@@ -202,6 +228,7 @@ function scanAndApplyIsoBlocks(container) {
   const imgs = container.querySelectorAll ? container.querySelectorAll('img[data-id]:not([data-iso="1"])') : [];
   for (const img of imgs) {
     if (img.complete && img.naturalWidth > 1) {
+      if (cropAnimatedSpriteIfNeeded(img)) continue;
       applyIsometricBlockIfNeeded(img);
     }
   }
@@ -227,6 +254,7 @@ function markCellIcon(e, missing) {
   if (!cell) return;
   if (!missing && img.naturalWidth > 1) {
     cell.classList.remove('icon-missing');
+    if (cropAnimatedSpriteIfNeeded(img)) return;
     applyIsometricBlockIfNeeded(img);
     return;
   }

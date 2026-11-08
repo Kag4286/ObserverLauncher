@@ -116,6 +116,7 @@ UV.rightArmSlim = { top:[44,16,3,4], bottom:[47,16,3,4], right:[40,20,4,12], fro
 UV.rightSleeveSlim = { top:[44,32,3,4], bottom:[47,32,3,4], right:[40,36,4,12], front:[44,36,3,12], left:[47,36,3,12], back:[50,36,4,12] };
 UV.leftArmSlim = { top:[36,48,3,4], bottom:[39,48,3,4], right:[32,52,4,12], front:[36,52,3,12], left:[39,52,3,12], back:[42,52,4,12] };
 UV.leftSleeveSlim = { top:[52,48,3,4], bottom:[55,48,3,4], right:[48,52,4,12], front:[52,52,3,12], left:[55,52,3,12], back:[58,52,4,12] };
+UV.horn = { top:[0,16,2,2], bottom:[2,16,2,2], front:[0,18,2,5], back:[2,18,2,5], left:[4,18,2,5], right:[6,18,2,5] };
 
 // Build the 6 UV quads of one body part.
 //
@@ -362,6 +363,9 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // Level 3: Outer armor parts (Helmet, Chestplate, Boots, +1.0..+1.2 inflation)
   const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32));
   const cHelmet64 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 64));
+  const cHelmetOverlay32 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 32));
+  const cHelmetOverlay64 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 64));
+  const cHorn = buildCube(1.8, 1.8, 4.5, uvc(UV.horn, SKIN, 64));
   const cChestplate32 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 32));
   const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
   const cRightArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
@@ -447,12 +451,12 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     const rot = mat4Multiply(mat4RotateX(rotX), mat4RotateY(rotY));
     const baseMvp = mat4Multiply(proj, mat4Multiply(view, rot));
 
-    const drawPart = (cube, tx, ty, tz) => {
-      const model = mat4Translate(tx, ty, tz);
+    const drawPartTransform = (cube, model) => {
       gl.uniformMatrix4fv(uMvp, false, mat4Multiply(baseMvp, model));
       bindBufs(cube);
       gl.drawArrays(gl.TRIANGLES, 0, 36);
     };
+    const drawPart = (cube, tx, ty, tz) => drawPartTransform(cube, mat4Translate(tx, ty, tz));
 
     // BUGFIX: bind the skin texture on EVERY draw. loadArmor's upload() binds the armor texture to
     // TEXTURE0, and both skin and armor share that one texture unit (the sampler defaults to 0), so
@@ -522,6 +526,18 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
         gl.bindTexture(gl.TEXTURE_2D, texHelmet);
         const is64 = texHelmetH === 64;
         drawPart(is64 ? cHelmet64 : cHelmet32, p('head').x, p('head').y, 0);
+        setOffset(-2.5, -3.5);
+        drawPart(is64 ? cHelmetOverlay64 : cHelmetOverlay32, p('head').x, p('head').y, 0);
+
+        const isDragonHelmet = Boolean(helmetMat && helmetMat.isMod && helmetMat.ns === 'iceandfire' && (helmetMat.mat.includes('armor_') || helmetMat.mat.includes('dragon')));
+        if (isDragonHelmet && is64) {
+          const headMat = mat4Translate(p('head').x, p('head').y, 0);
+          const leftMat = mat4Multiply(headMat, mat4Multiply(mat4Translate(3.6, 2.0, -3.8), mat4Multiply(mat4RotateY(0.35), mat4Multiply(mat4RotateX(-0.35), mat4Translate(0, 0, -2.0)))));
+          drawPartTransform(cHorn, leftMat);
+
+          const rightMat = mat4Multiply(headMat, mat4Multiply(mat4Translate(-3.6, 2.0, -3.8), mat4Multiply(mat4RotateY(-0.35), mat4Multiply(mat4RotateX(-0.35), mat4Translate(0, 0, -2.0)))));
+          drawPartTransform(cHorn, rightMat);
+        }
       }
     }
   }

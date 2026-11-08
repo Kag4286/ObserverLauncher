@@ -445,38 +445,47 @@ function handle(request) {
     ? (detectMcVersion(serverNames()) || DEFAULT_VERSION)
     : u.hostname;
 
+  // Mod textures come from the server's mod jars. Query the mod index first so
+  // newly discovered model JSON definitions or updated mod jars take immediate effect
+  // and update any existing disk cache rather than being bypassed by stale files.
+  if (kind === 'itemmod') {
+    const parts = splitModFile(file);
+    if (parts) {
+      const custom = renderCustomModItem(parts.namespace, parts.name);
+      if (custom) return respondWithCachedPng(custom, version, kind, file);
+    }
+    const modBuf = readModTexture(file);
+    if (modBuf) return respondWithCachedPng(modBuf, version, kind, file);
+  }
+
+  if (kind === 'armormod' || kind === 'armormodlegs') {
+    const layer = kind === 'armormodlegs' ? 2 : 1;
+    const modBuf = readModArmorTexture(file, layer);
+    if (modBuf) return respondWithCachedPng(modBuf, version, kind, file);
+  }
+
   const local = resolveLocal(version, kind, file);
   if (local) {
     if (kind === 'item' || kind === 'block') {
       const customVanilla = renderCustomVanillaItem(file.replace(/\.png$/, ''));
       if (customVanilla) return respondWithCachedPng(customVanilla, version, kind, file);
-    }
-    if (kind === 'itemmod') {
-      const parts = splitModFile(file);
-      if (parts) {
-        const custom = renderCustomModItem(parts.namespace, parts.name);
-        if (custom) return respondWithCachedPng(custom, version, kind, file);
+      if (file.endsWith('_bed.png')) {
+        try {
+          if (fs.statSync(local).size <= 500) fs.unlinkSync(local);
+          else return pngResponse(local);
+        } catch { return pngResponse(local); }
+      } else {
+        return pngResponse(local);
       }
+    } else {
+      return pngResponse(local);
     }
-    return pngResponse(local);
   }
   // An aliased item serves the base texture's cached copy immediately, so the second open of the
   // inspector does not flash the placeholder first.
   if (kind === 'item') {
     const alias = itemAliasOf(file);
     if (alias) { const a = resolveLocal(version, kind, alias); if (a) return pngResponse(a); }
-  }
-
-  // Mod textures come from a jar on disk, not the network. Try it synchronously: the index is
-  // session-cached and a hit is instant, so the first paint of an inventory renders correctly
-  // without the placeholder flash the remote path needs.
-  if (kind === 'itemmod') {
-    return respondWithCachedPng(readModTexture(file), version, kind, file);
-  }
-
-  if (kind === 'armormod' || kind === 'armormodlegs') {
-    const layer = kind === 'armormodlegs' ? 2 : 1;
-    return respondWithCachedPng(readModArmorTexture(file, layer), version, kind, file);
   }
 
   if (kind === 'item' || kind === 'block') {
