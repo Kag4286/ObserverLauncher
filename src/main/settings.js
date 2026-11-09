@@ -169,7 +169,8 @@ function loadSettingsStore() {
       try { writeFileAtomic(backupPathV3(), JSON.stringify(raw, null, 2)); } catch {}
     }
     const migrated = migrate(raw);
-    if (migrated.version !== rawVersion) {
+    const healed = sanitizeStoreInstances(migrated);
+    if (migrated.version !== rawVersion || healed) {
       try { saveSettings(migrated); } catch {}
     }
     return { ...defaultGlobal(), ...migrated };
@@ -210,7 +211,95 @@ function resolveInstanceId(instanceId) {
   if (byName) return byName.id;
   const byPrefix = insts.filter(i => i.id && i.id.startsWith(target));
   if (byPrefix.length === 1) return byPrefix[0].id;
+  const byPath = insts.find(i => i.serverPath && isSamePath(i.serverPath, target));
+  if (byPath) return byPath.id;
   return null;
+}
+
+// Compare two filesystem paths with platform-specific casing and slash normalization.
+function isSamePath(a, b) {
+  if (!a || !b) return false;
+  try {
+    const pa = path.resolve(String(a)).replace(/[/\\]+$/, '');
+    const pb = path.resolve(String(b)).replace(/[/\\]+$/, '');
+    return process.platform === 'win32' ? pa.toLowerCase() === pb.toLowerCase() : pa === pb;
+  } catch {
+    return String(a) === String(b);
+  }
+}
+
+// Auto-heal legacy or corrupted instance definitions in settings store:
+// 1. Normalizes legacy `path` -> `serverPath`
+// 2. Generates unique `id` if missing
+// 3. Deduplicates instances sharing the same physical path
+function sanitizeStoreInstances(store) {
+  if (!store || typeof store !== 'object') return false;
+  let changed = false;
+  const rawList = Array.isArray(store.instances) ? store.instances : [];
+
+  const normalized = [];
+  for (const item of rawList) {
+    if (!item || typeof item !== 'object') continue;
+    const inst = { ...item };
+    if (inst.path && !inst.serverPath) {
+      inst.serverPath = String(inst.path).replace(/\\\\+/g, '\\');
+      delete inst.path;
+      changed = true;
+    }
+    if (!inst.id || typeof inst.id !== 'string') {
+      inst.id = newInstanceId();
+      changed = true;
+    }
+    normalized.push(inst);
+  }
+
+  const deduped = [];
+  for (const inst of normalized) {
+    const sp = String(inst.serverPath || '').trim();
+    if (!sp) {
+      deduped.push(inst);
+      continue;
+    }
+    const existingIndex = deduped.findIndex(other => isSamePath(other.serverPath, sp));
+    if (existingIndex >= 0) {
+      changed = true;
+      const existing = deduped[existingIndex];
+      const isExistingActive = store.activeInstanceId === existing.id;
+      const isInstActive = store.activeInstanceId === inst.id;
+
+      let preferredName = existing.name;
+      if (/\s*\(\d+\)$/.test(preferredName) && inst.name && !/\s*\(\d+\)$/.test(inst.name)) {
+        preferredName = inst.name;
+      }
+
+      const merged = { ...defaultInstanceFields(), ...existing, ...inst };
+      merged.name = preferredName || existing.name || inst.name;
+      if (isInstActive && !isExistingActive) {
+        merged.id = inst.id;
+      } else {
+        merged.id = existing.id;
+      }
+      deduped[existingIndex] = merged;
+    } else {
+      deduped.push(inst);
+    }
+  }
+
+  if (deduped.length > 0) {
+    if (!store.activeInstanceId || !deduped.some(i => i.id === store.activeInstanceId)) {
+      store.activeInstanceId = deduped[0].id;
+      changed = true;
+    }
+  } else if (store.activeInstanceId) {
+    store.activeInstanceId = null;
+    changed = true;
+  }
+
+  if (changed || deduped.length !== rawList.length) {
+    store.instances = deduped;
+    return true;
+  }
+  return false;
 }
 
 // --- v2.0.0 multi-instance CRUD (Phase B) ---
@@ -266,8 +355,8 @@ function listInstances() {
 function addInstance({ name, serverPath } = {}) {
   const store = loadSettingsStore();
   const instances = Array.isArray(store.instances) ? store.instances.map(i => ({ ...i })) : [];
-  const sp = String(serverPath || '');
-  if (sp && instances.some(i => i.serverPath === sp)) {
+  const sp = String(serverPath || '').trim();
+  if (sp && instances.some(i => isSamePath(i.serverPath, sp))) {
     return { ok: false, error: 'That folder is already used by another instance.' };
   }
   const id = newInstanceId();
@@ -350,10 +439,13 @@ function setInstanceGroup(id, group) {
 function removeInstance(id) {
   const store = loadSettingsStore();
   const before = Array.isArray(store.instances) ? store.instances : [];
-  if (!before.some(i => i.id === id)) return { ok: false, error: 'No such instance.' };
-  const instances = before.filter(i => i.id !== id).map(i => ({ ...i }));
+  const targetId = resolveInstanceId(id) || id;
+  const target = before.find(i => i.id === targetId || i.id === id || (id && (i.name === id || (i.serverPath && isSamePath(i.serverPath, id)))));
+  if (!target) return { ok: false, error: 'No such instance.' };
+  const realId = target.id;
+  const instances = before.filter(i => i !== target).map(i => ({ ...i }));
   let activeInstanceId = store.activeInstanceId;
-  if (activeInstanceId === id) activeInstanceId = (instances[0] && instances[0].id) || null;
+  if (activeInstanceId === realId) activeInstanceId = (instances[0] && instances[0].id) || null;
   saveSettings({ ...store, instances, activeInstanceId });
   return { ok: true, instances: instances.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0, group: typeof i.group === 'string' ? i.group : '' })), activeInstanceId };
 }
@@ -368,7 +460,7 @@ function relinkInstance(id, serverPath) {
   if (!target) return { ok: false, error: 'No such instance.' };
   const sp = String(serverPath || '').trim();
   if (!sp) return { ok: false, error: 'Choose a folder.' };
-  if (instances.some(i => i.id !== id && i.serverPath === sp)) return { ok: false, error: 'That folder is already used by another instance.' };
+  if (instances.some(i => i.id !== id && isSamePath(i.serverPath, sp))) return { ok: false, error: 'That folder is already used by another instance.' };
   const next = instances.map(i => i.id === id ? { ...i, serverPath: sp } : i);
   saveSettings({ ...store, instances: next });
   return { ok: true, instances: next.map(i => ({ id: i.id, name: i.name || '', serverPath: i.serverPath || '', tunnelAddress: i.tunnelAddress || '', autoTunnel: !!i.autoTunnel, accent: i.accent || '', artSeed: Number(i.artSeed) || 0, group: typeof i.group === 'string' ? i.group : '' })) };
@@ -405,4 +497,4 @@ function saveSettingsFor(instanceId, flat) {
   writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
 }
 
-module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, setInstanceGroup, INSTANCE_ACCENTS, removeInstance, relinkInstance, sanitizeInstanceName, sanitizeGroup, INSTANCE_NAME_MAX, INSTANCE_GROUP_MAX };
+module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, setInstanceGroup, INSTANCE_ACCENTS, removeInstance, relinkInstance, sanitizeInstanceName, sanitizeGroup, INSTANCE_NAME_MAX, INSTANCE_GROUP_MAX, isSamePath, sanitizeStoreInstances };

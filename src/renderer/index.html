@@ -715,23 +715,23 @@
           <div id="wmNoWorld" class="flat-wrap" hidden><div class="wld-none" style="padding:40px 14px"><img src="./assets/icons/ui/grid.svg" alt=""><div><b data-i18n="wm.noWorldT">No world found</b><span data-i18n="wm.noWorldS">Start the server once — level.dat appears in the server folder and the map comes alive.</span></div><button class="btn secondary sm" id="wmReload2" data-i18n="ed.reload">Reload</button></div></div>
           <div id="wmApp" class="flat-wrap" hidden>
             <div class="wm-status-hud" id="wmStatusHud">
-              <span class="badge ok wm-engine-badge">⚡ 60 FPS Cartography</span>
+              <span class="badge ok wm-engine-badge"><svg class="ico-svg" viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>60 FPS Cartography</span>
               <span class="wm-hud-metric" id="wmTileMetric">Tile Cache Active</span>
-              <button type="button" class="badge wm-perf-pill" id="wmPerfPill" style="cursor:pointer" hidden>⚠️ <span data-i18n="wm.lowResMode">⚡ Low-Resource Mode</span></button>
+              <button type="button" class="badge wm-perf-pill" id="wmPerfPill" hidden><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span data-i18n="wm.lowResMode">Low-Resource Mode</span></button>
               <span class="spacer"></span>
               <span class="wm-hud-tip" data-i18n="wm.hudTip">Drag to pan · Wheel to zoom · Click to inspect & portal link</span>
             </div>
-            <div id="wmPerfWarning" class="wm-perf-warning alert alert-warning" role="alert" style="margin:8px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:6px;font-size:12px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.28)">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:16px">⚠️</span>
-                <div>
-                  <b data-i18n="wm.warningTitle">Real-Time World Map Notice</b> — 
-                  <span class="text-muted" data-i18n="wm.warningDesc">World Map parses real world save files (.mca) directly from disk. Panning across extensive unexplored terrain may temporarily increase CPU & RAM usage.</span>
+            <div id="wmPerfWarning" class="wm-perf-hint" role="note">
+              <div class="wm-perf-hint-content">
+                <svg class="wm-perf-hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div class="wm-perf-hint-text">
+                  <b class="wm-perf-hint-title" data-i18n="wm.warningTitle">Real-Time World Map Notice</b> — 
+                  <span class="text-muted wm-perf-hint-desc" data-i18n="wm.warningDesc">World Map parses real world save files (.mca) directly from disk. Panning across extensive unexplored terrain may temporarily increase CPU & RAM usage.</span>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-                <button type="button" class="btn sm secondary" id="wmToggleLowRes" data-i18n="wm.lowResMode" style="white-space:nowrap">⚡ Low-Resource Mode</button>
-                <button type="button" class="btn-icon sm" id="wmDismissWarning" data-i18n-title="wm.dismiss" title="Dismiss" style="padding:2px 6px">✕</button>
+              <div class="wm-perf-hint-actions">
+                <button type="button" class="btn sm secondary wm-perf-toggle" id="wmToggleLowRes"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span class="wm-toggle-text" data-i18n="wm.lowResMode">Low-Resource Mode</span></button>
+                <button type="button" class="btn-icon sm wm-perf-dismiss" id="wmDismissWarning" data-i18n-title="wm.dismiss" title="Dismiss" aria-label="Dismiss"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
             </div>
             <p class="text-muted wm-modded-note" id="wmModdedNote" hidden></p>

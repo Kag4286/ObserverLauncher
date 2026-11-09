@@ -513,9 +513,12 @@ function wmSyncPerfWarning() {
   if (pillEl) {
     pillEl.hidden = !dismissed;
     pillEl.classList.toggle('active', lowRes);
+    const pillTxt = pillEl.querySelector('span[data-i18n]') || pillEl.querySelector('span');
+    if (pillTxt) pillTxt.textContent = lowRes ? t('wm.lowResActive') : t('wm.lowResMode');
   }
   if (btnLowRes) {
-    btnLowRes.textContent = lowRes ? t('wm.lowResActive') : t('wm.lowResMode');
+    const btnTxt = btnLowRes.querySelector('.wm-toggle-text') || btnLowRes;
+    btnTxt.textContent = lowRes ? t('wm.lowResActive') : t('wm.lowResMode');
     btnLowRes.classList.toggle('active', lowRes);
   }
 }

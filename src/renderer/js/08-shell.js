@@ -439,15 +439,19 @@ async function removeInstancePrompt(inst){
   if(!ok)return;
   // v6.0.0 H3: second, explicit choice about the FILES. Default (Cancel) keeps them, so a hasty
   // second Enter never deletes a world. Deleting files is permanent and states it plainly.
-  const delFiles=await confirmDialog({title:t('inst.removeFilesTitle'),body:esc(t('inst.removeFilesBody',{n:name,p:inst.serverPath||''})),ok:t('inst.deleteFiles'),cancel:t('inst.keepFiles'),danger:true});
-  let r; try{ r=await window.observer.instanceRemove(inst.id,{deleteFiles:delFiles}); }catch(e){ return toast(e?.message||'Remove failed.','error'); }
+  // Skip asking about files if the folder is missing or not set.
+  let delFiles=false;
+  if(!inst.missing && inst.serverPath){
+    delFiles=await confirmDialog({title:t('inst.removeFilesTitle'),body:esc(t('inst.removeFilesBody',{n:name,p:inst.serverPath||''})),ok:t('inst.deleteFiles'),cancel:t('inst.keepFiles'),danger:true});
+  }
+  let r; try{ r=await window.observer.instanceRemove(inst.id||inst.name,{deleteFiles:delFiles}); }catch(e){ return toast(e?.message||'Remove failed.','error'); }
   if(!r||!r.ok)return toast((r&&r.error)||'Remove failed.','error');
   try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
   refreshUI();
   // UX (2.6.0): offer a one-click undo — re-adds the same folder as an instance. Never touches the
   // folder on disk either way, so this is purely a list-level convenience.
   const _path=inst.serverPath||'';
-  if(_path) toast(t('inst.removed',{n:inst.name||_path}),undefined,{label:t('toast.undo'),fn:async()=>{ try{ const a=await window.observer.instanceAdd({serverPath:_path}); if(a&&a.ok){ const s2=await window.observer.getState(); state={...state,...s2}; refreshUI(); toast(t('inst.added'),'success'); } }catch{} }});
+  if(_path && !delFiles && !inst.missing) toast(t('inst.removed',{n:inst.name||_path}),undefined,{label:t('toast.undo'),fn:async()=>{ try{ const a=await window.observer.instanceAdd({serverPath:_path}); if(a&&a.ok){ const s2=await window.observer.getState(); state={...state,...s2}; refreshUI(); toast(t('inst.added'),'success'); } }catch{} }});
 }
 // Switch the active instance: the backend re-seeds ctx and repoints the runtime folder, then we
 // Re-pull the full snapshot and repaint the console + chart for the ACTIVE instance. server:metrics

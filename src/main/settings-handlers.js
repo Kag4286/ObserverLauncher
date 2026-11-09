@@ -5,7 +5,7 @@ const path = require('path');
 // B1 (v3.0.0): no top-level electron require (throws in plain Node). Data paths go through
 // dataDir()/tempDir(); `dialog`/`app` are required LAZILY inside the GUI-only handlers.
 const { dataDir, tempDir } = require('./data-dir.js');
-const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance, relinkInstance, loadSettingsFor, loadSettingsStore } = require('./settings.js');
+const { loadSettings, saveSettings, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, removeInstance, relinkInstance, loadSettingsFor, loadSettingsStore, isSamePath } = require('./settings.js');
 const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt, javaBinName } = require('./java.js');
 const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
@@ -519,7 +519,7 @@ function registerSettings(ipcMain, ctx) {
       if (!guard.ok) return guard;
       // Refuse if another instance still points at the same folder (deleting it would break them).
       try {
-        const others = loadSettingsStore().instances.filter(i => i.id !== target && i.serverPath && path.resolve(i.serverPath) === path.resolve(folder));
+        const others = loadSettingsStore().instances.filter(i => i.id !== target && i.serverPath && isSamePath(i.serverPath, folder));
         if (others.length) return { ok: false, error: 'Another server still uses this folder. Remove that one first.' };
       } catch {}
     }
