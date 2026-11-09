@@ -53,6 +53,8 @@ let wm = {
   loaded: false,
   seedBig: 0n,
   cheatMode: false,
+  lowResourceMode: false,
+  isDragging: false,
   layers: {
     terrain: true,
     hillshade: true,
@@ -255,7 +257,7 @@ function wmChunkColors(ck, cx, cz) {
   } else {
     out = null;
   }
-  lruSet(wmColorCache, key, out, 4000);
+  lruSet(wmColorCache, key, out, 2000);
   return out;
 }
 
@@ -333,9 +335,9 @@ function wmScheduleBiomes() {
   let cx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / 16), cx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / 16);
   let cz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / 16), cz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / 16);
 
-  // When zoomed far out, clamp fetch rect to 45-chunk radius around camera center (90x90 chunks = 1440x1440 blocks)
-  // so the view around the player / camera vantage point always loads authentic world terrain.
-  const MAX_RADIUS = 45;
+  // Clamped scan radius: 24 chunks in normal mode (covers up to 4K displays), 16 chunks in Low-Resource mode
+  const isFast = (wm.zoom < 0.15 || !!wm.lowResourceMode);
+  const MAX_RADIUS = wm.lowResourceMode ? 16 : 24;
   const ccx = Math.floor(wm.cam.x / 16), ccz = Math.floor(wm.cam.z / 16);
   if (cx1 - cx0 > MAX_RADIUS * 2) {
     cx0 = ccx - MAX_RADIUS;
@@ -346,10 +348,11 @@ function wmScheduleBiomes() {
     cz1 = ccz + MAX_RADIUS;
   }
 
-  const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? ''].join(',');
+  const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? '', isFast ? 'fast' : 'full'].join(',');
   if (rect === wm.lastBiomeRect) return;
 
   clearTimeout(wm.biomeTimer);
+  const debounceMs = wm.isDragging ? 280 : 180;
   wm.biomeTimer = setTimeout(async () => {
     wm.lastBiomeRect = rect;
     const reqId = ++wm.biomeReqSeq;
@@ -362,7 +365,8 @@ function wmScheduleBiomes() {
       cz0,
       cx1,
       cz1,
-      sliceY: wm.sliceY
+      sliceY: wm.sliceY,
+      lod: isFast ? 'fast' : 'full'
     }).catch(() => null);
     if (reqId !== wm.biomeReqSeq) return;
     wm.biomeLoading = false;
@@ -376,13 +380,14 @@ function wmScheduleBiomes() {
       wmDrawSoon();
       wmRenderLegend();
     }
-  }, 220);
+  }, debounceMs);
 }
 
 async function wmPrefetchBiomes(ccx, ccz, half) {
   if (!wm.level) return;
   const pfId = ++wmPrefetchReqSeq;
   const pfDim = wm.dim;
+  const isFast = (wm.zoom < 0.15 || !!wm.lowResourceMode);
   wm.biomeLoading = true;
   wmDrawSoon();
   const pfRes = await window.observer.worldmapBiomes({
@@ -391,7 +396,8 @@ async function wmPrefetchBiomes(ccx, ccz, half) {
     cz0: ccz - half,
     cx1: ccx + half,
     cz1: ccz + half,
-    sliceY: wm.sliceY
+    sliceY: wm.sliceY,
+    lod: isFast ? 'fast' : 'full'
   }).catch(() => null);
   if (pfId !== wmPrefetchReqSeq) return;
   wm.biomeLoading = false;
@@ -432,10 +438,22 @@ function wmGetTile(tx, tz) {
       const pz = (cz - chunkZ0) * 16;
 
       if (cols && cols.length === 16) {
-        for (let oz = 0; oz < 4; oz++) {
-          for (let ox = 0; ox < 4; ox++) {
-            ctx.fillStyle = cols[oz * 4 + ox];
-            ctx.fillRect(px + ox * 4, pz + oz * 4, 4, 4);
+        // Uniform chunk color optimization: if all 16 cells share the same color,
+        // blit 1 single 16x16 rect instead of 16 individual 4x4 sub-quads.
+        const c0 = cols[0];
+        let uniform = true;
+        for (let i = 1; i < 16; i++) {
+          if (cols[i] !== c0) { uniform = false; break; }
+        }
+        if (uniform) {
+          ctx.fillStyle = c0;
+          ctx.fillRect(px, pz, 16, 16);
+        } else {
+          for (let oz = 0; oz < 4; oz++) {
+            for (let ox = 0; ox < 4; ox++) {
+              ctx.fillStyle = cols[oz * 4 + ox];
+              ctx.fillRect(px + ox * 4, pz + oz * 4, 4, 4);
+            }
           }
         }
       } else if (cols && cols.length === 1) {
@@ -479,8 +497,33 @@ function wmSyncCheatMode() {
 }
 window.wmSyncCheatMode = wmSyncCheatMode;
 
+function wmSyncPerfWarning() {
+  let dismissed = false, lowRes = false;
+  try {
+    dismissed = localStorage.getItem('wmWarningDismissed') === '1';
+    lowRes = localStorage.getItem('wmLowResourceMode') === '1';
+  } catch {}
+  wm.lowResourceMode = lowRes;
+
+  const warnEl = $('#wmPerfWarning');
+  const pillEl = $('#wmPerfPill');
+  const btnLowRes = $('#wmToggleLowRes');
+
+  if (warnEl) warnEl.hidden = dismissed;
+  if (pillEl) {
+    pillEl.hidden = !dismissed;
+    pillEl.classList.toggle('active', lowRes);
+  }
+  if (btnLowRes) {
+    btnLowRes.textContent = lowRes ? t('wm.lowResActive') : t('wm.lowResMode');
+    btnLowRes.classList.toggle('active', lowRes);
+  }
+}
+window.wmSyncPerfWarning = wmSyncPerfWarning;
+
 async function wmLoad() {
   wmSyncCheatMode();
+  wmSyncPerfWarning();
   let r;
   try {
     r = await window.observer.worldmapLoad();
@@ -1398,6 +1441,26 @@ $('#wmAdd').onclick = () => {
   $('#wmAdd').classList.toggle('active', wm.addMode);
 };
 
+$('#wmToggleLowRes')?.addEventListener('click', () => {
+  wm.lowResourceMode = !wm.lowResourceMode;
+  try { localStorage.setItem('wmLowResourceMode', wm.lowResourceMode ? '1' : '0'); } catch {}
+  wmSyncPerfWarning();
+  wmTileCache.clear();
+  wmColorCache.clear();
+  wmDrawSoon();
+  wmScheduleBiomes();
+});
+
+$('#wmDismissWarning')?.addEventListener('click', () => {
+  try { localStorage.setItem('wmWarningDismissed', '1'); } catch {}
+  wmSyncPerfWarning();
+});
+
+$('#wmPerfPill')?.addEventListener('click', () => {
+  const warnEl = $('#wmPerfWarning');
+  if (warnEl) warnEl.hidden = !warnEl.hidden;
+});
+
 async function wmLoadChunks(dim) {
   if (!dim) dim = wm.dim;
   try {
@@ -1474,7 +1537,7 @@ $('#wmExport').onclick = () => {
       }
     }
 
-    dragging = true; lx = e.clientX; ly = e.clientY; downPos = { x: e.clientX, y: e.clientY };
+    dragging = true; wm.isDragging = true; lx = e.clientX; ly = e.clientY; downPos = { x: e.clientX, y: e.clientY };
     try { cv.setPointerCapture(e.pointerId); } catch {}
     wmHidePopup();
   });
@@ -1487,9 +1550,12 @@ $('#wmExport').onclick = () => {
       wmRenderList();
       return;
     }
+    const wasDragging = dragging;
     if (!dragging) return;
     dragging = false;
+    wm.isDragging = false;
     try { cv.releasePointerCapture(e.pointerId); } catch {}
+    if (wasDragging) wmScheduleBiomes();
 
     if (!wm.level) { downPos = null; return; }
     if (downPos && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) { downPos = null; return; }
@@ -1507,7 +1573,7 @@ $('#wmExport').onclick = () => {
     wmMapClick(e.clientX - r.left, e.clientY - r.top, x, z);
   });
 
-  cv.addEventListener('pointercancel', () => { dragging = false; downPos = null; wm.dragWp = null; });
+  cv.addEventListener('pointercancel', () => { dragging = false; wm.isDragging = false; downPos = null; wm.dragWp = null; });
 
   cv.addEventListener('pointermove', e => {
     const r = cv.getBoundingClientRect();

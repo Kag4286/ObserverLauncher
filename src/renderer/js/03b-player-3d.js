@@ -119,7 +119,6 @@ UV.leftSleeveSlim = { top:[52,48,3,4], bottom:[55,48,3,4], right:[48,52,4,12], f
 UV.horn = { top:[0,16,2,2], bottom:[2,16,2,2], front:[0,18,2,5], back:[2,18,2,5], left:[4,18,2,5], right:[6,18,2,5] };
 UV.boot = { top:[4,16,4,4], bottom:[8,16,4,4], right:[0,26,4,6], front:[4,26,4,6], left:[8,26,4,6], back:[12,26,4,6] };
 UV.belt = { top:[20,16,8,4], bottom:[28,16,8,4], right:[16,26,4,6], front:[20,26,8,6], left:[28,26,4,6], back:[32,26,8,6] };
-UV.collar = { top:[20,20,2,2], bottom:[20,20,2,2], right:[20,20,2,2], front:[20,20,2,2], left:[20,20,2,2], back:[20,20,2,2] };
 
 // Build the 6 UV quads of one body part.
 //
@@ -375,8 +374,6 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const cHelmetOverlay64 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 64));
   const cHorn = buildCube(1.8, 1.8, 4.5, uvc(UV.horn, SKIN, 64));
 
-  const cNeckCollar32 = buildCube(5.2, 2.6, 4.2, uvc(UV.collar, SKIN, 32));
-  const cNeckCollar64 = buildCube(5.2, 2.6, 4.2, uvc(UV.collar, SKIN, 64));
   const cChestplate32 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 32));
   const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
   const cRightArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
@@ -525,8 +522,6 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
       if (texChest && equipment && equipment.chest) {
         gl.bindTexture(gl.TEXTURE_2D, texChest);
         const is64 = texChestH === 64;
-        setOffset(-2.2, -3.2);
-        drawPart(is64 ? cNeckCollar64 : cNeckCollar32, p('body').x, SHOULDER_Y - 1.0, 0);
         setOffset(-2.4, -3.4);
         drawPart(is64 ? cChestplate64 : cChestplate32, p('body').x, p('body').y, 0);
         drawPart(is64 ? cRightArmArmor64 : cRightArmArmor32, p('armR').x, p('armR').y, 0);

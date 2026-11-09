@@ -506,8 +506,7 @@ function biomeGridFromSection(sec) {
   }
   return grid;
 }
-async function readChunkNbt(fp, sectorOff) {
-  const raw = readChunkRaw(fp, sectorOff);
+async function parseRawNbt(raw) {
   if (!raw) return null;
   try {
     const p = await nbt.parse(raw);
@@ -515,6 +514,14 @@ async function readChunkNbt(fp, sectorOff) {
   } catch {
     return null;
   }
+}
+
+async function readChunkNbtFd(fd, sectorOff) {
+  return parseRawNbt(readChunkRawFd(fd, sectorOff));
+}
+
+async function readChunkNbt(fp, sectorOff) {
+  return parseRawNbt(readChunkRaw(fp, sectorOff));
 }
 
 // ============ 1.16 / 1.15 / LEGACY CHUNK & BIOME SUPPORT ============
@@ -845,7 +852,7 @@ const biomeRegionCache = new Map();
 // PURE: extract { biome, biomeGrid, relief } from a parsed chunk NBT object. Only a FULLY generated
 // chunk (Status 'minecraft:full', 'full', 'postprocessed', or 1.12.2 TerrainPopulated:1) carries REAL biome data.
 // Early-stage chunks ship a placeholder palette that must NOT be trusted.
-function biomeFromChunk(nbtData, customMap = null, sliceY = null) {
+function biomeFromChunk(nbtData, customMap = null, sliceY = null, fastLod = false) {
   let biome = null, biomeGrid = null, relief = null, surface = null;
   if (!nbtData) return { biome, biomeGrid, relief, surface };
 
@@ -865,32 +872,35 @@ function biomeFromChunk(nbtData, customMap = null, sliceY = null) {
 
   // Sections: normalized across 1.18+ (root sections), 1.16/1.15, and 1.12.2- (Level.Sections)
   const secs = getChunkSections(nbtData).slice().sort((a, b) => (a.Y | 0) - (b.Y | 0));
-  // Heightmaps offset: only 1.18+ (no Level compound, negative yPos) offsets height values by minY.
-  // Pre-1.18 chunks (1.16/1.17/1.12 with Level) ALWAYS use absolute Y coordinates (0..255).
-  let minY = 0;
-  if (!nbtData.Level && typeof nbtData.yPos === 'number' && nbtData.yPos < 0) {
-    minY = nbtData.yPos * 16;
-  }
 
-  // 1. Heightmaps and surface relief (1.13+ Heightmaps compound, or 1.12.2- HeightMap int[256])
-  const hm = nbtData.Heightmaps || (L && L.Heightmaps);
-  if (hm) {
-    const motionRaw = hm.MOTION_BLOCKING || hm.WORLD_SURFACE || null;
-    const oceanRaw = hm.OCEAN_FLOOR || hm.OCEAN_FLOOR_WG || motionRaw;
-    let motion = unpackHeightmap(motionRaw);
-    let ocean = unpackHeightmap(oceanRaw) || motion;
-    if (minY !== 0) {
-      if (motion) motion = motion.map(h => h + minY);
-      if (ocean) ocean = ocean.map(h => h + minY);
+  if (!fastLod) {
+    // Heightmaps offset: only 1.18+ (no Level compound, negative yPos) offsets height values by minY.
+    // Pre-1.18 chunks (1.16/1.17/1.12 with Level) ALWAYS use absolute Y coordinates (0..255).
+    let minY = 0;
+    if (!nbtData.Level && typeof nbtData.yPos === 'number' && nbtData.yPos < 0) {
+      minY = nbtData.yPos * 16;
     }
-    relief = downsampleHeights(motion, ocean, 4);
-    try { surface = surfaceBlocksFromChunk(nbtData, motion, ocean, 4, relief, sliceY); } catch { surface = null; }
-  } else if (L && (L.HeightMap || L.Heightmap)) {
-    const rawH = L.HeightMap || L.Heightmap;
-    if (rawH && rawH.length >= 256) {
-      const motion = Array.from(rawH.slice(0, 256));
-      relief = downsampleHeights(motion, motion, 4);
-      try { surface = surfaceBlocksFromChunk(nbtData, motion, motion, 4, relief, sliceY); } catch { surface = null; }
+
+    // 1. Heightmaps and surface relief (1.13+ Heightmaps compound, or 1.12.2- HeightMap int[256])
+    const hm = nbtData.Heightmaps || (L && L.Heightmaps);
+    if (hm) {
+      const motionRaw = hm.MOTION_BLOCKING || hm.WORLD_SURFACE || null;
+      const oceanRaw = hm.OCEAN_FLOOR || hm.OCEAN_FLOOR_WG || motionRaw;
+      let motion = unpackHeightmap(motionRaw);
+      let ocean = unpackHeightmap(oceanRaw) || motion;
+      if (minY !== 0) {
+        if (motion) motion = motion.map(h => h + minY);
+        if (ocean) ocean = ocean.map(h => h + minY);
+      }
+      relief = downsampleHeights(motion, ocean, 4);
+      try { surface = surfaceBlocksFromChunk(nbtData, motion, ocean, 4, relief, sliceY); } catch { surface = null; }
+    } else if (L && (L.HeightMap || L.Heightmap)) {
+      const rawH = L.HeightMap || L.Heightmap;
+      if (rawH && rawH.length >= 256) {
+        const motion = Array.from(rawH.slice(0, 256));
+        relief = downsampleHeights(motion, motion, 4);
+        try { surface = surfaceBlocksFromChunk(nbtData, motion, motion, 4, relief, sliceY); } catch { surface = null; }
+      }
     }
   }
 
@@ -904,7 +914,7 @@ function biomeFromChunk(nbtData, customMap = null, sliceY = null) {
       const b = sectionBiome(targetSec);
       if (b) {
         biome = b;
-        biomeGrid = biomeGridFromSection(targetSec);
+        if (!fastLod) biomeGrid = biomeGridFromSection(targetSec);
       }
     }
   }
@@ -913,7 +923,7 @@ function biomeFromChunk(nbtData, customMap = null, sliceY = null) {
       const b = sectionBiome(sec);
       if (b) {
         biome = b;
-        biomeGrid = biomeGridFromSection(sec);
+        if (!fastLod) biomeGrid = biomeGridFromSection(sec);
         break;
       }
     }
@@ -926,7 +936,7 @@ function biomeFromChunk(nbtData, customMap = null, sliceY = null) {
       const fromArr = biomesFromChunkArray(rawBiomes, relief, customMap, sliceY);
       if (fromArr) {
         biome = fromArr.biome;
-        biomeGrid = fromArr.biomeGrid;
+        if (!fastLod) biomeGrid = fromArr.biomeGrid;
       }
     }
   }
@@ -983,6 +993,7 @@ function toOverworldCoords(x, z) {
 
 async function readBiomes(root, levelName, dim, rect) {
   const sliceY = (rect?.sliceY !== undefined && rect?.sliceY !== null) ? Number(rect.sliceY) : null;
+  const isFastLod = rect?.lod === 'fast';
   if (!root || !rect) return { biomes: [], structures: [] };
   const customBiomeMap = getBiomeRegistry(root, levelName);
   const { cx0, cz0, cx1, cz1 } = rect;
@@ -998,7 +1009,7 @@ async function readBiomes(root, levelName, dim, rect) {
         const fp = path.join(dir, `r.${rx}.${rz}.mca`);
         let stat;
         try { stat = fs.statSync(fp); } catch { continue; }
-        const key = fp + (sliceY !== null ? ':y' + sliceY : '');
+        const key = fp + (sliceY !== null ? ':y' + sliceY : '') + (isFastLod ? ':fast' : '');
         let entry = biomeRegionCache.get(key);
         if (!entry || entry.mtime !== stat.mtimeMs) {
           entry = { mtime: stat.mtimeMs, chunks: new Map(), header: null };
@@ -1010,51 +1021,65 @@ async function readBiomes(root, levelName, dim, rect) {
           try { const h = Buffer.alloc(4096); const fd = fs.openSync(fp, 'r'); fs.readSync(fd, h, 0, 4096, 0); fs.closeSync(fd); entry.header = h; } catch { continue; }
         }
         const header = entry.header;
-        for (let i = 0; i < 1024 && out.length < CAP; i++) {
-          const v = header.readUInt32BE(i * 4);
-          if (v === 0) continue;
-          const cx = rx * 32 + (i % 32), cz = rz * 32 + Math.floor(i / 32);
-          if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
-          const ck = cx + ',' + cz;
-          if (entry.chunks.has(ck)) {
-            const rec = entry.chunks.get(ck);
-            if (rec) {
-              const row = [cx, cz, rec.b];
-              if (rec.h) { row.push(rec.h, rec.w, rec.g || null, rec.s || null); }
-              out.push(row);
-              if (rec.st) {
-                for (const s of rec.st) {
-                  const sk = s.id + ':' + s.x + ',' + s.z;
-                  if (!structMap.has(sk)) structMap.set(sk, s);
+        let regionFd = null;
+        try {
+          for (let i = 0; i < 1024 && out.length < CAP; i++) {
+            const v = header.readUInt32BE(i * 4);
+            if (v === 0) continue;
+            const cx = rx * 32 + (i % 32), cz = rz * 32 + Math.floor(i / 32);
+            if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
+            const ck = cx + ',' + cz;
+            if (entry.chunks.has(ck)) {
+              const rec = entry.chunks.get(ck);
+              if (rec) {
+                const row = [cx, cz, rec.b];
+                if (rec.h) { row.push(rec.h, rec.w, rec.g || null, rec.s || null); }
+                out.push(row);
+                if (rec.st) {
+                  for (const s of rec.st) {
+                    const sk = s.id + ':' + s.x + ',' + s.z;
+                    if (!structMap.has(sk)) structMap.set(sk, s);
+                  }
                 }
               }
+              continue;
             }
-            continue;
-          }
-          let nbtData;
-          try { nbtData = await readChunkNbt(fp, v >>> 8); } catch { nbtData = null; }
-          // BUGFIX (3.2.5): only a FULLY generated chunk carries real biome data. An early-stage chunk
-          // (status 'minecraft:structure_starts' or similar) still ships a PLACEHOLDER biome palette
-          // (minecraft:plains) that was read as if real - so The End rendered with overworld colours.
-          // scanExploredChunks() already trusts only 'minecraft:full'; readBiomes must match.
-          const { biome, biomeGrid, relief, surface } = biomeFromChunk(nbtData, customBiomeMap, sliceY);
-          const structs = extractStructureStarts(nbtData, cx, cz);
-          const rec = { b: biome };
-          if (relief) { rec.h = relief.heights; rec.w = relief.water; rec.g = biomeGrid || null; rec.s = surface || null; }
-          if (structs && structs.length) {
-            rec.st = structs;
-            for (const s of structs) {
-              const sk = s.id + ':' + s.x + ',' + s.z;
-              if (!structMap.has(sk)) structMap.set(sk, s);
+            if (regionFd === null) {
+              try { regionFd = fs.openSync(fp, 'r'); } catch { regionFd = false; }
             }
+            let nbtData = null;
+            if (regionFd) {
+              try { nbtData = await readChunkNbtFd(regionFd, v >>> 8); } catch { nbtData = null; }
+            } else {
+              try { nbtData = await readChunkNbt(fp, v >>> 8); } catch { nbtData = null; }
+            }
+            // BUGFIX (3.2.5): only a FULLY generated chunk carries real biome data. An early-stage chunk
+            // (status 'minecraft:structure_starts' or similar) still ships a PLACEHOLDER biome palette
+            // (minecraft:plains) that was read as if real - so The End rendered with overworld colours.
+            // scanExploredChunks() already trusts only 'minecraft:full'; readBiomes must match.
+            const { biome, biomeGrid, relief, surface } = biomeFromChunk(nbtData, customBiomeMap, sliceY, isFastLod);
+            const structs = isFastLod ? [] : extractStructureStarts(nbtData, cx, cz);
+            const rec = { b: biome };
+            if (relief) { rec.h = relief.heights; rec.w = relief.water; rec.g = biomeGrid || null; rec.s = surface || null; }
+            if (structs && structs.length) {
+              rec.st = structs;
+              for (const s of structs) {
+                const sk = s.id + ':' + s.x + ',' + s.z;
+                if (!structMap.has(sk)) structMap.set(sk, s);
+              }
+            }
+            entry.chunks.set(ck, rec);
+            // Push null-biome chunks too (as [cx,cz,null]) so the renderer can tell "checked, no
+            // biome data" apart from "not fetched yet" and shade it differently. h/w (when present)
+            // carry the real 4x4 heightmap + water mask; g (when present) the 16 per-cell biomes.
+            const row = [cx, cz, biome];
+            if (relief) { row.push(relief.heights, relief.water, biomeGrid || null, surface || null); }
+            out.push(row);
           }
-          entry.chunks.set(ck, rec);
-          // Push null-biome chunks too (as [cx,cz,null]) so the renderer can tell "checked, no
-          // biome data" apart from "not fetched yet" and shade it differently. h/w (when present)
-          // carry the real 4x4 heightmap + water mask; g (when present) the 16 per-cell biomes.
-          const row = [cx, cz, biome];
-          if (relief) { row.push(relief.heights, relief.water, biomeGrid || null, surface || null); }
-          out.push(row);
+        } finally {
+          if (regionFd) {
+            try { fs.closeSync(regionFd); } catch {}
+          }
         }
       }
     }
@@ -1097,4 +1122,4 @@ function listDimensions(root, levelName) {
   return out;
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry, decompressLz4Block, decompressLz4, readChunkRaw, extractStructureStarts, isSlimeChunk, toNetherCoords, toOverworldCoords };
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry, decompressLz4Block, decompressLz4, readChunkRaw, readChunkNbtFd, extractStructureStarts, isSlimeChunk, toNetherCoords, toOverworldCoords };
