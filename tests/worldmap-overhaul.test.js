@@ -115,5 +115,15 @@ test('dismiss button has zero OS-default chrome and content native notice uses S
   assert.ok(html.includes('class="content-native-notice"'), 'Must have content-native-notice container');
 });
 
+// 8. Low-resource toggle consistency and tile relief completeness
+test('low resource toggle clears biomes and enforces relief completeness for full tiles', () => {
+  const fs = require('fs');
+  const code = fs.readFileSync('src/renderer/js/02-worldmap.js', 'utf8');
+  assert.ok(code.includes('wm.biomes.clear()'), 'Must clear biomes on toggle to prevent mixed flat and detailed rendering');
+  assert.ok(code.includes('wmColorCache.clear()'), 'Must clear color cache on toggle and biome ingest');
+  assert.ok(code.includes('const isFullDetailNeeded = !wm.lowResourceMode && wm.zoom >= 0.35'), 'Must check full detail requirement');
+  assert.ok(code.includes('const hasCompleteBiome = rec && (!isFullDetailNeeded || rec[3] !== undefined)'), 'Tile is only complete when relief is present');
+});
+
 console.log(`\n${passed} worldmap overhaul unit tests passed.`);
 

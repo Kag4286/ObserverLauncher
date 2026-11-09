@@ -331,6 +331,8 @@ function wmIngestBiomePayload(payload, targetDimension) {
         count++;
       }
     }
+    // New biome records arrived: clear color cache so all chunks re-evaluate fresh heights/colors
+    wmColorCache.clear();
   }
   return count;
 }
@@ -452,8 +454,11 @@ function wmGetTile(tx, tz) {
       const hasExplored = wm.explored.size ? wm.explored.has(ck) : true;
       if (!hasExplored && wm.explored.size > 0) continue;
 
-      const hasBiome = wm.biomes.has((wm.dim || 'overworld') + ':' + ck);
-      if (!hasBiome) {
+      const bKey = (wm.dim || 'overworld') + ':' + ck;
+      const rec = wm.biomes.get(bKey);
+      const isFullDetailNeeded = !wm.lowResourceMode && wm.zoom >= 0.35 && (wm.dim || 'overworld') === 'overworld';
+      const hasCompleteBiome = rec && (!isFullDetailNeeded || rec[3] !== undefined);
+      if (!hasCompleteBiome) {
         tileComplete = false;
       }
 
@@ -1478,33 +1483,26 @@ $('#wmAdd').onclick = () => {
   $('#wmAdd').classList.toggle('active', wm.addMode);
 };
 
-$('#wmToggleLowRes')?.addEventListener('click', () => {
+function wmApplyLowResToggle() {
   wm.lowResourceMode = !wm.lowResourceMode;
   try { localStorage.setItem('wmLowResourceMode', wm.lowResourceMode ? '1' : '0'); } catch {}
   wmSyncPerfWarning();
   wmTileCache.clear();
   wmColorCache.clear();
+  wm.biomes.clear();
   wm.lastBiomeRect = '';
-  const cap = getBiomeCacheCap();
-  if (wm.biomes.size > cap) {
-    const keys = Array.from(wm.biomes.keys());
-    for (let i = 0; i < keys.length - cap; i++) {
-      wm.biomes.delete(keys[i]);
-    }
-  }
   wmDrawSoon();
   wmScheduleBiomes();
-});
+}
+
+$('#wmToggleLowRes')?.addEventListener('click', wmApplyLowResToggle);
 
 $('#wmDismissWarning')?.addEventListener('click', () => {
   try { localStorage.setItem('wmWarningDismissed', '1'); } catch {}
   wmSyncPerfWarning();
 });
 
-$('#wmPerfPill')?.addEventListener('click', () => {
-  const warnEl = $('#wmPerfWarning');
-  if (warnEl) warnEl.hidden = !warnEl.hidden;
-});
+$('#wmPerfPill')?.addEventListener('click', wmApplyLowResToggle);
 
 async function wmLoadChunks(dim) {
   if (!dim) dim = wm.dim;
