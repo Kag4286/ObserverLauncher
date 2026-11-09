@@ -94,6 +94,10 @@ function mat4RotateY(rad) {
   const c = Math.cos(rad), s = Math.sin(rad);
   return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
 }
+function mat4RotateZ(rad) {
+  const c = Math.cos(rad), s = Math.sin(rad);
+  return new Float32Array([c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]);
+}
 
 // UV standard bounds (x, y, w, h) in 64x64 skin space.
 const UV = {
@@ -116,7 +120,8 @@ UV.rightArmSlim = { top:[44,16,3,4], bottom:[47,16,3,4], right:[40,20,4,12], fro
 UV.rightSleeveSlim = { top:[44,32,3,4], bottom:[47,32,3,4], right:[40,36,4,12], front:[44,36,3,12], left:[47,36,3,12], back:[50,36,4,12] };
 UV.leftArmSlim = { top:[36,48,3,4], bottom:[39,48,3,4], right:[32,52,4,12], front:[36,52,3,12], left:[39,52,3,12], back:[42,52,4,12] };
 UV.leftSleeveSlim = { top:[52,48,3,4], bottom:[55,48,3,4], right:[48,52,4,12], front:[52,52,3,12], left:[55,52,3,12], back:[58,52,4,12] };
-UV.horn = { top:[0,16,2,2], bottom:[2,16,2,2], front:[0,18,2,5], back:[2,18,2,5], left:[4,18,2,5], right:[6,18,2,5] };
+UV.horn = { top:[53,44,2,5], bottom:[55,44,2,5], right:[48,49,5,3], front:[53,49,2,3], left:[55,49,5,3], back:[60,49,2,3] };
+UV.hornTip = { top:[49,36,1,3], bottom:[50,36,1,3], right:[46,39,3,2], front:[49,39,1,2], left:[50,39,3,2], back:[53,39,1,2] };
 UV.boot = { top:[4,16,4,4], bottom:[8,16,4,4], right:[0,26,4,6], front:[4,26,4,6], left:[8,26,4,6], back:[12,26,4,6] };
 UV.belt = { top:[20,16,8,4], bottom:[28,16,8,4], right:[16,26,4,6], front:[20,26,8,6], left:[28,26,4,6], back:[32,26,8,6] };
 
@@ -169,7 +174,7 @@ function uvcMirrored(uv, texW, texH) {
   };
 }
 
-function buildCube(w, h, d, faces) {
+function buildCube(w, h, d, faces, opts) {
   const x = w / 2, y = h / 2, z = d / 2;
   const p = []; const t = [];
   const addFace = (verts, uvs) => {
@@ -182,13 +187,16 @@ function buildCube(w, h, d, faces) {
   addFace([[x, -y, -z], [-x, -y, -z], [-x, y, -z], [x, y, -z]], faces.back);
   // Top
   addFace([[-x, y, z], [x, y, z], [x, y, -z], [-x, y, -z]], faces.top);
-  // Bottom
-  addFace([[-x, -y, -z], [x, -y, -z], [x, -y, z], [-x, -y, z]], faces.bottom);
+  // Bottom (omitted for helmets so the hollow neck opening does not clip the chestplate collar)
+  if (!opts || !opts.noBottom) {
+    addFace([[-x, -y, -z], [x, -y, -z], [x, -y, z], [-x, -y, z]], faces.bottom);
+  }
   // East = +X (viewer's right = character's left)
   addFace([[x, -y, z], [x, -y, -z], [x, y, -z], [x, y, z]], faces.east);
   // West = -X
   addFace([[-x, -y, -z], [-x, -y, z], [-x, y, z], [-x, y, -z]], faces.west);
-  return { p: new Float32Array(p), t: new Float32Array(t) };
+  const count = p.length / 3;
+  return { p: new Float32Array(p), t: new Float32Array(t), count };
 }
 
 function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
@@ -368,11 +376,12 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   const cLeftBoot32 = buildCube(4.75, 6.3, 4.75, uvcMirrored(UV.boot, SKIN, 32));
   const cLeftBoot64 = buildCube(4.75, 6.3, 4.75, uvcMirrored(UV.boot, SKIN, 64));
 
-  const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32));
-  const cHelmet64 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 64));
-  const cHelmetOverlay32 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 32));
-  const cHelmetOverlay64 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 64));
-  const cHorn = buildCube(1.8, 1.8, 4.5, uvc(UV.horn, SKIN, 64));
+  const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32), { noBottom: true });
+  const cHelmet64 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 64), { noBottom: true });
+  const cHelmetOverlay32 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 32), { noBottom: true });
+  const cHelmetOverlay64 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 64), { noBottom: true });
+  const cHorn = buildCube(2.0, 3.0, 5.0, uvc(UV.horn, SKIN, 64));
+  const cHornTip = buildCube(1.2, 2.0, 3.0, uvc(UV.hornTip, SKIN, 64));
 
   const cChestplate32 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 32));
   const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
@@ -458,7 +467,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     const drawPartTransform = (cube, model) => {
       gl.uniformMatrix4fv(uMvp, false, mat4Multiply(baseMvp, model));
       bindBufs(cube);
-      gl.drawArrays(gl.TRIANGLES, 0, 36);
+      gl.drawArrays(gl.TRIANGLES, 0, cube.count || 36);
     };
     const drawPart = (cube, tx, ty, tz) => drawPartTransform(cube, mat4Translate(tx, ty, tz));
 
@@ -530,20 +539,32 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
       if (texHelmet && equipment && equipment.helmet) {
         gl.bindTexture(gl.TEXTURE_2D, texHelmet);
         const is64 = texHelmetH === 64;
+        const isDragonHelmet = Boolean(helmetMat && helmetMat.isMod && helmetMat.ns === 'iceandfire' && (helmetMat.mat.includes('armor_') || helmetMat.mat.includes('dragon')));
         setOffset(-2.8, -3.8);
         drawPart(is64 ? cHelmet64 : cHelmet32, p('head').x, p('head').y, 0);
-        setOffset(-3.2, -4.2);
-        drawPart(is64 ? cHelmetOverlay64 : cHelmetOverlay32, p('head').x, p('head').y, 0);
 
-        const isDragonHelmet = Boolean(helmetMat && helmetMat.isMod && helmetMat.ns === 'iceandfire' && (helmetMat.mat.includes('armor_') || helmetMat.mat.includes('dragon')));
-        if (isDragonHelmet && is64) {
+        if (!isDragonHelmet) {
+          setOffset(-3.2, -4.2);
+          drawPart(is64 ? cHelmetOverlay64 : cHelmetOverlay32, p('head').x, p('head').y, 0);
+        } else if (is64) {
           setOffset(-3.5, -4.5);
           const headMat = mat4Translate(p('head').x, p('head').y, 0);
-          const leftMat = mat4Multiply(headMat, mat4Multiply(mat4Translate(3.6, 2.0, -3.8), mat4Multiply(mat4RotateY(0.35), mat4Multiply(mat4RotateX(-0.35), mat4Translate(0, 0, -2.0)))));
-          drawPartTransform(cHorn, leftMat);
 
-          const rightMat = mat4Multiply(headMat, mat4Multiply(mat4Translate(-3.6, 2.0, -3.8), mat4Multiply(mat4RotateY(-0.35), mat4Multiply(mat4RotateX(-0.35), mat4Translate(0, 0, -2.0)))));
-          drawPartTransform(cHorn, rightMat);
+          // Left horn (main + tip)
+          const leftBase = mat4Multiply(headMat, mat4Translate(3.6, 3.2, -1.0));
+          const leftRot = mat4Multiply(mat4RotateY(-0.35), mat4Multiply(mat4RotateX(0.32), mat4RotateZ(0.18)));
+          const leftMain = mat4Multiply(leftBase, mat4Multiply(leftRot, mat4Translate(0, 0, -2.5)));
+          drawPartTransform(cHorn, leftMain);
+          const leftTip = mat4Multiply(leftBase, mat4Multiply(leftRot, mat4Multiply(mat4Translate(0, 0.2, -6.5), mat4RotateX(-0.1))));
+          drawPartTransform(cHornTip, leftTip);
+
+          // Right horn (main + tip)
+          const rightBase = mat4Multiply(headMat, mat4Translate(-3.6, 3.2, -1.0));
+          const rightRot = mat4Multiply(mat4RotateY(0.35), mat4Multiply(mat4RotateX(0.32), mat4RotateZ(-0.18)));
+          const rightMain = mat4Multiply(rightBase, mat4Multiply(rightRot, mat4Translate(0, 0, -2.5)));
+          drawPartTransform(cHorn, rightMain);
+          const rightTip = mat4Multiply(rightBase, mat4Multiply(rightRot, mat4Multiply(mat4Translate(0, 0.2, -6.5), mat4RotateX(-0.1))));
+          drawPartTransform(cHornTip, rightTip);
         }
       }
     }

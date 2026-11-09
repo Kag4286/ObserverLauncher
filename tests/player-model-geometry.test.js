@@ -191,6 +191,21 @@ ck('mArm west has flipped U order', mArm.west[0][0] > mArm.west[1][0]);
 // --- Seam sealing & anatomy assertions ---
 ck('UV.boot defined', Boolean(UV.boot && UV.boot.front && UV.boot.front[1] === 26));
 ck('UV.belt defined', Boolean(UV.belt && UV.belt.front && UV.belt.front[1] === 26));
+ck('UV.horn defined and within 64x64 bounds', Boolean(UV.horn && UV.horn.front && UV.horn.front[0] >= 0 && UV.horn.front[0] + UV.horn.front[2] <= 64));
+ck('UV.hornTip defined and within 64x64 bounds', Boolean(UV.hornTip && UV.hornTip.front && UV.hornTip.front[0] >= 0 && UV.hornTip.front[0] + UV.hornTip.front[2] <= 64));
+
+// buildCube noBottom option for hollow helmets (prevents collar clipping)
+{
+  const dummyFaces = {
+    top: [[0, 0], [0, 0], [0, 0], [0, 0]], bottom: [[0, 0], [0, 0], [0, 0], [0, 0]],
+    front: [[0, 0], [0, 0], [0, 0], [0, 0]], back: [[0, 0], [0, 0], [0, 0], [0, 0]],
+    east: [[0, 0], [0, 0], [0, 0], [0, 0]], west: [[0, 0], [0, 0], [0, 0], [0, 0]],
+  };
+  const standardCube = buildCube(2, 2, 2, dummyFaces);
+  const hollowCube = buildCube(2, 2, 2, dummyFaces, { noBottom: true });
+  ck('standard cube has 36 vertices (6 faces)', standardCube.count === 36 && standardCube.p.length === 36 * 3);
+  ck('hollow helmet cube has 30 vertices (5 faces, no bottom)', hollowCube.count === 30 && hollowCube.p.length === 30 * 3);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

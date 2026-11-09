@@ -681,32 +681,24 @@ function patchIceAndFireArmorBlack(blackBuf) {
   try {
     const grayBuf = modsIndex.readArmorTexture('iceandfire', 'armor_gray', 1);
     if (!grayBuf) return blackBuf;
-    const black = decodePngRgba(blackBuf);
     const gray = decodePngRgba(grayBuf);
-    if (!black || !gray || black.w !== 64 || black.h !== 64 || gray.w !== 64 || gray.h !== 64) return blackBuf;
-    // armor_black.png in Ice & Fire is an unfinished white mask template (rows 0..16 contain 311 pure
-    // white pixels [255,255,255] meant for runtime OpenGL glColor4f tinting).
+    if (!gray || gray.w !== 64 || gray.h !== 64) return blackBuf;
+    // armor_black.png in Ice & Fire is an unfinished template file containing Blockbench UV debug
+    // markers (pure cyan, magenta, yellow, blue wireframe markers) and raw white fill intended
+    // for OpenGL runtime glColor4f tinting.
     // armor_gray.png has the full genuine textured dragon scales for both helmet and body.
-    // Tone the entire 64x64 texture (rows 0 to 63) to 0.45 luminance for authentic pitch-black scales.
+    // Tone armor_gray across all 64x64 rows to 0.50 luminance for authentic dark black dragon scales,
+    // leaving the untextured background completely transparent without injecting any debug pixels.
     const combined = Buffer.alloc(64 * 64 * 4);
     for (let y = 0; y < 64; y++) {
       for (let x = 0; x < 64; x++) {
         const idx = (y * 64 + x) * 4;
         const ga = gray.img[idx + 3];
         if (ga > 10) {
-          combined[idx] = Math.round(gray.img[idx] * 0.45);
-          combined[idx + 1] = Math.round(gray.img[idx + 1] * 0.45);
-          combined[idx + 2] = Math.round(gray.img[idx + 2] * 0.45);
+          combined[idx] = Math.round(gray.img[idx] * 0.50);
+          combined[idx + 1] = Math.round(gray.img[idx + 1] * 0.50);
+          combined[idx + 2] = Math.round(gray.img[idx + 2] * 0.50);
           combined[idx + 3] = ga;
-        } else {
-          const ba = black.img[idx + 3];
-          // Preserve any non-white accents from black if present, but ignore raw white mask pixels
-          if (ba > 10 && (black.img[idx] < 240 || black.img[idx + 1] < 240 || black.img[idx + 2] < 240)) {
-            combined[idx] = black.img[idx];
-            combined[idx + 1] = black.img[idx + 1];
-            combined[idx + 2] = black.img[idx + 2];
-            combined[idx + 3] = ba;
-          }
         }
       }
     }
