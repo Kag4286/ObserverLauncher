@@ -1159,6 +1159,10 @@ async function renderPlayer3D(canvas,status,uuid,name,armor){
   return null;
 }
 async function openPlayerInspector(uuid,name){
+  if (!name && uuid) {
+    const p = (state.files?.knownPlayers || []).find(x => x.uuid === uuid);
+    name = p?.name || (uuid.length >= 8 ? uuid.slice(0, 8) : uuid);
+  }
   selectedPlayer={uuid:uuid||null,name};
   openPlayerInspectModal();
   pdSetTab('overview');
@@ -1180,8 +1184,9 @@ async function openPlayerInspector(uuid,name){
 
   // Header quick action toolbar bindings
   const f = state.files || {};
-  const isOp = (f.ops || []).some(x => (typeof x==='string'?x:x?.name)?.toLowerCase() === name.toLowerCase());
-  const isWl = (f.whitelist || []).some(x => (typeof x==='string'?x:x?.name)?.toLowerCase() === name.toLowerCase());
+  const pName = String(name || '').toLowerCase();
+  const isOp = pName ? (f.ops || []).some(x => String(typeof x==='string'?x:x?.name||'').toLowerCase() === pName) : false;
+  const isWl = pName ? (f.whitelist || []).some(x => String(typeof x==='string'?x:x?.name||'').toLowerCase() === pName) : false;
   const opBtn = $('#inspectHeaderOpBtn');
   if (opBtn) {
     opBtn.textContent = isOp ? t('ply.removeOp') : t('ply.makeOp');
@@ -1212,7 +1217,7 @@ async function openPlayerInspector(uuid,name){
       }
     });
   }
-  const isBanned = (f.banned || []).some(x => (typeof x==='string'?x:x?.name)?.toLowerCase() === name.toLowerCase());
+  const isBanned = pName ? (f.banned || []).some(x => String(typeof x==='string'?x:x?.name||'').toLowerCase() === pName) : false;
   const banBtn = $('#inspectHeaderBanBtn');
   if (banBtn) {
     banBtn.textContent = isBanned ? t('ply.unban') : t('ply.ban');

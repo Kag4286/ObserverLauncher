@@ -89,15 +89,27 @@ async function readPlayers(root, levelName) {
   // modern: <world>/playerdata — legacy: <root>/playerdata
   // BUGFIX: Minecraft 26.x moved player data to <world>/players/data/; added that path
   // so world-map markers show real player positions on newer servers too.
-  let files = [];
-  for (const dir of [
-    path.join(root, name, 'players', 'data'),
-    path.join(root, name, 'playerdata'),
-    path.join(root, 'playerdata'),
-  ]) {
-    try { files = fs.readdirSync(dir).filter(f => f.endsWith('.dat')); if (files.length) { files = files.map(f => path.join(dir, f)); break; } } catch {}
+  let worldDirs = [];
+  try { worldDirs = fs.readdirSync(root, { withFileTypes: true }).filter(x => x.isDirectory()).map(x => x.name); } catch {}
+  const candidateWorlds = [...new Set([name, 'world', ...worldDirs])];
+  const fileMap = new Map();
+  const addFilesFrom = (dir) => {
+    try {
+      const found = fs.readdirSync(dir).filter(f => f.endsWith('.dat')).map(f => path.join(dir, f));
+      for (const fp of found) {
+        const u = path.basename(fp, '.dat').toLowerCase();
+        if (!fileMap.has(u)) fileMap.set(u, fp);
+      }
+    } catch {}
+  };
+  for (const w of candidateWorlds) {
+    for (const sub of [['players', 'data'], ['playerdata']]) {
+      addFilesFrom(path.join(root, w, ...sub));
+    }
   }
-  // uuid -> name from usercache.json
+  addFilesFrom(path.join(root, 'playerdata'));
+  const files = Array.from(fileMap.values());
+  // uuid -> name from usercache.json (resolves data/usercache.json too)
   const names = {};
   try { for (const c of readJsonList(root, 'usercache.json')) if (c.uuid && c.name) names[String(c.uuid).toLowerCase()] = c.name; } catch {}
   const players = [];
@@ -119,7 +131,7 @@ async function readPlayers(root, levelName) {
       const food = Number(S.foodLevel ?? (S.simple && S.simple.food_level) ?? 20);
       players.push({
         uuid,
-        name: names[uuid.toLowerCase()] || null,
+        name: names[uuid.toLowerCase()] || (uuid.length >= 8 ? uuid.slice(0, 8) : uuid),
         pos: { x: +pos[0], y: +pos[1], z: +pos[2] },
         dim: dimName(S.Dimension),
         gamemode: S.playerGameType | 0,

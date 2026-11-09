@@ -93,13 +93,21 @@ function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=
   const pt=$('.prop-toolbar');if(pt)pt.hidden=proxy;
   $('#propertiesTitle').textContent=proxy?t('prop.proxyTitle'):t('prop.title');$('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
   try{ if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{}); }catch(e){console.warn('props render error:',e)}
-  try{ renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');renderWorlds(f.worlds||[]);renderBackups(f.backups||[]); }catch(e){console.warn('files render error:',e)}
+  const cur = typeof currentTab === 'string' ? currentTab : 'overview';
+  try{
+    if(cur === 'content'){
+      renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');
+    }
+    if(cur === 'worlds' || cur === 'overview'){
+      renderWorlds(f.worlds||[]);renderBackups(f.backups||[]);
+    }
+  }catch(e){console.warn('files render error:',e)}
    const wc=$('#worldsCountPill'), bc=$('#backupsCountPill'), be=$('#backupEmpty'); if(wc) wc.textContent=String((f.worlds||[]).length); if(bc) bc.textContent=String((f.backups||[]).length); if(be) be.hidden=(f.backups||[]).length>0;
    const cpc=$('#contentPluginsCount'), cmc=$('#contentModsCount'), cdc=$('#contentDatapacksCount'); if(cpc) cpc.textContent=String((f.plugins||[]).length); if(cmc) cmc.textContent=String((f.mods||[]).length); if(cdc) cdc.textContent=String((f.datapacks||[]).length);
    if(typeof syncContentKindAuto==='function')syncContentKindAuto();if(typeof updateContentToolbarState==='function')updateContentToolbarState();
    const abs=$('#autoBackupStatus');if(abs){const mins=s.autoBackupMinutes||0;abs.innerHTML=mins>0?t('wld.autoOn',{n:mins})+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.configure')+'</button>':t('wld.autoOff')+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.turnOn')+'</button>';abs.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump))}
-  try{ renderPlayers(); }catch(e){console.warn('players render error:',e)}
-  try{ renderPerfDiagnostics(); }catch(e){console.warn('perf diag render error:',e)}const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
+  if(cur === 'players'){ try{ renderPlayers(); }catch(e){console.warn('players render error:',e)} }
+  if(cur === 'performance'){ try{ renderPerfDiagnostics(); }catch(e){console.warn('perf diag render error:',e)} }const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
 // 2.2.0 (C): show the Java the current server's jar NEEDS vs what is detected, and offer the
 // one-click install whenever the detected Java is missing OR the wrong version (not just missing).
 // 2.2.0 (Java gap): prefer the Java requirement resolved in the main process (it also handles a

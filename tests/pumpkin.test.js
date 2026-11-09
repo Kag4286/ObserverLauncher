@@ -139,6 +139,36 @@ function ck(name, condition) {
     ck('readBiomes successfully parses live Pumpkin LZ4 chunks', Array.isArray(liveBiomes.biomes) && liveBiomes.biomes.length > 0);
   }
 
+  // 6. Pumpkin data/ Subdirectory & Player Resolution
+  const pumpkinPlayerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-player-test-'));
+  try {
+    fs.mkdirSync(path.join(pumpkinPlayerDir, 'data'), { recursive: true });
+    fs.mkdirSync(path.join(pumpkinPlayerDir, 'world', 'players', 'data'), { recursive: true });
+    fs.writeFileSync(path.join(pumpkinPlayerDir, 'Pumpkin.toml'), defaultToml);
+    fs.writeFileSync(path.join(pumpkinPlayerDir, 'data', 'usercache.json'), JSON.stringify([
+      { name: 'PumpkinPlayer', uuid: '11111111-2222-3333-4444-555555555555' }
+    ]));
+    fs.writeFileSync(path.join(pumpkinPlayerDir, 'data', 'ops.json'), JSON.stringify([
+      { name: 'PumpkinPlayer', uuid: '11111111-2222-3333-4444-555555555555', level: 4 }
+    ]));
+    const { writeJsonList, readJsonList } = require('../src/main/fs-utils.js');
+    writeJsonList(pumpkinPlayerDir, 'whitelist.json', [{ name: 'PumpkinPlayer', uuid: '11111111-2222-3333-4444-555555555555' }]);
+    ck('writeJsonList writes to data/ for Pumpkin server', fs.existsSync(path.join(pumpkinPlayerDir, 'data', 'whitelist.json')));
+
+    const sf = serverFiles(pumpkinPlayerDir);
+    ck('serverFiles resolves usercache from data/usercache.json', sf.knownPlayers.length === 1 && sf.knownPlayers[0].name === 'PumpkinPlayer');
+    ck('serverFiles resolves ops from data/ops.json', sf.ops.length === 1 && sf.ops[0].name === 'PumpkinPlayer');
+    ck('serverFiles resolves whitelist from data/whitelist.json', sf.whitelist.length === 1 && sf.whitelist[0].name === 'PumpkinPlayer');
+
+    const { readPlayers } = require('../src/main/worldmap.js');
+    // Offline player fallback when .dat file exists
+    fs.writeFileSync(path.join(pumpkinPlayerDir, 'world', 'players', 'data', '99999999-8888-7777-6666-555555555555.dat'), 'dummy');
+    const sfFallback = serverFiles(pumpkinPlayerDir);
+    ck('serverFiles fallback lists un-cached players from players/data/', sfFallback.knownPlayers.some(p => p.uuid === '99999999-8888-7777-6666-555555555555'));
+  } finally {
+    fs.rmSync(pumpkinPlayerDir, { recursive: true, force: true });
+  }
+
   console.log(`\n${pass} passed, 0 failed`);
 })().catch(err => {
   console.error(err);

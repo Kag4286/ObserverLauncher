@@ -150,6 +150,29 @@ let lastTabIdx=0;
 // it, instead of snapping back to the top. The scrolling container is `.workspace main`.
 const _tabScroll={};
 let _lastTab=null;
+let _cachedFilesPromise=null;
+let _cachedFilesTime=0;
+function getFilesCached(force=false){
+  const now=Date.now();
+  if(!force&&_cachedFilesPromise&&(now-_cachedFilesTime<2500)){
+    return _cachedFilesPromise;
+  }
+  _cachedFilesTime=now;
+  _cachedFilesPromise=window.observer.getFiles().then(r=>{
+    if(!r||!r.ok){_cachedFilesPromise=null;}
+    return r;
+  }).catch(err=>{
+    _cachedFilesPromise=null;
+    throw err;
+  });
+  return _cachedFilesPromise;
+}
+function invalidateFilesCache(){
+  _cachedFilesPromise=null;
+  _cachedFilesTime=0;
+}
+window.invalidateFilesCache=invalidateFilesCache;
+
 function switchTab(tab){
   const _main=document.querySelector('.workspace main');
   if(_main&&_lastTab&&_lastTab!==tab)_tabScroll[_lastTab]=_main.scrollTop;
@@ -175,18 +198,18 @@ function switchTab(tab){
     setTimeout(()=>{panel.classList.remove('tab-enter-fwd','tab-enter-back');panel.removeEventListener('animationend',onTabEnd);},200);
   }
   if(tab==='marketplace'&&!$('#marketResults').innerHTML)$('#marketSearch').click();
-  if(tab==='performance'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource');}catch{}})}); }
+  if(tab==='performance'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource');}catch{}})}); }
   // v5.7.0: Overview re-fetches files on entry so a jar dropped into plugins/mods by hand (Geyser,
   // Floodgate, a mod) surfaces without an app restart, and the Geyser/Bedrock card appears at once.
   // The sparkline was 0-sized while Overview was hidden — redraw on reveal (same class of bug as the
   // hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
-  if(tab==='overview'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));}
-  if(tab==='players')window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
-  if(tab==='content'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI();if(typeof syncContentKindAuto==='function')syncContentKindAuto();}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates();if(typeof loadContentConflicts==='function')loadContentConflicts();}
+  if(tab==='overview'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));}
+  if(tab==='players')getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
+  if(tab==='content'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI();if(typeof syncContentKindAuto==='function')syncContentKindAuto();}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates();if(typeof loadContentConflicts==='function')loadContentConflicts();}
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
   // hook switchTab itself: it evaluates before this file, so capturing
   // switchTab there throws and leaves the tab blank with dead Reload buttons.
-  if(tab==='settings'){window.observer.getFiles().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}})}
+  if(tab==='settings'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}})}
   if(tab==='worldmap'&&typeof wmLoad==='function')wmLoad().catch(e=>toast(`World Map failed to load: ${e?.message||e}`,'error'));
   // Restore this tab's scroll position (rAF so the panel is laid out first). Console is exempt —
   // it manages its own auto-scroll/tail behavior and should always pin to the newest line.
@@ -496,6 +519,8 @@ function resetInstanceViews(){
     // entry, so staying on the tab would otherwise keep the previous world's seed/biomes).
     const wmTab=document.getElementById('worldmap');
     if(wmTab&&wmTab.classList.contains('active')&&typeof wmLoad==='function') wmLoad().catch(()=>{});
+    else if(typeof wm !== 'undefined') { wm.level = null; wm.players = []; if(typeof wmClearCaches === 'function') wmClearCaches(); }
+    invalidateFilesCache();
     // v6.0.0 D1: drop the cached 7d/30d disk history so the next range pick re-fetches for the NEW
     // instance instead of showing the previous instance's long window.
     try{ samplesVeryLong=[]; _veryLongFor=null; }catch{}

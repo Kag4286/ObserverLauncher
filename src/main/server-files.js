@@ -110,7 +110,35 @@ function serverFiles(root) {
   if (hasHorizonConfig) { try { const { syncTomlToProperties } = require('./horizon-config.js'); Object.assign(properties, syncTomlToProperties(fs.readFileSync(path.join(root, 'server.toml'), 'utf8'))); } catch {} }
   if (hasPumpkinConfig) { try { const { syncPumpkinTomlToProperties } = require('./pumpkin-config.js'); const pFile = fs.existsSync(path.join(root, 'Pumpkin.toml')) ? 'Pumpkin.toml' : 'pumpkin.toml'; Object.assign(properties, syncPumpkinTomlToProperties(fs.readFileSync(path.join(root, pFile), 'utf8'))); } catch {} }
   let knownPlayers = [];
-  try { const cache = JSON.parse(fs.readFileSync(path.join(root, 'usercache.json'), 'utf8')); knownPlayers = cache.map(x => ({ name: x.name, uuid: x.uuid, hasData: !!findPlayerDataFile(root, properties, x.uuid, x.name) })).filter(x => x.name); } catch {}
+  try {
+    const cache = readJsonList(root, 'usercache.json');
+    knownPlayers = cache.map(x => ({ name: x.name, uuid: x.uuid, hasData: !!findPlayerDataFile(root, properties, x.uuid, x.name) })).filter(x => x.name);
+  } catch {}
+  // Fallback: if usercache is missing or incomplete, scan playerdata folders so offline players always show up
+  try {
+    const knownUuids = new Set(knownPlayers.map(p => String(p.uuid).toLowerCase()));
+    const lvl = properties['level-name'] || 'world';
+    const scanDirs = [
+      path.join(root, lvl, 'players', 'data'),
+      path.join(root, lvl, 'playerdata'),
+      path.join(root, 'world', 'players', 'data'),
+      path.join(root, 'world', 'playerdata'),
+      path.join(root, 'playerdata')
+    ];
+    for (const dir of scanDirs) {
+      if (fs.existsSync(dir)) {
+        for (const f of fs.readdirSync(dir)) {
+          if (f.endsWith('.dat')) {
+            const u = path.basename(f, '.dat');
+            if (u && !knownUuids.has(u.toLowerCase())) {
+              knownUuids.add(u.toLowerCase());
+              knownPlayers.push({ name: u.slice(0, 8), uuid: u, hasData: true });
+            }
+          }
+        }
+      }
+    }
+  } catch {}
   const hasSpigotConfig = fs.existsSync(path.join(root, 'spigot.yml')) || fs.existsSync(path.join(root, 'bukkit.yml'));
   // FEATURE: read whitelist/banned-players/ops so the Players tab can categorize Online/Offline/Whitelisted/Banned.
   const whitelist = readJsonList(root, 'whitelist.json');

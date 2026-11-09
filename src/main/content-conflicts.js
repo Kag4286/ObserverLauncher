@@ -1,6 +1,7 @@
 // content-conflicts.js — Scan server mods and plugins for issues before start (v6.1.0).
 // Identifies duplicate jars (same modId), wrong-loader jars, missing required dependencies,
 // incompatible mod pairs, and client-only mods.
+const fs = require('fs');
 const path = require('path');
 const { openJar } = require('./jar-read.js');
 const { classifyJar } = require('./mod-metadata.js');
@@ -10,10 +11,26 @@ const { readJsonList } = require('./fs-utils.js');
 const { missingDependencies, conflictingDependencies } = require('../mcp/modpack-plan.js');
 const { checkMcCompat } = require('./mc-compat.js');
 
+const _classifyCache = new Map();
 function safeClassify(folder, fileName) {
   try {
-    const jar = openJar(path.join(folder, fileName));
-    return classifyJar(jar.read, fileName);
+    const filePath = path.join(folder, fileName);
+    let mtime = null;
+    try {
+      if (fs.existsSync(filePath)) mtime = fs.statSync(filePath).mtimeMs;
+    } catch {}
+    if (mtime !== null) {
+      const cached = _classifyCache.get(filePath);
+      if (cached && cached.mtime === mtime) {
+        return cached.cls;
+      }
+    }
+    const jar = openJar(filePath);
+    const cls = classifyJar(jar.read, fileName);
+    if (mtime !== null) {
+      _classifyCache.set(filePath, { mtime, cls });
+    }
+    return cls;
   } catch {
     return null;
   }
@@ -209,4 +226,4 @@ async function scanContentConflicts(root, options = {}) {
   };
 }
 
-module.exports = { scanContentConflicts };
+module.exports = { scanContentConflicts, safeClassify };

@@ -34,10 +34,8 @@ function updatable(entry) {
 
 function inspectJarVersion(folder, fileName) {
   try {
-    const { openJar } = require('./jar-read.js');
-    const { classifyJar } = require('./mod-metadata.js');
-    const jar = openJar(path.join(folder, fileName));
-    const cls = classifyJar(jar.read, fileName);
+    const { safeClassify } = require('./content-conflicts.js');
+    const cls = safeClassify(folder, fileName);
     return (cls && cls.version) ? cls.version : null;
   } catch {
     return null;

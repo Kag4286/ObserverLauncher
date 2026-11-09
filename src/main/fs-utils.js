@@ -38,8 +38,30 @@ function writeFileAtomic(filePath, content) {
   try { fs.copyFileSync(tmp, filePath); fs.unlinkSync(tmp); return; }
   catch { try { fs.unlinkSync(tmp); } catch {} throw lastErr; }
 }
-function readJsonList(root, name) { try { return JSON.parse(fs.readFileSync(path.join(root, name), 'utf8')); } catch { return []; } }
-function writeJsonList(root, name, list) { writeFileAtomic(path.join(root, name), JSON.stringify(list, null, 2)); }
+function resolveJsonPath(root, name) {
+  if (!root || !name) return null;
+  const pData = path.join(root, 'data', name);
+  const pRoot = path.join(root, name);
+  if (fs.existsSync(pData)) return pData;
+  if (fs.existsSync(pRoot)) return pRoot;
+  // PumpkinMC and native engines keep usercache, whitelist, ops, bans inside data/
+  const hasPumpkin = fs.existsSync(path.join(root, 'Pumpkin.toml')) || fs.existsSync(path.join(root, 'pumpkin.toml'));
+  if (hasPumpkin && fs.existsSync(path.join(root, 'data'))) return pData;
+  return pRoot;
+}
+function readJsonList(root, name) {
+  try {
+    const target = resolveJsonPath(root, name);
+    if (!target || !fs.existsSync(target)) return [];
+    return JSON.parse(fs.readFileSync(target, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+function writeJsonList(root, name, list) {
+  const target = resolveJsonPath(root, name) || path.join(root, name);
+  writeFileAtomic(target, JSON.stringify(list, null, 2));
+}
 function fileHashes(filePath) {
   const buffer = fs.readFileSync(filePath);
   return { sha1: crypto.createHash('sha1').update(buffer).digest('hex'), sha512: crypto.createHash('sha512').update(buffer).digest('hex') };
@@ -170,4 +192,4 @@ class FileTransaction {
   }
 }
 
-module.exports = { writeFileAtomic, readJsonList, writeJsonList, fileHashes, verifyFileHash, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp, FileTransaction };
+module.exports = { writeFileAtomic, resolveJsonPath, readJsonList, writeJsonList, fileHashes, verifyFileHash, findFileRecursive, safeTarget, recordManifestEntry, cleanOrphanTmp, FileTransaction };
