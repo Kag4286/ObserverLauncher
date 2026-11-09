@@ -179,6 +179,8 @@ function switchTab(tab){
   // RAM-1 (3.3.0): leaving the World Map releases its biome/colour caches (rebuilt lazily on reopen).
   if(_lastTab==='worldmap'&&tab!=='worldmap'&&typeof wmClearCaches==='function'){try{wmClearCaches()}catch{}}
   _lastTab=tab;
+  window.currentTab=tab;
+  try{ currentTab=tab; }catch{}
   $$('.nav-item').forEach(b=>{ const on=b.dataset.tab===tab; b.classList.toggle('active',on); b.setAttribute('aria-current', on?'page':'false'); });
   // Direction-aware slide: forward in rail order slides from the right.
   const order=[...channelOrder,'worldmap','settings'];
@@ -471,10 +473,17 @@ async function removeInstancePrompt(inst){
   if(!r||!r.ok)return toast((r&&r.error)||'Remove failed.','error');
   try{ const s=await window.observer.getState(); state={...state,...s}; }catch{}
   refreshUI();
+  syncActiveTabPlayers();
   // UX (2.6.0): offer a one-click undo — re-adds the same folder as an instance. Never touches the
   // folder on disk either way, so this is purely a list-level convenience.
   const _path=inst.serverPath||'';
   if(_path && !delFiles && !inst.missing) toast(t('inst.removed',{n:inst.name||_path}),undefined,{label:t('toast.undo'),fn:async()=>{ try{ const a=await window.observer.instanceAdd({serverPath:_path}); if(a&&a.ok){ const s2=await window.observer.getState(); state={...state,...s2}; refreshUI(); toast(t('inst.added'),'success'); } }catch{} }});
+}
+function syncActiveTabPlayers(){
+  const curTab = typeof _lastTab === 'string' ? _lastTab : window.currentTab;
+  if(curTab === 'players'){
+    try{ if(typeof renderPlayers === 'function') renderPlayers(); }catch{}
+  }
 }
 // Switch the active instance: the backend re-seeds ctx and repoints the runtime folder, then we
 // Re-pull the full snapshot and repaint the console + chart for the ACTIVE instance. server:metrics
@@ -486,6 +495,7 @@ async function refreshFromState(){
   repaintConsole(state.logs);
   rebuildSamples(state.metricsHistory,state.metricsLong);
   refreshUI();
+  syncActiveTabPlayers();
   try{ window.observer.pinggyGet().then(applyPinggyStatus).catch(()=>{}); }catch{}
   try{ refreshTunnelUI(); }catch{}
   try{ loadConnectInfo(); }catch{}
@@ -496,18 +506,9 @@ async function refreshFromState(){
 // config. Close the editor back to the bays, forget its file state, and force a properties reload.
 function resetInstanceViews(){
   try{
-    if(typeof selectedPlayer!=='undefined' && selectedPlayer){
-      const rows = typeof buildPlayerRows==='function' ? buildPlayerRows() : [];
-      const still = rows.find(p =>
-        (selectedPlayer.uuid && p.uuid === selectedPlayer.uuid) ||
-        (selectedPlayer.name && String(p.name).toLowerCase() === String(selectedPlayer.name).toLowerCase())
-      );
-      if(!still || !still.hasData){
-        if(typeof deselectPlayer==='function') deselectPlayer();
-      } else {
-        if(typeof openPlayerInspector==='function') openPlayerInspector(still.uuid, still.name);
-      }
-    }
+    if(typeof deselectPlayer==='function') deselectPlayer();
+    if(typeof closePlayerInspectModal==='function') closePlayerInspectModal();
+    if(typeof window.resetPlayersSig==='function') window.resetPlayersSig();
     if(typeof edState!=='undefined' && edState){
       // Always return to the bays and drop any open file / browsed tree (a stale tree points at the
       // previous instance's folder). edState.files is repopulated lazily by openFileBrowser().

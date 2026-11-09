@@ -52,7 +52,7 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 
 ### Simple & Friendly for Everyday Use
 
-- **Pioneering Native Rust Engine Support (Horizon & Pumpkin):** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) and [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) out of the box—clean-room Minecraft servers built in Rust. They offer ultra-low RAM usage (~100MB to ~600MB dynamic working set) and zero Java GC pauses, providing fast native alternatives alongside your favorite Paper, Fabric, and Forge setups.
+- **Pioneering Native Rust Engine Support (Horizon & Pumpkin):** ObserverLauncher is the first local hosting application to support [Horizon](https://github.com/horizon-rust/horizon) and [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) out of the box—clean-room Minecraft servers built in Rust. They offer ultra-low RAM usage (~100MB to ~250MB dynamic working set) and zero Java GC pauses, providing fast native alternatives alongside your favorite Paper, Fabric, and Forge setups.
 - **1-Click Server Creation:** Choose from Horizon, Pumpkin (Rust Native), Paper, Purpur, Leaf, Folia, Fabric, Forge, NeoForge, Spigot, Vanilla, or Velocity. New Minecraft versions appear right inside the menu without needing app updates.
 - **Automatic Java Setup:** Never worry about which Java to install. The launcher automatically detects what Java version your server needs (Java 8, 17, 21, or 25) and downloads it for you with 1 click.
 - **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.

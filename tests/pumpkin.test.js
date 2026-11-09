@@ -169,6 +169,16 @@ function ck(name, condition) {
     fs.rmSync(pumpkinPlayerDir, { recursive: true, force: true });
   }
 
+  // 7. Pumpkin TPS and MSPT Parsing
+  {
+    const { parseServerLine } = require('../src/main/server-files.js');
+    const live = { tps: null, mspt: null, players: [] };
+    let sent = false;
+    parseServerLine('18:01:16 INFO TPS: 20.00 MSPT: 0.15ms', live, () => { sent = true; });
+    ck('parseServerLine parses Pumpkin TPS', live.tps === 20);
+    ck('parseServerLine parses Pumpkin MSPT', live.mspt === 0.15);
+  }
+
   console.log(`\n${pass} passed, 0 failed`);
 })().catch(err => {
   console.error(err);

@@ -29,9 +29,9 @@ function startAutoPoll(ctx, software) {
         if (ctx.sparkAvailable) ctx.serverProcess.stdin.write('spark tps\r\n');
         return;
       }
-      if (software === 'paper-like') {
+      if (software === 'paper-like' || software === 'pumpkin') {
         ctx.serverProcess.stdin.write('tps\r\n');
-        ctx.serverProcess.stdin.write('tick query\r\n');
+        if (software === 'paper-like') ctx.serverProcess.stdin.write('tick query\r\n');
       } else if (software === 'forge') {
         ctx.serverProcess.stdin.write('forge tps\r\n');
       }

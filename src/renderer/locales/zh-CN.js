@@ -155,7 +155,7 @@ window.LOCALES['zh-CN'] = {
   'nsw.inf.pumpkin.b1': "完全兼容最新原版协议，官方 Java 版客户端可直接连接游玩。",
   'nsw.inf.pumpkin.b2': "无需 Java 或 JVM 运行时。启动迅捷，轻松通过 Pumpkin.toml 配置文件管理。",
   'nsw.srcPumpkin': "GitHub Releases (Pumpkin-MC/Pumpkin)",
-  'nsw.desc.horizon': "Rust 编写的突破性 Minecraft 26.3。极致性能，~600MB 内存，无需 Java。",
+  'nsw.desc.horizon': "Rust 编写的突破性 Minecraft 26.3。极致性能，~150–250MB 内存，无需 Java。",
   "nsw.inf.horizon": "Horizon 是用 Rust 重新构建的 Minecraft Java Edition 服务器，启动神速，运行轻巧。",
   "nsw.inf.horizon.b1": "完全兼容原版 26.3 协议，官方客户端可直接连接游玩。",
   "nsw.inf.horizon.b2": "无需安装 Java 或 JVM 运行时。支持 server.toml 配置。",
@@ -212,7 +212,7 @@ window.LOCALES['zh-CN'] = {
   'nsw.nativeMemExplainPumpkin': "Pumpkin 是使用 Rust 编写的高性能轻量级多线程 Minecraft 服务端。它直接由操作系统分配物理内存，无需预分配 JVM 堆内存，亦无垃圾回收导致的卡顿。启动内存仅约 100MB，随玩家数量平滑自适应扩展。",
   'nsw.nativeNoJvmPumpkin': "Rust 原生 • ~100MB 内存",
   'nsw.subfolderPlaceholder': "可选 — 留空直接使用所选文件夹",
-  'nsw.nativeDirectRam': "直接系统内存 (~600 MB)",
+  'nsw.nativeDirectRam': "直接系统内存 (~200 MB)",
 
   'nsw.mem1': "适合 1-4 名玩家",
   'nsw.mem2': "适合 5-10 名玩家",

@@ -93,7 +93,7 @@ function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=
   const pt=$('.prop-toolbar');if(pt)pt.hidden=proxy;
   $('#propertiesTitle').textContent=proxy?t('prop.proxyTitle'):t('prop.title');$('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
   try{ if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{}); }catch(e){console.warn('props render error:',e)}
-  const cur = typeof currentTab === 'string' ? currentTab : 'overview';
+  const cur = typeof currentTab === 'string' ? currentTab : (typeof _lastTab === 'string' ? _lastTab : (window.currentTab || 'overview'));
   try{
     if(cur === 'content'){
       renderFiles('#pluginsList',f.plugins||[],'plugin');renderFiles('#modsList',f.mods||[],'mod');renderFiles('#datapacksList',f.datapacks||[],'datapack');

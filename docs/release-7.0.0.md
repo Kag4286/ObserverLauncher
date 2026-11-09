@@ -17,7 +17,7 @@ Horizon takes a completely new approach: it is a ground-up recreation of the Min
 
 ### Why this is a huge upgrade for local hosting:
 - **Zero Java required:** You never need to install, update, or troubleshoot Java versions. Horizon starts immediately as an executable.
-- **Micro-memory footprint (~600 MB):** Where a typical Java server needs 2 GB to 4 GB of RAM just to boot, Horizon runs smoothly using only about 600 MB of your computer's memory. It leaves the rest of your RAM free for your browser, Discord, or the game itself.
+- **Micro-memory footprint (~150–250 MB):** Where a typical Java server needs 2 GB to 4 GB of RAM just to boot, Horizon runs smoothly using only about 150–250 MB of your computer's memory. It leaves the rest of your RAM free for your browser, Discord, or the game itself.
 - **Smooth gameplay with no stuttering:** Horizon frees memory automatically as you play. Because there is no Java memory cleaner running in the background, your server maintains steady tick rates without random lag spikes.
 - **1-Click setup in ObserverLauncher:** In the past, running Horizon required technical knowledge and terminal commands. In ObserverLauncher, you simply choose Horizon in the New Server Wizard. The launcher downloads the official files, configures your settings, and lets friends connect instantly over local Wi-Fi or with our built-in internet tunnels (Playit.gg / Pinggy).
 

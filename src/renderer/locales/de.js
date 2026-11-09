@@ -155,7 +155,7 @@ window.LOCALES.de = {
   'nsw.inf.pumpkin.b1': "Kompatibel mit dem neuesten Vanilla-Protokoll — Standard-Java-Clients verbinden sich direkt.",
   'nsw.inf.pumpkin.b2': "Kein Java oder JVM-Overhead. Blitzschneller Start und verwaltet über Pumpkin.toml.",
   'nsw.srcPumpkin': "GitHub Releases (Pumpkin-MC/Pumpkin)",
-  'nsw.desc.horizon': "Minecraft 26.3-Durchbruch in Rust. Höchstleistung, ~600MB RAM, kein Java erforderlich.",
+  'nsw.desc.horizon': "Minecraft 26.3-Durchbruch in Rust. Höchstleistung, ~150–250MB RAM, kein Java erforderlich.",
   "nsw.inf.horizon": "Horizon ist ein kompletter Rewrite von Minecraft Java Edition in Rust mit überragender Performance und Sofortstart.",
   "nsw.inf.horizon.b1": "Kompatibel mit Vanilla 26.3-Protokoll — Standard-Clients verbinden sich direkt.",
   "nsw.inf.horizon.b2": "Kein Java oder JVM erforderlich. Verwaltet über server.toml.",
@@ -212,7 +212,7 @@ window.LOCALES.de = {
   'nsw.nativeMemExplainPumpkin': "Pumpkin ist ein leichtgewichtiger, multithreaded Minecraft-Server in Rust. Er verwaltet RAM direkt über das Betriebssystem ohne JVM-Heap-Reservierung und ohne Garbage-Collection-Ruckler. Der Speicherbedarf beginnt bei nur ~100MB und skaliert dynamisch mit den Spielern.",
   'nsw.nativeNoJvmPumpkin': "Rust Native • ~100MB RAM",
   'nsw.subfolderPlaceholder': "Optional — leer lassen für ausgewählten Ordner",
-  'nsw.nativeDirectRam': "Direkter Systemspeicher (~600 MB)",
+  'nsw.nativeDirectRam': "Direkter Systemspeicher (~200 MB)",
 
   'nsw.mem1': "Gut für 1–4 Spieler",
   'nsw.mem2': "Gut für 5–10 Spieler",

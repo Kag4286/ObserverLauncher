@@ -155,7 +155,7 @@ window.LOCALES.vi = {
   'nsw.inf.pumpkin.b1': "Tương thích giao thức vanilla mới nhất — client Java Edition tiêu chuẩn tham gia trực tiếp.",
   'nsw.inf.pumpkin.b2': "Hoàn toàn không cần Java hay JVM. Khởi động cực nhanh, cấu hình qua Pumpkin.toml.",
   'nsw.srcPumpkin': "GitHub Releases (Pumpkin-MC/Pumpkin)",
-  'nsw.desc.horizon': "Đột phá Minecraft 26.3 bằng ngôn ngữ Rust. Siêu tối ưu, RAM ~600MB, không cần Java.",
+  'nsw.desc.horizon': "Đột phá Minecraft 26.3 bằng ngôn ngữ Rust. Siêu tối ưu, RAM ~150–250MB, không cần Java.",
   "nsw.inf.horizon": "Horizon là bản viết lại sạch của Minecraft Java Edition bằng Rust, đem lại hiệu năng vượt trội, khởi động tức thì và mức ngốn RAM cực thấp.",
   "nsw.inf.horizon.b1": "Tương thích giao thức vanilla 26.3 — người chơi Minecraft chính thức kết nối bình thường.",
   "nsw.inf.horizon.b2": "Hoàn toàn không cần Java hay JVM. Cấu hình tiện lợi qua server.toml.",
@@ -212,7 +212,7 @@ window.LOCALES.vi = {
   'nsw.nativeMemExplainPumpkin': "Pumpkin là máy chủ Minecraft đa luồng siêu nhẹ được xây dựng bằng Rust. Khác với máy chủ Java cần cấp phát trước hàng gigabyte RAM heap (-Xmx), Pumpkin quản lý RAM trực tiếp từ hệ điều hành và không bị giật lag do Garbage Collection. Mức tiêu thụ bộ nhớ chỉ khoảng ~100MB khi khởi động và co giãn mượt mà theo lượng người chơi.",
   'nsw.nativeNoJvmPumpkin': "Rust Native • RAM ~100MB",
   'nsw.subfolderPlaceholder': "Không bắt buộc — để trống nếu dùng thư mục đã chọn",
-  'nsw.nativeDirectRam': "RAM hệ thống trực tiếp (~600 MB)",
+  'nsw.nativeDirectRam': "RAM hệ thống trực tiếp (~200 MB)",
 
   'nsw.mem1': "Phù hợp cho 1-4 người chơi",
   'nsw.mem2': "Phù hợp cho 5-10 người chơi",

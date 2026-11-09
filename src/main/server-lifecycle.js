@@ -501,7 +501,7 @@ async function startServerInternal(ctx, settings) {
       // Any output while we are still waiting means boot is still in progress -> push the quiet
       // watchdog out, so a slow modpack is never flipped to 'running' mid-load.
       if (ctx.waitingForDone) armDoneWatchdog();
-      if (ctx.waitingForDone && (/\bDone \([^)]*\)!/i.test(x) || (isNative && /listening on|horizon.*ready|server started/i.test(x)))) {
+      if (ctx.waitingForDone && (/\bDone \([^)]*\)!/i.test(x) || (isNative && /listening on|horizon.*ready|server started|started server|server is now running/i.test(x)))) {
         ctx.waitingForDone = false;
         clearTimeout(doneWatchdog);
         startAutoPoll(ctx, software);
@@ -524,7 +524,7 @@ async function startServerInternal(ctx, settings) {
         ctx.tpsUnsupported = true;
       }
       const isAutoPollStatus = duringPoll
-        && /(spark-worker-pool|players online|TPS from last|Tick durations|CPU usage from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|\(system\)|\(process\)|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^spark tps$|^list$)/i.test(x);
+        && /(spark-worker-pool|players online|TPS from last|Tick durations|CPU usage from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|\bTPS:\s*[\d.]+\s*MSPT:|\(system\)|\(process\)|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^spark tps$|^list$)/i.test(x);
       if (!isAutoPollStatus) ctx.appendLog(x);
       // v6.0.0 F1: fire the player_join webhook when a join line appears (before parseServerLine
       // mutates the list, so we can compare). Fail-silent.

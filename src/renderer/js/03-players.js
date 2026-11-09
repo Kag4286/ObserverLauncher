@@ -1470,4 +1470,4 @@ window.observer.onIconsUpdate(()=>{
   }, 120);
 });
 
-try{ window.deselectPlayer=deselectPlayer; window.openPlayerInspector=openPlayerInspector; window.buildPlayerRows=buildPlayerRows; }catch{}
+try{ window.deselectPlayer=deselectPlayer; window.closePlayerInspectModal=closePlayerInspectModal; window.openPlayerInspector=openPlayerInspector; window.buildPlayerRows=buildPlayerRows; window.resetPlayersSig=()=>{ lastPlayersSig=''; }; }catch{}

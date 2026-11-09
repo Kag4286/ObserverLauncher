@@ -242,7 +242,7 @@ function nswRender(){
   if(nsw.step===1){const nb=$('#nswNext');if(nb)nb.disabled=!nsw.folder;}
   $('#nswRailSub1').textContent=NSW_SOFTWARE_LABEL[nsw.software]||nsw.software;
   $('#nswRailSub2').textContent=version;
-  $('#nswRailSub3').textContent=nsw.software==='horizon'?'~600 MB':nsw.software==='pumpkin'?'~100 MB':`${$('#nswMemorySlider').value} GB`;
+  $('#nswRailSub3').textContent=nsw.software==='horizon'?'~200 MB':nsw.software==='pumpkin'?'~100 MB':`${$('#nswMemorySlider').value} GB`;
   if(nsw.step===2){loadNswTemplates()}
   if(nsw.step===3){
     loadNswVersions(nsw.software);
@@ -266,7 +266,7 @@ function nswRender(){
     if(nWrap) nWrap.hidden=!isNat;
     if(isNat){
       const isPumpkin=nsw.software==='pumpkin';
-      const numEl=$('#nswNativeMemNum');if(numEl)numEl.textContent=isPumpkin?'~100':'~600';
+      const numEl=$('#nswNativeMemNum');if(numEl)numEl.textContent=isPumpkin?'~100':'~200';
       const badgeEl=$('#nswNativeMemBadge');if(badgeEl)badgeEl.textContent=isPumpkin?t('nsw.nativeNoJvmPumpkin'):t('nsw.noJvmNeeded');
       const explainEl=$('#nswNativeMemExplain');if(explainEl)explainEl.textContent=isPumpkin?t('nsw.nativeMemExplainPumpkin'):t('nsw.nativeMemExplain');
     } else {
