@@ -14,7 +14,7 @@ Thanks for taking a look. This project is small, so the process is intentionally
 ```bash
 npm install
 npm start        # launch the app in development mode
-npm test         # unit/regression suite (node tests/run.js — 167 test suites)
+npm test         # unit/regression suite (node tests/run.js — 170 test suites)
 npm run test:e2e # Playwright smoke tests against the real Electron app
 ```
 
@@ -31,7 +31,7 @@ plus a window-less entry point that reuses the exact same backend:
     `pinggy-tunnel.js` (per-instance ssh child for the Bedrock UDP tunnel), `bulk-instances.js`
     (pure start-all/stop-all planners), `prometheus.js` (the loopback `/metrics` endpoint).
   - Plain helpers (testable without an Electron window): `settings.js`, `fs-utils.js`, `http.js`,
-    `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js`, `textures.js`,
+    `java.js`, `server-files.js`, `network.js`, `editor.js`, `worldmap.js` (chunk decompression, biomes, relief and clearBiomeCaches), `textures.js`,
     `validate.js` (IPC & SSRF guards covering IPv4/IPv6 loopback, link-local, ULA, multicast, and private ranges),
     `migrations.js`, `kill.js`, `server-metrics.js`, `server-poll.js`, `curseforge.js`
     (CurseForge API helpers + pure manifest/dependency mapping; the user supplies their own API key),
@@ -173,7 +173,7 @@ Textures do not go through the normal IPC path. A custom `tex://` scheme serves 
 - **Keep IPC channel names stable.** `preload.js` and the renderer depend on the exact channel strings used in `ipcMain.handle(...)`.
 - **Validate untrusted input.** Anything arriving from the renderer (or a remote API / MCP) is treated as untrusted. Use `src/main/validate.js` and `safeTarget` in `src/main/fs-utils.js`. When checking file basenames for path traversal, always check for both `/` and `\` explicitly (`name.includes('/') || name.includes('\\')`) because POSIX `path.basename` does not treat backslash as a directory separator.
 - **Follow the motion contract.** New animation uses tokens (`var(--dur-*)`, `var(--ease-*)`) from `01-tokens.css`, never literal `.2s`/`150ms`, and guards Lite mode and `prefers-reduced-motion`.
-- **Run the tests** before opening a PR: `npm test` (167 test suites) and `node tests/i18n.test.js`.
+- **Run the tests** before opening a PR: `npm test` (170 test suites) and `node tests/i18n.test.js`.
 - **Test on Windows** if you can — Windows and Linux are supported platforms, and several paths (`powershell.exe`, `cmd.exe`, `run.bat`) are Windows-specific.
 
 ## Adding a language

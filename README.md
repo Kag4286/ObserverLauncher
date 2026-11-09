@@ -58,9 +58,9 @@ Everything runs locally on your PC. There are no paid subscriptions, no account 
 - **Easy Internet Play:** Play with friends over the internet without touching messy router settings. Built-in Playit.gg and Pinggy integration creates a shareable link in seconds.
 - **Built-in Mod & Plugin Store:** Browse and install mods, plugins, and datapacks directly from Modrinth, Hangar, and SpigotMC. The app checks if mods match your server before installing and lets you rollback updates with one click.
 - **Automatic Mod Conflict Checks:** Warns you before your server starts if mods are missing required dependencies, duplicate, built for the wrong mod loader, or made for an incompatible Minecraft version.
-- **Player Inspector 2.0 & 3D Skins:** Manage online and offline players with an authentic Spatial Character Stage, 10-segment precision vitals HUD, 9×4 inventory matrix, editorial item lore drawer, direct World Map bridge, intention-clustered live admin actions, and interactive 3D skins with dynamic dimension lighting.
+- **Player Inspector 2.0 & Seamless 3D Skins:** Manage online and offline players with an authentic 3D character stage, seamless clothing layering with zero visual flicker, authentic modded 3D armor (e.g. Ice and Fire dragons), 10-segment vitals, 9×4 inventory matrix, editorial lore drawer, and direct World Map coordinate jump.
 - **Safe World Backups:** Back up your worlds to ZIP files anytime or on an automatic schedule. Backups pause world saving for a split second so your saves never get corrupted.
-- **Live World Map:** Explore your generated world terrain, surface biomes, and custom waypoints in real-time.
+- **Live World Map with Low-Resource Mode:** Explore your real world terrain, biomes, and custom waypoints in real-time. Includes a 1-click Low-Resource Mode, void-free chunk streaming, and automatic memory cleanup for smooth performance on any PC.
 - **Friendly Crash Explanations:** If your server crashes due to a wrong Java version, the launcher explains the problem in plain English (e.g. *"This server requires Java 21, but Java 17 is selected"*) and gives you a button to fix it immediately.
 - **Safety History for Settings:** If you make a mistake editing server properties, easily restore previous versions with a 1-click history rewind.
 - **Discord Alerts:** Send messages to your Discord channel whenever your server starts, stops, crashes, or when players join.
@@ -155,7 +155,7 @@ npm install
 # Run the app in development mode
 npm start
 
-# Run unit and integration tests (167 test suites)
+# Run unit and integration tests (170 test suites)
 npm test
 
 # Run end-to-end tests
