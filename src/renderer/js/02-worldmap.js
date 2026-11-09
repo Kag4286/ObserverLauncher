@@ -257,7 +257,7 @@ function wmChunkColors(ck, cx, cz) {
   } else {
     out = null;
   }
-  lruSet(wmColorCache, key, out, 2000);
+  lruSet(wmColorCache, key, out, 12000);
   return out;
 }
 
@@ -295,7 +295,7 @@ function biomeColor(id) {
 const WM_BIOME_MAX_CHUNKS = 1600;
 const WM_BIOME_MIN_ZOOM = 0.06;
 const WM_LABEL_MIN_ZOOM = 0.15;
-const WM_BIOME_CACHE_MAX = 2000;
+const WM_BIOME_CACHE_MAX = 12000;
 
 function wmSetBiome(ck, row, dim) {
   lruSet(wm.biomes, (dim || wm.dim) + ':' + ck, row, WM_BIOME_CACHE_MAX);
@@ -332,27 +332,23 @@ function wmScheduleBiomes() {
   if (!wm.level || !wm.layers.terrain || !wm.explored.size) return;
   const cv = $('#wmCanvas'); if (!cv) return;
   const W = cv.clientWidth || 800, H = cv.clientHeight || 520;
-  let cx0 = Math.floor((wm.cam.x - W / 2 / wm.zoom) / 16), cx1 = Math.floor((wm.cam.x + W / 2 / wm.zoom) / 16);
-  let cz0 = Math.floor((wm.cam.z - H / 2 / wm.zoom) / 16), cz1 = Math.floor((wm.cam.z + H / 2 / wm.zoom) / 16);
 
-  // Clamped scan radius: 24 chunks in normal mode (covers up to 4K displays), 16 chunks in Low-Resource mode
-  const isFast = (wm.zoom < 0.15 || !!wm.lowResourceMode);
-  const MAX_RADIUS = wm.lowResourceMode ? 16 : 24;
+  // Fast LOD for wide views (zoom < 0.35) or when Low-Resource mode is enabled
+  const isFast = (wm.zoom < 0.35 || !!wm.lowResourceMode);
+  const halfW = Math.ceil((W / 2 / wm.zoom) / 16) + 2;
+  const halfH = Math.ceil((H / 2 / wm.zoom) / 16) + 2;
+  const maxRadius = isFast ? 64 : (wm.lowResourceMode ? 24 : 40);
+  const radiusX = Math.min(halfW, maxRadius);
+  const radiusZ = Math.min(halfH, maxRadius);
   const ccx = Math.floor(wm.cam.x / 16), ccz = Math.floor(wm.cam.z / 16);
-  if (cx1 - cx0 > MAX_RADIUS * 2) {
-    cx0 = ccx - MAX_RADIUS;
-    cx1 = ccx + MAX_RADIUS;
-  }
-  if (cz1 - cz0 > MAX_RADIUS * 2) {
-    cz0 = ccz - MAX_RADIUS;
-    cz1 = ccz + MAX_RADIUS;
-  }
+  const cx0 = ccx - radiusX, cx1 = ccx + radiusX;
+  const cz0 = ccz - radiusZ, cz1 = ccz + radiusZ;
 
   const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? '', isFast ? 'fast' : 'full'].join(',');
   if (rect === wm.lastBiomeRect) return;
 
   clearTimeout(wm.biomeTimer);
-  const debounceMs = wm.isDragging ? 280 : 180;
+  const debounceMs = wm.isDragging ? 200 : 120;
   wm.biomeTimer = setTimeout(async () => {
     wm.lastBiomeRect = rect;
     const reqId = ++wm.biomeReqSeq;
@@ -368,18 +364,24 @@ function wmScheduleBiomes() {
       sliceY: wm.sliceY,
       lod: isFast ? 'fast' : 'full'
     }).catch(() => null);
+
+    // Always ingest arriving biomes immediately even if another drag sequence was triggered.
+    if (res && res.ok) {
+      const ingested = wmIngestBiomePayload(res, currentDim);
+      if (ingested) {
+        wmDrawSoon();
+        wmRenderLegend();
+      }
+    }
+
     if (reqId !== wm.biomeReqSeq) return;
     wm.biomeLoading = false;
-    if (!res || !res.ok) {
+    if (!res || !res.ok || res.truncated) {
       wm.lastBiomeRect = '';
       return;
     }
     wm.biomeTruncated = !!res.truncated;
-    const ingested = wmIngestBiomePayload(res, currentDim);
-    if (ingested || wm.biomeTruncated) {
-      wmDrawSoon();
-      wmRenderLegend();
-    }
+    wmDrawSoon();
   }, debounceMs);
 }
 
@@ -387,7 +389,7 @@ async function wmPrefetchBiomes(ccx, ccz, half) {
   if (!wm.level) return;
   const pfId = ++wmPrefetchReqSeq;
   const pfDim = wm.dim;
-  const isFast = (wm.zoom < 0.15 || !!wm.lowResourceMode);
+  const isFast = (wm.zoom < 0.35 || !!wm.lowResourceMode);
   wm.biomeLoading = true;
   wmDrawSoon();
   const pfRes = await window.observer.worldmapBiomes({
@@ -399,19 +401,21 @@ async function wmPrefetchBiomes(ccx, ccz, half) {
     sliceY: wm.sliceY,
     lod: isFast ? 'fast' : 'full'
   }).catch(() => null);
+  if (pfRes && pfRes.ok) {
+    if (wmIngestBiomePayload(pfRes, pfDim)) {
+      wmDrawSoon();
+      wmRenderLegend();
+    }
+  }
   if (pfId !== wmPrefetchReqSeq) return;
   wm.biomeLoading = false;
-  if (wmIngestBiomePayload(pfRes, pfDim)) {
-    wmDrawSoon();
-    wmRenderLegend();
-  }
 }
 
 const WM_COLORS = ['#FF3B5C', '#00E5FF', '#FFD23F', '#00E5A0', '#C792EA', '#FF8C42'];
 
 // ============ 60 FPS GPU-ACCELERATED TILE BITMAP CACHE ============
 const WM_TILE_BLOCKS = 256; // 16 chunks = 256 blocks per tile
-const WM_TILE_CACHE_MAX = 36;
+const WM_TILE_CACHE_MAX = 96;
 const wmTileCache = new Map();
 
 function wmGetTile(tx, tz) {
@@ -426,12 +430,18 @@ function wmGetTile(tx, tz) {
 
   const chunkX0 = tx * 16;
   const chunkZ0 = tz * 16;
+  let tileComplete = true;
 
   for (let cz = chunkZ0; cz < chunkZ0 + 16; cz++) {
     for (let cx = chunkX0; cx < chunkX0 + 16; cx++) {
       const ck = cx + ',' + cz;
       const hasExplored = wm.explored.size ? wm.explored.has(ck) : true;
       if (!hasExplored && wm.explored.size > 0) continue;
+
+      const hasBiome = wm.biomes.has((wm.dim || 'overworld') + ':' + ck);
+      if (!hasBiome) {
+        tileComplete = false;
+      }
 
       const cols = wmChunkColors(ck, cx, cz);
       const px = (cx - chunkX0) * 16;
@@ -467,7 +477,11 @@ function wmGetTile(tx, tz) {
     }
   }
 
-  lruSet(wmTileCache, tk, cv, WM_TILE_CACHE_MAX);
+  // Only store fully resolved tiles in the cache. Incomplete tiles will be re-drawn
+  // cleanly as soon as their biomes arrive rather than being stuck as black patches.
+  if (tileComplete) {
+    lruSet(wmTileCache, tk, cv, WM_TILE_CACHE_MAX);
+  }
   const metricEl = document.getElementById('wmTileMetric');
   if (metricEl) metricEl.textContent = `${wmTileCache.size} tiles cached · 60 FPS`;
   return cv;
@@ -955,7 +969,7 @@ function wmGoTo() {
 $('#wmGotoBtn')?.addEventListener('click', wmGoTo);
 $('#wmGotoInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); wmGoTo(); } });
 
-function wmZoomBy(f) { wm.zoom = Math.max(0.02, Math.min(16, wm.zoom * f)); wmDrawSoon(); }
+function wmZoomBy(f) { wm.zoom = Math.max(0.02, Math.min(16, wm.zoom * f)); wmDrawSoon(); wmScheduleBiomes(); }
 $('#wmZoomIn')?.addEventListener('click', () => wmZoomBy(1.25));
 $('#wmZoomOut')?.addEventListener('click', () => wmZoomBy(1 / 1.25));
 
@@ -965,6 +979,7 @@ function wmFitSpawn() {
   wm.zoom = Math.max(0.02, Math.min(16, span / 512));
   wm.cam = { x: sp.x, z: sp.z };
   wmDrawSoon();
+  wmScheduleBiomes();
 }
 $('#wmFitSpawn')?.addEventListener('click', wmFitSpawn);
 
@@ -1599,6 +1614,7 @@ $('#wmExport').onclick = () => {
     wm.zoom = Math.max(0.02, Math.min(16, wm.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
     wm.cam = { x: wx - (e.clientX - r.left - WM_CX()) / wm.zoom, z: wz - (e.clientY - r.top - WM_CY()) / wm.zoom };
     wmDrawSoon();
+    wmScheduleBiomes();
   }, { passive: false });
 
   cv.addEventListener('keydown', e => {
@@ -1616,6 +1632,7 @@ $('#wmExport').onclick = () => {
     }
     e.preventDefault();
     wmDrawSoon();
+    wmScheduleBiomes();
   });
 
   new ResizeObserver(() => wmDraw()).observe(cv);
