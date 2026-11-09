@@ -109,9 +109,11 @@ async function readPlayers(root, levelName) {
   }
   addFilesFrom(path.join(root, 'playerdata'));
   const files = Array.from(fileMap.values());
-  // uuid -> name from usercache.json (resolves data/usercache.json too)
+  // uuid -> name from usercache.json (resolves data/usercache.json too), with ops/whitelist fallbacks
   const names = {};
   try { for (const c of readJsonList(root, 'usercache.json')) if (c.uuid && c.name) names[String(c.uuid).toLowerCase()] = c.name; } catch {}
+  try { for (const c of readJsonList(root, 'ops.json')) if (c.uuid && c.name && !names[String(c.uuid).toLowerCase()]) names[String(c.uuid).toLowerCase()] = c.name; } catch {}
+  try { for (const c of readJsonList(root, 'whitelist.json')) if (c.uuid && c.name && !names[String(c.uuid).toLowerCase()]) names[String(c.uuid).toLowerCase()] = c.name; } catch {}
   const players = [];
   for (const f of files) {
     try {
@@ -1138,6 +1140,7 @@ function listDimensions(root, levelName) {
 function clearBiomeCaches() {
   biomeRegionCache.clear();
   exploredCache.clear();
+  worldBiomeRegistries.clear();
 }
 
 module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry, decompressLz4Block, decompressLz4, readChunkRaw, readChunkNbtFd, extractStructureStarts, isSlimeChunk, toNetherCoords, toOverworldCoords, clearBiomeCaches };

@@ -773,6 +773,14 @@
             <div class="wm-main">
               <canvas id="wmCanvas" width="800" height="520" tabindex="0" role="application" aria-label="World map - arrow keys pan, +/- zoom, 0 fits spawn"></canvas>
               <aside class="wm-panel">
+                <div class="wm-panel-section" id="wmPlayersSection" style="margin-bottom:14px" hidden>
+                  <div class="sec-head" style="margin-bottom:6px">
+                    <h3 data-i18n="nav.players">Players</h3>
+                    <span class="spacer"></span>
+                    <span class="prop-count" id="wmPlayersCount">0</span>
+                  </div>
+                  <div id="wmPlayersList" class="wm-wplist"></div>
+                </div>
                 <div class="sec-head" style="margin-bottom:8px">
                   <h3 data-i18n="wm.waypoints">Waypoints</h3>
                   <span class="spacer"></span>

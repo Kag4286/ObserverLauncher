@@ -605,6 +605,16 @@ function getHeadAvatarHtml(uuid, name) {
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
   const all=buildPlayerRows();
+  // If no players are currently online (e.g. server stopped or 0 online), auto-switch to offline
+  // so known players with data immediately show up rather than presenting a blank list.
+  if (playerFilter === 'online' && !all.some(p => p.online) && all.length > 0) {
+    playerFilter = 'offline';
+    $$('[data-player-filter]').forEach(x => {
+      const on = x.dataset.playerFilter === 'offline';
+      x.classList.toggle('active', on);
+      x.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
   if(selectedPlayer){
     const still=all.find(p=>(selectedPlayer.uuid&&p.uuid===selectedPlayer.uuid)||(selectedPlayer.name&&String(p.name).toLowerCase()===String(selectedPlayer.name).toLowerCase()));
     if(!still||!still.hasData){

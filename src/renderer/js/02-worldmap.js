@@ -1095,7 +1095,73 @@ if (wmSliceReset) {
 }
 
 // Waypoint List Rendering
+async function wmCopyTpCommand(cmd) {
+  try {
+    await navigator.clipboard.writeText(cmd);
+    toast(t('wm.tpCopied') + `: ${cmd}`, 'success');
+  } catch {
+    toast(cmd);
+  }
+}
+
 function wmRenderList() {
+  const pBox = $('#wmPlayersList');
+  const pSec = $('#wmPlayersSection');
+  const pCount = $('#wmPlayersCount');
+  if (pBox && pSec) {
+    const pList = wm.players || [];
+    if (pCount) pCount.textContent = String(pList.length);
+    if (!pList.length) {
+      pSec.hidden = true;
+      pBox.innerHTML = '';
+    } else {
+      pSec.hidden = false;
+      pBox.innerHTML = pList.map(p => {
+        const dimStr = p.dim || 'overworld';
+        const coordsStr = p.pos ? `${Math.round(p.pos.x)} ${Math.round(p.pos.z)}` : '';
+        const hpStr = p.health !== undefined ? `❤ ${p.health}/20` : '';
+        return `<div class="wm-wprow" data-uuid="${esc(p.uuid || '')}">
+          <span class="wm-dot" style="background:#00E5FF"></span>
+          <div class="wm-wpmain">
+            <b>${esc(p.name || p.uuid.slice(0, 8))} ${hpStr ? `<span class="wm-wp-dist">${hpStr}</span>` : ''}</b>
+            <small>${esc(dimStr)} · ${coordsStr}</small>
+          </div>
+          <div class="wm-wp-actions">
+            <button class="text-btn" data-wm-pjump="${esc(p.uuid)}" title="${esc(t('wm.jump'))}">🎯</button>
+            <button class="text-btn" data-wm-pinspect="${esc(p.uuid)}" data-name="${esc(p.name || '')}" title="${esc(t('ply.inspect'))}">🔍</button>
+            <button class="text-btn" data-wm-ptp="${esc(p.uuid)}" title="${esc(t('wm.copyTp'))}">/tp</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      pBox.querySelectorAll('[data-wm-pjump]').forEach(b => b.onclick = () => {
+        const p = (wm.players || []).find(x => x.uuid === b.dataset.wmPjump);
+        if (p && p.pos) {
+          if (p.dim && p.dim !== wm.dim) {
+            wm.dim = p.dim;
+            wmSyncDimTabs();
+            wmDrawSoon();
+          }
+          wmJump(p.pos.x, p.pos.z);
+        }
+      });
+
+      pBox.querySelectorAll('[data-wm-pinspect]').forEach(b => b.onclick = () => {
+        const uuid = b.dataset.wmPinspect;
+        const name = b.dataset.name;
+        if (typeof switchTab === 'function') switchTab('players');
+        if (typeof openPlayerInspector === 'function') openPlayerInspector(uuid, name);
+      });
+
+      pBox.querySelectorAll('[data-wm-ptp]').forEach(b => b.onclick = () => {
+        const p = (wm.players || []).find(x => x.uuid === b.dataset.wmPtp);
+        if (p && p.pos) {
+          wmCopyTpCommand(`/tp @s ${Math.round(p.pos.x)} ${Math.round(p.pos.y || 64)} ${Math.round(p.pos.z)}`);
+        }
+      });
+    }
+  }
+
   const box = $('#wmWpList'); const list = wm.waypoints;
   $('#wmWpCount').textContent = String(list.length);
   box.innerHTML = list.length ? list.map(w => {
@@ -1128,16 +1194,10 @@ function wmRenderList() {
     }
   });
 
-  box.querySelectorAll('[data-wm-tp]').forEach(b => b.onclick = async () => {
+  box.querySelectorAll('[data-wm-tp]').forEach(b => b.onclick = () => {
     const w = wm.waypoints.find(x => x.id === b.dataset.wmTp);
     if (w) {
-      const cmd = `/tp @s ${Math.round(w.x)} ${Math.round(w.y || 64)} ${Math.round(w.z)}`;
-      try {
-        await navigator.clipboard.writeText(cmd);
-        toast(t('wm.tpCopied') + `: ${cmd}`, 'success');
-      } catch {
-        toast(cmd);
-      }
+      wmCopyTpCommand(`/tp @s ${Math.round(w.x)} ${Math.round(w.y || 64)} ${Math.round(w.z)}`);
     }
   });
 
