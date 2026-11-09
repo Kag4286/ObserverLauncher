@@ -80,6 +80,7 @@ async function loadNswVersions(software){
   if(!NSW_MC_FIRST[software])nswMc=null; // MC-first only applies to forge/neoforge
   renderNswChips('');
   $('#nswLatestLabel').textContent=t('nsw.latestSub');
+  if(software==='horizon'||software==='pumpkin'){const jc=$('#nswJavaCheck');if(jc)jc.hidden=true;}
   const r=await window.observer.wizardVersions(software);
   if(nswVersions.software!==software)return; // user switched software mid-request
   nswVersions.loading=false;
@@ -212,10 +213,20 @@ function renderNswJava(){
   el.textContent=(nswJava.exact?t('nsw.javaRunsOn',{v:nswJava.java}):t('nsw.javaEstimated',{v:nswJava.java}))+(nswJava.exact?t('nsw.javaVerified'):'+')+(tooOld?t('nsw.javaTooOld',{v:jm}):tooOld===false&&jm!=null?t('nsw.javaReady',{v:jm}):'');
 }
 function checkNswJava(v){
+  if(nsw.software==='horizon'||nsw.software==='pumpkin'){
+    nswJava={version:v||'',java:null,exact:true};
+    const el=$('#nswJavaCheck');if(el){el.hidden=true;el.textContent='';}
+    return;
+  }
   if(!v||v==='latest'){nswJava={version:'',java:null,exact:false};const el=$('#nswJavaCheck');if(el)el.hidden=true;return}
   const el=$('#nswJavaCheck');
   if(el){el.hidden=false;el.className='nsw-java loading';el.textContent=t('nsw.checkingJava')}
   window.observer.wizardJavaCheck({software:nsw.software,version:v}).then(r=>{
+    if(nsw.software==='horizon'||nsw.software==='pumpkin'){
+      nswJava={version:v,java:null,exact:true};
+      if(el){el.hidden=true;el.textContent='';}
+      return;
+    }
     if(r&&r.ok&&r.java){nswJava={version:v,java:r.java,exact:!!r.exact}}
     else{nswJava={version:v,java:null,exact:false}}
     renderNswJava();
@@ -310,9 +321,17 @@ $$('[data-software]').forEach(c=>c.onclick=()=>{
   if(nsw.software===c.dataset.software)return;
   nsw.software=c.dataset.software;
   $$('[data-software]').forEach(x=>x.classList.toggle('active',x===c));
-  // invalidate the cached live list so step 2 refetches for this software
+  // Invalidate and reset all version & Java check state for the newly selected software
   nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:'',annotated:[]};
   nswMc=null;
+  nswJava={version:'',java:null,exact:false};
+  const vi=$('#nswVersionInput'); if(vi){vi.value=''; vi.disabled=true;}
+  const vc=$('#nswVersionClear'); if(vc) vc.hidden=true;
+  $$('input[name="nswVersionMode"]').forEach(r=>r.checked=(r.value==='latest'));
+  const vp=$('#nswVersionPicker'); if(vp) vp.hidden=true;
+  const ll=$('#nswLatestLabel'); if(ll) ll.textContent=t('nsw.latestSub');
+  const jc=$('#nswJavaCheck'); if(jc){jc.hidden=true; jc.textContent=''; jc.className='nsw-java';}
+  setVersionHint(t('nsw.verInfo'));
   if(nsw.step===3)loadNswVersions(nsw.software);
   nswRender();
 });

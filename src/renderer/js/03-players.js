@@ -602,6 +602,8 @@ function getHeadAvatarHtml(uuid, name) {
   }
   return fallback;
 }
+window.getHeadAvatarHtml = getHeadAvatarHtml;
+window.playerInitialsAvatar = playerInitialsAvatar;
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
   const all=buildPlayerRows();

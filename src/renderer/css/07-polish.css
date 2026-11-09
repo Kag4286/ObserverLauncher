@@ -56,11 +56,11 @@
 .nsw2-row.active{background:var(--accent-weak);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset,0 0 16px var(--accent-weak);color:var(--text)}
 .nsw2-row img{width:44px;height:44px;flex-shrink:0;border:1px solid var(--border);background:rgba(255,255,255,.03);padding:4px;box-sizing:border-box;border-radius:var(--r-sm);object-fit:contain;transition:border-color var(--dur-fast),background var(--dur-fast)}
 .nsw2-rowbody{min-width:0;flex:1}
-.nsw2-row b{display:block;font:600 13px var(--font-ui);color:var(--text)}
+.nsw2-row b{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font:600 13px var(--font-ui);color:var(--text);padding-right:26px}
 .nsw2-row span{display:block;margin-top:3px;font:500 11px var(--font-ui);line-height:1.45}
 .nsw2-req{display:inline-block;margin-top:6px;font:600 9.5px var(--font-mono);letter-spacing:.04em;color:var(--text-dim);background:var(--field);border:1px solid var(--border);border-radius:999px;padding:2px 8px}
 .nsw2-req.warn{color:var(--warning);border-color:rgba(255,210,63,.35);background:var(--warning-weak)}
-.nsw2-tag{font:700 8.5px var(--font-mono);letter-spacing:.1em;font-style:normal;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-dim);vertical-align:1px;margin-left:6px}
+.nsw2-tag{font:700 8.5px var(--font-mono);letter-spacing:.08em;font-style:normal;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-dim);white-space:nowrap}
 .nsw2-tag.accent{color:var(--accent);border-color:rgba(34,197,94,.35)}
 .nsw2-tag.warn{color:var(--warning);border-color:rgba(255,210,63,.35)}
 /* v4.0.0 wizard step 2: grouped cards + an info (i) button that opens a details popover. */
@@ -170,6 +170,23 @@ html.motion-lite .ol-tip{animation:none}
 .wm-wpmain{flex:1;min-width:0}
 .wm-wpmain b{display:block;font:600 12px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm-wpmain small{font:500 9.5px var(--font-mono);color:var(--text-dim)}
+.wm-pcard{display:flex;flex-direction:column;gap:6px;padding:9px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);transition:border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+.wm-pcard:hover{border-color:var(--border-strong);background:var(--surface-2)}
+.wm-pcard-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.wm-pcard-user{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
+.wm-pcard-avatar{width:22px;height:22px;border-radius:4px;overflow:hidden;flex-shrink:0;background:var(--surface-3);display:flex;align-items:center;justify-content:center}
+.wm-pcard-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.wm-pcard-ident{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.wm-pcard-name{font:600 12px var(--font-ui);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wm-p-hp{display:inline-flex;align-items:center;gap:3px;font:600 10px var(--font-mono);color:#ff5c77;background:rgba(255,92,119,.12);border:1px solid rgba(255,92,119,.25);border-radius:999px;padding:1px 5px;flex-shrink:0}
+.wm-p-hp svg{width:9px;height:9px;fill:currentColor}
+.wm-pcard-actions{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.wm-pcard-actions .btn-icon{width:22px;height:22px;color:var(--text-muted)}
+.wm-pcard-actions .btn-icon:hover{color:var(--text);background:var(--surface-3)}
+.wm-tp-btn{padding:2px 7px!important;font:600 10.5px var(--font-mono)!important;height:22px!important;line-height:1!important;letter-spacing:0}
+.wm-pcard-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;font:500 10px var(--font-mono);color:var(--text-dim);padding-left:29px}
+.wm-pcard-dim{text-transform:lowercase;background:var(--surface-2);padding:1px 5px;border-radius:var(--r-xs);border:1px solid var(--border)}
+.wm-pcard-coord{color:var(--brand);letter-spacing:.02em;white-space:nowrap}
 .wm-legend{border-top:1px solid var(--border);padding:var(--space-3) var(--space-4);background:var(--surface);interpolate-size:allow-keywords}
 .wm-legend::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
 .wm-legend[open]::details-content{block-size:auto}

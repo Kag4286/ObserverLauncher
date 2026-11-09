@@ -149,7 +149,7 @@ window.LOCALES['zh-CN'] = {
 
 'set.tunnelT':'互联网隧道','set.tunnelD':'用 Playit 在线分享你的服务器',
 'set.catSetup':'设置','set.catPersonal':'个人','set.catAutomation':'自动化','set.catIntegrations':'集成','set.catAdvanced':'高级','set.grpShare':'分享你的服务器','set.grpTools':'连接工具','set.adv':'高级','set.netAdv':'高级网络','as.title':'添加服务器','as.sub':'创建新服务器，或将启动器指向你已有的服务器。','as.new':'创建新服务器','as.newSub':'选择一个空文件夹，启动器会为你下载服务器。','as.existingSub':'指向已包含服务器 jar 和世界的文件夹。','inst.missing':'未找到文件夹','inst.missingTip':'此服务器文件夹已不存在。将其重新关联到新文件夹，或移除此实例。','inst.relink':'重新关联文件夹','inst.relinked':'实例已重新关联到新文件夹。','cnt.conflictsFound':'检测到 {n} 个问题','cnt.showDetails':'详情 ▾','cnt.hideDetails':'收起 ▴','cnt.conflictBadge':'问题','cnt.issue_duplicate':'重复','cnt.issue_loader_mismatch':'加载器不匹配','cnt.issue_missing_dep':'缺少依赖','cnt.issue_conflict':'不兼容','cnt.issue_client_only':'仅客户端','cnt.updateAll':'全部更新','cnt.confirmUpdateAll':'将 {n} 个项目更新到最新版本？将自动创建备份。','cnt.rollbackUpdate':'回滚更新','cnt.confirmRollback':'将最新更新（{n} 个文件）回滚到以前的版本？','toast.rollbackSuccess':'已将 {n} 个项目回滚到以前的版本。','toast.rollbackFailed':'回滚失败：{m}','cnt.summary':'{n} 项','cnt.filterAll':'全部','cnt.filterEnabled':'已启用','cnt.filterDisabled':'已禁用','cnt.filterUpdates':'有更新','cnt.filterIssues':'问题','cnt.jumpConfig':'配置','cnt.noMatches':'未找到匹配文件',
-  'nsw.badgeNative': "Rust 原生 • 技术突破",
+  'nsw.badgeNative': "Rust 原生",
   'nsw.desc.pumpkin': "Rust 编写的高性能多线程 Minecraft 服务端。瞬时启动，~100MB 内存，无需 Java。",
   'nsw.inf.pumpkin': "Pumpkin 是采用 Rust 编写的现代化多线程 Minecraft 服务端，具备卓越的高并发性能。",
   'nsw.inf.pumpkin.b1': "完全兼容最新原版协议，官方 Java 版客户端可直接连接游玩。",

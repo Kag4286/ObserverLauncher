@@ -533,7 +533,8 @@ window.wmSyncCheatMode = wmSyncCheatMode;
 function wmSyncPerfWarning() {
   let dismissed = false, lowRes = false;
   try {
-    dismissed = localStorage.getItem('wmWarningDismissed') === '1';
+    localStorage.removeItem('wmWarningDismissed');
+    dismissed = sessionStorage.getItem('wmWarningDismissed') === '1';
     lowRes = localStorage.getItem('wmLowResourceMode') === '1';
   } catch {}
   wm.lowResourceMode = lowRes;
@@ -1118,18 +1119,30 @@ function wmRenderList() {
       pSec.hidden = false;
       pBox.innerHTML = pList.map(p => {
         const dimStr = p.dim || 'overworld';
-        const coordsStr = p.pos ? `${Math.round(p.pos.x)} ${Math.round(p.pos.z)}` : '';
-        const hpStr = p.health !== undefined ? `❤ ${p.health}/20` : '';
-        return `<div class="wm-wprow" data-uuid="${esc(p.uuid || '')}">
-          <span class="wm-dot" style="background:#00E5FF"></span>
-          <div class="wm-wpmain">
-            <b>${esc(p.name || p.uuid.slice(0, 8))} ${hpStr ? `<span class="wm-wp-dist">${hpStr}</span>` : ''}</b>
-            <small>${esc(dimStr)} · ${coordsStr}</small>
+        const coordsStr = p.pos ? `${Math.round(p.pos.x)} ${Math.round(p.pos.z)}` : '—';
+        const hpNum = p.health !== undefined ? Math.round(p.health) : null;
+        const hpBadge = hpNum !== null ? `<span class="wm-p-hp"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${hpNum}</span>` : '';
+        const avatarHtml = typeof window.getHeadAvatarHtml === 'function'
+          ? window.getHeadAvatarHtml(p.uuid, p.name)
+          : (typeof window.playerInitialsAvatar === 'function' ? `<img class="player-avatar" src="${window.playerInitialsAvatar(p.name)}" alt="">` : `<span class="wm-dot" style="background:#00E5FF"></span>`);
+        return `<div class="wm-pcard" data-uuid="${esc(p.uuid || '')}">
+          <div class="wm-pcard-head">
+            <div class="wm-pcard-user">
+              <div class="wm-pcard-avatar">${avatarHtml}</div>
+              <div class="wm-pcard-ident">
+                <span class="wm-pcard-name" title="${esc(p.name || p.uuid)}">${esc(p.name || p.uuid.slice(0, 8))}</span>
+                ${hpBadge}
+              </div>
+            </div>
+            <div class="wm-pcard-actions">
+              <button type="button" class="btn-icon sm" data-wm-pjump="${esc(p.uuid)}" data-i18n-title="wm.jump" title="${esc(t('wm.jump'))}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/></svg></button>
+              <button type="button" class="btn-icon sm" data-wm-pinspect="${esc(p.uuid)}" data-name="${esc(p.name || '')}" data-i18n-title="ply.inspect" title="${esc(t('ply.inspect'))}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/></svg></button>
+              <button type="button" class="btn sm secondary wm-tp-btn" data-wm-ptp="${esc(p.uuid)}" data-i18n-title="wm.copyTp" title="${esc(t('wm.copyTp'))}">/tp</button>
+            </div>
           </div>
-          <div class="wm-wp-actions">
-            <button class="text-btn" data-wm-pjump="${esc(p.uuid)}" title="${esc(t('wm.jump'))}">🎯</button>
-            <button class="text-btn" data-wm-pinspect="${esc(p.uuid)}" data-name="${esc(p.name || '')}" title="${esc(t('ply.inspect'))}">🔍</button>
-            <button class="text-btn" data-wm-ptp="${esc(p.uuid)}" title="${esc(t('wm.copyTp'))}">/tp</button>
+          <div class="wm-pcard-meta">
+            <span class="wm-pcard-dim">${esc(dimStr)}</span>
+            <span class="wm-pcard-coord mono">${coordsStr}</span>
           </div>
         </div>`;
       }).join('');
@@ -1558,11 +1571,14 @@ function wmApplyLowResToggle() {
 $('#wmToggleLowRes')?.addEventListener('click', wmApplyLowResToggle);
 
 $('#wmDismissWarning')?.addEventListener('click', () => {
-  try { localStorage.setItem('wmWarningDismissed', '1'); } catch {}
+  try { sessionStorage.setItem('wmWarningDismissed', '1'); } catch {}
   wmSyncPerfWarning();
 });
 
-$('#wmPerfPill')?.addEventListener('click', wmApplyLowResToggle);
+$('#wmPerfPill')?.addEventListener('click', () => {
+  try { sessionStorage.removeItem('wmWarningDismissed'); } catch {}
+  wmApplyLowResToggle();
+});
 
 async function wmLoadChunks(dim) {
   if (!dim) dim = wm.dim;
