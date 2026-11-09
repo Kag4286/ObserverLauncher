@@ -91,5 +91,29 @@ test('worldmapCheatMode defaults to false (fair survival mode)', () => {
   assert.strictEqual(s.worldmapCheatMode, false);
 });
 
+// 5. Backend cache clearing
+test('clearBiomeCaches is exported and resets memory caches cleanly', () => {
+  assert.strictEqual(typeof worldmap.clearBiomeCaches, 'function');
+  assert.doesNotThrow(() => worldmap.clearBiomeCaches());
+});
+
+// 6. Low-resource mode radius logic
+test('low resource mode enforces compact radius (18 max) instead of 64', () => {
+  const fs = require('fs');
+  const code = fs.readFileSync('src/renderer/js/02-worldmap.js', 'utf8');
+  assert.ok(code.includes('const maxRadius = isLowRes ? 18 : (isFast ? 48 : 36)'), 'Must strictly cap radius to 18 in low-res mode');
+  assert.ok(code.includes('WM_TILE_CACHE_MAX_LOW = 16'), 'Must throttle tile cache in low-res mode');
+});
+
+// 7. Dismiss button and content native notice design
+test('dismiss button has zero OS-default chrome and content native notice uses SVG', () => {
+  const fs = require('fs');
+  const html = fs.readFileSync('src/renderer/index.html', 'utf8');
+  const css = fs.readFileSync('src/renderer/css/07-polish.css', 'utf8');
+  assert.ok(css.includes('.wm-perf-dismiss{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;background:transparent;border:1px solid transparent'), 'Dismiss button must neutralize OS chrome');
+  assert.ok(!html.includes('class="info-badge" aria-hidden="true">ℹ</span>'), 'Must not use raw unicode ℹ in content native notice');
+  assert.ok(html.includes('class="content-native-notice"'), 'Must have content-native-notice container');
+});
+
 console.log(`\n${passed} worldmap overhaul unit tests passed.`);
 

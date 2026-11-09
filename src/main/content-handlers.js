@@ -403,13 +403,18 @@ function registerContent(ipcMain, ctx) {
   // seed-coloured approximation on {ok:false}.
   ipcMain.handle('worldmap:biomes', async (_, rect) => {
     try {
+      if (rect?.clearCache) {
+        if (typeof worldmap.clearBiomeCaches === 'function') worldmap.clearBiomeCaches();
+        return { ok: true, cleared: true };
+      }
       const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
       const dim = rect?.dim || 'overworld';
       const sliceY = (rect?.sliceY !== undefined && rect?.sliceY !== null) ? Number(rect.sliceY) : null;
       const out = await worldmap.readBiomes(ctx.currentServerPath, lvlName, dim, {
         cx0: Number(rect?.cx0) || 0, cz0: Number(rect?.cz0) || 0,
         cx1: Number(rect?.cx1) || 0, cz1: Number(rect?.cz1) || 0,
-        sliceY
+        sliceY,
+        lod: rect?.lod || 'full'
       });
       return { ok: true, ...out };
     } catch (error) {

@@ -199,8 +199,17 @@ html.motion-lite .ol-tip{animation:none}
 .wm-perf-hint-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .wm-perf-toggle{display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
 .wm-perf-toggle.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
-.wm-perf-dismiss{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;color:var(--text-muted);border-radius:var(--r-xs)}
-.wm-perf-dismiss:hover{color:var(--text);background:var(--surface-3)}
+.btn-icon,
+.wm-perf-dismiss{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;background:transparent;border:1px solid transparent;outline:none;box-shadow:none;cursor:pointer;color:var(--text-muted);border-radius:var(--r-xs);transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out)}
+.btn-icon:hover,
+.wm-perf-dismiss:hover{color:var(--text);background:var(--surface-3);border-color:var(--border)}
+.btn-icon:active,
+.wm-perf-dismiss:active{transform:scale(.95)}
+.content-native-notice{margin-bottom:var(--space-3);padding:9px 13px;display:flex;align-items:center;gap:var(--space-3);border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--info);box-shadow:0 1px 3px rgba(0,0,0,.2);animation:panelIn var(--dur-fast) var(--ease-out) both}
+.cnn-icon-wrap{width:22px;height:22px;border-radius:50%;background:rgba(143,184,255,.12);border:1px solid rgba(143,184,255,.25);color:var(--info);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cnn-body{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;line-height:1.4}
+.cnn-badge{font:600 10px var(--font-mono);letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:var(--r-xs);background:rgba(143,184,255,.15);color:var(--info);border:1px solid rgba(143,184,255,.3)}
+.cnn-text{font:400 12.5px var(--font-ui);color:var(--text-2)}
 .wm-slice-ctrl{display:inline-flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-xs);padding:2px 8px}
 .wm-slice-ctrl[hidden]{display:none!important}
 .wm-slice-badge{font:600 11px var(--font-mono);color:var(--text);min-width:76px;white-space:nowrap}

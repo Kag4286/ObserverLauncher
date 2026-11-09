@@ -204,17 +204,26 @@ function blendCells(colors, w) {
   return out;
 }
 
+const WM_BIOME_CACHE_MAX_NORM = 12000;
+const WM_BIOME_CACHE_MAX_LOW = 2500;
+function getBiomeCacheCap() {
+  return wm.lowResourceMode ? WM_BIOME_CACHE_MAX_LOW : WM_BIOME_CACHE_MAX_NORM;
+}
+
 const wmColorCache = new Map();
 
 function wmChunkColors(ck, cx, cz) {
-  const key = `${wm.dim}:${ck}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}`;
+  const key = `${wm.dim}:${ck}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}:${wm.lowResourceMode ? 'l' : 'n'}`;
   const hit = wmColorCache.get(key); if (hit) return hit;
   const rec = wm.biomes.get(wm.dim + ':' + ck);
   let out;
   if (rec && rec[2] !== undefined) {
     const grid = rec[5], surface = rec[6];
     const base = biomeColor(rec[2]);
-    if (rec[3]) {
+    // Low-resource mode optimization: skip expensive 16-cell relief, hillshade, and water depth passes
+    if (wm.lowResourceMode) {
+      out = [base];
+    } else if (rec[3]) {
       out = new Array(16);
       const heights = rec[3];
       for (let oz = 0; oz < 4; oz++) {
@@ -257,7 +266,7 @@ function wmChunkColors(ck, cx, cz) {
   } else {
     out = null;
   }
-  lruSet(wmColorCache, key, out, 12000);
+  lruSet(wmColorCache, key, out, getBiomeCacheCap());
   return out;
 }
 
@@ -295,15 +304,13 @@ function biomeColor(id) {
 const WM_BIOME_MAX_CHUNKS = 1600;
 const WM_BIOME_MIN_ZOOM = 0.06;
 const WM_LABEL_MIN_ZOOM = 0.15;
-const WM_BIOME_CACHE_MAX = 12000;
-
 function wmSetBiome(ck, row, dim) {
-  lruSet(wm.biomes, (dim || wm.dim) + ':' + ck, row, WM_BIOME_CACHE_MAX);
+  lruSet(wm.biomes, (dim || wm.dim) + ':' + ck, row, getBiomeCacheCap());
   // Invalidate tile cache intersecting this chunk
   const p = ck.split(',');
   const cx = parseInt(p[0], 10), cz = parseInt(p[1], 10);
   const tx = Math.floor(cx / 16), tz = Math.floor(cz / 16);
-  const tk = `${dim || wm.dim}:${tx},${tz}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}`;
+  const tk = `${dim || wm.dim}:${tx},${tz}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}:${wm.lowResourceMode ? 'l' : 'n'}`;
   wmTileCache.delete(tk);
 }
 
@@ -333,18 +340,19 @@ function wmScheduleBiomes() {
   const cv = $('#wmCanvas'); if (!cv) return;
   const W = cv.clientWidth || 800, H = cv.clientHeight || 520;
 
-  // Fast LOD for wide views (zoom < 0.35) or when Low-Resource mode is enabled
-  const isFast = (wm.zoom < 0.35 || !!wm.lowResourceMode);
+  // Low-Resource mode strictly limits chunk radius to prevent memory bloat; wide zoom uses fast LOD
+  const isLowRes = !!wm.lowResourceMode;
+  const isFast = (wm.zoom < 0.35 || isLowRes);
   const halfW = Math.ceil((W / 2 / wm.zoom) / 16) + 2;
   const halfH = Math.ceil((H / 2 / wm.zoom) / 16) + 2;
-  const maxRadius = isFast ? 64 : (wm.lowResourceMode ? 24 : 40);
+  const maxRadius = isLowRes ? 18 : (isFast ? 48 : 36);
   const radiusX = Math.min(halfW, maxRadius);
   const radiusZ = Math.min(halfH, maxRadius);
   const ccx = Math.floor(wm.cam.x / 16), ccz = Math.floor(wm.cam.z / 16);
   const cx0 = ccx - radiusX, cx1 = ccx + radiusX;
   const cz0 = ccz - radiusZ, cz1 = ccz + radiusZ;
 
-  const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? '', isFast ? 'fast' : 'full'].join(',');
+  const rect = [cx0, cz0, cx1, cz1, wm.sliceY ?? '', isFast ? 'fast' : 'full', isLowRes ? 'low' : 'norm'].join(',');
   if (rect === wm.lastBiomeRect) return;
 
   clearTimeout(wm.biomeTimer);
@@ -389,15 +397,17 @@ async function wmPrefetchBiomes(ccx, ccz, half) {
   if (!wm.level) return;
   const pfId = ++wmPrefetchReqSeq;
   const pfDim = wm.dim;
-  const isFast = (wm.zoom < 0.35 || !!wm.lowResourceMode);
+  const isLowRes = !!wm.lowResourceMode;
+  const isFast = (wm.zoom < 0.35 || isLowRes);
+  const actualHalf = isLowRes ? Math.min(half, 8) : half;
   wm.biomeLoading = true;
   wmDrawSoon();
   const pfRes = await window.observer.worldmapBiomes({
     dim: pfDim,
-    cx0: ccx - half,
-    cz0: ccz - half,
-    cx1: ccx + half,
-    cz1: ccz + half,
+    cx0: ccx - actualHalf,
+    cz0: ccz - actualHalf,
+    cx1: ccx + actualHalf,
+    cz1: ccz + actualHalf,
     sliceY: wm.sliceY,
     lod: isFast ? 'fast' : 'full'
   }).catch(() => null);
@@ -415,11 +425,15 @@ const WM_COLORS = ['#FF3B5C', '#00E5FF', '#FFD23F', '#00E5A0', '#C792EA', '#FF8C
 
 // ============ 60 FPS GPU-ACCELERATED TILE BITMAP CACHE ============
 const WM_TILE_BLOCKS = 256; // 16 chunks = 256 blocks per tile
-const WM_TILE_CACHE_MAX = 96;
+const WM_TILE_CACHE_MAX_NORM = 96;
+const WM_TILE_CACHE_MAX_LOW = 16;
+function getTileCacheCap() {
+  return wm.lowResourceMode ? WM_TILE_CACHE_MAX_LOW : WM_TILE_CACHE_MAX_NORM;
+}
 const wmTileCache = new Map();
 
 function wmGetTile(tx, tz) {
-  const tk = `${wm.dim}:${tx},${tz}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}`;
+  const tk = `${wm.dim}:${tx},${tz}:${wm.layers.hillshade ? 'h' : 'f'}:${wm.sliceY ?? 's'}:${wm.lowResourceMode ? 'l' : 'n'}`;
   const hit = wmTileCache.get(tk);
   if (hit) return hit;
 
@@ -480,7 +494,7 @@ function wmGetTile(tx, tz) {
   // Only store fully resolved tiles in the cache. Incomplete tiles will be re-drawn
   // cleanly as soon as their biomes arrive rather than being stuck as black patches.
   if (tileComplete) {
-    lruSet(wmTileCache, tk, cv, WM_TILE_CACHE_MAX);
+    lruSet(wmTileCache, tk, cv, getTileCacheCap());
   }
   const metricEl = document.getElementById('wmTileMetric');
   if (metricEl) metricEl.textContent = `${wmTileCache.size} tiles cached · 60 FPS`;
@@ -626,6 +640,11 @@ function wmClearCaches() {
   wm.lastBiomeRect = '';
   wm.biomeTooWide = false;
   wm.biomeTruncated = false;
+  try {
+    if (window.observer?.worldmapBiomes) {
+      window.observer.worldmapBiomes({ clearCache: true }).catch(() => {});
+    }
+  } catch {}
 }
 
 // Distance helper
@@ -1465,6 +1484,14 @@ $('#wmToggleLowRes')?.addEventListener('click', () => {
   wmSyncPerfWarning();
   wmTileCache.clear();
   wmColorCache.clear();
+  wm.lastBiomeRect = '';
+  const cap = getBiomeCacheCap();
+  if (wm.biomes.size > cap) {
+    const keys = Array.from(wm.biomes.keys());
+    for (let i = 0; i < keys.length - cap; i++) {
+      wm.biomes.delete(keys[i]);
+    }
+  }
   wmDrawSoon();
   wmScheduleBiomes();
 });

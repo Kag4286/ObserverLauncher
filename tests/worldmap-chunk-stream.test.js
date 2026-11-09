@@ -55,3 +55,4 @@ function ok(name, cond) { assert(cond, `FAIL: ${name}`); console.log(`PASS ${nam
 
   console.log(`\n${passed} passed, 0 failed`);
 })();
+

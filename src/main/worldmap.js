@@ -1013,7 +1013,8 @@ async function readBiomes(root, levelName, dim, rect) {
         let entry = biomeRegionCache.get(key);
         if (!entry || entry.mtime !== stat.mtimeMs) {
           entry = { mtime: stat.mtimeMs, chunks: new Map(), header: null };
-          lruSet(biomeRegionCache, key, entry, 48);
+          const regionLimit = isFastLod ? 8 : 16;
+          lruSet(biomeRegionCache, key, entry, regionLimit);
         }
         // PERF: the 4 KB region header is read once per region and cached with the entry, so
         // repeated pans over the same region don't re-open + re-read it on every readBiomes call.
@@ -1122,4 +1123,9 @@ function listDimensions(root, levelName) {
   return out;
 }
 
-module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry, decompressLz4Block, decompressLz4, readChunkRaw, readChunkNbtFd, extractStructureStarts, isSlimeChunk, toNetherCoords, toOverworldCoords };
+function clearBiomeCaches() {
+  biomeRegionCache.clear();
+  exploredCache.clear();
+}
+
+module.exports = { readLevel, readPlayers, readWaypoints, writeWaypoints, longToBigInt, dimName, WP_FILE, getRegionDirs, scanExploredChunks, readBiomes, biomeFromChunk, unpackHeightmap, downsampleHeights, biomeGridFromSection, listDimensions, surfaceBlocksFromChunk, blockAt, extractBlockName, resolveBiome, getChunkSections, biomesFromChunkArray, getBiomeRegistry, decompressLz4Block, decompressLz4, readChunkRaw, readChunkNbtFd, extractStructureStarts, isSlimeChunk, toNetherCoords, toOverworldCoords, clearBiomeCaches };

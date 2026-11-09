@@ -561,9 +561,18 @@
             <button type="button" class="filter-chip chip-issues" data-qfilter="issues" hidden><span data-i18n="cnt.filterIssues">Issues</span> <b class="chip-count" id="chipIssuesCount">0</b></button>
           </div>
         </div>
-                <div class="content-native-notice info-banner" id="contentNativeNotice" hidden>
-          <span class="info-badge" aria-hidden="true">ℹ</span>
-          <span id="contentNativeNoticeText" data-i18n="cnt.nativeNotice">Native server engine detected. Horizon uses native Rust plugins; Java mods and plugins are not supported.</span>
+                <div class="content-native-notice" id="contentNativeNotice" hidden>
+          <div class="cnn-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </div>
+          <div class="cnn-body">
+            <span class="cnn-badge">Rust Native</span>
+            <span id="contentNativeNoticeText" class="cnn-text" data-i18n="cnt.nativeNotice">Native server engine detected. Horizon uses native Rust plugins; Java mods and plugins are not supported.</span>
+          </div>
         </div>
         <div class="content-conflicts-banner" id="contentConflictsBanner" hidden>
           <div class="ccb-head">
