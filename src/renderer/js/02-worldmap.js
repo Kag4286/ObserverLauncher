@@ -39,6 +39,29 @@ const STRUCTURE_ICONS = {
   trial_chambers: '⚔'
 };
 
+function resolveStructureIcon(name) {
+  const n = String(name || '').toLowerCase();
+  if (n.includes('village')) return '🏘';
+  if (n.includes('pillager') || n.includes('outpost')) return '🏹';
+  if (n.includes('monument')) return '🔱';
+  if (n.includes('fortress')) return '🏰';
+  if (n.includes('bastion')) return '🐷';
+  if (n.includes('ancient_city')) return '🏛';
+  if (n.includes('mansion')) return '🏰';
+  if (n.includes('end_city') || n.includes('endcity')) return '🛸';
+  if (n.includes('mineshaft')) return '⛏';
+  if (n.includes('stronghold')) return '👁';
+  if (n.includes('swamp_hut') || n.includes('witch')) return '🧙';
+  if (n.includes('pyramid') || n.includes('desert') || n.includes('temple')) return '🔺';
+  if (n.includes('trail_ruins')) return '🏺';
+  if (n.includes('trial_chamber')) return '⚔';
+  if (n.includes('shipwreck')) return '⛵';
+  if (n.includes('portal')) return '🟣';
+  if (n.includes('ruin')) return '🏺';
+  if (n.includes('igloo')) return '❄';
+  return STRUCTURE_ICONS[n] || '🏛';
+}
+
 let wm = {
   level: null,
   players: [],
@@ -80,6 +103,7 @@ let wm = {
   selectedPos: null,
   pendingWpPos: null
 };
+window.wm = wm;
 
 const BIOME_COLORS = {
   ocean: '#2E5A8A', deep_ocean: '#1E3F63', warm_ocean: '#2F8FA0', lukewarm_ocean: '#3585A0', cold_ocean: '#254A72', frozen_ocean: '#2A4A6A', deep_cold_ocean: '#1A3452', deep_frozen_ocean: '#1C3A55', deep_lukewarm_ocean: '#285570',
@@ -819,7 +843,7 @@ function wmDraw() {
       const [sx, sy] = toS(st.x, st.z);
       if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
 
-      const emoji = STRUCTURE_ICONS[st.name] || '🏛';
+      const emoji = resolveStructureIcon(st.name);
       ctx.beginPath(); ctx.arc(sx, sy, 11, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(26, 32, 44, 0.88)';
       ctx.strokeStyle = '#f59e0b';
@@ -1129,10 +1153,7 @@ function wmRenderList() {
           <div class="wm-pcard-head">
             <div class="wm-pcard-user">
               <div class="wm-pcard-avatar">${avatarHtml}</div>
-              <div class="wm-pcard-ident">
-                <span class="wm-pcard-name" title="${esc(p.name || p.uuid)}">${esc(p.name || p.uuid.slice(0, 8))}</span>
-                ${hpBadge}
-              </div>
+              <span class="wm-pcard-name" title="${esc(p.name || p.uuid)}">${esc(p.name || p.uuid.slice(0, 8))}</span>
             </div>
             <div class="wm-pcard-actions">
               <button type="button" class="btn-icon sm" data-wm-pjump="${esc(p.uuid)}" data-i18n-title="wm.jump" title="${esc(t('wm.jump'))}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/></svg></button>
@@ -1141,7 +1162,10 @@ function wmRenderList() {
             </div>
           </div>
           <div class="wm-pcard-meta">
-            <span class="wm-pcard-dim">${esc(dimStr)}</span>
+            <div class="wm-pcard-state">
+              <span class="wm-pcard-dim">${esc(dimStr)}</span>
+              ${hpBadge}
+            </div>
             <span class="wm-pcard-coord mono">${coordsStr}</span>
           </div>
         </div>`;
@@ -1347,8 +1371,10 @@ function wmMapClick(px, py, wx, wz) {
       const [sx, sy] = wmToScreen(st.x, st.z);
       if (Math.hypot(px - sx, py - sy) <= hitRadius) {
         const tpCmd = `/tp @s ${st.x} ~ ${st.z}`;
+        const icon = resolveStructureIcon(st.name);
+        const label = st.name.replace(/^minecraft:/, '').replace(/_/g, ' ').toUpperCase();
         wmShowPopup(px, py, {
-          title: st.name.toUpperCase(),
+          title: `${icon} ${label}`,
           lines: [`Coordinates: ${st.x} ${st.z}`, `Dimension: ${st.dim}`],
           copy: tpCmd
         });

@@ -528,7 +528,7 @@ async function startServerInternal(ctx, settings) {
       if (!isAutoPollStatus) ctx.appendLog(x);
       // v6.0.0 F1: fire the player_join webhook when a join line appears (before parseServerLine
       // mutates the list, so we can compare). Fail-silent.
-      try { const j = String(x).replace(/§./g, '').match(/:\s+([\w.-]+) joined the game/i); if (j && !ctx.live.players.includes(j[1])) fireWebhook(ctx, { type: 'player_join', player: j[1] }); } catch {}
+      try { const j = String(x).replace(/§./g, '').match(/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+joined the game/i); if (j && !ctx.live.players.includes(j[1])) fireWebhook(ctx, { type: 'player_join', player: j[1] }); } catch {}
       parseServerLine(x, ctx.live, ctx.send);
     });
   }));

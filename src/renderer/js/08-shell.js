@@ -509,6 +509,7 @@ function resetInstanceViews(){
     if(typeof deselectPlayer==='function') deselectPlayer();
     if(typeof closePlayerInspectModal==='function') closePlayerInspectModal();
     if(typeof window.resetPlayersSig==='function') window.resetPlayersSig();
+    if(typeof window.resetUserSelectedFilter==='function') window.resetUserSelectedFilter();
     if(typeof edState!=='undefined' && edState){
       // Always return to the bays and drop any open file / browsed tree (a stale tree points at the
       // previous instance's folder). edState.files is repopulated lazily by openFileBrowser().

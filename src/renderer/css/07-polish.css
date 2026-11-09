@@ -170,22 +170,22 @@ html.motion-lite .ol-tip{animation:none}
 .wm-wpmain{flex:1;min-width:0}
 .wm-wpmain b{display:block;font:600 12px var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm-wpmain small{font:500 9.5px var(--font-mono);color:var(--text-dim)}
-.wm-pcard{display:flex;flex-direction:column;gap:6px;padding:9px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);transition:border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+.wm-pcard{display:flex;flex-direction:column;gap:5px;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);transition:border-color var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
 .wm-pcard:hover{border-color:var(--border-strong);background:var(--surface-2)}
 .wm-pcard-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
 .wm-pcard-user{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
 .wm-pcard-avatar{width:22px;height:22px;border-radius:4px;overflow:hidden;flex-shrink:0;background:var(--surface-3);display:flex;align-items:center;justify-content:center}
 .wm-pcard-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-.wm-pcard-ident{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
-.wm-pcard-name{font:600 12px var(--font-ui);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wm-p-hp{display:inline-flex;align-items:center;gap:3px;font:600 10px var(--font-mono);color:#ff5c77;background:rgba(255,92,119,.12);border:1px solid rgba(255,92,119,.25);border-radius:999px;padding:1px 5px;flex-shrink:0}
-.wm-p-hp svg{width:9px;height:9px;fill:currentColor}
-.wm-pcard-actions{display:flex;align-items:center;gap:3px;flex-shrink:0}
-.wm-pcard-actions .btn-icon{width:22px;height:22px;color:var(--text-muted)}
+.wm-pcard-name{font:600 12.5px var(--font-ui);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.wm-pcard-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.wm-pcard-actions .btn-icon{width:22px;height:22px;color:var(--text-muted);border-radius:var(--r-xs)}
 .wm-pcard-actions .btn-icon:hover{color:var(--text);background:var(--surface-3)}
-.wm-tp-btn{padding:2px 7px!important;font:600 10.5px var(--font-mono)!important;height:22px!important;line-height:1!important;letter-spacing:0}
+.wm-tp-btn{padding:2px 6px!important;font:600 10px var(--font-mono)!important;height:22px!important;line-height:1!important;letter-spacing:0}
 .wm-pcard-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;font:500 10px var(--font-mono);color:var(--text-dim);padding-left:29px}
+.wm-pcard-state{display:flex;align-items:center;gap:5px;min-width:0}
 .wm-pcard-dim{text-transform:lowercase;background:var(--surface-2);padding:1px 5px;border-radius:var(--r-xs);border:1px solid var(--border)}
+.wm-p-hp{display:inline-flex;align-items:center;gap:3px;font:600 9.5px var(--font-mono);color:#ff5c77;background:rgba(255,92,119,.12);border:1px solid rgba(255,92,119,.25);border-radius:999px;padding:1px 5px;flex-shrink:0}
+.wm-p-hp svg{width:8.5px;height:8.5px;fill:currentColor}
 .wm-pcard-coord{color:var(--brand);letter-spacing:.02em;white-space:nowrap}
 .wm-legend{border-top:1px solid var(--border);padding:var(--space-3) var(--space-4);background:var(--surface);interpolate-size:allow-keywords}
 .wm-legend::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}

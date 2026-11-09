@@ -83,5 +83,9 @@ ObserverLauncher expands its native engine support by integrating [Pumpkin](http
 ## Multi-Language & Quality Assurance
 
 - **100% Locale Coverage:** All new Player Inspector 2.0, Pumpkin, and native configuration strings are translated across all 7 supported interface languages: English (`en`), Tiếng Việt (`vi`), Español (`es`), Português do Brasil (`pt-BR`), Deutsch (`de`), Русский (`ru`), and 简体中文 (`zh-CN`).
+- **Live Online Player Inspection:** Online players can be inspected and managed in real-time even when offline `.dat` files have not been saved to disk yet (Pumpkin, Horizon, or newly joined players).
+- **Online Filter Stability:** User filter selections in the roster are strictly respected and no longer overridden by automatic fallbacks when zero players are online.
+- **Robust Log Parsing:** Universal regex pattern captures player join and leave events across both colon-delimited (`[INFO]:`) and modern simple-log formats (`[INFO]`) used by native engines.
+- **World Map Layout Refinement:** Player cards reposition health indicators to row 2, providing maximum horizontal width for player names. Structure detection automatically resolves icons across 1.12–1.21+ Anvil formats.
 - **Zero External Runtime Dependencies:** All vector icons, HUD meters, 3D math, and layout bridges are implemented with pure HTML5, vanilla CSS, and standard Electron IPC.
-- **Comprehensive Quality Gates:** 100% pass rate across all 167 automated test suites, strictly complying with headless integrity, duplicate code guards, and i18n key consistency.
+- **Comprehensive Quality Gates:** 100% pass rate across automated test suites, strictly complying with headless integrity, duplicate code guards, and i18n key consistency.

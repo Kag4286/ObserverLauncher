@@ -44,12 +44,14 @@ function checkPlayerInput({ name, reason, uuid }) {
 let _lastSaveAll = 0, _saveAllBusy = false;
 async function ensurePlayerDataFresh(ctx) {
   if (_saveAllBusy || !ctx.serverProcess) return;
+  // Skip save-all flush for native engines (Horizon, Pumpkin) which don't support it
+  if (ctx.isNative || ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'pumpkin') return;
   if (Date.now() - _lastSaveAll < 5000) return;
   _lastSaveAll = Date.now();
   _saveAllBusy = true;
   try {
     writeCmd(ctx, 'save-all flush');
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 500));
   } finally { _saveAllBusy = false; }
 }
 

@@ -1,60 +1,69 @@
-# ObserverLauncher 8.1.0
+# ObserverLauncher 8.0.0
 
-Welcome to **ObserverLauncher 8.1.0**! 
+Welcome to **ObserverLauncher 8.0.0**!
 
-This release focuses on making your experience smoother, lighter, and more enjoyable: gorgeous 3D player armor, a lightning-fast World Map with a 1-click **Low-Resource Mode**, massive memory savings, and friendlier menus for everyone.
+This major release makes managing and hosting your Minecraft servers simpler, lighter, and more visual. Highlights include **Player Inspector 2.0** with real-time 3D character preview, native **Pumpkin** and **Horizon** server support (ultra-low memory, zero Java needed), a smoother **World Map** with structure discovery, and refined controls throughout the app.
 
 For technical details, developers and power users can read the [developer changelog](CHANGELOG.md).
 
 ---
 
-## 🛡️ 3D Player Models & Armor Look Better Than Ever
+## 🎮 Player Inspector 2.0: Real-Time 3D Previews & Easy Management
 
-Managing your players is now more fun and visual:
+Managing the players on your server is now visual and intuitive:
 
-- **Clean, Seamless 3D Skins:** We fixed the tiny visible cracks and flickering between player skin layers and outer clothing (sleeves, jackets, and pants). Your character model looks smooth and natural from every angle.
-- **Modded Helmets Look Right:** Modded headgear—such as Dragon Helmets from *Ice and Fire*—now render their authentic custom 3D models. No more weird white boxes over your character's face, and no oversized neck collars getting in the way!
-- **Accurate Layering:** Equipped helmets, chestplates, leggings, and boots now fit snugly over your player's skin without clipping into your character's body.
-- **Instant Item Details:** Click any item in a player's inventory or Ender Chest to view its enchantments, lore, and durability bar in crisp, readable detail.
-
----
-
-## 🗺️ Silky Smooth World Map with 1-Click "Low-Resource Mode"
-
-Exploring your Minecraft world should never slow down your PC:
-
-- **1-Click Low-Resource Mode:** Playing on a laptop, older PC, or a server with a huge explored world? Click the **Low-Resource Mode** button at the top of the World Map! The map switches to a lightweight display that drastically cuts CPU and memory usage while keeping your view responsive and clear.
-- **No More Black Gaps:** Panning across large unexplored areas or zooming in and out now streams terrain smoothly, eliminating black void boxes and missing chunks.
-- **Consistent Terrain View:** Toggling Low-Resource mode on and off refreshes your whole view instantly and evenly—no weird half-flat, half-detailed map borders!
+- **Live 3D Skin & Armor View:** See an authentic 3D model of any player wearing their current armor. Skin layers and outer jackets render smoothly without graphical glitches.
+- **Inspect Online Players Instantly:** Click any player who is currently playing to check their live health, food, position, and dimension in real-time. Works across all server types, including native Rust servers (Pumpkin and Horizon) and newly joined players.
+- **1-Click Quick Actions:** Give or remove Operator status, edit the whitelist, teleport to a player (`/tp`), kick, or ban with a single click from the top toolbar.
+- **Full Inventory & Ender Chest:** Browse every item a player is carrying in a familiar 9×4 grid. Switch between their backpack and Ender Chest with one click, or search items by name.
+- **Health & Hunger Meters:** Clear 10-segment gauges show exactly how much health, saturation, and experience a player has.
+- **Jump to Map:** Click the map button next to a player's coordinates to jump straight to their location on the World Map.
 
 ---
 
-## ⚡ Big RAM Savings (Keeps Your PC Cool & Quiet)
+## ⚡ Super-Lightweight Rust Servers (Pumpkin & Horizon)
 
-- **Automatic Memory Cleanup:** When you switch away from the World Map tab, the launcher immediately frees its cached map regions and graphics surfaces back to your operating system.
-- **Lightweight Background Footprint:** Instead of climbing into heavy memory usage during long map sessions, ObserverLauncher stays nimble (around 100–160 MB), leaving plenty of RAM for Minecraft and your other apps.
+ObserverLauncher now supports modern, high-performance Minecraft servers written in Rust:
 
----
-
-## 🎮 Smarter, Safer Server Management
-
-- **Hassle-Free Server Folders:** If you move your server folder, rename it, or have multiple worlds, ObserverLauncher automatically recognizes your folders without getting confused by Windows drive letters or trailing slashes.
-- **Safe Adding & Deleting:** Creating a new server or removing an old one is fast, safe, and protects your files from accidental deletion.
-- **Switching Between Worlds:** When switching between different server instances, the player inspector automatically deselects the previous player so you never accidentally modify data in the wrong world.
+- **No Java Required:** Pumpkin and Horizon run as native programs directly on Windows and Linux. You don't need to install or configure Java runtimes.
+- **Ultra-Low Memory:** While traditional servers often need 2 GB to 4 GB of RAM, Pumpkin and Horizon run smoothly with only ~100 MB to ~250 MB of memory. Perfect for older PCs, laptops, or background hosting.
+- **Instant Start:** Servers launch in less than a second.
+- **Simple Settings:** Adjust server port, max players, difficulty, PVP, game mode, and whitelist directly in the launcher interface without manually opening config files.
 
 ---
 
-## 🎨 Polished Menus & Clearer Guidance
+## 🗺️ World Map: Structure Finder & Low-Resource Mode
 
-- **Rust Native Servers (Pumpkin & Horizon):** If you run a lightweight Rust-based Minecraft server like Pumpkin or Horizon, the Content tab now shows a sleek, calm **Rust Native** badge with helpful tips instead of confusing warnings about Java plugins.
-- **Easy Friend Invites:** The sharing card clearly explains how friends can join your server—whether you're playing together on your home Wi-Fi or sharing an instant link over the internet.
-- **Modern, Sleek Design:** Buttons, dismiss icons, and status badges now blend seamlessly into the dark interface without clunky operating-system borders.
+The built-in World Map gives you a live overview of your Minecraft world:
+
+- **Structure Discovery:** Locate villages, pillager outposts, desert temples, ancient cities, ocean monuments, nether fortresses, and trial chambers directly on the map.
+- **1-Click Low-Resource Mode:** If your world is very large or you are on a laptop, click the **Low-Resource Mode** button to reduce CPU and memory usage while keeping terrain fast and responsive.
+- **Readable Player Cards:** Player names in the map sidebar are spaced cleanly so they are never cut off by health badges.
+- **Nether Portal Link Calculator:** Click any spot on the map to see the exact matching coordinates in the Nether, with a 16-block safe link circle.
+- **Custom Waypoints:** Drop waypoints for your base, mines, or portals and jump to them anytime.
 
 ---
 
-## 🌍 Built for Everyone (7 Supported Languages)
+## 🌐 Play with Friends Without Port Forwarding
 
-ObserverLauncher is 100% translated into 7 languages. Every single menu, button, and tip is available in:
+Playing with friends shouldn't require messing with your home Wi-Fi router:
+
+- **Local Network:** If friends are in the same house or on the same Wi-Fi, copy your local IP address in 1 click.
+- **Internet Play (Built-in Tunnels):** Turn on the built-in Playit.gg or Pinggy tunnel to get a shareable internet link. Your friends can connect from anywhere in the world—**no router port forwarding or public IP setup required**.
+
+---
+
+## 🛠️ Smarter Setup Wizard & Conflict Checks
+
+- **Accurate Software Guides:** The new server wizard clearly highlights what makes each software special (Vanilla, Paper, Purpur, Fabric, Forge, Horizon, Pumpkin).
+- **Clean Version Selection:** Switching between different software types resets version pickers cleanly without leftover messages.
+- **Mod Conflict Scanner:** If you install mods, the launcher checks for missing dependencies, wrong mod loaders, or duplicate files before you press Start.
+
+---
+
+## 🌍 Available in 7 Languages
+
+Every screen, button, and help text in ObserverLauncher is fully translated:
 
 - 🇬🇧 **English**
 - 🇻🇳 **Tiếng Việt**
@@ -68,7 +77,7 @@ You can change your language anytime in **Launcher settings &rarr; Personal &rar
 
 ---
 
-### Need Help or Have Feedback?
-- [Download latest release](https://github.com/Kag4286/ObserverLauncher/releases/latest)
-- [Report an issue](https://github.com/Kag4286/ObserverLauncher/issues)
-- [Join discussions & guides](https://github.com/Kag4286/ObserverLauncher#what-is-observerlauncher)
+### Getting Started & Support
+- [Download ObserverLauncher 8.0.0](https://github.com/Kag4286/ObserverLauncher/releases/latest)
+- [Report an issue or suggest a feature](https://github.com/Kag4286/ObserverLauncher/issues)
+- [Browse project documentation](docs/)

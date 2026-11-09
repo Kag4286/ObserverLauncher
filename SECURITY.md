@@ -35,4 +35,9 @@ be credited in the changelog unless you ask to stay anonymous.
 
 ## Supported versions
 
-Only the latest release is supported. Older versions do not receive security fixes.
+| Version | Supported |
+|---|---|
+| 8.0.x | :white_check_mark: Current release |
+| < 8.0 | :x: End of life |
+
+Only the latest release receives security fixes. Users should always update to the newest version.

@@ -10,54 +10,98 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
-## [8.1.0] - 2026-11-09
+## [8.0.0] - 2026-11-09
 
-**World Map Low-Resource Engine & Memory Leak Elimination, Seamless 3D Armor Inspection & Z-Fighting Resolution, Resilient Multi-Instance Path Normalization, and DESIGN.md Compliance Polish.**
+**Major Release: Player Inspector 2.0, Native Pumpkin & Horizon Rust Server Integration, Interactive World Map with Low-Resource Mode & Multi-Version Structure Cartography, Seamless 3D Armor & Skin Rendering, Resilient Multi-Instance Management, and Comprehensive UI/UX Polish.**
 
-### World Map Cartography & Memory Architecture:
-- **Low-Resource Mode Engine Overhaul (`src/renderer/js/02-worldmap.js`, `src/main/worldmap.js`, `src/main/content-handlers.js`):**
-  - Resolved logic bug in `02-worldmap.js` where `isFast` evaluated to `true` whenever `wm.lowResourceMode` was active, causing `maxRadius` to incorrectly stick at maximum view (64 chunks = 16,600+ chunks queried) instead of capping at 18 chunks (~1,300 chunks).
-  - Fixed dropped IPC property in `content-handlers.js`: properly forwarded `lod: rect?.lod || 'full'` to `worldmap.readBiomes()`, allowing backend fast-LOD extraction that skips expensive heightmap parsing, 3D relief loops, and structure extraction.
-  - Eliminated split-screen rendering artifact where previously visited areas appeared as flat solid squares alongside detailed hillshaded terrain. Cleaned `wm.biomes` and `wmColorCache` on toggle (`wmApplyLowResToggle()`), and strictly enforced `hasCompleteBiome` in `wmGetTile()` so incomplete fast-LOD biomes are never permanently locked into the tile bitmap cache.
-  - Reduced memory consumption from 600–800 MB down to ~120–160 MB by dynamically scaling tile cache capacity (16 tiles in low-res, 96 in normal), biome cache (2,500 low-res, 12,000 in normal), and backend region cache (8 regions in fast-LOD, 16 in normal).
-  - Added and exported `clearBiomeCaches()` in `src/main/worldmap.js`, triggered automatically via IPC (`worldmapBiomes({ clearCache: true })`) whenever leaving the World Map tab (`switchTab`) or switching instances to release memory back to the operating system immediately.
-- **Chunk Stream Reliability & Void Elimination (`src/renderer/js/02-worldmap.js`):**
-  - Eliminated black void bands and horizontal chunk drops during fast panning and rapid zooming by ingesting arriving biome payloads regardless of sequence ID.
-  - Only caches tiles in `wmTileCache` once all explored chunks within the 16×16 boundary have resolved biomes.
-  - Added wheel, zoom, and arrow key prefetch triggers so surrounding terrain streams proactively before panning halts.
-
-### Player Inspector 3D Geometry & Mod Armor Rendering:
-- **Seams & Z-Fighting Elimination (`src/renderer/js/03b-player-3d.js`):**
-  - Sealed visible micro-seams across limbs, torso, and head by normalizing polygon boundaries and adjusting depth offsets.
-  - Resolved severe Z-fighting flickering between the inner player skin layer and outer jacket/sleeve/pant cubes using anatomical expansion offsets.
-  - Corrected helmet overlay rendering: eliminated the white opaque head-mask glitch on modded helmets (e.g. Ice and Fire dragon helmets) and removed the oversized choking collar cube.
-  - Implemented model-first texture resolution for modded armor and items; fixed sprite cropping bugs on multi-frame animated textures.
-
-### Multi-Instance Management & Path Normalization:
-- **Resilient Instance Store & Duplicate Protection (`src/main/settings.js`, `src/renderer/js/08-shell.js`):**
-  - Implemented automatic migration and self-healing for legacy instance keys (`path` -> `serverPath`) and missing instance IDs upon loading settings.
-  - Added Windows case-insensitive path normalization (`isSamePath`) to duplicate server detection, preventing false duplicate blocks when adding servers with differing drive letter casing or trailing slashes.
-  - Hardened instance creation and deletion workflows to prevent ghost instances, directory conflicts, and orphaned processes.
-  - Automatically deselects active player records when switching between server instances to prevent cross-server state bleed.
-
-### UI/UX, Design System & Accessibility Polish:
-- **DESIGN.md Compliance (`src/renderer/css/07-polish.css`, `src/renderer/index.html`):**
-  - Redesigned the World Map performance notice using Feather SVG vector icons and strict design tokens (`--surface-2`, `--border`, `--warning`, `--r-sm`).
-  - Neutralized OS-default button chrome on `#wmDismissWarning` by defining `.btn-icon` and `.wm-perf-dismiss` with transparent borders and subtle hover states, removing the Windows 95 button border artifact.
-  - Replaced the bare, unstyled unicode `ℹ` notice in the Content tab for native server engines (Pumpkin and Horizon) with a dedicated `.content-native-notice` card featuring a Rust Native badge tag, SVG info icon, and `--surface-2` + `--info` styling.
-  - Streamlined the Beginner Mode sharing card with clear distinction between home LAN Wi-Fi sharing and public internet tunnel connections (Playit / Pinggy).
-
-### Quality Gates:
-- **170 Test Suites Passing:** 100% pass rate across all 170 automated test suites with zero duplicate blocks and complete headless/IPC compliance.
-- **Full Localization Sync:** 100% key sync across all 7 supported locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
-
-## [8.0.0] - 2026-11-07
-
-**Player Inspector 2.0 (Spatial Character Stage, Telemetry HUD, Unified Inventory Matrix, Lore Drawer, Live Admin), Native Pumpkin Server Integration, Interactive World Map LZ4 Chunk Cartography, Authentic 3D Block/Item Procedural Rendering, and Tooltip Decoding.**
-
-### Player Inspector 2.0 Architecture & Design System:
+### Player Inspector 2.0 & Real-Time Player Administration:
 - **Spatial Character Stage (`src/renderer/js/03-players.js`, `src/renderer/index.html`, `src/renderer/css/04-players.css`, `src/renderer/css/07-polish.css`):**
   - Replaced bottom 5-card equipment spam with an integrated Character Stage centering the 3D player canvas.
+  - Added 38×38px equipment rail brackets: vertical armor bracket on left (`Helmet`, `Chestplate`, `Leggings`, `Boots`), hands on right (`Mainhand`, `Offhand`), and dynamic Armor Defense rating badge.
+  - Added dynamic ambient dimension lighting responding to player dimension (`overworld`, `nether`, `end`).
+  - Added micro-durability indicators and rich item tooltip metadata with glowing enchantments and item IDs.
+- **Live Online Player Inspection & State Resilience (`src/renderer/js/03-players.js`, `src/main/players.js`):**
+  - Resolved inspection failure on online players without offline `.dat` saves on disk (essential for native Rust servers like PumpkinMC and Horizon, or newly connected players).
+  - Fixed premature deselection in `renderPlayers()`: changed `if (!still || !still.hasData)` to `if (!still)`, ensuring active players stay selected during background state polling.
+  - Added runtime fallback data for online players when reading `.dat` fails, populating live coordinates, dimension, health, 3D skin model, and live admin quick actions (`OP`, `Whitelist`, `Teleport`, `Kick`, `Ban`).
+  - Fixed Online filter tab switching: added `userSelectedFilter` flag preventing automatic fallback to Offline when 0 players are online, respecting explicit user clicks.
+  - Unified log parsing regex in `server-files.js` and `server-lifecycle.js` to `/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+joined the game/i`, capturing player join and leave events across both colon-delimited (`[INFO]:`) and modern simple-log formats (`[INFO]`) used by PumpkinMC and Horizon.
+  - Bypassed 1500ms `save-all flush` blocking delay on native engines to eliminate tab-switch freezes.
+- **High-Legibility Telemetry HUD (`src/renderer/js/03-players.js`):**
+  - 10-segment precision meters for Health (absorption highlights) and Food (saturation indicators).
+  - In-game styled XP progress bar with neon level indicator and total points.
+  - One-click `[↗ Map]` coordinate jump button transitioning to World Map centered on player location.
+  - Active potion effect pill strip with Roman numeral potency and countdown timers.
+- **Unified 9×4 Inventory Matrix & Editorial Lore Drawer (`src/renderer/js/03-players.js`):**
+  - Integrated Main Inventory (rows 1–3) and Hotbar (row 4) into a cohesive 9-column matrix.
+  - Segmented controller switching between 36-slot inventory and 27-slot Ender Chest.
+  - 54px enlarged inventory cells with 40px pixelated icons, instant search, and slot/name/count sorting.
+  - Editorial Lore Drawer rendering custom names, formatted enchantment stacks, lore with Minecraft `§` color codes, and NBT tags.
+- **Live Admin & NBT Data Editor (`src/renderer/js/03-players.js`):**
+  - Grouped command tiles: Player Recovery (Heal, Feed, Extinguish), Gamemode switcher, XP adjustments, Item dispenser, and Teleportation.
+  - Isolated safety zone for destructive actions (Kick, Ban, Clear Inventory) with double-confirmation dialogs.
+  - Offline `.dat` editor with validation and automatic backup safety nets.
+
+### Native Rust Engine Integration (Pumpkin & Horizon):
+- **Pumpkin Server Support (`src/main/pumpkin-config.js`, `src/main/adapters/pumpkin.js`, `src/main/server-files.js`):**
+  - First local hosting application with native out-of-the-box support for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin).
+  - Zero Java/JVM required: runs native binaries (`pumpkin-X64-Windows.exe`, `pumpkin-X64-Linux`, `pumpkin-ARM64-macOS`) with ~100MB working set and sub-second launch times.
+  - Multi-source download resolution with mirror fallback (`ghfast.top`) and release tag reconciliation.
+  - Bidirectional `Pumpkin.toml` and `server.properties` synchronization covering port, max players, online-mode, MOTD, difficulty, gamemode, PVP, nether, whitelist, spawn protection, view distance, seed, and compression.
+  - Content library automatically adapts for native engines with clear instructions and `[Open plugins folder ↗]` action.
+  - Added Pumpkin TPS and MSPT console metric parsers.
+- **Horizon Engine Hardening (`src/main/horizon-config.js`, `src/main/server-files.js`):**
+  - Maintained full support for Horizon MC 26.3 native server.
+  - Optimized wizard descriptions (~150–250MB RAM working set, zero Java required).
+  - Wizard Step 2 and 3 polish: tag clearance for Rust Native badges, version state reset when switching software, and suppression of Java checks for native engines.
+
+### World Map Cartography, Low-Resource Mode & Multi-Version Structures:
+- **Low-Resource Mode Engine Overhaul (`src/renderer/js/02-worldmap.js`, `src/main/worldmap.js`, `src/main/content-handlers.js`):**
+  - Fixed logic bug where `isFast` evaluated to `true` whenever `wm.lowResourceMode` was active, properly enforcing 18-chunk compact radius (~1,300 chunks) instead of 64 chunks (16,600+ chunks).
+  - Forwarded `lod: rect?.lod || 'full'` over IPC, skipping expensive heightmap parsing, 3D relief loops, and structure extraction in low-res mode.
+  - Eliminated split-screen rendering artifacts when toggling Low-Resource mode by clearing `wm.biomes` and `wmColorCache` and validating `hasCompleteBiome` in `wmGetTile()`.
+  - Reduced memory consumption from 600–800 MB down to ~120–160 MB with dynamically scaled tile and region caches.
+  - Exported `clearBiomeCaches()` in `src/main/worldmap.js`, triggered automatically on tab switch or instance switch to release memory back to the OS.
+- **Multi-Version Structure Recognition (`src/renderer/js/02-worldmap.js`, `src/main/worldmap.js`):**
+  - Structure parser handles both legacy nested `Level.Structures.Starts` (Minecraft 1.12–1.17 TitleCase: `Village`, `Mineshaft`, `Temple`, `Monument`, `Fortress`, `EndCity`, `Stronghold`) and modern flat `structures.starts` (1.18–1.21+ & 26.x: `minecraft:village_plains`, `pillager_outpost`, `ancient_city`, `trial_chambers`, `trail_ruins`).
+  - Added `resolveStructureIcon()` with contextual emoji icons and readable formatted popup cards.
+- **World Map Player Card Redesign (`src/renderer/js/02-worldmap.js`, `src/renderer/css/07-polish.css`):**
+  - Repositioned health badges to Row 2 alongside dimension badges (`[overworld] [❤️ 20]`), allocating full horizontal width (>120px) in Row 1 for player names without truncation.
+  - Interactive player jump, inspect, and `/tp` actions.
+- **Anvil LZ4 Decompression & Cartography (`src/main/worldmap.js`):**
+  - Integrated built-in LZ4 block decompression for Minecraft Anvil chunk compression algorithm 4 (`LZ4Block`), resolving chunk cartography on Pumpkin region files.
+  - Explored chunks render with 4×4 relief heights, water bodies, real biome boundaries, and surface blocks.
+  - Empty-world guidance HUD: radar grid, spawn marker, and informative status card for ungenerated worlds.
+- **Performance Warning Banner (`src/renderer/js/02-worldmap.js`):**
+  - Migrated warning banner persistence from permanent `localStorage` to `sessionStorage`.
+  - Clicking the `#wmPerfPill` HUD element re-opens the advisory notice on demand.
+
+### 3D Geometry, Mod Armor & Procedural Item Rendering:
+- **Seams & Z-Fighting Elimination (`src/renderer/js/03b-player-3d.js`):**
+  - Sealed visible micro-seams across limbs, torso, and head by normalizing polygon boundaries and adjusting depth offsets.
+  - Resolved Z-fighting flickering between inner skin and outer clothing layers with anatomical expansion offsets.
+  - Fixed helmet overlay rendering: eliminated opaque white mask glitches on modded helmets (e.g. Ice and Fire dragon helmets) and removed oversized neck collars.
+  - Model-first texture resolution for modded armor and items; fixed sprite cropping on multi-frame animated textures.
+- **Procedural 3D Block & Mod Item Renders (`src/renderer/js/03b-player-3d.js`):**
+  - Procedural multi-face 3D TNT rendering with authentic top fuse and labeled side sticks.
+  - Procedural 3D Waystones as isometric stone pillars with glowing warp crystals.
+  - Tiered Sophisticated Backpacks with authentic leather textures and tier-colored metallic buckles.
+  - Offline-first 0ms response time with 120ms debounce stabilization.
+
+### Multi-Instance Management & Path Normalization:
+- **Resilient Instance Store (`src/main/settings.js`, `src/renderer/js/08-shell.js`):**
+  - Self-healing migrations for legacy instance keys (`path` -> `serverPath`) and missing instance IDs.
+  - Windows case-insensitive path normalization (`isSamePath`) to duplicate server detection, preventing false duplicate blocks across drive letter casing or trailing slashes.
+  - Automatic active player deselection when switching between server instances to prevent cross-server state bleed.
+
+### UI/UX, Design System & Localization:
+- **DESIGN.md Compliance (`src/renderer/css/07-polish.css`, `src/renderer/index.html`):**
+  - World Map performance notice redesigned with Feather SVG vector icons and design tokens.
+  - Neutralized OS-default button chrome on `#wmDismissWarning` (`.btn-icon`, `.wm-perf-dismiss`).
+  - Dedicated `.content-native-notice` card for native engines with Rust Native badge tag and SVG icon.
+  - Clarified Beginner Mode sharing card between home Wi-Fi LAN sharing and public tunnels (Playit / Pinggy).
+- **100% Localization Coverage:** Full parity across all 7 supported locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
+- **Quality Gates:** 100% pass rate across automated test suites with zero duplicate blocks and complete headless/IPC compliance.
   - Flanked model laterally with sleek 38px equipment brackets: left rail houses vertical armor slots (`Helmet`, `Chestplate`, `Leggings`, `Boots`), while right rail presents `Mainhand`, `Offhand`, and total Armor Defense points.
   - Dynamically computes total player armor defense rating from equipped armor attributes.
   - Retained ambient spatial aura reacting to player world dimension (Overworld, Nether, The End).

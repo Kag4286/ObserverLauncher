@@ -526,6 +526,7 @@ function jumpToPlayerMap(x,z,dim){
   },120);
 }
 let playerFilter='online';
+let userSelectedFilter=false;
 const PLAYERS_PAGE_SIZE=14;
 let playerPage=0;
 let playerSearchQuery='';
@@ -534,7 +535,17 @@ let playerSearchQuery='';
 // players, usercache, whitelist.json, banned-players.json) into one model keyed by name
 // (case-insensitive), then filters by the selected tab.
 function buildPlayerRows(){
-  const online=(state.running?(state.live?.players||[]):[]).map(p=>typeof p==='string'?{name:p}:p);
+  const liveList=(state.running?(state.live?.players||[]):[]).slice();
+  if(state.running&&typeof window.wm!=='undefined'&&Array.isArray(window.wm.players)){
+    for(const wp of window.wm.players){
+      if(!wp) continue;
+      const n=wp.name||wp.uuid;
+      if(n&&!liveList.some(x=>(typeof x==='string'?x:x.name||x.uuid)===n)){
+        liveList.push({name:wp.name||wp.uuid,uuid:wp.uuid});
+      }
+    }
+  }
+  const online=liveList.map(p=>typeof p==='string'?{name:p}:p);
   const known=state.files?.knownPlayers||[]; const whitelist=state.files?.whitelist||[]; const banned=state.files?.banned||[]; const ops=state.files?.ops||[];
   const byName={}; known.forEach(p=>byName[String(p.name).toLowerCase()]=p);
   const rows={}; const upsert=(name,patch)=>{const k=String(name).toLowerCase();rows[k]={...(rows[k]||{name}),...patch}};
@@ -607,9 +618,9 @@ window.playerInitialsAvatar = playerInitialsAvatar;
 function renderPlayers(){
   const n=$('#playersList');if(!n)return;
   const all=buildPlayerRows();
-  // If no players are currently online (e.g. server stopped or 0 online), auto-switch to offline
-  // so known players with data immediately show up rather than presenting a blank list.
-  if (playerFilter === 'online' && !all.some(p => p.online) && all.length > 0) {
+  // On initial load when stopped, auto-switch default filter to 'offline' so known players show up
+  // rather than presenting a blank list. But NEVER override an explicit user click.
+  if (!userSelectedFilter && playerFilter === 'online' && !all.some(p => p.online) && all.length > 0) {
     playerFilter = 'offline';
     $$('[data-player-filter]').forEach(x => {
       const on = x.dataset.playerFilter === 'offline';
@@ -619,7 +630,7 @@ function renderPlayers(){
   }
   if(selectedPlayer){
     const still=all.find(p=>(selectedPlayer.uuid&&p.uuid===selectedPlayer.uuid)||(selectedPlayer.name&&String(p.name).toLowerCase()===String(selectedPlayer.name).toLowerCase()));
-    if(!still||!still.hasData){
+    if(!still || (!still.online && !still.hasData)){
       deselectPlayer();
     }
   }
@@ -646,12 +657,12 @@ function renderPlayers(){
     const avatar = getHeadAvatarHtml(p.uuid, p.name);
     const meta=[
       p.online ? `<span class="ply-online-txt">${t('ply.online')}</span>` : `<span class="ply-offline-txt">${t('ply.offline')}</span>`,
-      `<span>${p.hasData ? t('ply.hasData') : t('ply.noData')}</span>`,
+      p.online ? (p.hasData ? `<span>${t('ply.hasData')}</span>` : null) : `<span>${p.hasData ? t('ply.hasData') : t('ply.noData')}</span>`,
       p.uuid ? `<span class="ply-uuid-snip">UUID ${esc(p.uuid.slice(0,8))}…</span>` : null
     ].filter(Boolean).join('<span class="ply-meta-dot">•</span>');
     const isSelected = selectedPlayer && (selectedPlayer.name === p.name || (selectedPlayer.uuid && selectedPlayer.uuid === p.uuid));
     const rowCls = `player-row ${p.online?'online':''} ${isSelected?'is-selected':''}`.trim();
-    return `<div class="${rowCls}" tabindex="0" role="listitem" ${attrs} data-tip="${p.hasData?t('ply.inspectHint'):t('ply.noDataHint')}">
+    return `<div class="${rowCls}" tabindex="0" role="listitem" ${attrs} data-tip="${p.online?t('ply.inspectHint'):(p.hasData?t('ply.inspectHint'):t('ply.noDataHint'))}">
       <div class="player-avatar-wrap">
         ${avatar}
         <i class="player-status-dot ${p.online?'online':'offline'}"></i>
@@ -702,7 +713,7 @@ function pdIsOnline(name,uuid){
   if(!state.running)return false;
   const live=(state.live?.players||[]).map(p=>typeof p==='string'?{name:p}:p);
   const n=String(name||'').toLowerCase();
-  return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid===uuid));
+  return live.some(p=>String(p.name||'').toLowerCase()===n||(uuid&&p.uuid&&String(p.uuid).toLowerCase()===String(uuid).toLowerCase()));
 }
 function fmtNum(val, fallback = '—') {
   if (val === null || val === undefined || val === '' || val === 'undefined' || val === 'null') return fallback;
@@ -1245,15 +1256,46 @@ async function openPlayerInspector(uuid,name){
   if (closeBtn) closeBtn.onclick = deselectPlayer;
 
   let r;
-  try{r=await window.observer.playerRead(uuid, name)}catch(e){$('#playerDataError').textContent=t('ply.readError',{m:e?.message||e});return}
-  if(!r||!r.ok){
+  try{r=await window.observer.playerRead(uuid, name)}catch(e){ r={ ok: false, error: t('ply.readError', { m: e?.message || e }) }; }
+  if((!r||!r.ok) && !isOnline){
     if(!uuid){ const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.textContent=t('ply.uuidUnknown'); uuidEl.hidden=false; uuidEl.setAttribute('data-tip', t('ply.uuidNone')); uuidEl.onclick=null; } $('#playerDataError').textContent=t('ply.noUuidLong',{n:name}); }
     else { $('#playerDataError').textContent=r?.error||t('ply.unknownReadError'); }
     return;
   }
-  if(!r||!r.ok){$('#playerDataError').textContent=r?.error||t('ply.unknownReadError');return}
-  const d=r.data;
-  if(!d){$('#playerDataError').textContent=t('ply.corrupt');return}
+  const hasDiskData = !!(r && r.ok && r.data);
+  if (r && r.ok && !r.data && !isOnline) { $('#playerDataError').textContent=t('ply.corrupt'); return; }
+  let livePos = [];
+  let liveDim = 'minecraft:overworld';
+  let liveHp = 20;
+  if (typeof window.wm !== 'undefined' && Array.isArray(window.wm.players)) {
+    const liveP = window.wm.players.find(x => (uuid && x.uuid === uuid) || (name && String(x.name).toLowerCase() === String(name).toLowerCase()));
+    if (liveP) {
+      if (liveP.pos) livePos = [liveP.pos.x, liveP.pos.y, liveP.pos.z];
+      if (liveP.dim) liveDim = liveP.dim;
+      if (liveP.health != null) liveHp = liveP.health;
+    }
+  }
+
+  const d = hasDiskData ? r.data : {
+    dimension: liveDim,
+    health: liveHp,
+    food: 20,
+    saturation: 5,
+    xpLevel: 0,
+    xpTotal: 0,
+    gameType: 0,
+    pos: livePos,
+    armor: [],
+    offhand: null,
+    inventory: [],
+    enderChest: [],
+    effects: [],
+    stats: {}
+  };
+  if (!hasDiskData) {
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.setAttribute('data-tip', t('ply.noDataHint')); }
+    if (offHint && !state.running) offHint.textContent = t('ply.noDataHint');
+  }
 
   invSearchQuery='';ecSearchQuery='';invShowEmpty=true;ecShowEmpty=true;invSortBy='slot';ecSortBy='slot';
   pdStatsCat='all';pdStatsSearchQuery='';
@@ -1296,7 +1338,20 @@ async function openPlayerInspector(uuid,name){
   renderPdReadout(d,isOnline);
   renderPdMiniStats(d.stats);
   resetInvItemDetail();
-  const uuidEl=$('#inspectUuid'); if(uuidEl){ uuidEl.hidden=false; uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`); uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} }; }
+  const uuidEl=$('#inspectUuid');
+  if(uuidEl){
+    if(uuid){
+      uuidEl.hidden=false;
+      uuidEl.textContent=t('ply.uuidLabel',{v:uuid});
+      uuidEl.setAttribute('data-tip', `${uuid} — ${t('ply.copyUuidHint')}`);
+      uuidEl.onclick=async()=>{ try{ await navigator.clipboard.writeText(uuid); uuidEl.classList.add('copied'); const prev=uuidEl.textContent; uuidEl.textContent=t('toast.uuidCopied'); toast(t('toast.uuidCopied'),'success'); setTimeout(()=>{ uuidEl.textContent=t('ply.uuidLabel',{v:uuid}); uuidEl.classList.remove('copied'); }, 1200); }catch{ toast(uuid)} };
+    } else {
+      uuidEl.hidden=false;
+      uuidEl.textContent=t('ply.uuidUnknown');
+      uuidEl.setAttribute('data-tip', t('ply.uuidNone'));
+      uuidEl.onclick=null;
+    }
+  }
   $('#pdHealth').value=d.health!=null&&Number.isFinite(Number(d.health))?fmtNum(d.health,''):(d.health??'');$('#pdFood').value=d.food??'';$('#pdSaturation').value=d.saturation!=null&&Number.isFinite(Number(d.saturation))?fmtNum(d.saturation,''):(d.saturation??'');$('#pdXpLevel').value=d.xpLevel??0;$('#pdXpTotal').value=d.xpTotal??0;$('#pdGameType').value=d.gameType??0;$('#pdClearInventory').checked=false;
   iconEpoch++;
   const selSlot=d.selectedItemSlot??0;
@@ -1412,6 +1467,7 @@ $('#invSwitchEnder')?.addEventListener('click',()=>{
   const vm=$('#invViewMain');if(vm)vm.hidden=true;const ve=$('#invViewEnder');if(ve)ve.hidden=false;
 });$('#playerInspectClose').onclick=closePlayerInspectModal;
 $$('[data-player-filter]').forEach(b=>b.onclick=()=>{
+  userSelectedFilter=true;
   playerFilter=b.dataset.playerFilter;playerPage=0;
   $$('[data-player-filter]').forEach(x=>{ const on=x===b; x.classList.toggle('active',on); x.setAttribute('aria-pressed', on?'true':'false'); });
   renderPlayers();
@@ -1472,4 +1528,4 @@ window.observer.onIconsUpdate(()=>{
   }, 120);
 });
 
-try{ window.deselectPlayer=deselectPlayer; window.closePlayerInspectModal=closePlayerInspectModal; window.openPlayerInspector=openPlayerInspector; window.buildPlayerRows=buildPlayerRows; window.resetPlayersSig=()=>{ lastPlayersSig=''; }; }catch{}
+try{ window.deselectPlayer=deselectPlayer; window.closePlayerInspectModal=closePlayerInspectModal; window.openPlayerInspector=openPlayerInspector; window.buildPlayerRows=buildPlayerRows; window.resetPlayersSig=()=>{ lastPlayersSig=''; }; window.resetUserSelectedFilter=()=>{ userSelectedFilter=false; }; }catch{}

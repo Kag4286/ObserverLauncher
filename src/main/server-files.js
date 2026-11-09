@@ -466,8 +466,8 @@ function parseServerLine(text, live, send) {
   let changed = false;
   const list = clean.match(/There are (\d+) of a max of \d+ players online(?::\s*(.*))?/i);
   if (list) { live.players = list[2] ? list[2].split(',').map(x => x.trim()).filter(Boolean) : []; changed = true; }
-  const joined = clean.match(/:\s+([\w.-]+) joined the game/i); if (joined && !live.players.includes(joined[1])) { live.players.push(joined[1]); changed = true; }
-  const left = clean.match(/:\s+([\w.-]+) left the game/i); if (left) { const before = live.players.length; live.players = live.players.filter(x => x !== left[1]); if (live.players.length !== before) changed = true; }
+  const joined = clean.match(/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+joined the game/i); if (joined && !live.players.includes(joined[1])) { live.players.push(joined[1]); changed = true; }
+  const left = clean.match(/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+left the game/i); if (left) { const before = live.players.length; live.players = live.players.filter(x => x !== left[1]); if (live.players.length !== before) changed = true; }
   // --- spark (`spark tps`) splits a HEADER and its VALUES across two lines: ---
   //   [..] TPS from last 5s, 10s, 1m, 5m, 15m:
   //   [..] 20.0, *20.0, *20.0, *20.0, *20.0
