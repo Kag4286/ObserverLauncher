@@ -13,6 +13,7 @@ let app, win, userDataDir, ctx, fixtureRoot;
 // Mark onboarding done (persists onboarded=true) so it never reappears after a reload.
 async function completeOnboarding() {
   const modal = win.locator('#onboardingModal');
+  await modal.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   if (await modal.isVisible().catch(() => false)) {
     // 5.2.0: onboarding now has a mode picker. Pick ADVANCED so the full rail (all tabs) is
     // available for the E2E flows below — beginner mode hides several tabs by design.
@@ -237,4 +238,27 @@ test('responsive breakpoint hides the rail on narrow screens and shows it on wid
 
   // Restore the neutraliser so later tests can still click rail nav items on any runner.
   await win.addStyleTag({ content: '@media(max-width:1100px){.app-shell{grid-template-columns:260px 1fr}.rail{display:flex}}' });
+});
+
+test('Beginner mode hides advanced rail tabs after Apply and restores them when turned off', async () => {
+  await gotoTab(win, 'settings');
+  await win.locator('#settingsSeg .seg-switch-btn[data-set-view="personal"]').click();
+  await expect(win.locator('#settings .set-pane[data-set-pane="personal"]')).toBeVisible();
+
+  const toggle = win.locator('#settings .set-pane[data-set-pane="personal"] label.switch:has(#beginnerModeInput)');
+  await toggle.click();
+  await win.locator('#saveSettings').click();
+
+  await expect(win.locator('body')).toHaveClass(/beginner-mode/);
+  await expect(win.locator('.nav-item[data-tab="performance"]')).toBeHidden();
+  await expect(win.locator('.nav-item[data-tab="worldmap"]')).toBeHidden();
+
+  await toggle.click();
+  await win.locator('#saveSettings').click();
+
+  await expect(win.locator('body')).not.toHaveClass(/beginner-mode/);
+  await expect(win.locator('.nav-item[data-tab="performance"]')).toBeVisible();
+  await expect(win.locator('.nav-item[data-tab="worldmap"]')).toBeVisible();
+
+  await win.locator('#settingsSeg .seg-switch-btn[data-set-view="setup"]').click();
 });

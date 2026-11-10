@@ -1,22 +1,28 @@
 // E2E smoke tests for the renderer. These launch the real Electron app (isolated user-data
 // dir) and assert the UI boots and the main tabs render. Run with `npm run test:e2e`.
 const { test, expect } = require('@playwright/test');
-const { launchApp, closeApp, selectByValue } = require('./helpers');
+const { launchApp, closeApp, getRendererErrors, selectByValue } = require('./helpers');
 
 // A fresh user-data dir means onboarding is not completed, so the welcome modal shows first.
-// Dismiss it so the tabs are reachable (the modal covers the app).
+// Wait briefly for it to appear, pick Advanced mode so all rail tabs are visible, then dismiss it.
 async function dismissOnboarding(win) {
   const modal = win.locator('#onboardingModal');
+  await modal.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   if (await modal.isVisible().catch(() => false)) {
+    // Onboarding defaults to Beginner and persists obMode on close; pick Advanced so every rail
+    // tab (including performance, content, marketplace, worlds, worldmap) stays visible to test.
+    const adv = win.locator('#obModeAdvanced');
+    if (await adv.isVisible().catch(() => false)) await adv.click();
     await win.locator('#onboardingClose').click();
     await expect(modal).toBeHidden();
   }
 }
 
-let app, win, userDataDir;
+let ctx, app, win, userDataDir;
 
 test.beforeAll(async () => {
-  ({ app, win, userDataDir } = await launchApp());
+  ctx = await launchApp();
+  ({ app, win, userDataDir } = ctx);
   await dismissOnboarding(win);
 });
 
@@ -25,6 +31,8 @@ test.afterAll(async () => { await closeApp(app, userDataDir); });
 test('boots with the Overview tab active and no renderer errors', async () => {
   await expect(win.locator('#pageTitle')).toHaveText(/Overview/i);
   await expect(win.locator('#overview')).toHaveClass(/active/);
+  await expect(win.locator('body')).not.toHaveClass(/beginner-mode/);
+  expect(getRendererErrors(ctx)).toEqual([]);
 });
 
 test('every main tab renders when clicked', async () => {
