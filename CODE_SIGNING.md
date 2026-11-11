@@ -5,7 +5,7 @@ built, and how to verify a download once signing is in place.
 
 ## Current status: not signed
 
-As of 5.3.0, the Windows installer is **not code-signed**. Windows SmartScreen therefore shows a
+As of 8.0.x, the Windows installer is **not code-signed**. Windows SmartScreen therefore shows a
 "Windows protected your PC" or "Unknown publisher" warning on first run. Click **More info**, then
 **Run anyway** to continue. The Linux AppImage is unaffected.
 

@@ -34,15 +34,19 @@ function bridgeConfigPath() {
 
 function readConfig() {
   try {
-    const raw = fs.readFileSync(bridgeConfigPath(), 'utf8');
+    const cfgPath = bridgeConfigPath();
+    const stat = fs.statSync(cfgPath);
+    if (!stat.isFile() || stat.size > 4096) return null;
+    const raw = fs.readFileSync(cfgPath, 'utf8');
     const cfg = JSON.parse(raw);
-    if (!cfg || !cfg.port || !cfg.token) return null;
+    if (!cfg || typeof cfg.port !== 'number' || cfg.port <= 0 || cfg.port >= 65536) return null;
+    if (typeof cfg.token !== 'string' || !cfg.token || cfg.token.length > 256) return null;
     if (cfg.pid && typeof cfg.pid === 'number') {
       try {
         process.kill(cfg.pid, 0);
       } catch (e) {
         if (e && e.code === 'ESRCH') {
-          try { fs.rmSync(bridgeConfigPath(), { force: true }); } catch {}
+          try { fs.rmSync(cfgPath, { force: true }); } catch {}
           return null;
         }
       }
@@ -388,19 +392,21 @@ async function handle(msg) {
   if (id !== undefined && id !== null) replyError(id, -32601, 'Method not found: ' + method);
 }
 
-let buffer = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => {
-  buffer += chunk;
-  let idx;
-  while ((idx = buffer.indexOf('\n')) >= 0) {
-    const line = buffer.slice(0, idx).trim();
-    buffer = buffer.slice(idx + 1);
-    if (!line) continue;
-    let msg; try { msg = JSON.parse(line); } catch { continue; }
-    handle(msg).catch(e => { if (msg && msg.id != null) replyError(msg.id, -32603, e?.message || String(e)); });
-  }
-});
-process.stdin.on('end', () => process.exit(0));
+if (require.main === module) {
+  let buffer = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    buffer += chunk;
+    let idx;
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line) continue;
+      let msg; try { msg = JSON.parse(line); } catch { continue; }
+      handle(msg).catch(e => { if (msg && msg.id != null) replyError(msg.id, -32603, e?.message || String(e)); });
+    }
+  });
+  process.stdin.on('end', () => process.exit(0));
+}
 
-module.exports = { callApp, bridgeConfigPath, STATIC_TOOLS, timeoutForTool };
+module.exports = { callApp, bridgeConfigPath, readConfig, STATIC_TOOLS, timeoutForTool };

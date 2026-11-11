@@ -394,11 +394,16 @@ function diagnoseFromData(d) {
 //   "Skipping jar ... because it is for Minecraft Forge"
 // Pure: takes the log text, returns { missingDeps:[{modId, requestedBy}], skippedJars:[...] }.
 function scanLogForMissingDeps(text) {
-  const lines = String(text || '').split(/\r?\n/);
+  const s = String(text || '');
+  const boundedText = s.length > 256 * 1024 ? s.slice(-256 * 1024) : s;
+  const lines = boundedText.split(/\r?\n/);
   const missingDeps = [];
   const skippedJars = [];
   let inBlock = false;
-  for (const raw of lines) {
+  const deadline = Date.now() + ANALYZE_BUDGET_MS;
+  for (let i = 0; i < lines.length; i++) {
+    if ((i & 31) === 31 && Date.now() > deadline) break;
+    const raw = lines[i].length > REGEX_MAX_LINE ? lines[i].slice(0, REGEX_MAX_LINE) : lines[i];
     const line = raw.replace(/§./g, '').replace(/\u001b\[[0-9;]*m/g, '').trim();
     if (/Missing or unsupported mandatory dependencies/i.test(line)) { inBlock = true; continue; }
     if (inBlock) {
@@ -406,7 +411,7 @@ function scanLogForMissingDeps(text) {
       const m = line.match(/Mod ID:\s*['"]([^'"]+)['"]\s*,\s*Requested by:\s*['"]([^'"]+)['"]/i);
       if (m) { missingDeps.push({ modId: m[1], requestedBy: m[2] }); continue; }
       // Fabric: "- Mod 'x' (y) is missing" / "requires any version of x"
-      const fm = line.match(/^[-*]?\s*Mod\s+['"]([^'"]+)['"]/i) || line.match(/requires .* of ([\w.-]+)/i);
+      const fm = line.match(/^[-*]?\s*Mod\s+['"]([^'"]+)['"]/i) || line.match(/requires [^\r\n]{1,120}? of ([\w.-]+)/i);
       if (fm) { missingDeps.push({ modId: fm[1], requestedBy: null }); continue; }
       // End of the block when a blank line or a non-indented new section starts.
       if (!line || (!/^[-*\t]/.test(raw) && missingDeps.length && !/dependencies?/i.test(line))) { inBlock = false; }

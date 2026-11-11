@@ -1,83 +1,46 @@
-# ObserverLauncher 8.0.0
+# ObserverLauncher 8.0.1
 
-Welcome to **ObserverLauncher 8.0.0**!
+Welcome to **ObserverLauncher 8.0.1**!
 
-This major release makes managing and hosting your Minecraft servers simpler, lighter, and more visual. Highlights include **Player Inspector 2.0** with real-time 3D character preview, native **Pumpkin** and **Horizon** server support (ultra-low memory, zero Java needed), a smoother **World Map** with structure discovery, and refined controls throughout the app.
+This maintenance and security update focuses on verified Java downloads, faster modpack verification, network safety guards, and tool parity across the entire app.
 
-For technical details, developers and power users can read the [developer changelog](CHANGELOG.md).
-
----
-
-## 🎮 Player Inspector 2.0: Real-Time 3D Previews & Easy Management
-
-Managing the players on your server is now visual and intuitive:
-
-- **Live 3D Skin & Armor View:** See an authentic 3D model of any player wearing their current armor. Skin layers and outer jackets render smoothly without graphical glitches.
-- **Inspect Online Players Instantly:** Click any player who is currently playing to check their live health, food, position, and dimension in real-time. Works across all server types, including native Rust servers (Pumpkin and Horizon) and newly joined players.
-- **1-Click Quick Actions:** Give or remove Operator status, edit the whitelist, teleport to a player (`/tp`), kick, or ban with a single click from the top toolbar.
-- **Full Inventory & Ender Chest:** Browse every item a player is carrying in a familiar 9×4 grid. Switch between their backpack and Ender Chest with one click, or search items by name.
-- **Health & Hunger Meters:** Clear 10-segment gauges show exactly how much health, saturation, and experience a player has.
-- **Jump to Map:** Click the map button next to a player's coordinates to jump straight to their location on the World Map.
+For technical details and commit references, developers can read the [developer changelog](CHANGELOG.md).
 
 ---
 
-## ⚡ Super-Lightweight Rust Servers (Pumpkin & Horizon)
+## 🔒 Verified Java Downloads (Adoptium SHA-256)
 
-ObserverLauncher now supports modern, high-performance Minecraft servers written in Rust:
-
-- **No Java Required:** Pumpkin and Horizon run as native programs directly on Windows and Linux. You don't need to install or configure Java runtimes.
-- **Ultra-Low Memory:** While traditional servers often need 2 GB to 4 GB of RAM, Pumpkin and Horizon run smoothly with only ~100 MB to ~250 MB of memory. Perfect for older PCs, laptops, or background hosting.
-- **Instant Start:** Servers launch in less than a second.
-- **Simple Settings:** Adjust server port, max players, difficulty, PVP, game mode, and whitelist directly in the launcher interface without manually opening config files.
+When ObserverLauncher automatically downloads Java runtimes for your servers:
+- **Hash Verification:** The launcher queries Adoptium's official release metadata and checks the SHA-256 checksum of the downloaded archive before extracting or running `java.exe`.
+- **Integrity Guarantee:** Any corrupted or incomplete download is rejected immediately, keeping your machine safe from broken or tampered binaries.
 
 ---
 
-## 🗺️ World Map: Structure Finder & Low-Resource Mode
+## ⚡ Faster Modpack Verification
 
-The built-in World Map gives you a live overview of your Minecraft world:
-
-- **Structure Discovery:** Locate villages, pillager outposts, desert temples, ancient cities, ocean monuments, nether fortresses, and trial chambers directly on the map.
-- **1-Click Low-Resource Mode:** If your world is very large or you are on a laptop, click the **Low-Resource Mode** button to reduce CPU and memory usage while keeping terrain fast and responsive.
-- **Readable Player Cards:** Player names in the map sidebar are spaced cleanly so they are never cut off by health badges.
-- **Nether Portal Link Calculator:** Click any spot on the map to see the exact matching coordinates in the Nether, with a 16-block safe link circle.
-- **Custom Waypoints:** Drop waypoints for your base, mines, or portals and jump to them anytime.
+- **Smart File Matching:** When checking user-dropped files for CurseForge modpacks, the launcher now looks up exact filename matches first instead of scanning and hashing every unrelated file in your `mods/` directory.
+- **Huge I/O Savings:** Large modpacks (with 300–500 mods) now verify missing or blocked files in seconds rather than locking disk activity for minutes.
 
 ---
 
-## 🌐 Play with Friends Without Port Forwarding
+## 🛡️ Network & Server Safety Guards
 
-Playing with friends shouldn't require messing with your home Wi-Fi router:
-
-- **Local Network:** If friends are in the same house or on the same Wi-Fi, copy your local IP address in 1 click.
-- **Internet Play (Built-in Tunnels):** Turn on the built-in Playit.gg or Pinggy tunnel to get a shareable internet link. Your friends can connect from anywhere in the world—**no router port forwarding or public IP setup required**.
-
----
-
-## 🛠️ Smarter Setup Wizard & Conflict Checks
-
-- **Accurate Software Guides:** The new server wizard clearly highlights what makes each software special (Vanilla, Paper, Purpur, Fabric, Forge, Horizon, Pumpkin).
-- **Clean Version Selection:** Switching between different software types resets version pickers cleanly without leftover messages.
-- **Mod Conflict Scanner:** If you install mods, the launcher checks for missing dependencies, wrong mod loaders, or duplicate files before you press Start.
+- **Remote API Exposure Prompt:** If you enable the Remote Dashboard on an off-loopback address (`0.0.0.0`) with an empty IP allowlist, ObserverLauncher now displays an explicit confirmation dialog before applying settings, ensuring you don't expose your server to public networks by accident.
+- **World Name Sanitization:** Creating or renaming worlds now guards against Windows-reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and trailing dots that could cause operating system errors.
+- **Ephemeral Tunnel Tokens:** The Pinggy tunnel helper now uses a random per-session token and automatically cleans up its temporary launch script when exiting.
+- **Skin Mirror Verification:** The fallback player skin fetcher validates the official 8-byte PNG file signature, preventing network errors or captive portal HTML pages from being saved as skins.
 
 ---
 
-## 🌍 Available in 7 Languages
+## 🤖 MCP & Automation Parity
 
-Every screen, button, and help text in ObserverLauncher is fully translated:
-
-- 🇬🇧 **English**
-- 🇻🇳 **Tiếng Việt**
-- 🇪🇸 **Español**
-- 🇧🇷 **Português (Brasil)**
-- 🇩🇪 **Deutsch**
-- 🇷🇺 **Русский**
-- 🇨🇳 **简体中文**
-
-You can change your language anytime in **Launcher settings &rarr; Personal &rarr; Language**.
+- **80 Server-Management Tools:** All 80 server tools are now verified by automated tests to ensure exact synchronization between live tools and the offline bridge fallback.
+- **Metadata Route Protection:** The local MCP server now rate-limits discovery routes (`/tools`, `/prompts`, `/resources`) to prevent excessive CPU consumption from tight client polling loops.
+- **Bridge File Size Bounds:** The bridge configuration reader now enforces strict file size and token length limits.
 
 ---
 
-### Getting Started & Support
-- [Download ObserverLauncher 8.0.0](https://github.com/Kag4286/ObserverLauncher/releases/latest)
-- [Report an issue or suggest a feature](https://github.com/Kag4286/ObserverLauncher/issues)
-- [Browse project documentation](docs/)
+## 📦 Test Suite & Quality Gates
+
+- **174 Automated Test Suites:** 100% passing rate across all 174 test suites, with 4 new dedicated test suites added for Adoptium verification, tool synchronization, world name sanitization, and modpack lookup performance.
+- **Clean Architecture:** Zero duplicate CSS/JS code blocks and 100% string parity across all 7 supported languages.

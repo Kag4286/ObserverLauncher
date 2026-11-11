@@ -13,10 +13,12 @@ async function readAndBackupLevelDat(filePath) {
   return await nbt.parse(raw);
 }
 
+const WIN_RESERVED_WORLD_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 function sanitizeWorldName(name) {
   if (typeof name !== 'string') return null;
   const s = name.trim();
-  if (!s || s.length > 64 || s.includes('..') || /[\\/]/.test(s)) return null;
+  if (!s || s.length > 64 || s.includes('..') || /[\\/]/.test(s) || s.endsWith(' ') || s.endsWith('.')) return null;
+  if (WIN_RESERVED_WORLD_NAMES.test(s)) return null;
   return /^[a-zA-Z0-9_\- ]+$/.test(s) ? s : null;
 }
 

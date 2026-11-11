@@ -64,6 +64,14 @@ async function fetchMojangProfile(input) {
   return JSON.parse(text);
 }
 
+// PURE (v8.0.1): verify the 8-byte PNG signature so a captive portal / error HTML page is never
+// cached as steve.png.
+function isValidPngBuffer(buf) {
+  return Buffer.isBuffer(buf) && buf.length >= 100 &&
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
+    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a;
+}
+
 // Fetch the default Steve texture from the PrismarineJS mirror, cache it under dataDir, and
 // return a data URI. Returns null on any failure (offline, mirror down) so the caller can fall
 // through to its last resort.
@@ -72,13 +80,13 @@ async function fetchDefaultFromMirror() {
   const cacheFile = path.join(cacheDir, 'steve.png');
   if (fs.existsSync(cacheFile)) {
     const buf = fs.readFileSync(cacheFile);
-    if (buf.length > 100) return 'data:image/png;base64,' + buf.toString('base64');
+    if (isValidPngBuffer(buf)) return 'data:image/png;base64,' + buf.toString('base64');
   }
   const url = `${MIRROR_BASE}/${MIRROR_VERSION}/entity/player/wide/steve.png`;
   const r = await fetch(url);
   if (!r.ok) return null;
   const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length < 100) return null;
+  if (!isValidPngBuffer(buf)) return null;
   fs.mkdirSync(cacheDir, { recursive: true });
   writeFileAtomic(cacheFile, buf);
   return 'data:image/png;base64,' + buf.toString('base64');
@@ -148,4 +156,4 @@ async function getSkin(input) {
   }
 }
 
-module.exports = { parseSkinUrl, getSkin, isOfflineUuid };
+module.exports = { parseSkinUrl, getSkin, isOfflineUuid, isValidPngBuffer };

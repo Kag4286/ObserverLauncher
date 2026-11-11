@@ -50,7 +50,6 @@ const CDN_BASES = [
   'https://cdn.jsdelivr.net/gh/PrismarineJS/minecraft-assets@master/data',
   'https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data',
 ];
-const RAW_BASE = CDN_BASES[1];
 
 // BUGFIX: some vanilla items have no texture file of their own. The enchanted golden apple is
 // drawn by the game from golden_apple.png plus a glint; the mirror only ships the base file, so

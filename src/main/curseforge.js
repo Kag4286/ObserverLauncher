@@ -144,25 +144,36 @@ function partitionCfFiles(files) {
 // Returns { verified, missing }. Pure-ish (reads the server folder) so it is unit-testable with a
 // temp dir. `destFolder` is relative to root, e.g. 'mods'.
 function verifyBlockedFiles(root, blocked, destFolder) {
+  const crypto = require('crypto');
   const fs = require('fs');
   const path = require('path');
-  const { fileHashes, safeTarget } = require('./fs-utils.js');
+  const { safeTarget } = require('./fs-utils.js');
   const dir = safeTarget(root, destFolder || 'mods');
   const listing = (() => { try { return fs.readdirSync(dir); } catch { return []; } })();
   const hashCache = new Map();
   const hashOf = name => {
     if (hashCache.has(name)) return hashCache.get(name);
     let h = null;
-    try { const fp = path.join(dir, name); if (fs.statSync(fp).isFile()) h = fileHashes(fp).sha1; } catch {}
+    try {
+      const fp = path.join(dir, name);
+      if (fs.statSync(fp).isFile()) {
+        h = crypto.createHash('sha1').update(fs.readFileSync(fp)).digest('hex');
+      }
+    } catch {}
     hashCache.set(name, h);
     return h;
   };
   const verified = [], missing = [];
   for (const b of (blocked || [])) {
-    const wantSha = b.hashes?.sha1 || null;
+    const wantSha = b.hashes?.sha1 ? String(b.hashes.sha1).toLowerCase() : null;
     const wantName = b.fileName || null;
     let hit = null;
-    if (wantSha) hit = listing.find(n => hashOf(n) === wantSha) || null;
+    // Fast path (v8.0.1): check the candidate by exact filename first so a large mods/ folder does
+    // not hash hundreds of unrelated jars when the user dropped the file with its original name.
+    if (wantName && listing.includes(wantName)) {
+      if (!wantSha || hashOf(wantName) === wantSha) hit = wantName;
+    }
+    if (!hit && wantSha) hit = listing.find(n => n !== wantName && hashOf(n) === wantSha) || null;
     if (!hit && wantName && listing.includes(wantName)) hit = wantName;
     if (hit) verified.push({ ...b, matchedFile: hit });
     else missing.push(b);

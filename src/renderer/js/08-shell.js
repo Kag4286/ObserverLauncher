@@ -649,6 +649,15 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   if(!isNatSave && next.jvmArgs && next.jvmArgs.length>2000) return toast(t('set.errJvmLong'),'error');
   if(!isNatSave && next.jvmArgs && /["'<>|]/.test(next.jvmArgs)) return toast(t('set.errJvmChars'),'error');
   if(!isNatSave && state.java?.arch==='32-bit' && next.memoryMax>2) return toast(t('set.errJava32'),'error');
+  // v8.0.1: prompt confirmation when enabling or changing to an off-loopback remote bind without an allowlist.
+  const bindNorm=String(next.remoteBind||'').trim();
+  const allowNorm=String(next.remoteAllow||'').trim();
+  const isWildRemote=!!(next.remoteEnabled && bindNorm && !['127.0.0.1','localhost','::1'].includes(bindNorm) && !allowNorm);
+  const prevBind=String(state.settings?.remoteBind||'').trim(), prevAllow=String(state.settings?.remoteAllow||'').trim();
+  const wasWildRemote=!!(state.settings?.remoteEnabled && prevBind && !['127.0.0.1','localhost','::1'].includes(prevBind) && !prevAllow);
+  if(isWildRemote && (!wasWildRemote || prevBind!==bindNorm)){
+    if(!await confirmDialog({title:t('remote.title'),body:esc(t('remote.wildWarn')),ok:t('set.apply'),danger:true})) return;
+  }
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!isNatSave && !r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }

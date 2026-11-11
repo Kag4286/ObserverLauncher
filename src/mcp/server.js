@@ -229,8 +229,10 @@ function startMcpServer(ctx) {
   // 4.4.0: the bucket math lives in the shared rate-limit.js (also used by the remote server).
   const limitBucket = require('../main/rate-limit.js').makeRateLimiter(60, 60000);
   const resourceBucket = require('../main/rate-limit.js').makeRateLimiter(180, 60000);
+  const metaBucket = require('../main/rate-limit.js').makeRateLimiter(120, 60000);
   const rateLimited = (client, name) => limitBucket(client + '::' + name);
   const resourceRateLimited = client => resourceBucket(client + '::resource');
+  const metaRateLimited = client => metaBucket(client + '::meta');
   const server = http.createServer((req, res) => {
     // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
     // Origin header and connects by IP. A browser page on any site can still POST to 127.0.0.1
@@ -259,10 +261,16 @@ function startMcpServer(ctx) {
     // 5.0.0 (fail-closed): an empty/absent configured token rejects everything below (mirrors
     // remote.js). startMcpServer always mints one, so this only guards direct embedding.
     if (!token) { res.writeHead(401); return res.end('unauthorized'); }
+    const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';
+    const rejectMetaRateLimit = () => {
+      res.writeHead(429, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (120/min) - slow down and retry.' }));
+    };
     // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
     // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.
     if (req.method === 'GET' && req.url === '/tools') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       // v5.0.0: advertise annotations + outputSchema too, so the MCP client can auto-approve reads
       // (readOnlyHint) and validate structured results. Omitted fields are simply absent.
@@ -283,6 +291,7 @@ function startMcpServer(ctx) {
     // message list for one prompt. Both auth-gated (loopback + token).
     if (req.method === 'GET' && req.url === '/prompts') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       const { promptList } = require('./prompts.js');
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -290,6 +299,7 @@ function startMcpServer(ctx) {
     }
     if (req.method === 'GET' && req.url.startsWith('/prompt')) {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (metaRateLimited(client)) return rejectMetaRateLimit();
       let name = '', args = {};
       try {
         const u = new URL(req.url, 'http://127.0.0.1');
@@ -312,6 +322,7 @@ function startMcpServer(ctx) {
     // bridge does not carry a duplicate copy. Auth-gated.
     if (req.method === 'GET' && req.url === '/resources') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       const { STATIC_RESOURCES, UI_RESOURCES } = require('./resources.js');
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -319,6 +330,7 @@ function startMcpServer(ctx) {
     }
     if (req.method === 'GET' && req.url === '/resource-templates') {
       if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       const { RESOURCE_TEMPLATES } = require('./resources.js');
       const tpl = RESOURCE_TEMPLATES.map(t => ({ uriTemplate: t.uriTemplate, name: t.name, description: t.description, mimeType: t.mimeType }));
@@ -330,7 +342,6 @@ function startMcpServer(ctx) {
       // 5.0.0: /resource previously bypassed the rate limiter AND the per-instance ALS scope
       // (it called the handler directly). Both now apply, so an instance template reads the RIGHT
       // instance and a leaked token cannot spam the expensive diagnosis resource.
-      const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';
       if (resourceRateLimited(client)) {
         res.writeHead(429, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: 'Rate limit exceeded (180/min) - slow down and retry.' }));

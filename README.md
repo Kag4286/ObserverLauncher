@@ -130,7 +130,7 @@ Enabled under **Launcher settings > Integrations** (off by default):
 - **Prometheus Metrics**: optional loopback-only (`127.0.0.1`) `/metrics` endpoint for Grafana scraping.
 
 ### Local MCP Server
-ObserverLauncher exposes 78 server-management tools via `src/mcp/bridge.js` (stdio bridge forwarding to a per-launch authenticated loopback HTTP RPC server). Tools are grouped into `read` (always allowed), `write` (prompts in-app unless **Auto-allow write tools** is enabled), and `destroy` (always requires explicit GUI confirmation, disabled in **Read-only mode**). File reads pass through `maskSecrets()` to redact RCON passwords and tokens.
+ObserverLauncher exposes 80 server-management tools via `src/mcp/bridge.js` (stdio bridge forwarding to a per-launch authenticated loopback HTTP RPC server). Tools are grouped into `read` (always allowed), `write` (prompts in-app unless **Auto-allow write tools** is enabled), and `destroy` (always requires explicit GUI confirmation, disabled in **Read-only mode**). File reads pass through `maskSecrets()` to redact RCON passwords and tokens.
 
 <div align="center">
   <img src="docs/screenshot-MCP.png" width="760" alt="Integrations and MCP Settings">
@@ -162,7 +162,7 @@ cd ObserverLauncher
 
 npm install
 npm start          # Launch Electron app in development mode
-npm test           # Run unit and integration suite (170 test files)
+npm test           # Run unit and integration suite (174 test files)
 npm run test:e2e   # Run Playwright Electron E2E tests
 
 npm run build:win   # Windows installer (.exe)

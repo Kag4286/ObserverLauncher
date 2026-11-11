@@ -10,6 +10,38 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [8.0.1] - 2026-11-11
+
+**Security Hardening, Supply-Chain Verification, MCP Parity, and Performance Optimization Release.**
+
+### Supply-Chain Security & Hardening:
+- **Adoptium JRE SHA-256 Verification (`src/main/settings-handlers.js`, `tests/adoptium-hash.test.js`):**
+  - Added `resolveAdoptiumAsset(major, osName, arch)` to query `/v3/assets/latest/{major}/hotspot` before downloading the portable Java runtime.
+  - Enforced `verifyFileHash(zipPath, { sha256 })` on downloaded JRE archives before staging or executing `java.exe`.
+- **MCP Metadata Endpoint Rate Limiting (`src/mcp/server.js`):**
+  - Added per-client rate limiting (`120 req/min`) to `/tools`, `/prompts`, `/prompt`, `/resources`, and `/resource-templates`.
+- **MCP Bridge Config Bounds & Parity (`src/mcp/bridge.js`, `tests/mcp-bridge-tools-sync.test.js`):**
+  - Bounded `readConfig()` in `src/mcp/bridge.js` to reject `mcp-bridge.json` files over 4096 bytes, out-of-range ports, or tokens exceeding 256 characters.
+  - Guarded the `process.stdin` listener under `if (require.main === module)` so unit tests can import `bridge.js` directly without hanging the event loop.
+  - Added `tests/mcp-bridge-tools-sync.test.js` enforcing 80-tool parity between `src/mcp/tools.js` and `STATIC_TOOLS`.
+- **Pinggy Ephemeral Askpass Token (`src/main/pinggy.js`):**
+  - Replaced static dummy password with a per-process `crypto.randomBytes(16).toString('hex')` token and registered an exit hook to unlink the helper script.
+- **Doctor Log Scanner Bounds (`src/mcp/doctor.js`):**
+  - Bounded `scanLogForMissingDeps(text)` to a 256 KB tail, 4000-character line cap (`REGEX_MAX_LINE`), and `ANALYZE_BUDGET_MS` time budget.
+- **World Name & Remote Bind Safeguards (`src/main/world-ops.js`, `src/renderer/js/08-shell.js`, `tests/world-name-sanitize.test.js`):**
+  - Updated `sanitizeWorldName()` to reject Windows-reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and trailing dots.
+  - Added an explicit confirmation dialog when saving an off-loopback Remote API bind address with an empty IP allowlist.
+- **Fallback Skin PNG Signature Check (`src/main/skins.js`):**
+  - Added `isValidPngBuffer()` verifying the 8-byte PNG magic header before caching or serving `steve.png` from the mirror.
+
+### Performance & Cache Consistency:
+- **CurseForge Blocked File Fast Path (`src/main/curseforge.js`, `tests/curseforge-blocked-perf.test.js`):**
+  - Optimized `verifyBlockedFiles()` to hash exact filename matches first before scanning unrelated files in `mods/`, and switched from dual SHA-1+SHA-512 to SHA-1 only.
+- **Content Classifier Cache Key (`src/main/content-conflicts.js`):**
+  - Added file `size` alongside `mtimeMs` in `safeClassify()` cache entries to prevent stale hits when archives share timestamps.
+- **Cleanup & Documentation (`src/main/textures.js`, `CODE_SIGNING.md`, `README.md`, `CONTRIBUTING.md`, `tests/i18n.test.js`):**
+  - Removed unused `RAW_BASE` alias in `textures.js`, updated `CODE_SIGNING.md` to `8.0.x`, updated tool and suite counts (`80` MCP tools, `174` test suites), and added `LOCALES_META` disk parity check in `tests/i18n.test.js`.
+
 ## [8.0.0] - 2026-11-09
 
 **Major Release: Player Inspector 2.0, Native Pumpkin & Horizon Rust Server Integration, Interactive World Map with Low-Resource Mode & Multi-Version Structure Cartography, Seamless 3D Armor & Skin Rendering, Resilient Multi-Instance Management, and Comprehensive UI/UX Polish.**
@@ -176,7 +208,7 @@ All notable changes to ObserverLauncher are documented here. Format follows
 
 ### Subsystem, Localization & Quality Gates:
 - **100% Locale Coverage:** Synchronized new strings across all 7 supported locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`) with 0 missing and 0 dead keys.
-- **167 Test Suites Passing:** 100% pass rate across all 167 automated test suites with zero duplicate blocks and full headless compliance.
+- **170 Test Suites Passing:** 100% pass rate across all 170 automated test suites with zero duplicate blocks and full headless compliance.
 - **Version Bump:** Bumped application version to `8.0.0` in `package.json`.
 
 

@@ -16,19 +16,24 @@ function safeClassify(folder, fileName) {
   try {
     const filePath = path.join(folder, fileName);
     let mtime = null;
+    let size = null;
     try {
-      if (fs.existsSync(filePath)) mtime = fs.statSync(filePath).mtimeMs;
+      if (fs.existsSync(filePath)) {
+        const st = fs.statSync(filePath);
+        mtime = st.mtimeMs;
+        size = st.size;
+      }
     } catch {}
-    if (mtime !== null) {
+    if (mtime !== null && size !== null) {
       const cached = _classifyCache.get(filePath);
-      if (cached && cached.mtime === mtime) {
+      if (cached && cached.mtime === mtime && cached.size === size) {
         return cached.cls;
       }
     }
     const jar = openJar(filePath);
     const cls = classifyJar(jar.read, fileName);
-    if (mtime !== null) {
-      _classifyCache.set(filePath, { mtime, cls });
+    if (mtime !== null && size !== null) {
+      _classifyCache.set(filePath, { mtime, size, cls });
     }
     return cls;
   } catch {

@@ -14,14 +14,15 @@
 // Pure helpers (findSshBinary, buildPinggyArgs, parsePinggyAddress) are unit-tested; the spawn
 // wrapper is thin so it can be exercised with a fake child in tests.
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const PINGGY_FREE_HOST = 'free.pinggy.io';
 const PINGGY_SSH_PORT = 443;
-// The dummy password line. Pinggy's anonymous free tier accepts any string; we send a constant so
-// the behaviour is obvious in a log and never depends on user input.
-const DUMMY_PASSWORD = 'observerlauncher';
+// SECURITY (v8.0.1): DO NOT put real credentials here. Pinggy's anonymous free tier accepts any
+// non-empty string; we mint a random ephemeral token per process and unlink the askpass script on exit.
+const DUMMY_PASSWORD = crypto.randomBytes(16).toString('hex');
 
 // Locate an SSH client. Settings override wins (users may point at a custom build), then the
 // Windows OpenSSH path, then PATH. Mirrors findPlayitBinary in tunnel.js. Returns null if none.
@@ -98,19 +99,23 @@ const ADDRESS_TIMEOUT = 25000;
 // password' then hangs). The standard non-interactive fix is an SSH_ASKPASS helper: a tiny script
 // that prints the password, used when SSH_ASKPASS_REQUIRE=force. Write it once into the data dir.
 let _askpassPath = null;
+let _askpassCleanupWired = false;
 function ensureAskpassHelper() {
-  if (_askpassPath) return _askpassPath;
-  const fs = require('fs');
-  const path = require('path');
+  if (_askpassPath && fs.existsSync(_askpassPath)) return _askpassPath;
   let dir;
   try { dir = require('./data-dir.js').dataDir(); } catch { dir = require('os').tmpdir(); }
   const isWin = process.platform === 'win32';
   const file = path.join(dir, isWin ? 'pinggy-askpass.bat' : 'pinggy-askpass.sh');
+  // SECURITY: never store real secrets in this helper script.
   const body = isWin
-    ? `@echo off\r\necho ${DUMMY_PASSWORD}\r\n`
-    : `#!/bin/sh\necho ${DUMMY_PASSWORD}\n`;
+    ? `@echo off\r\nREM Ephemeral anonymous dummy token for Pinggy free tier - DO NOT place real credentials here\r\necho ${DUMMY_PASSWORD}\r\n`
+    : `#!/bin/sh\n# Ephemeral anonymous dummy token for Pinggy free tier - DO NOT place real credentials here\necho ${DUMMY_PASSWORD}\n`;
   try { fs.mkdirSync(dir, { recursive: true }); require('./fs-utils.js').writeFileAtomic(file, body); if (!isWin) fs.chmodSync(file, 0o700); } catch {}
   _askpassPath = file;
+  if (!_askpassCleanupWired) {
+    _askpassCleanupWired = true;
+    process.once('exit', () => { try { if (_askpassPath) fs.rmSync(_askpassPath, { force: true }); } catch {} });
+  }
   return file;
 }
 

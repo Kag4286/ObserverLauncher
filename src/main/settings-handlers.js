@@ -10,8 +10,8 @@ const { detectJava, requiredJavaForJar, javaMajor, javaRuntimeOs, javaRuntimeExt
 const { requiredJavaForServer } = require('./server-java.js');
 const { serverFiles, emptyServerFiles, detectSoftware, readEula } = require('./server-files.js');
 const { localIPv4s } = require('./network.js');
-const { download, marketplaceError, withTimeout } = require('./http.js');
-const { findFileRecursive } = require('./fs-utils.js');
+const { download, json, marketplaceError, withTimeout } = require('./http.js');
+const { findFileRecursive, verifyFileHash } = require('./fs-utils.js');
 const platform = require('./platform');
 const { planStartAll, planStopAll } = require('./bulk-instances.js');
 
@@ -682,8 +682,22 @@ function registerSettings(ipcMain, ctx) {
   });
 }
 
+// SECURITY (v8.0.1 supply-chain): query Adoptium's /v3/assets metadata endpoint first so we have
+// an authoritative SHA-256 checksum before downloading and executing the JRE binary.
+async function resolveAdoptiumAsset(major, osName, arch, jsonFn = json) {
+  const metaUrl = `https://api.adoptium.net/v3/assets/latest/${encodeURIComponent(major)}/hotspot?architecture=${encodeURIComponent(arch)}&image_type=jre&os=${encodeURIComponent(osName)}&vendor=eclipse`;
+  const data = await jsonFn(metaUrl);
+  const pkg = Array.isArray(data) && data[0] && data[0].binary && data[0].binary.package;
+  const link = pkg && typeof pkg.link === 'string' ? pkg.link.trim() : '';
+  const checksum = pkg && typeof pkg.checksum === 'string' ? pkg.checksum.trim().toLowerCase() : '';
+  if (!link || !/^[a-f0-9]{64}$/.test(checksum)) {
+    throw new Error(`Could not retrieve a verified SHA-256 checksum for Java ${major} (${osName}/${arch}) from Adoptium.`);
+  }
+  return { url: link, sha256: checksum, size: Number(pkg.size) || 0 };
+}
+
 // Shared by the IPC handler and the MCP tool. Downloads a portable Adoptium JRE chosen from the
-// server jar's requirement (min Java 21), stages it, verifies the binary, then swaps it in.
+// server jar's requirement (min Java 21), verifies its SHA-256 checksum, stages it, verifies the binary, then swaps it in.
 async function autoInstallJava(ctx) {
     if (javaInstalling) return { ok: false, error: 'A Java install is already in progress — check the Console tab.' };
     // 2.2.0 (fix A): allow installing even when SOME Java is detected, as long as it is the WRONG
@@ -717,10 +731,14 @@ async function autoInstallJava(ctx) {
       ctx.appendLog(`Downloading a portable Java ${major} runtime from Adoptium (Eclipse Temurin)…`, 'system');
       const arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
       const osName = javaRuntimeOs(), ext = javaRuntimeExt(osName), binName = javaBinName(osName);
-      const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${osName}/${arch}/jre/hotspot/normal/eclipse`;
+      const { url, sha256 } = await resolveAdoptiumAsset(major, osName, arch);
       zipPath = path.join(tempDir(), `observerlauncher-jre-${Date.now()}.${ext}`);
       // A JDK/JRE archive is typically 40-200 MB; cap at 512 MB.
       await download(url, zipPath, (received, total) => ctx.send('java:progress', { received, total }), null, { maxBytes: 512 * 1024 * 1024 });
+      const hashCheck = verifyFileHash(zipPath, { sha256 });
+      if (!hashCheck.ok) {
+        throw new Error(hashCheck.error || 'Java runtime archive failed SHA-256 checksum verification.');
+      }
       const targetDir = path.join(dataDir(), `jre${major}`);
       // BUGFIX (a bad install could wipe a working Java): extract into a staging folder first; only
       // swap it in after the java binary is confirmed present, so a failure leaves the previous install
@@ -758,4 +776,4 @@ async function autoInstallJava(ctx) {
     }
 }
 
-module.exports = { registerSettings, autoInstallJava, safeServerFolderToDelete };
+module.exports = { registerSettings, autoInstallJava, resolveAdoptiumAsset, safeServerFolderToDelete };

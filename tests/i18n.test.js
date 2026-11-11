@@ -98,6 +98,10 @@ if (dead.length) console.log('dead keys (in en, never referenced):', dead.join('
 console.log(dead.length ? `dead keys: ${dead.length}` : 'no dead keys');
 const deadFail = dead.length ? 1 : 0;
 
-// The missing-lists + duplicate/extra + dead checks are the assertions.
-const fail = missing.length + jsMissing.length + dynMissing.length + dupFail + extraFail + deadFail;
+// The missing-lists + duplicate/extra + dead + meta parity checks are the assertions.
+const metaCodes = (window.LOCALES_META || []).map(m => m.code).sort();
+const diskCodes = fs.readdirSync(localeDir).filter(f => f.endsWith('.js') && f !== 'meta.js').map(f => f.replace(/\.js$/, '')).sort();
+const metaMismatch = JSON.stringify(metaCodes) !== JSON.stringify(diskCodes) ? 1 : 0;
+if (metaMismatch) console.log('LOCALES_META mismatch:', { metaCodes, diskCodes });
+const fail = (!ok ? 1 : 0) + missing.length + jsMissing.length + dynMissing.length + dupFail + extraFail + deadFail + metaMismatch;
 process.exit(fail ? 1 : 0);

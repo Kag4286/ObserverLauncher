@@ -14,7 +14,7 @@ Thanks for taking a look. This project is small, so the process is intentionally
 ```bash
 npm install
 npm start        # launch the app in development mode
-npm test         # unit/regression suite (node tests/run.js — 170 test suites)
+npm test         # unit/regression suite (node tests/run.js — 174 test suites)
 npm run test:e2e # Playwright smoke tests against the real Electron app
 ```
 
