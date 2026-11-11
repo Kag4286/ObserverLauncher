@@ -155,7 +155,7 @@ window.LOCALES['zh-CN'] = {
   'nsw.inf.pumpkin.b1': "完全兼容最新原版协议，官方 Java 版客户端可直接连接游玩。",
   'nsw.inf.pumpkin.b2': "无需 Java 或 JVM 运行时。启动迅捷，轻松通过 Pumpkin.toml 配置文件管理。",
   'nsw.srcPumpkin': "GitHub Releases (Pumpkin-MC/Pumpkin)",
-  'nsw.desc.horizon': "Rust 编写的突破性 Minecraft 26.3。极致性能，~150–250MB 内存，无需 Java。",
+  'nsw.desc.horizon': "Rust 编写的原生 Minecraft 26.3 服务端。约 150–250MB 内存，无需 Java。",
   "nsw.inf.horizon": "Horizon 是用 Rust 重新构建的 Minecraft Java Edition 服务器，启动神速，运行轻巧。",
   "nsw.inf.horizon.b1": "完全兼容原版 26.3 协议，官方客户端可直接连接游玩。",
   "nsw.inf.horizon.b2": "无需安装 Java 或 JVM 运行时。支持 server.toml 配置。",

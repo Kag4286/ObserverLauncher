@@ -155,7 +155,7 @@ window.LOCALES['pt-BR'] = {
   'nsw.inf.pumpkin.b1': "Compatível com o protocolo vanilla mais recente — clientes Java Edition conectam diretamente.",
   'nsw.inf.pumpkin.b2': "Sem sobrecarga de Java ou JVM. Inicialização rápida e configuração via Pumpkin.toml.",
   'nsw.srcPumpkin': "GitHub Releases (Pumpkin-MC/Pumpkin)",
-  'nsw.desc.horizon': "Avanço do Minecraft 26.3 em Rust. Ultra desempenho, ~150–250MB RAM, sem Java.",
+  'nsw.desc.horizon': "Servidor nativo de Minecraft 26.3 em Rust. ~150–250MB RAM, sem Java.",
   "nsw.inf.horizon": "Horizon é uma reescrita do Minecraft Java Edition em Rust, oferecendo alto desempenho e inicialização instantânea.",
   "nsw.inf.horizon.b1": "Compatível com o protocolo vanilla 26.3 — clientes oficiais conectam diretamente.",
   "nsw.inf.horizon.b2": "Nenhum Java ou JVM necessário. Configuração via server.toml.",
