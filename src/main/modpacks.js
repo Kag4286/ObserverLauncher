@@ -103,18 +103,38 @@ function canShowDialog(ctx) {
   } catch { return false; }
 }
 
-async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
+async function extractModpackArchive(archivePath, onInfo) {
+  onInfo?.({ phase: 'extract', name: 'Extracting modpack archive…', received: 0, total: 0 });
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const tempZip = path.join(tempDir(), `observerlauncher-import-${stamp}.zip`);
+  const extractDir = path.join(tempDir(), `observerlauncher-import-${stamp}`);
+  fs.copyFileSync(archivePath, tempZip);
+  const r = await platform.extractArchive(tempZip, extractDir);
+  if (!r.ok) {
+    try { fs.rmSync(tempZip, { force: true }); fs.rmSync(extractDir, { recursive: true, force: true }); } catch {}
+    throw new Error(r.error || 'Could not extract the modpack archive.');
+  }
+  return { tempZip, extractDir };
+}
+
+async function applyOverridesTransactional(ctx, ovrDir, tx) {
+  if (!ovrDir) return false;
+  const ovr = await copyOverridesWithConfirm(ctx, ovrDir, tx);
+  if (ovr && ovr.cancelled) {
+    tx.rollback();
+    return true;
+  }
+  return false;
+}
+
+async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local', preExtractedDir = null) {
   const { dialog } = require('electron'); // GUI-only: the compat/overwrite prompts below
-  let tempZip, extractDir;
+  let tempZip, extractDir = preExtractedDir;
   try {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    onInfo?.({ phase: 'extract', name: 'Extracting modpack archive…', received: 0, total: 0 });
-    const stamp = Date.now();
-    tempZip = path.join(tempDir(), `observerlauncher-import-${stamp}.zip`);
-    extractDir = path.join(tempDir(), `observerlauncher-import-${stamp}`);
-    fs.copyFileSync(mrpackPath, tempZip);
-    const r = await platform.extractArchive(tempZip, extractDir);
-    if (!r.ok) throw new Error(r.error || 'Could not extract the modpack archive.');
+    if (!extractDir) {
+      ({ tempZip, extractDir } = await extractModpackArchive(mrpackPath, onInfo));
+    }
     const indexPath = path.join(extractDir, 'modrinth.index.json');
     if (!fs.existsSync(indexPath)) throw new Error('Not a valid .mrpack file (missing modrinth.index.json).');
     const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
@@ -166,11 +186,15 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
         verify: (it) => verifyFileHash(it.dest, it.hashes),
       });
       installed = done.length;
-      const overridesDir = path.join(extractDir, 'overrides');
       // DRY (v3.1.0): use the SHARED overrides copy (same logic the CurseForge path uses) instead of a
       // second inline copy. It lists every file that would be clobbered and confirms with the user.
-      // The transaction stays open across the copy so a failed copy rolls the whole import back.
-      await copyOverridesWithConfirm(ctx, overridesDir, tx);
+      // The transaction stays open across the copy so a failed or cancelled copy rolls the whole import back.
+      // Modrinth spec supports both overrides/ and server-overrides/ (server-overrides takes precedence).
+      for (const sub of ['overrides', 'server-overrides']) {
+        if (await applyOverridesTransactional(ctx, path.join(extractDir, sub), tx)) {
+          return { ok: false, cancelled: true };
+        }
+      }
     } catch (e) {
       // Roll back every file this import wrote, then report the failure.
       const rolledBack = tx.rollback();
@@ -180,7 +204,7 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local') {
     tx.commit();
     return { ok: true, installed, skipped, name: index.name || 'Modpack', files: serverFiles(ctx.currentServerPath) };
   } catch (error) { return marketplaceError(error); }
-  finally { try { if (tempZip) fs.rmSync(tempZip, { force: true }); if (extractDir) fs.rmSync(extractDir, { recursive: true, force: true }); } catch {} }
+  finally { try { if (tempZip) fs.rmSync(tempZip, { force: true }); if (extractDir && !preExtractedDir) fs.rmSync(extractDir, { recursive: true, force: true }); } catch {} }
 }
 
 // Install a list of resolved files into the server folder as ONE transaction.
@@ -223,15 +247,19 @@ async function copyOverridesWithConfirm(ctx, overridesDir, tx) {
   if (!fs.existsSync(overridesDir)) return { cancelled: false };
   const sensitiveSet = new Set(['server.properties', 'eula.txt']);
   const clobbered = [];
+  const copyPairs = [];
   const walkRel = (rel) => {
     let entries; try { entries = fs.readdirSync(path.join(overridesDir, rel), { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
+      if (e.isSymbolicLink && e.isSymbolicLink()) continue; // SECURITY: never follow or copy symlinks
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) { walkRel(r); continue; }
+      if (!e.isFile()) continue;
       const dest = safeTarget(ctx.currentServerPath, r);
       if (!dest) continue; // unsafe path: the copy must not write outside the server folder
       if (tx) tx.touch(dest);
       if (fs.existsSync(dest)) clobbered.push(r);
+      copyPairs.push({ src: path.join(overridesDir, r), dest });
     }
   };
   walkRel('');
@@ -254,7 +282,10 @@ async function copyOverridesWithConfirm(ctx, overridesDir, tx) {
     }
   }
   if (!proceed) return { cancelled: true };
-  fs.cpSync(overridesDir, ctx.currentServerPath, { recursive: true });
+  for (const p of copyPairs) {
+    fs.mkdirSync(path.dirname(p.dest), { recursive: true });
+    fs.copyFileSync(p.src, p.dest);
+  }
   return { cancelled: false };
 }
 
@@ -276,8 +307,12 @@ async function importCfModpack(ctx, extractDir, index, onInfo) {
     const lines = [];
     if (compat.warnings.includes('mc')) lines.push(`• Minecraft: pack targets ${compat.mc.want}, this server is ${compat.mc.have}`);
     if (compat.warnings.includes('loader')) lines.push(`• Loader: pack targets ${compat.loader.want}, this server is ${compat.loader.have}`);
-    const choice = await dialog.showMessageBox(ctx.win, { type: 'warning', buttons: ['Cancel', 'Install anyway'], defaultId: 0, cancelId: 0, title: 'Modpack may not be compatible', message: 'This modpack does not match your server:', detail: lines.join('\n') + '\n\nContinue anyway?' });
-    if (choice.response !== 1) return { ok: false, cancelled: true };
+    if (canShowDialog(ctx)) {
+      const choice = await dialog.showMessageBox(ctx.win, { type: 'warning', buttons: ['Cancel', 'Install anyway'], defaultId: 0, cancelId: 0, title: 'Modpack may not be compatible', message: 'This modpack does not match your server:', detail: lines.join('\n') + '\n\nContinue anyway?' });
+      if (choice.response !== 1) return { ok: false, cancelled: true };
+    } else if (ctx.confirmMode === 'auto-deny') {
+      return { ok: false, cancelled: true, error: 'Incompatible modpack rejected by headless policy.' };
+    }
   }
   onInfo?.({ phase: 'extract', name: 'Resolving CurseForge files…', received: 0, total: 0 });
   let resolved;
@@ -303,8 +338,11 @@ async function importCfModpack(ctx, extractDir, index, onInfo) {
   try {
     done = await installFilesTransactional(tx, files, { onInfo });
     installed = done.length;
-    // The overrides copy runs INSIDE the transaction, so a failed copy rolls the jars back too.
-    await copyOverridesWithConfirm(ctx, path.join(extractDir, index.overrides || 'overrides'), tx);
+    // The overrides copy runs INSIDE the transaction, so a failed or cancelled copy rolls the jars back too.
+    const ovrDir = safeTarget(extractDir, index.overrides || 'overrides');
+    if (await applyOverridesTransactional(ctx, ovrDir, tx)) {
+      return { ok: false, cancelled: true };
+    }
   } catch (e) {
     const rolledBack = tx.rollback();
     return { ok: false, error: e?.message || 'The CurseForge modpack import failed.', rolledBack };
@@ -323,16 +361,11 @@ async function importModpackFromPath(ctx, modpackPath, onInfo, source = 'local')
   let tempZip, extractDir;
   try {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    const stamp = Date.now();
-    tempZip = path.join(tempDir(), `observerlauncher-import-${stamp}.zip`);
-    extractDir = path.join(tempDir(), `observerlauncher-import-${stamp}`);
-    fs.copyFileSync(modpackPath, tempZip);
-    const r = await platform.extractArchive(tempZip, extractDir);
-    if (!r.ok) throw new Error(r.error || 'Could not extract the modpack archive.');
+    ({ tempZip, extractDir } = await extractModpackArchive(modpackPath, onInfo));
     // Format detection: .mrpack carries modrinth.index.json; a CurseForge pack carries manifest.json.
     const mrIndex = path.join(extractDir, 'modrinth.index.json');
     const cfManifest = path.join(extractDir, 'manifest.json');
-    if (fs.existsSync(mrIndex)) return await importMrpackFromPath(ctx, modpackPath, onInfo, source);
+    if (fs.existsSync(mrIndex)) return await importMrpackFromPath(ctx, modpackPath, onInfo, source, extractDir);
     if (fs.existsSync(cfManifest)) {
       let parsed;
       try { parsed = cf.parseCfManifest(JSON.parse(fs.readFileSync(cfManifest, 'utf8'))); }
@@ -347,10 +380,22 @@ async function importModpackFromPath(ctx, modpackPath, onInfo, source = 'local')
 
 function registerModpacks(ipcMain, ctx) {
   const { dialog } = require('electron'); // GUI-only: the file-open dialog below
-  ipcMain.handle('modpack:install-from-market', async (_, { id, version, versionId }) => {
+  ipcMain.handle('modpack:install-from-market', async (_, { id, source = 'modrinth', version, versionId }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     let tempMrpack;
     try {
+      if (source === 'curseforge') {
+        const { resolveMarketDownload } = require('./marketplace.js');
+        const { isSafeDownloadUrl } = require('./validate.js');
+        const { verifyFileHash } = require('./fs-utils.js');
+        const dl = await resolveMarketDownload({ id, source: 'curseforge', kind: 'modpack', version, versionId });
+        if (!isSafeDownloadUrl(dl.url)) throw new Error('Refused: download URL is not on an allowlisted public host.');
+        tempMrpack = path.join(tempDir(), `observerlauncher-market-modpack-${Date.now()}.zip`);
+        await download(dl.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: dl.filename || 'modpack.zip', received, total }), null, { maxBytes: 1024 * 1024 * 1024 });
+        const vh = verifyFileHash(tempMrpack, dl.hashes);
+        if (!vh.ok) throw new Error(vh.error);
+        return await importModpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info), 'market');
+      }
       const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(id)}/version`);
       const byVersion = versions.filter(v => !version || (v.game_versions || []).includes(version));
       const hasMrpack = v => (v.files || []).some(f => /\.mrpack$/i.test(f.filename));
@@ -362,7 +407,10 @@ function registerModpacks(ipcMain, ctx) {
       // The .mrpack package itself can be large; cap at 1 GB.
       await download(file.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: file.filename, received, total }), null, { maxBytes: 1024 * 1024 * 1024 });
       return await importMrpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info), 'market');
-    } catch (error) { return marketplaceError(error); }
+    } catch (error) {
+      if (error && error.code === 'blocked') return { ok: false, blocked: true, error: 'This CurseForge modpack does not allow third-party downloads. Download the .zip manually and use Import Modpack.' };
+      return marketplaceError(error);
+    }
     finally { try { if (tempMrpack) fs.rmSync(tempMrpack, { force: true }); } catch {} }
   });
 

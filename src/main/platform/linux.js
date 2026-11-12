@@ -214,7 +214,7 @@ async function restoreBackup({ destPath, zipPath }) {
     if (r.ok) return { ok: true };
     // fallback to tar
   }
-  const r = await exec('tar', ['-xzf', zipPath, '-C', destPath], 300000);
+  const r = await exec('tar', ['--no-same-owner', '-xzf', zipPath, '-C', destPath], 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract backup (needs unzip or tar)' };
 }
 
@@ -223,9 +223,18 @@ async function restoreBackup({ destPath, zipPath }) {
 // (caller then falls through to normal extraction).
 async function listArchiveEntries(zipPath) {
   const zipList = await exec('unzip', ['-Z1', zipPath], 30000);
-  if (zipList.ok && zipList.stdout.trim()) return zipList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (zipList.ok && zipList.stdout.trim()) {
+    // Reject archives containing symlinks (zipinfo -Z -l starts symlink mode lines with 'l')
+    const zipModes = await exec('unzip', ['-Z', '-l', zipPath], 30000);
+    if (zipModes.ok && (zipModes.stdout || '').split(/\r?\n/).some(line => /^l[rwx-]{9}/i.test(line.trim()))) return ['../symlink-rejected'];
+    return zipList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
   const tarList = await exec('tar', ['-tzf', zipPath], 30000);
-  if (tarList.ok && tarList.stdout.trim()) return tarList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (tarList.ok && tarList.stdout.trim()) {
+    const tarModes = await exec('tar', ['-tvzf', zipPath], 30000);
+    if (tarModes.ok && (tarModes.stdout || '').split(/\r?\n/).some(line => /^[lh][rwx-]{9}/i.test(line.trim()))) return ['../symlink-rejected'];
+    return tarList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
   return null;
 }
 
@@ -259,10 +268,10 @@ async function extractArchive(archivePath, destDir) {
     const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);
     const r = hasUnzip
       ? await exec('unzip', ['-o', archivePath, '-d', destDir], 300000)
-      : await exec('tar', ['-xf', archivePath, '-C', destDir], 300000);
+      : await exec('tar', ['--no-same-owner', '-xf', archivePath, '-C', destDir], 300000);
     return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive (needs unzip or tar).' };
   }
-  const r = await exec('tar', ['-xzf', archivePath, '-C', destDir], 300000);
+  const r = await exec('tar', ['--no-same-owner', '-xzf', archivePath, '-C', destDir], 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive (needs tar).' };
 }
 async function createArchive(srcPath, destArchive) {

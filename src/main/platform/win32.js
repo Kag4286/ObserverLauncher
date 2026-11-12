@@ -106,7 +106,26 @@ async function createBackup({ serverPath, worlds, destZip }) {
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }
 
+async function verifyZipEntriesWin(archivePath, label = 'Archive') {
+  const { isSafeArchiveEntry } = require('../validate.js');
+  let entries = null;
+  try {
+    const list = await runPowerShell(`Add-Type -AssemblyName System.IO.Compression.FileSystem; $z = [System.IO.Compression.ZipFile]::OpenRead(${psQuote(archivePath)}); try { $z.Entries | ForEach-Object { $_.FullName } } finally { $z.Dispose() }`, 30000);
+    if (list && list.ok) {
+      entries = (list.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    }
+  } catch {
+    entries = null;
+  }
+  if (!entries) return { ok: false, error: `Could not read the ${label.toLowerCase()} to verify it is safe (unsupported or corrupt format) — extraction stopped.` };
+  const bad = entries.find(e => !isSafeArchiveEntry(e));
+  if (bad) return { ok: false, error: `${label} contains an unsafe path ("${bad}") — extraction stopped for safety.` };
+  return { ok: true };
+}
+
 async function restoreBackup({ destPath, zipPath }) {
+  const v = await verifyZipEntriesWin(zipPath, 'Backup');
+  if (!v.ok) return v;
   const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(zipPath)} -DestinationPath ${psQuote(destPath)} -Force`, 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }
@@ -136,19 +155,8 @@ async function extractArchive(archivePath, destDir) {
   // PARITY with Linux: list entries first and refuse the archive on the first unsafe path. .NET's
   // Expand-Archive already blocks traversal itself, but this makes the two platforms behave the
   // same and fails with a clear message instead of a partial extract.
-  const { isSafeArchiveEntry } = require('../validate.js');
-  let entries = null;
-  try {
-    const list = await runPowerShell(`Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::OpenRead(${psQuote(archivePath)}).Entries | ForEach-Object { $_.FullName }`, 30000);
-    if (list && list.ok) {
-      entries = (list.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    }
-  } catch {
-    entries = null;
-  }
-  if (!entries) return { ok: false, error: 'Could not read the archive to verify it is safe (unsupported or corrupt format) — extraction stopped.' };
-  const bad = entries.find(e => !isSafeArchiveEntry(e));
-  if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
+  const v = await verifyZipEntriesWin(archivePath, 'Archive');
+  if (!v.ok) return v;
   const r = await runPowerShell(`Expand-Archive -LiteralPath ${psQuote(archivePath)} -DestinationPath ${psQuote(destDir)} -Force`, 300000);
   return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive.' };
 }

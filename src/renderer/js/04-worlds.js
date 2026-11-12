@@ -9,7 +9,7 @@ function renderWorlds(worlds){
     n.innerHTML=worlds.map(x=>{
       const k=kindOf(x);
       const isSub=/_the_end$/i.test(x)||/_nether$/i.test(x);
-      const extraBtns=isSub?'':`<button class="btn sm secondary" data-rename-world="${esc(x)}">${t('wld.renameBtn')}</button><button class="btn sm secondary" data-seed-world="${esc(x)}">${t('wld.seedTitle')}</button><button class="btn sm danger-ghost" data-reset-dim="${esc(x)}">${t('wld.resetDimBtn')}</button>`;
+      const extraBtns=isSub?'':`<button class="btn sm secondary" data-rename-world="${esc(x)}">${t('wld.renameBtn')}</button><button class="btn sm secondary" data-clone-world="${esc(x)}">${t('wld.cloneBtn')}</button><button class="btn sm secondary" data-seed-world="${esc(x)}">${t('wld.seedTitle')}</button><button class="btn sm danger-ghost" data-reset-dim="${esc(x)}">${t('wld.resetDimBtn')}</button>`;
       return `<div class="entity-card wld-card" title="${esc(x)}"><span class="entity-avatar accent">◫</span><div class="entity-body"><div class="entity-title">${esc(x)}</div><div class="entity-meta"><span class="badge wld-tag-${k.cls}">${esc(k.tag)}</span></div></div><div class="entity-actions">${extraBtns}<button class="btn sm secondary" data-open-world="${esc(x)}">${t('wld.open')}</button></div></div>`;
     }).join('');
   }
@@ -23,6 +23,17 @@ function renderWorlds(worlds){
     if(!r.ok)return toast(r.error||'Failed');
     toast(t('wld.renamedSuccess'));
     state.files=r.files;refreshUI();
+  });
+  $$('[data-clone-world]').forEach(b=>b.onclick=async()=>{
+    if(state.running)return toast(t('wld.cantRunning'));
+    const curr=b.dataset.cloneWorld;
+    const next=await promptDialog({title:t('wld.cloneTitle'),value:`${curr}_copy`,ok:t('wld.cloneBtn')});
+    if(!next||next===curr)return;
+    const r=await window.observer.worldClone(curr,'',next);
+    if(!r.ok)return toast(r.error||'Failed');
+    toast(t('wld.clonedSuccess'));
+    if(r.files)state.files=r.files;
+    refreshUI();
   });
   $$('[data-seed-world]').forEach(b=>b.onclick=async()=>{
     if(state.running)return toast(t('wld.cantRunning'));

@@ -542,4 +542,4 @@ function parseServerLine(text, live, send) {
   }
   if (changed && typeof send === 'function') send('server:live', live);
 }
-module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine, stackOf, maxDamageFor, decodePropertiesValue, encodePropertiesValue };
+module.exports = { serverFiles, emptyServerFiles, detectSoftware, readEula, writeEula, buildPropertiesContent, findPlayerDataFile, readPlayerData, parseServerLine, stackOf, maxDamageFor, decodePropertiesValue, encodePropertiesValue, offlineUUID };

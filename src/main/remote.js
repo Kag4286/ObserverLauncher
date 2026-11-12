@@ -123,10 +123,11 @@ function createRemoteServer(opts) {
     // hostnames, which is what DNS-rebinding uses). A specific bind keeps the exact-match behavior.
     const bind = String(o.bind || '127.0.0.1');
     const wildcardBind = bind === '0.0.0.0' || bind === '::' || bind === '';
-    const hostOk = !hostHdr
-      || hostHdr === '127.0.0.1' || hostHdr === 'localhost' || hostHdr === '::1' || hostHdr === '[::1]'
+    const hostOk = Boolean(hostHdr) && (
+      hostHdr === '127.0.0.1' || hostHdr === 'localhost' || hostHdr === '::1' || hostHdr === '[::1]'
       || hostHdr === bind
-      || (wildcardBind && (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostHdr) || /^[0-9a-f:]+$/i.test(hostHdr)));
+      || (wildcardBind && (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostHdr) || /^[0-9a-f:]+$/i.test(hostHdr)))
+    );
     if (!hostOk) { res.writeHead(403); return res.end('forbidden'); }
     const ip = String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
     // SECURITY: the IP allowlist applies to EVERYTHING below this line, including /health and the
@@ -139,7 +140,13 @@ function createRemoteServer(opts) {
     // can paste a token; every DATA call below still needs the token).
     if (req.method === 'GET' && uiAssets[req.url]) {
       const a = uiAssets[req.url];
-      res.writeHead(200, { 'content-type': a.type, 'cache-control': 'no-cache' });
+      res.writeHead(200, {
+        'content-type': a.type,
+        'cache-control': 'no-cache',
+        'x-content-type-options': 'nosniff',
+        'x-frame-options': 'DENY',
+        'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'",
+      });
       return res.end(a.body);
     }
     const auth = req.headers['authorization'] || '';

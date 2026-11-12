@@ -68,32 +68,44 @@ async function searchMarket(opts) {
       return data.hits || [];
     };
     let hits, relaxed = null;
+    const runWithRelax = async (typeFacet, loaderGroup) => {
+      const base = loaderGroup ? [[typeFacet], loaderGroup] : [[typeFacet]];
+      const filters = [...base];
+      if (version) filters.push([`versions:${version}`]);
+      if (catFacets) filters.push(catFacets);
+      let res = await runSearch(filters);
+      if (!res.length && skip === 0 && catFacets) {
+        const fNoCat = [...base];
+        if (version) fNoCat.push([`versions:${version}`]);
+        res = await runSearch(fNoCat);
+        if (res.length) relaxed = 'category';
+      }
+      if (!res.length && skip === 0 && version) {
+        res = await runSearch(base);
+        if (res.length) relaxed = 'version';
+      }
+      if (!res.length && skip === 0 && loaderGroup) {
+        res = await runSearch([[typeFacet]]);
+        if (res.length) relaxed = 'loader';
+      }
+      return res;
+    };
     if (kind === 'modpack') {
-      hits = await runSearch([['project_type:modpack']]);
+      const mpLoader = explicit || loaderGroups[loader] || null;
+      hits = await runWithRelax('project_type:modpack', mpLoader);
     } else if (kind === 'datapack') {
       hits = await runSearch([['project_type:datapack']]);
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['loaders:datapack']]); if (hits.length) relaxed = 'loader'; }
       if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['categories:datapack']]); if (hits.length) relaxed = 'loader'; }
     } else {
       const loaderGroup = explicit || loaderGroups[loader] || loaderGroups[kind] || loaderGroups.plugin;
-      let filters = [['project_type:mod'], loaderGroup];
-      if (version) filters.push([`versions:${version}`]);
-      if (catFacets) filters.push(catFacets);
-      hits = await runSearch(filters);
-      if (!hits.length && skip === 0 && catFacets) {
-        const fNoCat = [['project_type:mod'], loaderGroup];
-        if (version) fNoCat.push([`versions:${version}`]);
-        hits = await runSearch(fNoCat);
-        if (hits.length) relaxed = 'category';
-      }
-      if (!hits.length && skip === 0 && version) { hits = await runSearch([['project_type:mod'], loaderGroup]); if (hits.length) relaxed = 'version'; }
-      if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod']]); if (hits.length) relaxed = 'loader'; }
+      hits = await runWithRelax('project_type:mod', loaderGroup);
     }
     const KNOWN_LOADERS = ['datapack', 'fabric', 'quilt', 'neoforge', 'forge', 'paper', 'purpur', 'spigot', 'folia', 'bukkit', 'velocity', 'waterfall', 'bungeecord', 'vanilla'];
     const mapHit = x => {
       const hitLoaders = (x.loaders && x.loaders.length) ? x.loaders : (x.categories || []).map(c => String(c).toLowerCase()).filter(c => KNOWN_LOADERS.includes(c));
       const hitEnv = { client: x.client_side || null, server: x.server_side || null, normalized: normalizeEnv({ client: x.client_side, server: x.server_side }) };
-      return { source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, env: hitEnv, loaders: hitLoaders, date: x.date_created || null };
+      return { source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, kind: kind === 'modpack' || kind === 'datapack' ? kind : undefined, env: hitEnv, loaders: hitLoaders, date: x.date_created || null };
     };
     return { ok: true, relaxed, total: lastTotal, items: hits.map(mapHit) };
   }
@@ -264,7 +276,9 @@ async function resolveMarketDownload(item) {
     const headers = cfHeaders();
     if (!headers) throw new Error('CurseForge API key not set.');
     const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(item.id)}/files?pageSize=50`, headers);
-    const wanted = cf.loaderIdFor(kind === 'fabric' ? 'fabric' : kind === 'forge' ? 'forge' : 'neoforge');
+    const wanted = kind === 'modpack'
+      ? (item.loader ? cf.loaderIdFor(item.loader) : null)
+      : cf.loaderIdFor(kind === 'fabric' ? 'fabric' : kind === 'forge' ? 'forge' : 'neoforge');
     // Honour an explicit versionId (the version picker) before falling back to the newest match.
     let file = item.versionId ? (files.data || []).find(f => String(f.id) === String(item.versionId)) : null;
     if (!file) file = cf.pickCfFile(files.data || [], item.version || '', wanted);

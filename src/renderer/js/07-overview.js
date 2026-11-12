@@ -89,7 +89,7 @@ function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=
   if(typeof applyBeginnerMode==='function')applyBeginnerMode(state.settings&&state.settings.beginnerMode);
   const proxy=isProxyServer();$('#eulaStatus').textContent=proxy?t('ov.eulaProxy'):(state.eulaAccepted?t('set.eulaOk').replace('✓ ',''):t('ov.eulaPending'));
   $('#worldsProxyNotice').hidden=!proxy;$('#playersProxyNotice').hidden=!proxy;
-  $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
+  $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;if($('#proxyServersPanel'))$('#proxyServersPanel').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
   const pt=$('.prop-toolbar');if(pt)pt.hidden=proxy;
   $('#propertiesTitle').textContent=proxy?t('prop.proxyTitle'):t('prop.title');$('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
   try{ if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{}); }catch(e){console.warn('props render error:',e)}

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
-const { serverFiles, readPlayerData } = require('./server-files.js');
+const { serverFiles, readPlayerData, offlineUUID } = require('./server-files.js');
 const { readJsonList, writeJsonList, safeTarget } = require('./fs-utils.js');
 const { marketplaceError } = require('./http.js');
 const { isSafePlayerName, isSafeReason, isSafeUuid, isSafeIp } = require('./validate.js');
@@ -56,6 +56,7 @@ async function ensurePlayerDataFresh(ctx) {
 }
 
 async function readPlayer(ctx, uuid, name) {
+  if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
   // Accept a UUID, or a name (resolved to the offline UUID on disk). Need at least one.
   const hasUuid = isSafeUuid(uuid);
   const hasName = typeof name === 'string' && name.length >= 1 && name.length <= 16;
@@ -67,6 +68,12 @@ async function readPlayer(ctx, uuid, name) {
   }
   catch (error) { return { ok: false, error: error?.message || `Unknown error reading player data.` }; }
 }
+function matchPlayerEntry(x, uuid, name) {
+  const n = String(name || '').toLowerCase();
+  if (uuid && x && x.uuid && String(x.uuid).toLowerCase() === String(uuid).toLowerCase()) return true;
+  if (n && x && x.name && String(x.name).toLowerCase() === n) return true;
+  return false;
+}
 async function whitelistToggle(ctx, { uuid, name, add }) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
   const bad = checkPlayerInput({ name, uuid });
@@ -74,8 +81,9 @@ async function whitelistToggle(ctx, { uuid, name, add }) {
   if (ctx.serverProcess) {
     if (!writeCmd(ctx, `whitelist ${add ? 'add' : 'remove'} ${name}`)) return { ok: false, error: 'The server just stopped — could not send the command.' };
   } else {
-    let list = readJsonList(ctx.currentServerPath, 'whitelist.json').filter(x => x.uuid !== uuid);
-    if (add) list.push({ uuid, name });
+    const resolvedUuid = uuid || offlineUUID(name);
+    let list = readJsonList(ctx.currentServerPath, 'whitelist.json').filter(x => !matchPlayerEntry(x, resolvedUuid, name));
+    if (add) list.push({ uuid: resolvedUuid, name });
     writeJsonList(ctx.currentServerPath, 'whitelist.json', list);
   }
   return { ok: true, files: serverFiles(ctx.currentServerPath) };
@@ -99,8 +107,9 @@ async function banToggle(ctx, { uuid, name, ban, reason, ip }) {
     if (ban) list.push({ ip: String(ip).trim(), created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
     writeJsonList(ctx.currentServerPath, 'banned-ips.json', list);
   } else {
-    let list = readJsonList(ctx.currentServerPath, 'banned-players.json').filter(x => x.uuid !== uuid);
-    if (ban) list.push({ uuid, name, created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
+    const resolvedUuid = uuid || offlineUUID(name);
+    let list = readJsonList(ctx.currentServerPath, 'banned-players.json').filter(x => !matchPlayerEntry(x, resolvedUuid, name));
+    if (ban) list.push({ uuid: resolvedUuid, name, created: new Date().toISOString(), source: 'ObserverLauncher', expires: 'forever', reason: reason || 'Banned by an operator.' });
     writeJsonList(ctx.currentServerPath, 'banned-players.json', list);
   }
   return { ok: true, files: serverFiles(ctx.currentServerPath) };
@@ -117,8 +126,9 @@ async function opToggle(ctx, { uuid, name, op, level }) {
     const cmd = op ? `op ${name}` : `deop ${name}`;
     if (!writeCmd(ctx, cmd)) return { ok: false, error: 'The server just stopped — could not send the command.' };
   } else {
-    let list = readJsonList(ctx.currentServerPath, 'ops.json').filter(x => x.uuid !== uuid);
-    if (op) list.push({ uuid, name, level: lvl, bypassesPlayerLimit: false });
+    const resolvedUuid = uuid || offlineUUID(name);
+    let list = readJsonList(ctx.currentServerPath, 'ops.json').filter(x => !matchPlayerEntry(x, resolvedUuid, name));
+    if (op) list.push({ uuid: resolvedUuid, name, level: lvl, bypassesPlayerLimit: false });
     writeJsonList(ctx.currentServerPath, 'ops.json', list);
   }
   return { ok: true, files: serverFiles(ctx.currentServerPath) };

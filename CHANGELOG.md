@@ -10,6 +10,55 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [8.0.2] - 2026-11-12
+
+**Full-Project Security Audit, Modpack Subsystem Overhaul, Orphaned Feature Wiring, and Accessibility (WCAG 2.2 AA) Release.**
+
+### Security Hardening & Archive / Network Guards:
+- **HTTP Redirect SSRF Guard (`src/main/http.js`):**
+  - Updated `downloadAttempt()` so any download whose initial URL passes `isSafeDownloadUrl(url)` follows redirects manually (`redirect: 'manual'`, up to 8 hops) and validates every `Location` target against `isSafeDownloadUrl(nextUrl)`, aborting with HTTP 403 if a redirect hop targets loopback, private, link-local, or cloud metadata addresses.
+- **Zip-Slip & Archive Extraction Hardening (`src/main/validate.js`, `src/main/platform/win32.js`, `src/main/platform/linux.js`, `src/main/wizard.js`):**
+  - Hardened `isSafeArchiveEntry()` in `src/main/validate.js` to reject ASCII control characters (`[\x00-\x1f]`) and Windows drive-relative paths (`/^[A-Za-z]:/`).
+  - Added `verifyZipEntriesWin()` in `src/main/platform/win32.js` (properly disposing the `ZipFile` handle in `finally`) and enforced it in both `restoreBackup()` and `extractArchive()` so modpack archives are checked for zip-slip before extraction on Windows.
+  - Hardened `listArchiveEntries()` in `src/main/platform/linux.js` to reject zip and tar symlink/hardlink entries and added `--no-same-owner` to all `tar` extraction calls across `linux.js` and `wizard.js`, plus `tar -tzf` entry validation before extracting Horizon `.tar.gz` archives.
+- **Modpack Override Symlink & Cancel Rollback Guards (`src/main/modpacks.js`):**
+  - Updated `copyOverridesWithConfirm()` to skip symbolic links (`e.isSymbolicLink()`) and copy only `safeTarget`-validated regular files one by one instead of recursive `fs.cpSync(overridesDir, ...)`.
+  - Rolled back the `FileTransaction` (`tx.rollback()`) when the user cancels the override confirmation dialog in both `.mrpack` and CurseForge modpack imports so previously downloaded jars are not left orphaned in `mods/`.
+  - Validated `index.overrides` through `safeTarget(extractDir, ...)` in `importCfModpack()`.
+- **Remote Dashboard Host & CSP Hardening (`src/main/remote.js`, `src/remote-ui/index.html`):**
+  - Required a non-empty `Host` header in `remote.js` (`Boolean(hostHdr) && isLoopbackHostHeader(hostHdr)`) to close the empty-Host bypass.
+  - Added `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `X-Frame-Options: DENY` headers to Remote Dashboard asset responses and a matching `<meta http-equiv="Content-Security-Policy">` tag in `src/remote-ui/index.html`.
+- **Offline Player Administration & Null-Path Guards (`src/main/players.js`, `src/main/server-files.js`):**
+  - Exported `offlineUUID(name)` from `src/main/server-files.js` and used `resolvedUuid = uuid || offlineUUID(name)` in offline `whitelistToggle()`, `banToggle()`, and `opToggle()` so manual name-only actions write valid offline UUIDs and match existing entries by UUID or case-insensitive name.
+  - Guarded `readPlayer()` when `ctx.currentServerPath` is unset, and escaped `chosen.gameVersions` / `chosen.loaders` with `esc()` in `src/renderer/js/05-marketplace.js`.
+
+### Modpack Subsystem Overhaul:
+- **Marketplace Modpack Install & Search (`src/renderer/js/05-marketplace.js`, `src/renderer/js/11-market.js`, `src/main/marketplace.js`, `src/main/modpacks.js`):**
+  - Fixed two renderer bugs where `item.kind === 'modpack'` was overwritten to `'fabric'`, `'neoforge'`, `'forge'`, or `'mod'` in `runMarketSearch()` (`11-market.js`) and `openInstallModal()` (`05-marketplace.js`), which caused modpacks to be installed as single `.jar` files instead of full modpacks.
+  - Added CurseForge modpack support to `modpack:install-from-market` and passed `source: item.source` from the renderer, including `openBlockedDialog()` handling when CurseForge authors block third-party downloads.
+  - Updated Modrinth modpack search in `src/main/marketplace.js` to honour `loader`, `version`, and `category` filters with automatic filter relaxation, and prevented CurseForge modpack downloads from forcing `neoforge` when no loader filter is set.
+- **`.mrpack` Spec & Headless MCP Modpack Tools (`src/main/modpacks.js`, `src/mcp/tools.js`):**
+  - Added `server-overrides/` directory support alongside `overrides/` in `importMrpackFromPath()`.
+  - Eliminated double extraction of `.mrpack` archives when dispatched from `importModpackFromPath()`.
+  - Guarded `dialog.showMessageBox` with `canShowDialog(ctx)` in `importCfModpack()` so headless/MCP CurseForge modpack imports never crash without a window.
+  - Updated MCP tools `install_from_market` and `import_modpack_path` to use `importModpackFromPath()` (supporting both `.mrpack` and CurseForge `.zip` packs), and added `verifyFileHash()` + `isZipFile()` checks to `assemble_modpack`.
+
+### Orphaned Features Wired & IPC Cleanup:
+- **Velocity Proxy Backend Servers Panel (`src/renderer/js/06-properties.js`, `src/renderer/js/07-overview.js`, `src/renderer/js/10-properties.js`):**
+  - Wired `#proxyServersPanel`, `#proxyServersList`, and `#proxyServerAddForm` on the Server Properties tab (`proxyServersGet`, `proxyServersAdd`, `proxyServersRemove`) when the active server is a Velocity proxy.
+- **World Cloning UI & Cross-Folder Validation (`src/renderer/js/04-worlds.js`, `src/main/world-ops.js`, `src/main/content-handlers.js`, `src/renderer/locales/*.js`):**
+  - Added a **Clone** button (`data-clone-world`) on world cards in the Worlds tab with localized prompts across all 7 languages (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN`).
+  - Updated `cloneWorld()` to default `targetRoot` to the current server folder, exclude `session.lock`, and validate cross-folder `targetServerPath` against registered launcher instances.
+- **Duplicate Tunnel IPC Removal (`src/main/tunnel.js`):**
+  - Removed unused duplicate IPC handlers `tunnel:install` and `tunnel:refresh`.
+
+### Accessibility (WCAG 2.2 AA):
+- **Form Labels, Dialog ARIA, Heading Hierarchy & Tap Targets (`src/renderer/index.html`, `src/renderer/css/03-overview.css`, `src/renderer/js/11-market.js`):**
+  - Added explicit `aria-label` attributes to 21 unlabeled form controls and 3 dynamically populated buttons across `src/renderer/index.html`.
+  - Added `aria-labelledby="blockedModalTitle"` and focus trapping (`trapFocus`/`releaseFocus`) to `#blockedModal`.
+  - Fixed the `h1 -> h3` heading level skip on the Console tab by promoting `<h2 data-i18n="con.title">` with matching CSS rules.
+  - Increased `.step-chip` minimum height to `28px` to satisfy the WCAG 2.2 AA `24×24px` target size requirement.
+
 ## [8.0.1] - 2026-11-11
 
 **Security Hardening, Supply-Chain Verification, MCP Parity, and Performance Optimization Release.**

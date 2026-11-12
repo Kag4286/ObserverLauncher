@@ -98,4 +98,21 @@ function renderProperties(props){
   capturePropsBaseline();
   if(typeof updatePropsDirty==='function')updatePropsDirty();
 }
-async function refreshProxyProperties(){const r=await window.observer.readRawProperties();if(r.ok){$('#propertiesRaw').value=r.content;capturePropsBaseline();if(typeof updatePropsDirty==='function')updatePropsDirty()}}
+async function renderProxyServers(){
+  const box=$('#proxyServersList');if(!box)return;
+  try{
+    const r=await window.observer.proxyServerGet();
+    if(!r||!r.ok){box.innerHTML='';return}
+    const entries=Object.entries(r.servers||{});
+    const trySet=new Set(r.try||[]);
+    const emptyEl=$('#proxyServersEmpty');if(emptyEl)emptyEl.hidden=entries.length>0;
+    if(!entries.length){box.innerHTML='';return}
+    box.innerHTML=entries.map(([name,addr])=>`<div class="proxy-srv-row"><b>${esc(name)}</b><code>${esc(addr)}</code>${trySet.has(name)?'<span class="badge">try</span>':''}<button type="button" class="btn sm danger-ghost" data-proxy-rm="${esc(name)}">${esc(t('wld.delete'))}</button></div>`).join('');
+    box.querySelectorAll('[data-proxy-rm]').forEach(b=>b.onclick=async()=>{
+      const rm=await window.observer.proxyServerRemove({name:b.dataset.proxyRm});
+      if(!rm||!rm.ok)return toast((rm&&rm.error)||'Failed','error');
+      await refreshProxyProperties();
+    });
+  }catch{box.innerHTML=''}
+}
+async function refreshProxyProperties(){const r=await window.observer.readRawProperties();if(r.ok){$('#propertiesRaw').value=r.content;capturePropsBaseline();if(typeof updatePropsDirty==='function')updatePropsDirty()}await renderProxyServers()}
