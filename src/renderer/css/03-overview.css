@@ -38,7 +38,7 @@
 /* Setup checklist: rendered ONLY when something needs attention. */
 .hero-steps{list-style:none;margin:14px 0 0;padding:12px 0 0;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .hero-steps li{margin:0;padding:0}
-.step-chip{border:1px solid var(--border);background:var(--field);color:var(--text-muted);border-radius:999px;padding:5px 12px;font:600 11.5px var(--font-ui);cursor:default;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step-chip{border:1px solid var(--border);background:var(--field);color:var(--text-muted);border-radius:999px;padding:5px 12px;min-height:28px;display:inline-flex;align-items:center;font:600 11.5px var(--font-ui);cursor:default;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .step-chip.warn{color:var(--warning);border-color:rgba(255,210,63,.35)}
 .step-chip.warn::before{content:'! ';font-weight:700}
 .step-chip.bad{color:var(--danger);border-color:rgba(255,59,92,.4);cursor:pointer}
@@ -207,7 +207,7 @@ html.motion-lite .hero.is-running{animation:none;box-shadow:0 0 0 1px var(--inst
 .terminal{display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;padding:0}
 .terminal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);margin:0}
 .terminal-title{display:flex;gap:10px;align-items:center}
-.terminal-title h3{font-size:16px;font-weight:700}
+.terminal-title h2,.terminal-title h3{font-size:16px;font-weight:700;margin:0}
 .terminal-title p{margin:2px 0 0;color:var(--text-muted);font:500 12px var(--font-ui)}
 .live-dot{width:9px;height:9px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
 .live-dot.on{background:var(--success);box-shadow:0 0 6px rgba(0,229,160,.6)}

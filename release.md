@@ -1,46 +1,46 @@
-# ObserverLauncher 8.0.1
+# ObserverLauncher 8.0.2
 
-Welcome to **ObserverLauncher 8.0.1**!
+Welcome to **ObserverLauncher 8.0.2**!
 
-This maintenance and security update focuses on verified Java downloads, faster modpack verification, network safety guards, and tool parity across the entire app.
+This release delivers a comprehensive **Modpack Subsystem Overhaul**, **Velocity Proxy & World Cloning UI integration**, **Deep Security Hardening** across archive extraction and network downloads, and **WCAG 2.2 AA Accessibility improvements**.
 
 For technical details and commit references, developers can read the [developer changelog](CHANGELOG.md).
 
 ---
 
-## 🔒 Verified Java Downloads (Adoptium SHA-256)
+## 📦 Complete Modpack Experience (Modrinth & CurseForge)
 
-When ObserverLauncher automatically downloads Java runtimes for your servers:
-- **Hash Verification:** The launcher queries Adoptium's official release metadata and checks the SHA-256 checksum of the downloaded archive before extracting or running `java.exe`.
-- **Integrity Guarantee:** Any corrupted or incomplete download is rejected immediately, keeping your machine safe from broken or tampered binaries.
-
----
-
-## ⚡ Faster Modpack Verification
-
-- **Smart File Matching:** When checking user-dropped files for CurseForge modpacks, the launcher now looks up exact filename matches first instead of scanning and hashing every unrelated file in your `mods/` directory.
-- **Huge I/O Savings:** Large modpacks (with 300–500 mods) now verify missing or blocked files in seconds rather than locking disk activity for minutes.
+- **One-Click Marketplace Modpacks:** Fixed an issue where Modpacks in the Marketplace were misidentified as single mods when opening the install dialog. Both **Modrinth (`.mrpack`)** and **CurseForge (`.zip`)** modpacks now install properly as full packs directly from the Marketplace.
+- **Full Modpack Search Filters:** Searching for modpacks on Modrinth now respects your selected **Minecraft version**, **Mod loader**, and **Category** filters.
+- **`server-overrides` Support:** Modrinth `.mrpack` archives that include server-specific configuration files in `server-overrides/` are now automatically applied alongside standard `overrides/`.
+- **Clean Cancel & Rollback:** Canceling the file-overwrite confirmation prompt during a modpack import now cleanly rolls back all downloaded mod files so your `mods/` folder is never left half-installed.
+- **Faster Local `.mrpack` Import:** Local `.mrpack` imports now extract the archive once instead of twice.
 
 ---
 
-## 🛡️ Network & Server Safety Guards
+## 🌐 Velocity Proxy Servers & World Cloning
 
-- **Remote API Exposure Prompt:** If you enable the Remote Dashboard on an off-loopback address (`0.0.0.0`) with an empty IP allowlist, ObserverLauncher now displays an explicit confirmation dialog before applying settings, ensuring you don't expose your server to public networks by accident.
-- **World Name Sanitization:** Creating or renaming worlds now guards against Windows-reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and trailing dots that could cause operating system errors.
-- **Ephemeral Tunnel Tokens:** The Pinggy tunnel helper now uses a random per-session token and automatically cleans up its temporary launch script when exiting.
-- **Skin Mirror Verification:** The fallback player skin fetcher validates the official 8-byte PNG file signature, preventing network errors or captive portal HTML pages from being saved as skins.
+- **Velocity Backend Server Manager:** When managing a **Velocity proxy**, the **Server Properties** tab now displays a dedicated **Backend servers** panel where you can view, add, and remove backend servers (`lobby`, `survival`, etc.) without editing raw TOML by hand.
+- **One-Click World Cloning:** Every world card on the **Worlds & Backups** tab now includes a **Clone** button, letting you duplicate an existing world (along with its Nether and End dimensions) under a new name while the server is stopped.
 
 ---
 
-## 🤖 MCP & Automation Parity
+## 🛡️ Security Hardening
 
-- **80 Server-Management Tools:** All 80 server tools are now verified by automated tests to ensure exact synchronization between live tools and the offline bridge fallback.
-- **Metadata Route Protection:** The local MCP server now rate-limits discovery routes (`/tools`, `/prompts`, `/resources`) to prevent excessive CPU consumption from tight client polling loops.
-- **Bridge File Size Bounds:** The bridge configuration reader now enforces strict file size and token length limits.
+- **Redirect SSRF Protection:** All marketplace, modpack, and runtime downloads now validate every HTTP redirect hop to ensure a public link cannot redirect into local or private network addresses.
+- **Archive Extraction Safety (Zip-Slip & Symlink Guards):** Modpack and backup extraction on both Windows and Linux now pre-validates every archive entry against path traversal, Windows drive-relative paths (`C:foo`), control characters, and symbolic links before extracting.
+- **Offline Player Management:** Adding or removing players on the Whitelist, Ban list, or Operator list by name while the server is stopped now generates deterministic offline UUIDs and matches players case-insensitively.
+- **Remote Dashboard Hardening:** Added strict `Content-Security-Policy` headers and closed empty `Host` header requests on the local Remote Dashboard server.
 
 ---
 
-## 📦 Test Suite & Quality Gates
+## ♿ Accessibility (WCAG 2.2 AA)
 
-- **174 Automated Test Suites:** 100% passing rate across all 174 test suites, with 4 new dedicated test suites added for Adoptium verification, tool synchronization, world name sanitization, and modpack lookup performance.
-- **Clean Architecture:** Zero duplicate CSS/JS code blocks and 100% string parity across all 7 supported languages.
+- **Screen Reader & Keyboard Support:** Added accessible labels to 24 form controls and action buttons across all tabs, added focus trapping and dialog labeling to the CurseForge manual-download modal, fixed heading order on the Console tab, and enlarged setup checklist chips to meet WCAG 2.2 AA touch/click target sizing.
+
+---
+
+## 🧪 Verification & Quality Gates
+
+- **175 Automated Test Suites:** 100% passing across all 175 unit/regression test suites (including the new 61-assertion `security-and-modpack-audit.test.js` suite) plus Playwright Electron E2E smoke tests.
+- **7 Languages:** 100% localization parity across English, Vietnamese, Spanish, Portuguese (Brazil), German, Russian, and Simplified Chinese.

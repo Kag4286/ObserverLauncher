@@ -72,7 +72,33 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
     const headers = { 'User-Agent': 'ObserverLauncher/0.2' };
     if (have > 0) headers['Range'] = `bytes=${have}-`;
     bump();
-    const r = await fetch(url, { redirect: 'follow', signal: controller.signal, headers });
+    const { isSafeDownloadUrl } = require('./validate.js');
+    const enforcePublicRedirect = isSafeDownloadUrl(url);
+    let curUrl = url;
+    let r;
+    for (let hop = 0; hop < 8; hop++) {
+      r = await fetch(curUrl, { redirect: enforcePublicRedirect ? 'manual' : 'follow', signal: controller.signal, headers });
+      if (enforcePublicRedirect && r.status >= 300 && r.status < 400) {
+        const loc = r.headers.get('location');
+        if (!loc) break;
+        const nextUrl = new URL(loc, curUrl).href;
+        if (!isSafeDownloadUrl(nextUrl)) {
+          const err = new Error('Refused: download redirected to a non-public or unsafe host.');
+          err.status = 403;
+          throw err;
+        }
+        try { if (r.body && typeof r.body.cancel === 'function') await r.body.cancel(); } catch {}
+        curUrl = nextUrl;
+        bump();
+        continue;
+      }
+      break;
+    }
+    if (r.status >= 300 && r.status < 400) {
+      const err = new Error('Too many redirects while downloading.');
+      err.status = 400;
+      throw err;
+    }
     if (!r.ok && r.status !== 206) {
       // 416 = our partial is already the whole file (or stale) — caller validates the final size.
       if (r.status === 416) return { done: true };

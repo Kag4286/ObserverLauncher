@@ -192,29 +192,43 @@ async function deleteDimension(root, worldName, dim) {
   }
 }
 
-async function cloneWorld(sourceRoot, worldName, targetRoot, targetWorldName) {
-  if (!sourceRoot || !targetRoot) return { ok: false, error: 'Both source and target root are required.' };
+async function cloneWorld(sourceRoot, worldName, targetRoot, targetWorldName, opts = {}) {
+  if (!sourceRoot) return { ok: false, error: 'Source server directory is required.' };
+  const destRoot = (typeof targetRoot === 'string' && targetRoot.trim()) ? targetRoot.trim() : sourceRoot;
+  const resolvedSrcRoot = path.resolve(sourceRoot);
+  const resolvedDestRoot = path.resolve(destRoot);
+  if (opts.requireRegisteredTarget && resolvedDestRoot !== resolvedSrcRoot) {
+    // SECURITY: only allow cross-folder IPC cloning into a registered server instance directory.
+    let allowed = false;
+    try {
+      const { listInstances } = require('./settings.js');
+      const list = listInstances() || [];
+      allowed = list.some(i => i && i.serverPath && path.resolve(i.serverPath) === resolvedDestRoot);
+    } catch { allowed = false; }
+    if (!allowed) return { ok: false, error: 'Target server folder must be the current server or a registered launcher instance.' };
+  }
   const safeSrc = sanitizeWorldName(worldName);
   const safeDst = sanitizeWorldName(targetWorldName) || safeSrc;
   if (!safeSrc) return { ok: false, error: 'Invalid source world name.' };
   if (!safeDst) return { ok: false, error: 'Invalid destination world name.' };
 
-  const srcDir = path.join(sourceRoot, safeSrc);
-  const dstDir = path.join(targetRoot, safeDst);
+  const srcDir = path.join(resolvedSrcRoot, safeSrc);
+  const dstDir = path.join(resolvedDestRoot, safeDst);
   if (!fs.existsSync(srcDir)) return { ok: false, error: `Source world "${safeSrc}" does not exist.` };
   if (fs.existsSync(dstDir)) return { ok: false, error: `Destination world "${safeDst}" already exists.` };
 
+  const copyFilter = s => path.basename(s) !== 'session.lock';
   try {
-    fs.cpSync(srcDir, dstDir, { recursive: true });
+    fs.cpSync(srcDir, dstDir, { recursive: true, filter: copyFilter });
     // Also copy Paper nether and end if present
     for (const suffix of ['_nether', '_the_end']) {
-      const srcDim = path.join(sourceRoot, safeSrc + suffix);
-      const dstDim = path.join(targetRoot, safeDst + suffix);
+      const srcDim = path.join(resolvedSrcRoot, safeSrc + suffix);
+      const dstDim = path.join(resolvedDestRoot, safeDst + suffix);
       if (fs.existsSync(srcDim) && !fs.existsSync(dstDim)) {
-        try { fs.cpSync(srcDim, dstDim, { recursive: true }); } catch {}
+        try { fs.cpSync(srcDim, dstDim, { recursive: true, filter: copyFilter }); } catch {}
       }
     }
-    return { ok: true, clonedWorld: safeDst };
+    return { ok: true, clonedWorld: safeDst, files: serverFiles(resolvedSrcRoot) };
   } catch (e) {
     return { ok: false, error: 'Failed to copy world: ' + (e?.message || e) };
   }

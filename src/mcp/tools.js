@@ -16,8 +16,8 @@ const { requiredJavaForServer } = require('../main/server-java.js');
 const doctor = require('./doctor.js');
 const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
-const { importMrpackFromPath, detectServerCompat } = require('../main/modpacks.js');
-const { searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject } = require('../main/marketplace.js');
+const { importMrpackFromPath, importModpackFromPath, detectServerCompat } = require('../main/modpacks.js');
+const { searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject, isZipFile } = require('../main/marketplace.js');
 const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY } = require('./modpack-plan.js');
 const { detectServerTarget, versionMatchesServer } = require('../main/server-compat.js');
 const { compareVersions, isComparableVersion } = require('../main/version-compare.js');
@@ -567,10 +567,11 @@ async function tInstallFromMarket(ctx, a) {
   if (kind === 'modpack') {
     const { download } = require('../main/http.js');
     const os = require('os');
-    const tmp = path.join(os.tmpdir(), 'ob-mcp-mrpack-' + Date.now() + '.mrpack');
+    const ext = source === 'curseforge' ? '.zip' : '.mrpack';
+    const tmp = path.join(os.tmpdir(), 'ob-mcp-modpack-' + Date.now() + ext);
     try {
       await download(dl.url, tmp, null, null, { maxBytes: 512 * 1024 * 1024 });
-      const r = await importMrpackFromPath(ctx, tmp, undefined, 'mcp');
+      const r = await importModpackFromPath(ctx, tmp, undefined, 'mcp');
       return ok(r);
     } catch (e) {
       return { ok: false, error: e?.message || 'Modpack import failed.' };
@@ -648,7 +649,7 @@ async function tImportModpackPath(ctx, a) {
   const src = String(a.path || '');
   if (!src || !fs.existsSync(src)) return { ok: false, error: 'Modpack file not found.' };
   if (!/\.(mrpack|zip)$/i.test(src)) return { ok: false, error: 'Expected a .mrpack (or .zip) file.' };
-  return ok(await importMrpackFromPath(ctx, src, undefined, 'mcp'));
+  return ok(await importModpackFromPath(ctx, src, undefined, 'mcp'));
 }
 async function tExportModpack(ctx, a) {
   const dest = String(a.path || '');
@@ -785,7 +786,7 @@ async function tAssembleModpack(ctx, a) {
   const levelName = (serverFiles(root).properties || {})['level-name'] || 'world';
   const { isSafeDownloadUrl } = require('../main/validate.js');
   const { download } = require('../main/http.js');
-  const { recordManifestEntry } = require('../main/fs-utils.js');
+  const { recordManifestEntry, verifyFileHash } = require('../main/fs-utils.js');
   // Recompute compatibility per item so the REPORT itself carries warnings — assemble must not
   // rely on the caller having run plan_modpack first (the "show plan, then assemble" flow is
   // prompt-driven, not enforced). A failed compat check does not block the install; it is reported.
@@ -821,6 +822,19 @@ async function tAssembleModpack(ctx, a) {
       if (!dest) { results.push({ id: it.id, ok: false, error: 'Unsafe destination path.' }); failed++; continue; }
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       await download(dl.url, dest, null, null, { maxBytes: 512 * 1024 * 1024 });
+      const vh = verifyFileHash(dest, dl.hashes);
+      if (!vh.ok) {
+        try { fs.rmSync(dest, { force: true }); } catch {}
+        results.push({ id: it.id, ok: false, error: vh.error });
+        failed++;
+        continue;
+      }
+      if (it.kind !== 'datapack' && !isZipFile(dest)) {
+        try { fs.rmSync(dest, { force: true }); } catch {}
+        results.push({ id: it.id, ok: false, error: 'Downloaded file is not a valid .jar archive and was deleted.' });
+        failed++;
+        continue;
+      }
       try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, env: it.env || undefined, projectId: dl.projectId || it.id, versionId: dl.versionId || undefined, gameVersion: dl.gameVersion || undefined, version: dl.versionNumber || undefined, installedAt: new Date().toISOString() }); } catch {}
       createdFiles.push(path.relative(root, dest).replace(/\\/g, '/'));
       const warnings = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server).warnings;

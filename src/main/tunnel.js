@@ -364,17 +364,11 @@ function registerTunnel(ipcMain, ctx) {
   ipcMain.handle('tunnel:start', async (_, provider) => {
     try { return await ensurePlayitService(ctx, provider); } catch (e) { return { ok: false, error: e?.message || 'Could not start the Playit service.' }; }
   });
-  ipcMain.handle('tunnel:install', async () => {
-    try { return await installPlayitAgent(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not install the Playit agent.' }; }
-  });
   ipcMain.handle('tunnel:stop', async () => {
     try { return stopTunnel(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not stop the tunnel.' }; }
   });
   ipcMain.handle('tunnel:get', async () => {
     try { return await refreshTunnel(ctx); } catch { return tunnelSnapshot(ctx); }
-  });
-  ipcMain.handle('tunnel:refresh', async () => {
-    try { return await refreshTunnel(ctx); } catch (e) { return { ok: false, error: e?.message || 'Could not read the Playit status.' }; }
   });
   ipcMain.handle('tunnel:open-url', async (_, url) => {
     if (!isSafePlayitUrl(url)) return { ok: false, error: 'Refused to open an untrusted link.' };

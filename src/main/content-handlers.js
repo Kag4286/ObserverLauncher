@@ -483,7 +483,8 @@ function registerContent(ipcMain, ctx) {
   });
   ipcMain.handle('world:clone', async (_, { worldName, targetServerPath, targetWorldName }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
-    return await worldOps.cloneWorld(ctx.currentServerPath, worldName, targetServerPath, targetWorldName);
+    if (ctx.serverStatus !== 'stopped') return { ok: false, error: 'Stop the server before cloning the world.' };
+    return await worldOps.cloneWorld(ctx.currentServerPath, worldName, targetServerPath, targetWorldName, { requireRegisteredTarget: true });
   });
 
   // v7.0.0Z Track 2: Waypoint synchronization

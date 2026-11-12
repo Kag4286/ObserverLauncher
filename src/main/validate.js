@@ -48,12 +48,12 @@ function isSafeBackupName(name) {
 }
 
 // Archive entries (zip/tar) must never escape the destination on restore.
-// Rejects absolute paths (C:\..., /etc/...) and any `..` segment.
+// Rejects absolute paths (C:\..., /etc/...), drive-relative paths (C:foo), control chars, and any `..` segment.
 function isSafeArchiveEntry(entry) {
-  if (typeof entry !== 'string' || !entry) return false;
+  if (typeof entry !== 'string' || !entry || /[\x00-\x1f]/.test(entry)) return false;
   const e = entry.replace(/\\/g, '/');
   if (!e || e === '/' || e === '.') return false;
-  if (path.posix.isAbsolute(e) || /^[A-Za-z]:\//.test(e)) return false;
+  if (path.posix.isAbsolute(e) || /^[A-Za-z]:/.test(e)) return false;
   if (e.split('/').includes('..')) return false;
   return true;
 }

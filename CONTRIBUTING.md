@@ -14,7 +14,7 @@ Thanks for taking a look. This project is small, so the process is intentionally
 ```bash
 npm install
 npm start        # launch the app in development mode
-npm test         # unit/regression suite (node tests/run.js — 174 test suites)
+npm test         # unit/regression suite (node tests/run.js — 175 test suites)
 npm run test:e2e # Playwright smoke tests against the real Electron app
 ```
 
@@ -58,7 +58,7 @@ plus a window-less entry point that reuses the exact same backend:
     + `jar-reader.js` (the player skin chain), and `mods-index.js` (item icons read from mod jars).
   - `remote-ui/` — the Remote-access WEB dashboard (`index.html` / `style.css` / `app.js`), served by
     `remote.js` from a fixed in-memory asset map. Plain scripts, self-contained i18n (7 locales).
-  - `mcp/` — local-only AI integration (78 structured tools, see below).
+  - `mcp/` — local-only AI integration (80 structured tools, see below).
   - `adapters/` — per-software download resolvers (vanilla, papermc, purpur, leaf, fabric, forge,
     spigot, mojang, horizon, pumpkin).
   - `platform/` — Windows/Linux process-tree walking, metrics and firewall (`win32.js`, `linux.js`,

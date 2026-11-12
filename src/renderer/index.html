@@ -141,7 +141,7 @@
         <div class="connect-grid tuner">
           <div class="connect-channel">
             <div class="connect-channel-head"><span class="connect-dot dot-lan" aria-hidden="true"></span><span data-i18n="conn.local">Same WiFi / network</span></div>
-            <div class="connect-freq"><svg class="connect-freq-icon" viewBox="0 0 24 24"><path d="M2 8.5a16 16 0 0 1 20 0"/><path d="M5.5 12.5a11 11 0 0 1 13 0"/><path d="M9 16.5a6 6 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1"/></svg><input id="connectLocal" readonly value="—"></div>
+            <div class="connect-freq"><svg class="connect-freq-icon" viewBox="0 0 24 24"><path d="M2 8.5a16 16 0 0 1 20 0"/><path d="M5.5 12.5a11 11 0 0 1 13 0"/><path d="M9 16.5a6 6 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1"/></svg><input id="connectLocal" readonly value="—" aria-label="Local network address"></div>
             <div class="connect-channel-actions"><button class="btn secondary" data-copy="#connectLocal" data-i18n="conn.copy">Copy</button></div>
           </div>
           <div class="connect-channel">
@@ -193,7 +193,7 @@
                 <button class="btn secondary sm" id="pinggyStopBtn" hidden data-i18n="pg.stop">Stop tunnel</button>
                 <button class="btn secondary sm" id="pinggyCopyBtn" hidden data-i18n="conn.copy">Copy</button>
               </div>
-              <div class="tunnel-addr" id="pinggyAddrRow" hidden><input id="pinggyAddr" readonly spellcheck="false"><span class="text-muted" id="pinggyHint"></span></div>
+              <div class="tunnel-addr" id="pinggyAddrRow" hidden><input id="pinggyAddr" readonly spellcheck="false" aria-label="Pinggy Bedrock tunnel address"><span class="text-muted" id="pinggyHint"></span></div>
               <p class="text-muted tunnel-msg" id="pinggyMsg" hidden></p>
             </div>
             <details class="tunnel-help"><summary data-i18n="geyser.techT">Set up the Bedrock tunnel (technical)</summary>
@@ -241,7 +241,7 @@
         <div class="crash-actions" id="crashActions" hidden><button type="button" class="btn secondary sm" id="crashFixJavaBtn" data-i18n="crash.openSettingsJava">Open Settings &gt; Java</button></div>
         <details class="crash-detail"><summary data-i18n="crash.detail">Stack trace</summary><pre id="crashStack" class="crash-stack"></pre></details>
       </div>
-      <div class="console-layout"><article class="panel glass terminal"><div class="terminal-head"><div class="terminal-title"><span class="live-dot" id="consoleLiveDot"></span><div><h3 data-i18n="con.title">Server console</h3><p data-i18n="con.sub">Live output — auto-scrolls when you're at the bottom</p></div></div><div class="terminal-actions"><span class="live-label" id="consoleLiveLabel">Offline</span><button class="text-btn" id="exportConsole" data-i18n="con.export">Export</button><button class="text-btn" id="clearConsole" data-i18n="con.clear">Clear</button></div></div>      <div class="log-toolbar"><div class="log-search"><input id="logSearch" type="search" autocomplete="off" data-i18n-placeholder="con.searchPh" placeholder="Search logs…" aria-label="Search logs"><button type="button" class="text-btn log-search-clear" id="logSearchClear" hidden aria-label="Clear search">×</button></div><div class="log-filters" role="group" aria-label="Log filters"><button class="filter-chip active" data-log-filter="all" aria-pressed="true" data-i18n="con.filterAll">All</button><button class="filter-chip" data-log-filter="warn" aria-pressed="false" data-i18n="con.filterWarn">Warnings</button><button class="filter-chip" data-log-filter="error" aria-pressed="false" data-i18n="con.filterError">Errors</button><button class="filter-chip" data-log-filter="command" aria-pressed="false" data-i18n="con.filterCmd">Commands</button></div><span class="log-hint" data-i18n="con.tip">Tip: press ↑ / ↓ for history • Ctrl+L clear</span></div><div class="log-wrap"><div id="logOutput" class="log-output" role="log" aria-live="polite" aria-atomic="false" tabindex="0" aria-label="Server console output"><div class="log-empty" id="logEmpty"><b data-i18n="con.empty">No output yet</b><span data-i18n="con.emptySub">Start the server to see logs. You can also try the shortcuts on the right →</span></div></div><button class="log-jump" id="logJump" hidden aria-label="Jump to latest output">↓ New output</button></div><form id="commandForm" class="command-row" aria-label="Send console command"><span class="prompt" aria-hidden="true">›</span><input id="commandInput" autocomplete="off" placeholder="Type a command and hit Enter — e.g. list, say Hello" data-i18n-placeholder="con.placeholder" aria-label="Console command input"><button class="btn primary" data-i18n="con.send" aria-label="Send command">Send</button></form></article><aside class="panel glass command-help"><div class="help-head"><h3 data-i18n="con.shortcuts">Quick commands</h3><p data-i18n="con.asideSub">Click to send — no typing needed</p></div><div class="command-group"><p class="command-group-label" data-i18n="con.diagnostics">Diagnostics</p><div class="help-cards"><button data-command="list"><b>list</b><span data-i18n="con.listDesc">Who's online</span></button><button data-command="tps"><b>tps</b><span data-i18n="con.tpsDesc">Tick health</span></button><button data-command="spark healthreport"><b>spark</b><span data-i18n="con.sparkDesc">Health report</span></button></div></div><div class="command-group" id="recentCommandsGroup" hidden><p class="command-group-label" data-i18n="con.recent">Recent</p><div id="recentCommands" class="recent-commands"></div></div><p class="help-note" data-i18n="con.note">Commands go to your local server only. Nothing leaves this PC.</p></aside></div></section>
+      <div class="console-layout"><article class="panel glass terminal"><div class="terminal-head"><div class="terminal-title"><span class="live-dot" id="consoleLiveDot"></span><div><h2 data-i18n="con.title">Server console</h2><p data-i18n="con.sub">Live output — auto-scrolls when you're at the bottom</p></div></div><div class="terminal-actions"><span class="live-label" id="consoleLiveLabel">Offline</span><button class="text-btn" id="exportConsole" data-i18n="con.export">Export</button><button class="text-btn" id="clearConsole" data-i18n="con.clear">Clear</button></div></div>      <div class="log-toolbar"><div class="log-search"><input id="logSearch" type="search" autocomplete="off" data-i18n-placeholder="con.searchPh" placeholder="Search logs…" aria-label="Search logs"><button type="button" class="text-btn log-search-clear" id="logSearchClear" hidden aria-label="Clear search">×</button></div><div class="log-filters" role="group" aria-label="Log filters"><button class="filter-chip active" data-log-filter="all" aria-pressed="true" data-i18n="con.filterAll">All</button><button class="filter-chip" data-log-filter="warn" aria-pressed="false" data-i18n="con.filterWarn">Warnings</button><button class="filter-chip" data-log-filter="error" aria-pressed="false" data-i18n="con.filterError">Errors</button><button class="filter-chip" data-log-filter="command" aria-pressed="false" data-i18n="con.filterCmd">Commands</button></div><span class="log-hint" data-i18n="con.tip">Tip: press ↑ / ↓ for history • Ctrl+L clear</span></div><div class="log-wrap"><div id="logOutput" class="log-output" role="log" aria-live="polite" aria-atomic="false" tabindex="0" aria-label="Server console output"><div class="log-empty" id="logEmpty"><b data-i18n="con.empty">No output yet</b><span data-i18n="con.emptySub">Start the server to see logs. You can also try the shortcuts on the right →</span></div></div><button class="log-jump" id="logJump" hidden aria-label="Jump to latest output">↓ New output</button></div><form id="commandForm" class="command-row" aria-label="Send console command"><span class="prompt" aria-hidden="true">›</span><input id="commandInput" autocomplete="off" placeholder="Type a command and hit Enter — e.g. list, say Hello" data-i18n-placeholder="con.placeholder" aria-label="Console command input"><button class="btn primary" data-i18n="con.send" aria-label="Send command">Send</button></form></article><aside class="panel glass command-help"><div class="help-head"><h3 data-i18n="con.shortcuts">Quick commands</h3><p data-i18n="con.asideSub">Click to send — no typing needed</p></div><div class="command-group"><p class="command-group-label" data-i18n="con.diagnostics">Diagnostics</p><div class="help-cards"><button data-command="list"><b>list</b><span data-i18n="con.listDesc">Who's online</span></button><button data-command="tps"><b>tps</b><span data-i18n="con.tpsDesc">Tick health</span></button><button data-command="spark healthreport"><b>spark</b><span data-i18n="con.sparkDesc">Health report</span></button></div></div><div class="command-group" id="recentCommandsGroup" hidden><p class="command-group-label" data-i18n="con.recent">Recent</p><div id="recentCommands" class="recent-commands"></div></div><p class="help-note" data-i18n="con.note">Commands go to your local server only. Nothing leaves this PC.</p></aside></div></section>
     <section id="players" class="tab">
       <div id="playersProxyNotice" class="proxy-notice" hidden data-i18n-html="ply.proxyNotice">This server is a <b>proxy (Velocity)</b> — players connect to the backend servers behind it, not to this proxy directly. Player/whitelist/ban management isn't available here.</div>
       <header class="tab-head">
@@ -350,7 +350,7 @@
                     <input id="invSearch" type="search" placeholder="Filter items…" data-i18n-placeholder="pd.searchPh" aria-label="Filter inventory">
                     <input id="ecSearch" type="hidden" style="display:none !important">
                     <label class="chk"><input type="checkbox" id="invShowEmpty"><span data-i18n="pd.showEmpty">Show empty slots</span></label>
-                    <input type="checkbox" id="ecShowEmpty" style="display:none !important">
+                    <input type="checkbox" id="ecShowEmpty" style="display:none !important" aria-label="Show empty Ender Chest slots">
                     <select id="invSort" class="ol-select" aria-label="Sort">
                       <option value="slot" data-i18n="pd.sortSlot">Slot</option>
                       <option value="name" data-i18n="pd.sortName">Name</option>
@@ -461,7 +461,7 @@
                 <div class="inspect-note" data-i18n="pd.liveNote">Live actions run as server commands and work while the server is running — the player must be online.</div>
                 <div class="pd-live-panel">
                   <div class="pd-live-form">
-                    <label class="pd-live-field"><span data-i18n="pd.gamemode">Gamemode</span><div class="pd-live-row"><select id="liveGameType" class="ol-select"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div></label>
+                    <label class="pd-live-field"><span data-i18n="pd.gamemode">Gamemode</span><div class="pd-live-row"><select id="liveGameType" class="ol-select" aria-label="Live gamemode"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select><button type="button" class="btn primary sm" data-live-cmd="gamemode">Apply</button></div></label>
                     <label class="pd-live-field"><span data-i18n="pd.xp">XP level</span><div class="pd-live-row"><input id="liveXp" type="number" min="0" max="2000000"><button type="button" class="btn primary sm" data-live-cmd="xp">Set</button></div></label>
                     <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.giveItem">Give item (id)</span><div class="pd-live-row"><input id="liveGiveId" placeholder="minecraft:diamond"><input id="liveGiveCount" class="pd-live-count" type="number" min="1" max="6400" value="1" data-i18n-title="pd.giveCount" title="Count" aria-label="Count"><button type="button" class="btn primary sm" data-live-cmd="give">Give</button></div></label>
                     <label class="pd-live-field pd-live-field-wide"><span data-i18n="pd.teleport">Teleport (X Y Z)</span><div class="pd-live-row"><input id="liveTp" placeholder="100 64 -200"><button type="button" class="btn primary sm" data-live-cmd="tp">Teleport</button></div></label>
@@ -476,7 +476,7 @@
               </div>
               <div class="inspect-panel" id="pdPanelEdit">
                 <div class="inspect-note" data-i18n="pd.editNote">Stop the server before editing saved data. A backup of the original .dat is saved automatically. While the server is running, use the Live actions tab instead.</div>
-                <div class="inspect-stats"><label><span data-i18n="pd.health">Health</span><input id="pdHealth" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.food">Food</span><input id="pdFood" type="number" min="0" max="20" placeholder="0–20"></label><label><span data-i18n="pd.saturation">Saturation</span><input id="pdSaturation" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.xp">XP level</span><input id="pdXpLevel" type="number" min="0"></label><label><span data-i18n="pd.totalXp">Total XP</span><input id="pdXpTotal" type="number" min="0"></label><label><span data-i18n="pd.gamemode">Gamemode</span><select id="pdGameType" class="ol-select"><option value="0">Survival</option><option value="1">Creative</option><option value="2">Adventure</option><option value="3">Spectator</option></select></label></div>
+                <div class="inspect-stats"><label><span data-i18n="pd.health">Health</span><input id="pdHealth" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.food">Food</span><input id="pdFood" type="number" min="0" max="20" placeholder="0–20"></label><label><span data-i18n="pd.saturation">Saturation</span><input id="pdSaturation" type="number" step="0.5" placeholder="0–20"></label><label><span data-i18n="pd.xp">XP level</span><input id="pdXpLevel" type="number" min="0"></label><label><span data-i18n="pd.totalXp">Total XP</span><input id="pdXpTotal" type="number" min="0"></label><label><span data-i18n="pd.gamemode">Gamemode</span><select id="pdGameType" class="ol-select" aria-label="Offline gamemode"><option value="0">Survival</option><option value="1">Creative</option><option value="2">Adventure</option><option value="3">Spectator</option></select></label></div>
                 <label class="inspect-check"><input id="pdClearInventory" type="checkbox"><span data-i18n="pd.clearInv">Clear inventory, armor and offhand (Ender chest untouched)</span></label>
                 <div class="pd-offline-actions"><button class="btn primary" id="savePlayerData" data-i18n="pd.apply">Apply changes</button><span class="text-muted" id="pdOfflineHint"></span></div>
               </div>
@@ -578,7 +578,7 @@
           <div class="ccb-head">
             <div class="ccb-icon-badge" aria-hidden="true">⚠</div>
             <span class="ccb-title" id="ccbTitle"></span>
-            <button type="button" class="btn xs secondary ccb-toggle" id="ccbToggle"></button>
+            <button type="button" class="btn xs secondary ccb-toggle" id="ccbToggle" aria-label="Toggle filter">Filter</button>
           </div>
           <div class="ccb-drawer" id="ccbDrawer">
             <div class="ccb-drawer-inner">
@@ -647,7 +647,7 @@
           <div class="ed-gutter" id="edGutter">1</div>
           <div class="ed-code-wrap">
             <pre class="ed-highlight" id="edHl" aria-hidden="true"><code></code></pre>
-            <textarea id="edText" class="ed-text" spellcheck="false" wrap="off"></textarea>
+            <textarea id="edText" class="ed-text" spellcheck="false" wrap="off" aria-label="File content editor"></textarea>
           </div>
         </div>
         <footer class="ed-status"><span id="edJsonState" class="ed-json" hidden></span><span id="edStats">—</span><span id="edSavedInfo" class="ed-savedinfo"></span></footer>
@@ -688,9 +688,9 @@
       <div class="market-toolbar">
         <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" hidden>CurseForge</button></div>
         <input type="hidden" id="marketSource" value="modrinth">
-        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="neoforge" data-i18n="mkt.neoforgeType">NeoForge mod</option><option value="forge" data-i18n="mkt.forgeType">Forge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
-        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select"><option value="">All versions</option></select></label>
-        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort" class="ol-select"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select" aria-label="Content type"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="neoforge" data-i18n="mkt.neoforgeType">NeoForge mod</option><option value="forge" data-i18n="mkt.forgeType">Forge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select" aria-label="Minecraft version"><option value="">All versions</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort" class="ol-select" aria-label="Sort by"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
       </div>
       <div id="marketStatus" class="market-status" hidden></div>
       <div id="marketResults" class="market-results"></div>
@@ -859,9 +859,10 @@
           <div id="proxyServersPanel" class="proxy-servers" hidden>
             <div class="sec-head"><h3 data-i18n="prx.serversT">Backend servers</h3><small data-i18n="prx.serversSub">The servers behind this proxy, in priority order.</small></div>
             <div id="proxyServersList" class="proxy-servers-list"></div>
+            <p id="proxyServersEmpty" class="proxy-servers-empty" data-i18n="prx.empty" hidden>No backend servers yet — add one below.</p>
             <form id="proxyServerAddForm" class="proxy-add-form">
-              <input id="proxyServerName" type="text" placeholder="Name (e.g. lobby)" data-i18n-placeholder="prx.namePh" required>
-              <input id="proxyServerAddr" type="text" placeholder="127.0.0.1:25565" data-i18n-placeholder="prx.addrPh" required>
+              <input id="proxyServerName" type="text" placeholder="Name (e.g. lobby)" data-i18n-placeholder="prx.namePh" aria-label="Backend server name" required>
+              <input id="proxyServerAddr" type="text" placeholder="127.0.0.1:25565" data-i18n-placeholder="prx.addrPh" aria-label="Backend server address" required>
               <button type="submit" class="btn primary sm" data-i18n="prx.add">Add</button>
             </form>
           </div>
@@ -931,7 +932,7 @@
                     <div class="sir-desc">Switch between detected local JRE/JDK installations.</div>
                   </div>
                   <div class="sir-control">
-                    <select id="javaPickSelect" class="launcher-select ol-select"></select>
+                    <select id="javaPickSelect" class="launcher-select ol-select" aria-label="Installed Java runtimes"></select>
                   </div>
                 </div>
                 <div class="set-item-row col">
@@ -999,7 +1000,7 @@
                     <div class="sir-desc" data-i18n="set.languageSub">Interface language — applies immediately.</div>
                   </div>
                   <div class="sir-control">
-                    <select id="languageSelect" class="launcher-select ol-select">
+                    <select id="languageSelect" class="launcher-select ol-select" aria-label="Language">
                       <option value="en">English</option>
                       <option value="vi">Tiếng Việt</option>
                     </select>
@@ -1022,7 +1023,7 @@
                     <div class="sir-desc" data-i18n="set.motionSub">Full adds ambient motion and effects. Choose Lite if your PC feels slow.</div>
                   </div>
                   <div class="sir-control">
-                    <select id="motionLevelSelect" class="launcher-select ol-select">
+                    <select id="motionLevelSelect" class="launcher-select ol-select" aria-label="Interface animation">
                       <option value="full" data-i18n="set.motionFull">Full (default)</option>
                       <option value="lite" data-i18n="set.motionLite">Lite (less motion)</option>
                     </select>
@@ -1133,7 +1134,7 @@
                       <button type="button" class="filter-chip ab-chip" data-backup-mins="30" data-i18n="set.chip30">30m</button>
                       <button type="button" class="filter-chip ab-chip" data-backup-mins="60" data-i18n="set.chip1h">1h</button>
                       <button type="button" class="filter-chip ab-chip" id="backupCustomChip" data-backup-mins="custom" data-i18n="set.chipCustom">Custom</button>
-                      <input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden>
+                      <input id="autoBackupMinutesInput" type="number" min="0" value="0" hidden aria-label="Auto-backup interval in minutes">
                     </div>
                   </div>
                 </div>
@@ -1148,7 +1149,7 @@
                     <div class="sir-desc" data-i18n="set.retentionHint">newest on disk · manual backups are never deleted</div>
                   </div>
                   <div class="sir-control">
-                    <input id="backupRetentionInput" type="number" min="1" max="100" value="10" style="width:70px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 10px;color:var(--text);font:12px var(--font-mono)">
+                    <input id="backupRetentionInput" type="number" min="1" max="100" value="10" aria-label="Backups to keep" style="width:70px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 10px;color:var(--text);font:12px var(--font-mono)">
                   </div>
                 </div>
               </div>
@@ -1438,7 +1439,7 @@
                     <div class="sir-desc" data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</div>
                   </div>
                   <div class="sir-control">
-                    <select class="ol-select" id="webhookFormatSelect" style="max-width:220px">
+                    <select class="ol-select" id="webhookFormatSelect" style="max-width:220px" aria-label="Webhook payload format">
                       <option value="discord" data-i18n="wh.formatDiscord">Discord</option>
                       <option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option>
                     </select>
@@ -1512,7 +1513,7 @@
                     <div class="sir-desc" data-i18n="upd.modeSub">How the app handles new versions. The manual button always works.</div>
                   </div>
                   <div class="sir-control">
-                    <select class="ol-select" id="updatePolicySelect" style="max-width:200px">
+                    <select class="ol-select" id="updatePolicySelect" style="max-width:200px" aria-label="Update policy">
                       <option value="auto" data-i18n="upd.modeAuto">Automatic</option>
                       <option value="ask" data-i18n="upd.modeAsk">Ask me first</option>
                       <option value="off" data-i18n="upd.modeOff">Off</option>
@@ -1670,7 +1671,7 @@
               <button type="button" class="filter-chip" data-mem="8">8 GB</button>
               <button type="button" class="filter-chip" data-mem="12">12 GB</button>
             </div>
-            <input id="nswMemorySlider" type="range" min="1" max="16" value="4" step="1">
+            <input id="nswMemorySlider" type="range" min="1" max="16" value="4" step="1" aria-label="Server memory in GB">
           </div>
           <div id="nswNativeMemoryWrap" hidden>
             <h2 id="nswNativeMemTitle" data-i18n="nsw.nativeMemT">Direct System Memory</h2>
@@ -1707,9 +1708,9 @@
     </div>
   </div>
 </div>
-<div id="blockedModal" class="modal-overlay" hidden role="dialog" aria-modal="true">
+<div id="blockedModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="blockedModalTitle">
   <div class="modal">
-    <h2 data-i18n="cfi.title">Some mods need a manual download</h2>
+    <h2 id="blockedModalTitle" data-i18n="cfi.title">Some mods need a manual download</h2>
     <p class="text-muted" data-i18n="cfi.sub">These mods could not be installed automatically because their author blocked third-party downloads. Open each page, download the file, put it in the server folder, then click Check.</p>
     <ul id="blockedList" class="blocked-list"></ul>
     <p id="blockedHint" class="field-hint"></p>
@@ -1759,7 +1760,7 @@
 <div id="promptModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <div class="modal confirm-modal">
     <div class="confirm-head"><span class="confirm-ico" id="pmIco">?</span><h2 id="pmTitle">Rename</h2></div>
-    <input type="text" id="pmInput" class="pm-input" autocomplete="off" maxlength="60">
+    <input type="text" id="pmInput" class="pm-input" autocomplete="off" maxlength="60" aria-label="Prompt input">
     <div class="confirm-actions">
       <button type="button" class="btn secondary" id="pmCancel" data-i18n="cf.cancel">Cancel</button>
       <button type="button" class="btn primary" id="pmOk" data-i18n="cf.ok">OK</button>
@@ -1783,7 +1784,7 @@
         <div class="im-compat" id="imCompat"></div>
       </div>
       <div class="im-section" id="imVersionSection">
-        <div class="im-sec-head"><p class="eyebrow" data-i18n="im.version">VERSION</p><div class="im-sec-right"><span class="im-pick-title" id="imVersionPickTitle" data-i18n="im.versionPickTitle">Pick a build compatible with your server</span><button type="button" class="text-btn im-filter-toggle" id="imToggleLoaderFilter" hidden></button></div></div>
+        <div class="im-sec-head"><p class="eyebrow" data-i18n="im.version">VERSION</p><div class="im-sec-right"><span class="im-pick-title" id="imVersionPickTitle" data-i18n="im.versionPickTitle">Pick a build compatible with your server</span><button type="button" class="text-btn im-filter-toggle" id="imToggleLoaderFilter" hidden aria-label="Toggle loader filter">Show all</button></div></div>
         <div class="im-version-cards" id="imVersionCards"></div>
         <select id="imVersion" class="launcher-select ol-select" aria-label="Version"></select>
         <ul class="im-versions" id="imVersionList" hidden></ul>
@@ -1792,7 +1793,7 @@
       <div class="im-section" id="imDepsSection" hidden>
         <p class="eyebrow" data-i18n="im.depsT">DEPENDENCIES</p>
         <ul class="im-deps" id="imDeps"></ul>
-        <button type="button" class="btn primary sm" id="imInstallDeps" hidden></button>
+        <button type="button" class="btn primary sm" id="imInstallDeps" hidden aria-label="Install required dependencies">Install dependencies</button>
       </div>
       <div class="im-section" id="imWarnSection">
         <p class="eyebrow" data-i18n="im.before">BEFORE YOU INSTALL</p>

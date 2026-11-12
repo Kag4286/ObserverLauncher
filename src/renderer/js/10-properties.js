@@ -124,6 +124,17 @@ $('#propHistoryRestore')?.addEventListener('click',()=>withBusy($('#propHistoryR
   toast(t('prop.historyRestored'),'success'); closePropHistory();
   try{ const s=await window.observer.getState(); state={...state,...s}; refreshUI(); }catch{}
 }));
+$('#proxyServerAddForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const name=($('#proxyServerName')?.value||'').trim();
+  const address=($('#proxyServerAddr')?.value||'').trim();
+  if(!name||!address)return;
+  const r=await window.observer.proxyServerAdd({name,address});
+  if(!r||!r.ok)return toast((r&&r.error)||'Failed','error');
+  if($('#proxyServerName'))$('#proxyServerName').value='';
+  if($('#proxyServerAddr'))$('#proxyServerAddr').value='';
+  await refreshProxyProperties();
+});
 $('#saveProperties').onclick=()=>withBusy($('#saveProperties'),async()=>{
   if(isProxyServer()){
     const raw=$('#propertiesRaw').value;

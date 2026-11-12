@@ -160,10 +160,22 @@ async function createServerFiles(ctx, { software, version }) {
           require('./fs-utils.js').writeFileAtomic(outPath, handle.read(entry));
         }
       } else {
+        const { isSafeArchiveEntry } = require('./validate.js');
+        const entries = await new Promise((res, rej) => {
+          require('child_process').execFile('tar', ['-tzf', tempArchive], (err, stdout) => {
+            if (err) rej(err);
+            else res(String(stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+          });
+        });
+        const badEntry = entries.find(e => !isSafeArchiveEntry(e));
+        if (badEntry) {
+          fs.rmSync(tempArchive, { force: true });
+          throw new Error(`Horizon archive contains an unsafe path ("${badEntry}") — extraction stopped for safety.`);
+        }
         await new Promise((res, rej) => {
-          require('child_process').execFile('tar', ['-xzf', tempArchive, '--strip-components=1'], { cwd: ctx.currentServerPath }, (err) => {
+          require('child_process').execFile('tar', ['--no-same-owner', '-xzf', tempArchive, '--strip-components=1'], { cwd: ctx.currentServerPath }, (err) => {
             if (err) {
-              require('child_process').execFile('tar', ['-xzf', tempArchive], { cwd: ctx.currentServerPath }, (err2) => {
+              require('child_process').execFile('tar', ['--no-same-owner', '-xzf', tempArchive], { cwd: ctx.currentServerPath }, (err2) => {
                 if (err2) rej(err2); else res();
               });
             } else res();

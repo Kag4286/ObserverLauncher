@@ -134,17 +134,17 @@ function imRenderCompat(){
   if(item.kind==='modpack'&&chosen){
     const gv=chosen.gameVersions||[];
     const match=!gameV||gv.includes(gameV);
-    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(match,gv.length?[...gv].reverse().slice(0,3).join(', '):'—',!match)}${match?'':`<small class="im-sub">${t('mkt.serverShort',{v:esc(gameV||'unknown')})}</small>`}</div>`);
+    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(match,gv.length?esc([...gv].reverse().slice(0,3).join(', ')):'—',!match)}${match?'':`<small class="im-sub">${t('mkt.serverShort',{v:esc(gameV||'unknown')})}</small>`}</div>`);
     const ld=(chosen.loaders||[]).filter(l=>!/datapack|minecraft/i.test(l));
     const loaderOk=srv.loader==='unknown'?null:(ld.length?ld.some(l=>l===srv.loader||(srv.loader==='paper'&&/paper|spigot|bukkit/.test(l))):null);
-    cells.push(`<div class="im-compat-cell"><small>LOADER</small>${imBadge(ld.length?(loaderOk===null?null:loaderOk):null,ld.length?ld.join(' / '):'vanilla',loaderOk===false)}</div>`);
+    cells.push(`<div class="im-compat-cell"><small>LOADER</small>${imBadge(ld.length?(loaderOk===null?null:loaderOk):null,ld.length?esc(ld.join(' / ')):'vanilla',loaderOk===false)}</div>`);
   } else {
     // BUGFIX: this cell used to LABEL itself with the server's Minecraft version (gameV), so on a
     // 26.3 server a plugin that supports 1.8-1.16 showed "MINECRAFT 26.3" in red, which reads as
     // "the mod targets 26.3". The label is what the BUILD supports now; the red/green still says
     // whether the server's version is inside that list.
     const buildMc=(chosen&&chosen.gameVersions||[]).filter(Boolean);
-    const buildMcLabel=buildMc.length?(buildMc.length>2?`${buildMc[0]} – ${buildMc[buildMc.length-1]}`:buildMc.join(', ')):(gameV||t('mkt.allVersionsShort'));
+    const buildMcLabel=esc(buildMc.length?(buildMc.length>2?`${buildMc[0]} – ${buildMc[buildMc.length-1]}`:buildMc.join(', ')):(gameV||t('mkt.allVersionsShort')));
     const mcMatches=!(chosen&&gameV&&buildMc.length&&!buildMc.includes(gameV));
     cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(mcMatches,buildMcLabel,!mcMatches)}${(!mcMatches&&gameV)?`<small class="im-sub">${esc(t('mkt.serverShort',{v:gameV}))}</small>`:''}</div>`);
     const chosenLds=(chosen&&chosen.loaders&&chosen.loaders.length)?chosen.loaders:(item.loaders||[]);
@@ -228,14 +228,14 @@ function imRenderWarns(){
       else if(ld.length&&!/forge|neoforge|fabric/i.test(String(state.files?.jar||''))&&srv.loader!=='vanilla'&&srv.loader!=='unknown')warns.push(t('im.warnPackLoader',{l:esc(ld.join('/')),s:esc(srv.loader)}));
       else if(ld.length&&srv.loader==='vanilla')warns.push(t('im.warnPackVanilla',{l:esc(ld.join('/'))}));
     }
-    if(gameV&&chosen&&!(chosen.gameVersions||[]).includes(gameV))warns.push(t('im.warnPackMc',{v:(chosen.gameVersions||[]).slice(-1)[0]||'?',s:esc(gameV)}));
+    if(gameV&&chosen&&!(chosen.gameVersions||[]).includes(gameV))warns.push(t('im.warnPackMc',{v:esc((chosen.gameVersions||[]).slice(-1)[0]||'?'),s:esc(gameV)}));
     warns.push(t('im.warnOverwrite'));
   } else {
     const isDatapack=(item.kind==='datapack'||(chosen?.loaders||[]).map(l=>String(l).toLowerCase()).includes('datapack'));
     const envSrv=(typeof detail?.env==='object'&&detail?.env)?detail.env.server:(detail?.env==='client-only'?'unsupported':'required');
     if(!isDatapack && envSrv==='unsupported')warns.push(t('im.warnClientOnly'));
     if(!isDatapack && envSrv==='optional')warns.push(t('im.warnOptional'));
-    if(chosen&&gameV&&!(chosen.gameVersions||[]).includes(gameV))warns.push(t('im.warnMc',{v:(chosen.gameVersions||[]).slice(-1)[0]||'?',s:esc(gameV)}));
+    if(chosen&&gameV&&!(chosen.gameVersions||[]).includes(gameV))warns.push(t('im.warnMc',{v:esc((chosen.gameVersions||[]).slice(-1)[0]||'?'),s:esc(gameV)}));
     const itemLoaders=item.loaders||[];
     const groupMap={plugin:['paper','spigot','purpur','folia','bukkit'],forge:['forge','neoforge'],fabric:['fabric','quilt']};
     const wanted=groupMap[item.kind];
@@ -450,9 +450,10 @@ async function startInstall(){
   $('#imBar').style.width='0%';$('#imBar').classList.remove('ok','bad');
   try{
     let r;
-    if(item.kind==='modpack')r=await window.observer.installMarketModpack({id:item.id,version:item.version,versionId:versionId||undefined});
+    if(item.kind==='modpack')r=await window.observer.installMarketModpack({id:item.id,source:item.source,version:item.version,versionId:versionId||undefined});
     else r=await window.observer.marketInstall({...item,versionId:versionId||undefined});
-    if(r.ok){imSetDone(r);toast(t('toast.installed',{n:r.name||item.title}),'success')}
+    if(r.ok){imSetDone(r);toast(t('toast.installed',{n:r.name||item.title}),'success');if(r.blocked&&r.blocked.length&&typeof openBlockedDialog==='function')openBlockedDialog(r)}
+    else if(r.cancelled){imSetBusy(false);$('#imProgressSection').hidden=true}
     else if(r.blocked){imSetError(r.error||t('mkt.cfBlocked'));if(r.projectUrl)window.observer.marketOpenExternal(r.projectUrl)}
     else imSetError(r.error||t('mkt.installFailed'));
   }catch(e){imSetError(e?.message||t('mkt.installFailed'))}
@@ -490,7 +491,9 @@ function openInstallModal(item){
   item.loader=srv.loader;
   const isDatapack=(item.kind==='datapack'||(item.loaders||[]).map(l=>String(l).toLowerCase()).includes('datapack'));
   let activeLdr;
-  if(isDatapack){
+  if(item.kind==='modpack'){
+    activeLdr=(srv.loader!=='unknown'?srv.loader:'all');
+  } else if(isDatapack){
     item.kind='datapack';
     activeLdr='datapack';
   } else {

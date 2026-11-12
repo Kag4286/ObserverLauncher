@@ -433,7 +433,7 @@ details[open].set-advanced .set-chevron{transform:rotate(90deg)}
 #properties .settings-toolbar{margin-top:0;background:var(--panel);border:1px solid var(--border);border-top:0;border-radius:0 0 var(--r) var(--r);padding:12px 18px}
 #properties .properties-search{max-width:none;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:10px 12px}
 #properties .properties-search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
-#properties .raw-editor{font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r);padding:14px;color:var(--text)}
+#properties .raw-editor{font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r);padding:14px;color:var(--text);width:100%;min-height:360px;box-sizing:border-box;resize:vertical}
 #properties .raw-editor:focus{outline:none;border-color:var(--accent)}
 
 /* ---------- SERVER PROPERTIES — rework (tidy 2-col rows, collapsible groups, chips) ---------- */
@@ -892,3 +892,20 @@ html.motion-lite #fileBrowser:not([hidden]),html.motion-lite #fileEditor:not([hi
 .file-badge{margin-left:8px;font:700 9px var(--font-mono);letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r-xs);border:1px solid var(--border);color:var(--text-dim);transition:all var(--dur-micro) var(--ease-out)}
 .file-badge.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
 
+/* ---------- VELOCITY backend servers — a calm section (heading + rows), not a bordered cell (DESIGN 2.1 / 12.6 / 17.9) ---------- */
+.proxy-servers{margin-bottom:var(--space-5);padding-bottom:var(--space-5);border-bottom:1px solid var(--border)}
+.proxy-servers .sec-head{flex-direction:column;align-items:flex-start;gap:2px;margin-bottom:var(--space-3)}
+.proxy-servers .sec-head h3{font-size:14px}
+.proxy-servers .sec-head small{font:500 12px var(--font-ui);color:var(--text-muted)}
+.proxy-servers-list{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--panel)}
+.proxy-servers-list:empty{display:none}
+.proxy-srv-row{display:flex;align-items:center;gap:var(--space-3);min-height:var(--row-h);padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border)}
+.proxy-srv-row:last-child{border-bottom:0}
+.proxy-srv-row b{min-width:96px;font:600 13px var(--font-ui);color:var(--text)}
+.proxy-srv-row code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12px var(--font-mono);color:var(--text-muted)}
+.proxy-srv-row .btn{margin-left:auto}
+.proxy-servers-empty{margin:0;font-size:12.5px;color:var(--text-muted)}
+.proxy-add-form{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-top:var(--space-3)}
+.proxy-add-form input{flex:1 1 160px;min-width:0;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font:500 12.5px var(--font-mono);outline:0;transition:border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out)}
+.proxy-add-form input:focus{border-color:var(--brand);box-shadow:0 0 0 2px var(--accent-weak)}
+.proxy-add-form .btn{flex:0 0 auto}
