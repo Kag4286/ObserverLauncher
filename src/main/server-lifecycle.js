@@ -466,8 +466,14 @@ async function startServerInternal(ctx, settings) {
     ctx.restartAfterStop = null;
     ctx.currentSoftware = null;
     clearInterval(ctx.autoPollTimer);
+    clearInterval(ctx.shutdownTimer); ctx.shutdownTimer = null;
+    clearTimeout(ctx.stabilityTimer); ctx.stabilityTimer = null;
     clearTimeout(doneWatchdog);
+    try { if (startedProcess.stdout) startedProcess.stdout.removeAllListeners(); } catch {}
+    try { if (startedProcess.stderr) startedProcess.stderr.removeAllListeners(); } catch {}
+    try { startedProcess.removeAllListeners(); } catch {}
     resetLiveToStopped(ctx);
+    releaseIdlePsHost(ctx);
   };
 
   ctx.serverProcess.on('error', inInst(err => {
@@ -636,6 +642,13 @@ async function requestStop(ctx, restartSettings) {
   return { ok: true };
 }
 
+function releaseIdlePsHost(ctx) {
+  try {
+    const anyAlive = ctx && ctx.instances && [...ctx.instances.values()].some(st => st && (st.serverProcess || st.serverStatus !== 'stopped'));
+    if (!anyAlive) require('./platform/ps-host.js').idleStop();
+  } catch {}
+}
+
 function registerServer(ipcMain, ctx) {
   // BUGFIX: an unexpected throw inside startServerInternal (bad folder perms,
   // corrupt files, spawn edge cases) used to reject the invoke — the renderer
@@ -709,37 +722,43 @@ function scheduleGracefulEscalation(ctx, instId, proc) {
 async function forceStopServer(ctx) {
   const proc = ctx.serverProcess;
   if (!proc || ctx.serverStatus === 'stopped') return { ok: false, error: 'Server is not running.' };
+  const rootPid = proc.pid;
+  const trackedPid = ctx.monitoredPid;
   ctx.manualStop = true; // the exit handler must not auto-restart our own kill
   ctx.restartAfterStop = null; // force stop cancels any queued restart
   clearTimeout(ctx.restartTimer);
   clearInterval(ctx.autoPollTimer);
+  clearInterval(ctx.shutdownTimer); ctx.shutdownTimer = null;
   try { if (proc.stdin?.writable) proc.stdin.write('stop\r\n'); } catch {}
   ctx.appendLog('Force stop requested — terminating the server process…', 'system');
   ctx.setServerStatus('stopping');
-  killTree(proc.pid);
+  killTree(rootPid);
   // v6.0.0 FIX (real process leak): kill the TRACKED java pid on EVERY platform. On Windows a
   // server launched via run.bat often detaches java (`start /b java ...`), so killing the cmd.exe
   // tree alone (taskkill /T) leaves java.exe running as an orphan that never exits. On POSIX the
   // java process is a grandchild of the bash we spawned. ctx.monitoredPid is the real java pid the
   // metrics sampler resolved, so kill it directly even when no ancestor walk would find it.
-  if (ctx.monitoredPid && ctx.monitoredPid !== proc.pid) { try { killTree(ctx.monitoredPid); } catch {} }
+  if (trackedPid && trackedPid !== rootPid) { try { killTree(trackedPid); } catch {} }
   // Best effort: when monitoredPid was never resolved (a fast force-stop), hunt a descendant once.
   try {
     const javaPid = await Promise.race([
       ((ctx.tpsUnsupported || ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'native') && typeof platform.findServerDescendant === 'function')
-        ? platform.findServerDescendant(proc.pid)
-        : platform.findJavaDescendant(proc.pid),
+        ? platform.findServerDescendant(rootPid)
+        : platform.findJavaDescendant(rootPid),
       new Promise(resolve => setTimeout(() => resolve(null), 4000))
     ]).catch(() => null);
-    if (javaPid && javaPid !== proc.pid && javaPid !== ctx.monitoredPid) killTree(javaPid);
+    if (javaPid && javaPid !== rootPid && javaPid !== trackedPid) killTree(javaPid);
   } catch {}
   // Whatever is still alive after 3s gets force-killed on both the parent and the java pid.
-  setTimeout(() => {
+  const t = setTimeout(() => {
     if (ctx.serverProcess === proc) {
-      try { killTree(proc.pid); } catch {}
-      try { if (ctx.monitoredPid) killTree(ctx.monitoredPid); } catch {}
+      try { killTree(rootPid); } catch {}
+      try { if (trackedPid) killTree(trackedPid); } catch {}
     }
+    releaseIdlePsHost(ctx);
   }, 3000);
+  if (t.unref) t.unref();
+  releaseIdlePsHost(ctx);
   return { ok: true };
 }
 

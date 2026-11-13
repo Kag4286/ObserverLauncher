@@ -18,15 +18,15 @@ function parseMetricValue(raw) {
 // One sampling tick — extracted from the interval so tests can drive it with a fixed ctx/state
 // (same pattern as scheduler.js's exported schedulerTick). `st` carries the counters between ticks.
 async function metricsTick(ctx, st) {
-  const used = process.memoryUsage().rss / 1024 / 1024;
   if (!ctx.serverProcess?.pid) {
     ctx.monitoredPid = null; st.consecutiveMisses = 0; st.javaRetryCount = 0;
-    // Idle (server stopped): this sampler still runs so the launcher-RAM KPI stays live, but pushing
-    // every second is ~86k pointless IPC messages/day. Throttle the idle push to ~1 per 5s.
+    // Idle (server stopped): throttle the idle push to ~1 per 5 ticks (and skip memoryUsage() on skipped ticks).
     if ((st.idleTicks++ % 5) !== 0) return;
+    const used = process.memoryUsage().rss / 1024 / 1024;
     ctx.send('server:metrics', { appMemory: Math.round(used), running: false, timestamp: Date.now(), ...ctx.live });
     return;
   }
+  const used = process.memoryUsage().rss / 1024 / 1024;
   st.idleTicks = 0;
   const isNative = ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'native';
   if (!ctx.monitoredPid || (isNative && ctx.monitoredPid === ctx.serverProcess.pid && ((st.nativeScanCount = (st.nativeScanCount || 0) + 1) % 4 === 0))) {

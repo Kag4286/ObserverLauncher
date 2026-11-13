@@ -10,6 +10,30 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [8.1.1] - 2026-11-13
+
+**Process Hygiene & Ultra-Low RAM Optimization.**
+
+### Background Process & Leak Fixes:
+- **PowerShell Host Auto-Idle Shutdown (`src/main/platform/ps-host.js`, `src/main/server-lifecycle.js`, `src/main/orphan.js`):**
+  - Added 15s idle auto-termination (`IDLE_TTL_MS`) and explicit `idleStop()` without disabling future `run()` calls, reclaiming ~45–50 MB of .NET/PowerShell RAM whenever no servers are running.
+  - Called `idleStop()` immediately in `teardown()`, `forceStopServer()` (via shared `releaseIdlePsHost()`), and at the end of boot-time `runOrphanCleanup()`.
+- **Lifecycle & Quit Cleanup (`src/main/server-lifecycle.js`, `src/main/app-lifecycle.js`):**
+  - `forceStopServer()` now clears `ctx.shutdownTimer` and `ctx.stabilityTimer`, and `teardown()` strips `stdout`/`stderr`/process event listeners immediately on exit.
+  - `before-quit` in `app-lifecycle.js` now sweeps all timers and file watchers (`contentWatcher`, `contentWatchers`, `edWatcher`) across **every** instance in `ctx.instances`.
+
+### Electron / Renderer RAM Reduction:
+- **Chromium Memory Caps (`src/main.js`, `src/main/app-lifecycle.js`):**
+  - Added `--renderer-process-limit=1`, `--js-flags=--max-old-space-size=256`, and `--disable-gpu-program-cache` before app ready.
+  - Added `minimize` cache trim (`webContents.session.clearCache()` + `worldmap.clearBiomeCaches()`).
+- **Idle Polling & DOM Trim (`src/main/server-metrics.js`, `src/renderer/js/08-shell.js`):**
+  - Deferred `process.memoryUsage()` syscall inside idle ticks so skipped idle ticks do zero work, and capped rendered `#logOutput` DOM children at 600 lines.
+- **World Map Worker Thread Isolation (`src/main/worldmap-worker.js`, `src/main/content-handlers.js`, `src/main/app-lifecycle.js`):**
+  - Offloaded heavy `scanExploredChunks` and `readBiomes` NBT/LZ4 region parsing from Electron Main into a lazy Node.js `worker_threads` worker (`IDLE_TTL_MS = 20s`).
+  - Worker auto-terminates when idle and is explicitly terminated on `clearCache`, window `minimize`, and `before-quit`, keeping Main's V8 heap small and returning all World Map caches/buffers to the OS.
+- **True Backpressure-Aware Streaming Downloads (`src/main/http.js`):**
+  - Replaced `fs.writeSync` loops and the `Buffer.from(await r.arrayBuffer())` full-file RAM fallback in `downloadAttempt()` with `createPartWriter()` backed by `fs.createWriteStream` (64 KB `highWaterMark`, `drain` backpressure, Web `ReadableStream` & async-iterable support, and safe fd close on abort/maxBytes overflow).
+
 ## [8.1.0] - 2026-11-13
 
 **Remote Access 2.0: Live SSE Streaming, Reverse Proxy Host Allowlist, Brute-Force Protection, and Remote Web Dashboard 2.0.**

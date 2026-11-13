@@ -29,6 +29,12 @@ async function createWindow(ctx) {
   // or injected markup could replace the app with a remote page.
   ctx.win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   ctx.win.webContents.on('will-navigate', (e, url) => { if (!String(url).startsWith('file://')) e.preventDefault(); });
+  // v8.1.1 (low RAM): trim transient Chromium HTTP/image caches & terminate worldmap worker on minimize.
+  ctx.win.on('minimize', () => {
+    try { ctx.win.webContents.session.clearCache().catch(() => {}); } catch {}
+    try { require('./worldmap-worker.js').terminate().catch(() => {}); } catch {}
+    try { require('./worldmap.js').clearBiomeCaches(); } catch {}
+  });
   await ctx.win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 
@@ -128,13 +134,37 @@ function setupQuitHandler(ctx) {
     return out;
   };
   app.on('before-quit', event => {
-    clearTimeout(ctx.restartTimer);
     clearInterval(ctx.sampleTimer);
+    // v8.1.1: clean up timers and file watchers across ALL instances, not only the active one.
+    try {
+      const ids = ctx.instances ? [...ctx.instances.keys()] : [];
+      for (const id of ids) {
+        const st = ctx.instances.get(id);
+        if (!st) continue;
+        clearTimeout(st.restartTimer);
+        clearTimeout(st.stabilityTimer);
+        clearTimeout(st.pinggyRestartTimer);
+        clearTimeout(st.contentWatchDebounce);
+        clearTimeout(st.edWatchDebounce);
+        clearInterval(st.sampleTimer);
+        clearInterval(st.autoPollTimer);
+        clearInterval(st.autoBackupTimer);
+        clearInterval(st.schedulerTimer);
+        clearInterval(st.shutdownTimer);
+        clearInterval(st.adoptWatchTimer);
+        try { if (st.contentWatcher) st.contentWatcher.close(); } catch {}
+        try { if (Array.isArray(st.contentWatchers)) st.contentWatchers.forEach(w => { try { w.close(); } catch {} }); } catch {}
+        try { if (st.edWatcher) st.edWatcher.close(); } catch {}
+      }
+    } catch {}
+    clearTimeout(ctx.restartTimer);
     clearInterval(ctx.autoPollTimer);
     clearInterval(ctx.autoBackupTimer);
     clearInterval(ctx.schedulerTimer);
     // 2.4.0: stop the persistent PowerShell host so its process does not linger after quit.
     try { require('./platform/ps-host.js').dispose(); } catch {}
+    // v8.1.1: terminate the World Map worker thread if running so it exits cleanly on quit.
+    try { require('./worldmap-worker.js').terminate().catch(() => {}); } catch {}
     if (quitHandled) return;
     const targets = gatherRunningInstances();
     if (!targets.length) return;

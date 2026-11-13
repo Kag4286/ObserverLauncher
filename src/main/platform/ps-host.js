@@ -5,21 +5,14 @@
 // as ~17% CPU + extra "Console Window Host"/"Windows PowerShell" processes even when the server was
 // idle. One persistent host runs the same cmdlets but pays the startup cost ONCE.
 //
-// PROTOCOL (verified live with a probe): `powershell -Command <repl>` with a
-// `while($true){ $l=[Console]::In.ReadLine(); ... }` loop STREAMS each line as it arrives. A plain
-// `-Command -` instead buffers until EOF and would HANG — so we must use the ReadLine REPL.
-// Each call writes ONE base64-encoded line (so a multi-line script is safe); the host decodes and
-// Invoke-Expression's it, prints its output, then prints a unique sentinel; we resolve when the
-// sentinel arrives. A throw is caught and printed as `#ERR#<msg>`.
-//
-// IMPORTANT: no command may call `exit` — that would kill the whole host. When the target process
-// is gone, emit NOTHING (an empty stdout) rather than exiting.
+// 8.1.1 (ultra-low RAM): PowerShell 5.1 (.NET CLR) holds ~45-55 MB RAM while alive. Auto-shut it
+// down after IDLE_TTL_MS (15s) of inactivity or immediately via idleStop() when all servers stop,
+// while transparently respawning on the next run() call.
 const { spawn } = require('child_process');
 
 const IS_WIN = process.platform === 'win32';
+const IDLE_TTL_MS = 15000;
 
-// Each stdin line is base64(JSON {s: <script>, m: <marker>}). The REPL decodes, runs `s` in a
-// try/catch, then ALWAYS prints `m` LAST (even after a throw) so the caller's sentinel is reliable.
 const REPL = '[System.Threading.Thread]::CurrentThread.CurrentCulture=[cultureinfo]::InvariantCulture; $ProgressPreference="SilentlyContinue"; while($true){ $l=[Console]::In.ReadLine(); if($l -eq $null){break}; $m=""; try{ $j=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($l)) | ConvertFrom-Json; $m=$j.m; Invoke-Expression $j.s }catch{ Write-Output ("#ERR#"+$_.Exception.Message) }; if($m){ Write-Output $m } }';
 
 let child = null;
@@ -28,9 +21,25 @@ let pending = null;        // the command currently running
 let queue = [];            // commands waiting for the host to be free
 let seq = 0;
 let disposed = false;
+let idleTimer = null;
+
+function clearIdleTimer() {
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+}
+
+function touchIdle() {
+  clearIdleTimer();
+  if (!child || pending || queue.length || disposed) return;
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    if (!pending && !queue.length) idleStop();
+  }, IDLE_TTL_MS);
+  if (idleTimer.unref) idleTimer.unref();
+}
 
 function start() {
   if (child) return child;
+  clearIdleTimer();
   child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', REPL], {
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -40,7 +49,8 @@ function start() {
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', () => {}); // drain; cmdlet errors also surface on stdout
   const fail = () => {
-    const p = pending; const q = queue; child = null; pending = null; queue = [];
+    clearIdleTimer();
+    const p = pending; const q = queue; child = null; pending = null; queue = []; buf = '';
     const err = new Error('ps-host exited');
     if (p) { clearTimeout(p.timer); try { p.reject(err); } catch {} }
     for (const c of q) { clearTimeout(c.queueTimer); clearTimeout(c.timer); try { c.reject(err); } catch {} }
@@ -52,7 +62,11 @@ function start() {
 
 // Send the next queued command to the host (called when pending clears).
 function pump() {
-  if (pending || !queue.length || disposed) return;
+  if (pending || !queue.length || disposed) {
+    touchIdle();
+    return;
+  }
+  clearIdleTimer();
   const c = start();
   const item = queue.shift();
   pending = item;
@@ -88,6 +102,7 @@ function onData(chunk) {
 // Callers that get a rejection fall back to the one-shot runPowerShell, so behaviour never regresses.
 function run(script, timeoutMs = 8000) {
   if (disposed || !IS_WIN) return Promise.reject(new Error('ps-host unavailable'));
+  clearIdleTimer();
   return new Promise((resolve, reject) => {
     const marker = `__OL_PS_${process.pid}_${Date.now()}_${seq++}__`;
     const item = { script, marker, resolve, reject, timer: null, queueTimer: null, timeoutMs, out: '' };
@@ -96,20 +111,37 @@ function run(script, timeoutMs = 8000) {
     item.queueTimer = setTimeout(() => {
       if (item.timer) return; // already running
       const i = queue.indexOf(item);
-      if (i >= 0) { queue.splice(i, 1); try { reject(new Error('ps-host timeout (queued)')); } catch {} }
+      if (i >= 0) { queue.splice(i, 1); try { reject(new Error('ps-host timeout (queued)')); } catch {} touchIdle(); }
     }, timeoutMs);
     if (!pending) { if (!child) start(); pump(); }
   });
 }
 
+// Stop the background PowerShell process when idle (frees ~45-50 MB RAM without disabling future run() calls).
+function idleStop() {
+  clearIdleTimer();
+  if (!child || pending || queue.length) return false;
+  const c = child;
+  child = null;
+  buf = '';
+  try { c.removeAllListeners(); } catch {}
+  try { if (c.stdin) c.stdin.end(); } catch {}
+  try { c.kill(); } catch {}
+  return true;
+}
+
 function dispose() {
   disposed = true;
+  clearIdleTimer();
   const err = new Error('ps-host disposed');
   if (pending) { clearTimeout(pending.timer); try { pending.reject(err); } catch {} }
   for (const c of queue) { clearTimeout(c.queueTimer); clearTimeout(c.timer); try { c.reject(err); } catch {} }
   queue = [];
-  try { if (child) child.kill(); } catch {}
+  pending = null;
+  const c = child;
   child = null;
+  buf = '';
+  try { if (c) { c.removeAllListeners(); c.kill(); } } catch {}
 }
 
-module.exports = { run, dispose, IS_WIN };
+module.exports = { run, dispose, idleStop, IS_WIN, IDLE_TTL_MS, _hasChild: () => !!child };

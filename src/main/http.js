@@ -50,6 +50,69 @@ async function json(url, extraHeaders, method, body, timeoutMs) {
 // transfer with no retry. Now: (1) the timeout is STALL-based — the clock only fires after
 // `stallMs` with NO bytes received, so a slow-but-alive download is never killed; (2) a failed
 // attempt is retried up to `attempts` times with a short backoff before giving up.
+function toChunkBuffer(chunk) {
+  if (!chunk) return Buffer.alloc(0);
+  if (Buffer.isBuffer(chunk)) return chunk;
+  if (ArrayBuffer.isView(chunk)) return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+  if (chunk instanceof ArrayBuffer) return Buffer.from(chunk);
+  if (typeof chunk === 'string') return Buffer.from(chunk, 'utf8');
+  return Buffer.from(chunk);
+}
+
+// True backpressure-aware disk stream writer so multi-hundred-MB downloads stream directly
+// to `.part` in bounded chunks instead of blocking Main with sync writes or buffering in RAM.
+function createPartWriter(partPath, append) {
+  const ws = fs.createWriteStream(partPath, { flags: append ? 'a' : 'w', highWaterMark: 64 * 1024 });
+  let streamErr = null;
+  let closed = false;
+  ws.on('error', (err) => { if (!streamErr) streamErr = err; });
+  ws.on('close', () => { closed = true; });
+
+  const writeChunk = (buf) => {
+    if (!buf || !buf.length) return Promise.resolve();
+    if (streamErr) return Promise.reject(streamErr);
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const done = (err) => {
+        if (settled) return;
+        settled = true;
+        ws.removeListener('drain', onDrain);
+        ws.removeListener('error', onErr);
+        if (err) reject(err);
+        else resolve();
+      };
+      const onDrain = () => done(streamErr);
+      const onErr = (err) => done(err);
+      ws.once('error', onErr);
+      if (ws.write(buf)) done(streamErr);
+      else ws.once('drain', onDrain);
+    });
+  };
+
+  const closeStream = (shouldAbort) => new Promise((resolve, reject) => {
+    if (closed) {
+      if (!shouldAbort && streamErr) return reject(streamErr);
+      return resolve();
+    }
+    const onClose = () => {
+      ws.removeListener('error', onErr);
+      if (!shouldAbort && streamErr) reject(streamErr);
+      else resolve();
+    };
+    const onErr = (err) => { if (!streamErr) streamErr = err; };
+    ws.once('close', onClose);
+    ws.on('error', onErr);
+    if (shouldAbort) ws.destroy();
+    else ws.end();
+  });
+
+  return {
+    writeChunk,
+    finish: () => closeStream(false),
+    abort: () => closeStream(true)
+  };
+}
+
 // One resumable download attempt. `partPath` is a STABLE path (not per-attempt) so bytes that
 // already arrived survive a retry: we send `Range: bytes=<have>-` and append from there. Servers
 // that don't support ranges reply 200 (full body) instead of 206 — then we restart that file.
@@ -116,27 +179,47 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
     const contentLengthKnown = clHeader != null && Number.isFinite(Number(clHeader));
     const total = (contentLengthKnown ? Number(clHeader) : 0) + have;
     let received = have;
-    const fileHandle = fs.openSync(partPath, resumed ? 'a' : 'w');
+    const writer = createPartWriter(partPath, resumed);
+    let reader = null;
     try {
+      const consumeChunk = async (rawChunk) => {
+        const buf = toChunkBuffer(rawChunk);
+        if (!buf.length) return;
+        bump(); // progress → reset the stall watchdog
+        received += buf.length;
+        if (maxBytes && received > maxBytes) {
+          throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
+        }
+        await writer.writeChunk(buf);
+        if (onProgress) onProgress(received, total);
+      };
       if (r.body && typeof r.body.getReader === 'function') {
-        const reader = r.body.getReader();
+        reader = r.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          bump(); // progress → reset the stall watchdog
-          received += value.length;
-          if (maxBytes && received > maxBytes) throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
-          fs.writeSync(fileHandle, value);
-          if (onProgress) onProgress(received, total);
+          await consumeChunk(value);
         }
-      } else {
-        const buffer = Buffer.from(await r.arrayBuffer());
-        received += buffer.length;
-        if (maxBytes && received > maxBytes) throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
-        fs.writeSync(fileHandle, buffer);
-        if (onProgress) onProgress(received, total || received);
+      } else if (r.body && typeof r.body[Symbol.asyncIterator] === 'function') {
+        for await (const chunk of r.body) {
+          await consumeChunk(chunk);
+        }
+      } else if (typeof r.arrayBuffer === 'function') {
+        if (contentLengthKnown && maxBytes && total > maxBytes) {
+          throw new Error(`Download exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit.`);
+        }
+        const ab = await r.arrayBuffer();
+        const bytes = new Uint8Array(ab);
+        for (let off = 0; off < bytes.length; off += 64 * 1024) {
+          await consumeChunk(bytes.subarray(off, Math.min(bytes.length, off + 64 * 1024)));
+        }
       }
-    } finally { fs.closeSync(fileHandle); }
+      await writer.finish();
+    } catch (streamError) {
+      if (reader) try { await reader.cancel(); } catch {}
+      await writer.abort();
+      throw streamError;
+    }
     // H2: verify the final size against content-length when the server declared one. A short read
     // that ended cleanly (server said N bytes, sent fewer, closed) would otherwise be kept as a
     // corrupt file. Tagged retryable so download() resumes from the partial.

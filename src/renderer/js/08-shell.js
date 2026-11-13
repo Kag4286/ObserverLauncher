@@ -44,7 +44,7 @@ function flushLogs(){
   const empty=$('#logEmpty'); if(empty) empty.hidden=true;
   // If a search/filter is active, a freshly-added line may be hidden — keep the hint honest.
   if(logQuery||logFilter!=='all') updateLogHint();
-  const excess = o.children.length - 2000; if(excess > 0){ const r = document.createRange(); r.setStartBefore(o.firstChild); r.setEndAfter(o.children[excess - 1]); r.deleteContents(); }
+  const excess = o.children.length - 600; if(excess > 0){ const r = document.createRange(); r.setStartBefore(o.firstChild); r.setEndAfter(o.children[excess - 1]); r.deleteContents(); }
   if(wasAtBottom && !logPaused) o.scrollTop=o.scrollHeight;
   else if(lastVisible && !lastVisible.hidden){ const j=$('#logJump'); if(j) j.hidden=false; }
   if(logQueue.length) requestAnimationFrame(flushLogs); else logFlushScheduled=false;
@@ -88,7 +88,7 @@ function repaintConsole(lines){
   const o=$('#logOutput'); if(!o) return;
   logQueue=[]; logFlushScheduled=false;
   o.innerHTML=''; o.classList.remove('has-content');
-  const arr=Array.isArray(lines)?lines:[];
+  const arr=(Array.isArray(lines)?lines:[]).slice(-600);
   if(!arr.length){ o.innerHTML=`<div class="log-empty" id="logEmpty"><b>${t('con.empty')}</b><span>${t('con.emptySub')}</span></div>`; return; }
   const frag=document.createDocumentFragment();
   const names=consolePlayerNames();

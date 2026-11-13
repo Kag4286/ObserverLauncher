@@ -18,6 +18,13 @@
 // IPC channel names are UNCHANGED so preload.js / renderer need no edits.
 const { app, ipcMain, protocol } = require('electron');
 
+// v8.1.1 (low RAM): bound Chromium helper processes, V8 heap, and disk shader cache bloat.
+if (app && app.commandLine) {
+  app.commandLine.appendSwitch('renderer-process-limit', '1');
+  app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+  app.commandLine.appendSwitch('disable-gpu-program-cache');
+}
+
 // SECURITY/ROBUSTNESS: a second instance would race the first on settings.json, the
 // server folder and the running server process. Refuse to start a second copy and
 // focus the existing window instead.

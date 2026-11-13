@@ -118,6 +118,11 @@ async function runOrphanCleanup(ctx, deps) {
       }
     }
   }
+  // Free ~45-50 MB PowerShell host RAM right after boot orphan scan if no server was reconnected.
+  try {
+    const anyAlive = ctx && ctx.instances && [...ctx.instances.values()].some(st => st && st.serverProcess);
+    if (!anyAlive && (!ctx || !ctx.serverProcess)) require('./platform/ps-host.js').idleStop();
+  } catch {}
   return results;
 }
 

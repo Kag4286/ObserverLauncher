@@ -8,6 +8,7 @@ const { requiredJavaForServer } = require('./server-java.js');
 const { writeFileAtomic, safeTarget } = require('./fs-utils.js');
 const editor = require('./editor.js');
 const worldmap = require('./worldmap.js');
+const worldmapWorker = require('./worldmap-worker.js');
 const resourcePack = require('./resource-pack.js');
 const worldOps = require('./world-ops.js');
 const waypointSync = require('./waypoint-sync.js');
@@ -384,8 +385,8 @@ function registerContent(ipcMain, ctx) {
   ipcMain.handle('worldmap:chunks', async (_, dim) => {
     try {
       const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
-      const set = worldmap.scanExploredChunks(ctx.currentServerPath, lvlName, dim || 'overworld');
-      return { ok: true, dim: dim || 'overworld', chunks: [...set], truncated: set.size >= 200000 };
+      const out = await worldmapWorker.scanExploredChunks(ctx.currentServerPath, lvlName, dim || 'overworld');
+      return { ok: true, dim: dim || 'overworld', chunks: out.chunks, truncated: !!out.truncated };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not scan chunks.' };
     }
@@ -404,13 +405,14 @@ function registerContent(ipcMain, ctx) {
   ipcMain.handle('worldmap:biomes', async (_, rect) => {
     try {
       if (rect?.clearCache) {
+        await worldmapWorker.terminate();
         if (typeof worldmap.clearBiomeCaches === 'function') worldmap.clearBiomeCaches();
         return { ok: true, cleared: true };
       }
       const lvlName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
       const dim = rect?.dim || 'overworld';
       const sliceY = (rect?.sliceY !== undefined && rect?.sliceY !== null) ? Number(rect.sliceY) : null;
-      const out = await worldmap.readBiomes(ctx.currentServerPath, lvlName, dim, {
+      const out = await worldmapWorker.readBiomes(ctx.currentServerPath, lvlName, dim, {
         cx0: Number(rect?.cx0) || 0, cz0: Number(rect?.cz0) || 0,
         cx1: Number(rect?.cx1) || 0, cz1: Number(rect?.cz1) || 0,
         sliceY,
