@@ -47,7 +47,7 @@ plus a window-less entry point that reuses the exact same backend:
     `docker.js` (a pure Dockerfile/compose generator), `modpack-manifest.js` (modpack.json schema + static verifier),
     `modpack-resolve.js` (manifest -> resolved items via the marketplace resolver), `modpack-build.js`
     (resolved items -> a real server folder; pure `planBuild` + transactional `buildPack`),
-    `rate-limit.js` (a shared token-bucket used by the MCP and remote servers),
+    `rate-limit.js` (a shared token-bucket with `.isLimited`/`.reset` used by the MCP and remote servers),
     `stability.js` (persistent per-instance run records + the auto-rollback decision),
     `metrics-store.js` (raw + 1m + 1h metric tiers), `instances-snapshot.js` (cross-instance table),
     `properties-history.js` (snapshot/diff/restore), `template-store.js` (user templates),

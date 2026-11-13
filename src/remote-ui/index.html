@@ -10,7 +10,12 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="dot" id="statusDot"></span><b>ObserverLauncher</b><span class="muted" data-i18n="title">Remote</span></div>
+  <div class="brand">
+    <span class="dot" id="statusDot"></span>
+    <b>ObserverLauncher</b>
+    <span class="muted" data-i18n="title">Remote</span>
+    <span class="stream-badge" id="streamBadge" hidden>Live</span>
+  </div>
   <div class="top-right">
     <select id="langSel" class="sel" title="Language" aria-label="Language selector"></select>
     <button class="btn ghost" id="forgetBtn" data-i18n="forget">Forget token</button>
@@ -22,16 +27,30 @@
     <div class="card">
       <div class="card-head"><h2 data-i18n="status">Status</h2><span class="pill" id="statePill">-</span></div>
       <dl class="kv" id="statusKv"></dl>
+      <div class="metrics-bar" id="metricsBar" hidden>
+        <div class="m-chip"><span class="m-lbl" data-i18n="tps">TPS</span><b id="mTps">—</b></div>
+        <div class="m-chip"><span class="m-lbl" data-i18n="cpu">CPU</span><b id="mCpu">—</b></div>
+        <div class="m-chip"><span class="m-lbl" data-i18n="uptime">Uptime</span><b id="mUptime">—</b></div>
+        <div class="m-ram">
+          <div class="m-ram-head"><span class="m-lbl" data-i18n="ram">RAM</span><b id="mRam">—</b></div>
+          <div class="m-ram-track"><div class="m-ram-fill" id="mRamFill" style="width:0%"></div></div>
+        </div>
+      </div>
       <!-- Actions are shown only when Read-only is OFF (same gate as the command box). -->
       <div class="actions" id="actions" hidden>
         <button class="btn primary" id="actStart" data-i18n="start">Start</button>
-        <button class="btn" id="actStop" data-i18n="stop">Stop</button>
+        <button class="btn danger" id="actStop" data-i18n="stop">Stop</button>
+        <button class="btn danger" id="actForceStop" data-i18n="forceStop">Force stop</button>
         <button class="btn" id="actRestart" data-i18n="restart">Restart</button>
       </div>
     </div>
     <div class="card">
       <div class="card-head"><h2 data-i18n="playersTitle">Players</h2><span class="badge" id="playerCount">0</span></div>
       <div id="players"></div>
+      <form class="wl-row" id="wlForm" hidden>
+        <input class="field" id="wlInput" autocomplete="off" spellcheck="false" placeholder="Player name" aria-label="Add player to whitelist">
+        <button class="btn" type="submit" data-i18n="wlAdd">Whitelist +</button>
+      </form>
     </div>
   </section>
 
@@ -39,11 +58,13 @@
     <div class="card-head">
       <h2 data-i18n="consoleTitle">Console</h2>
       <div class="tools">
+        <input class="field field-sm" id="logFilter" type="search" autocomplete="off" placeholder="Filter logs…" aria-label="Filter console output">
+        <button class="btn ghost btn-sm" id="clearLogBtn" type="button" data-i18n="clear">Clear</button>
         <label class="chk"><input type="checkbox" id="autoRefresh" checked> <span data-i18n="autoRefresh">Auto</span></label>
-        <button class="btn" id="refreshBtn" data-i18n="refresh">Refresh</button>
+        <button class="btn" id="refreshBtn" type="button" data-i18n="refresh">Refresh</button>
       </div>
     </div>
-    <pre class="console" id="console"></pre>
+    <div class="console" id="console" role="log" aria-live="polite"></div>
   </section>
 
   <section class="card" id="cmdCard" hidden>
@@ -52,6 +73,14 @@
       <input class="field" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="/list" aria-label="Server console command">
       <button class="btn primary" type="submit" data-i18n="send">Send</button>
     </form>
+  </section>
+
+  <section class="card" id="backupsCard">
+    <div class="card-head">
+      <h2 data-i18n="backupsTitle">Backups</h2>
+      <button class="btn primary btn-sm" id="createBackupBtn" type="button" hidden data-i18n="createBackup">Create backup</button>
+    </div>
+    <div id="backupsList" class="bk-list"></div>
   </section>
 </main>
 
@@ -63,6 +92,16 @@
     <button class="btn primary" type="submit" data-i18n="connect">Connect</button>
     <p class="err" id="gateErr" hidden></p>
   </form>
+</div>
+
+<div class="overlay dlg-overlay" id="confirmDlg" hidden role="dialog" aria-modal="true" aria-labelledby="confirmMsg">
+  <div class="gate confirm-box">
+    <p id="confirmMsg" class="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn ghost" id="confirmCancel" type="button" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="confirmOk" type="button" data-i18n="confirm">Confirm</button>
+    </div>
+  </div>
 </div>
 
 <script src="./ui/app.js"></script>

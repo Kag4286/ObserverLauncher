@@ -61,7 +61,7 @@ function defaultGlobal() {
     mcpEnabled: false, mcpAutoAllowWrite: false, mcpReadOnly: false,
     // 3.3.0 remote management (Track A): OFF by default, read-only by default, no IP restriction by
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
-    remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remotePort: 0, remoteBind: '',
+    remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remoteAllowedHosts: '', remotePort: 0, remoteBind: '',
     playitPath: '', pinggyPath: '', motionLevel: 'full', curseforgeApiKey: '',
     // v6.0.0 F1: webhook notifications (Discord-compatible). Empty URL = off. webhookEvents is the
     // subscribed list; webhookFormat is 'discord' (default) or 'generic'.

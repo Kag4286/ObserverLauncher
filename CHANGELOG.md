@@ -10,6 +10,37 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [8.1.0] - 2026-11-13
+
+**Remote Access 2.0: Live SSE Streaming, Reverse Proxy Host Allowlist, Brute-Force Protection, and Remote Web Dashboard 2.0.**
+
+### Backend Security & Fixes:
+- **Reverse-Proxy / Tailscale Host Allowlist (`src/main/remote.js`, `src/main/settings.js`, `src/main/settings-handlers.js`):**
+  - Added `remoteAllowedHosts` setting (rejecting bare `*` to prevent DNS-rebinding), `parseAllowedHosts()`, and `isHostAllowed()` supporting exact hostnames and wildcard subdomains (e.g. `*.ts.net`).
+  - Fixed `settings:save` response to include `addresses: remoteAddresses(ctx.remotePort || 0)` when restarting Remote Access.
+- **Query-Safe Routing & Brute-Force Guard (`src/main/remote.js`):**
+  - Switched `/health` and static UI asset routing to `url.pathname` matching so cache-busted or probed query strings (`/health?probe=1`, `/ui/app.js?v=810`) resolve cleanly.
+  - Added `authLimited` (15 failed `401` attempts per 5 minutes per IP -> `429 Too Many Requests`), checked **before** `tokenEquals()` via `rate-limit.js` `.isLimited()`/`.reset()` so brute-force guesses are blocked during lockout while keeping `/health` unblocked.
+  - Added malformed `req.url` handling (`400 Bad request`), `server.requestTimeout = 15000` (exempting `/events` SSE), `isSafeIp()` validation for `0.0.0.0` Host headers, and `server.closeAllConnections?.()` in `close()`.
+  - Fixed `remote:open-dashboard` to respect `remoteBind` (`[::1]` or specific Tailscale/LAN IP) instead of hardcoding `127.0.0.1`.
+
+### Live Streaming & Expanded Remote API:
+- **SSE Event Stream (`GET /events`, `src/main/remote.js`, `src/main/context.js`, `src/main/server-metrics.js`):**
+  - Added real-time Server-Sent Events stream (`GET /events?instance=...`) capped at 10 concurrent clients with 20s heartbeat comments (`: ping`) and automatic cleanup.
+  - Wired `ctx.remoteListeners` and `ctx.emitRemote(type, payload)` to stream live `'log'`, `'state'` (including `startedAt`), and throttled (`>=2s`) `'metrics'` events.
+- **Metrics, Backups & Moderation Endpoints (`src/main/remote.js`):**
+  - Added `GET /metrics` (TPS, CPU, RAM, uptime) and `GET /backups` (backup archive list).
+  - Expanded `POST /action` (gated by `!readOnly`) to support `force_stop`, `backup`, `whitelist_add`, `whitelist_remove`, `ban`, and `unban` alongside `start`/`stop`/`restart`/`kick`.
+
+### Remote Web Dashboard 2.0 (`src/remote-ui/*`) & Desktop Settings UI:
+- **Remote Web Dashboard (`src/remote-ui/index.html`, `style.css`, `app.js`):**
+  - Replaced polling-only updates with a `fetch()` `ReadableStream` SSE client (`/events`) with automatic reconnect & 4s polling fallback, live `syncMeta()` for players/backups, and a live connection status badge (`#streamBadge`).
+  - Added **Force Stop** (`#actForceStop`), live Metrics Bar (TPS, CPU, Uptime, RAM bar), Console Log Filter + severity coloring + Clear button, Command History (`ArrowUp`/`ArrowDown`), Whitelist Quick-Add & Ban/Unban/Kick controls, Backups card with one-click Create Backup, accessible in-page `#confirmDlg` replacing `window.confirm()`, persisted language & instance selection (`olRemoteLang`, `olRemoteInst`), and fixed `langSel.onchange` re-rendering, `429` lockout messaging, and `403` read-only state sync.
+  - Aligned `src/remote-ui/style.css` with `DESIGN.md` & `01-tokens.css` (emerald `--brand`, spatial borderless inner surfaces, 8px spacing rhythm, `--dur-*` motion, zero OS-default form chrome, and 44px mobile touch targets with 2×2 action grid).
+- **Desktop Settings & IPC (`src/renderer/index.html`, `src/renderer/js/07-overview.js`, `src/preload.js`, `src/main/settings-handlers.js`, `src/renderer/locales/*.js`):**
+  - Added `#remoteAllowedHostsInput` under Advanced Network settings and `#remoteOpenDashboard` button backed by dedicated `remote:open-dashboard` IPC (validated to `http://127.0.0.1:<port>/`).
+  - Updated all 7 desktop locales (`en`, `vi`, `de`, `es`, `pt-BR`, `ru`, `zh-CN`) with full key parity.
+
 ## [8.0.3] - 2026-11-13
 
 **Security Hardening, System Resilience, WCAG 2.2 AA Accessibility Completion, and Velocity UI Polish.**

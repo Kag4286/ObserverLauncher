@@ -112,6 +112,10 @@ async function metricsTick(ctx, st) {
   const curMem = memory > 0 ? memory : st.lastMetrics.serverMemory;
   pushHistory(ctx, { t: now, tps: ctx.live?.tps ?? null, mspt: ctx.live?.mspt ?? null, cpu: Number.isFinite(cpu) ? Math.round(cpu) : null, ram: curMem ? Math.round(curMem) : null, players: (ctx.live?.players || []).length });
   ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: curMem, cpu: Math.round(cpu), running: true, timestamp: now, ...ctx.live });
+  if (typeof ctx.emitRemote === 'function' && (now - (st.lastRemoteMetrics || 0)) >= 2000) {
+    st.lastRemoteMetrics = now;
+    ctx.emitRemote('metrics', { instanceId: ctx.inst(), t: now, tps: ctx.live?.tps ?? null, mspt: ctx.live?.mspt ?? null, cpu: Number.isFinite(cpu) ? Math.round(cpu) : null, ram: curMem ? Math.round(curMem) : null, players: (ctx.live?.players || []).length, startedAt: ctx.startedAt || 0 });
+  }
 }
 // Ring buffer of samples, capped at ~1800 (30 min at 1 sample/s). Oldest dropped first.
 const METRICS_HISTORY_CAP = 1800;

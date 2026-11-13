@@ -191,6 +191,15 @@ function registerSettings(ipcMain, ctx) {
       const p = Math.trunc(Number(merged.remotePort));
       merged.remotePort = (Number.isFinite(p) && p >= 0 && p <= 65535) ? p : 0;
     }
+    // 8.1.0: validate remoteAllowedHosts (reverse-proxy / Tailscale MagicDNS hostnames).
+    if (merged.remoteAllowedHosts !== undefined) {
+      const { parseAllowedHosts } = require('./remote.js');
+      const rawHosts = String(merged.remoteAllowedHosts || '').trim().slice(0, 500);
+      if (rawHosts.split(/[\s,]+/).includes('*')) {
+        return { ok: false, error: 'Allowed proxy hosts cannot contain a bare "*" wildcard — use a specific domain like *.ts.net.' };
+      }
+      merged.remoteAllowedHosts = parseAllowedHosts(rawHosts).join(', ');
+    }
     // Normalize scheduleDays to NUMBERS (0=Sun..6=Sat) — the shape scheduler.shouldFire() compares
     // against now.getDay(). Accepts names too, so a name-based value can never silently never-fire.
     if (merged.scheduleDays !== undefined) {
@@ -234,6 +243,7 @@ function registerSettings(ipcMain, ctx) {
     const nowRemote = !!merged.remoteEnabled;
     const remoteCfgChanged = prev.remoteBind !== merged.remoteBind
       || prev.remoteAllow !== merged.remoteAllow
+      || (prev.remoteAllowedHosts || '') !== (merged.remoteAllowedHosts || '')
       || (prev.remoteReadOnly !== false) !== (merged.remoteReadOnly !== false)
       || Number(prev.remotePort || 0) !== Number(merged.remotePort || 0);
     if (nowRemote && !wasRemote && typeof ctx.startRemoteServer === 'function') { try { await ctx.startRemoteServer(); } catch {} }
@@ -276,7 +286,7 @@ function registerSettings(ipcMain, ctx) {
       mcp: mcpStatus,
       // 4.3.0: mirror the live remote status so the UI refreshes right after Save (it already
       // consumes r.remote in 08-shell.js). Never includes the token.
-      remote: (() => { try { const { remoteSnapshot } = require('./remote.js'); return { ...remoteSnapshot(merged), running: !!ctx.remotePort, port: ctx.remotePort || null }; } catch { return undefined; } })(),
+      remote: (() => { try { const { remoteSnapshot, remoteAddresses } = require('./remote.js'); return { ...remoteSnapshot(merged), running: !!ctx.remotePort, port: ctx.remotePort || null, addresses: remoteAddresses(ctx.remotePort || 0) }; } catch { return undefined; } })(),
       // v6.0.0 F4: mirror the live Prometheus status so the UI refreshes after Save.
       prometheus: { enabled: !!merged.prometheusEnabled, running: !!ctx.prometheusPort, port: ctx.prometheusPort || null },
     };
@@ -287,6 +297,26 @@ function registerSettings(ipcMain, ctx) {
   ipcMain.handle('remote:token', async () => {
     try { const s = loadSettings(); return { ok: true, token: String(s.remoteToken || '') }; }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
+  // v8.1.0: open the local Remote Access dashboard in the default browser.
+  ipcMain.handle('remote:open-dashboard', async () => {
+    const port = Number(ctx.remotePort || 0);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      return { ok: false, error: 'Remote server is not running' };
+    }
+    let host = '127.0.0.1';
+    try {
+      const bind = String((loadSettings() || {}).remoteBind || '').trim();
+      const { isSafeIp } = require('./validate.js');
+      if (bind === '::' || bind === '::1') host = '[::1]';
+      else if (bind && bind !== '0.0.0.0' && bind !== '127.0.0.1' && bind !== 'localhost' && isSafeIp(bind)) {
+        host = bind.includes(':') ? `[${bind}]` : bind;
+      }
+    } catch {}
+    const { shell } = require('electron');
+    await shell.openExternal(`http://${host}:${port}/`);
+    return { ok: true };
   });
 
   // --- v2.0.0 multi-instance CRUD (Phase B backend) ---

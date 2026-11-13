@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('observer', {
   saveManualTunnel: addr => ipcRenderer.invoke('tunnel:set-address', addr),
   // 4.3.0 remote: reveal the long-lived token (trusted renderer only).
   getRemoteToken: () => ipcRenderer.invoke('remote:token'),
+  openRemoteDashboard: () => ipcRenderer.invoke('remote:open-dashboard'),
   // v2.0.0 multi-instance (Phase B backend)
   instancesList: () => ipcRenderer.invoke('instances:list'),
   exportDocker: () => ipcRenderer.invoke('docker:export'),

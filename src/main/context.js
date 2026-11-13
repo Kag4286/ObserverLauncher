@@ -154,6 +154,13 @@ function createContext() {
     sendRaw(channel, data);
   }
 
+  // 8.1.0: lightweight event bus for Remote Access SSE streaming (all instances, ungated).
+  const remoteListeners = new Set();
+  function emitRemote(type, payload) {
+    if (!remoteListeners.size) return;
+    for (const fn of remoteListeners) { try { fn(type, payload); } catch {} }
+  }
+
   function appendLog(text, type = 'server') {
     const line = { time: new Date().toLocaleTimeString(), text: String(text).replace(/\r?\n$/, ''), type, instanceId: ctx.inst() };
     ctx.consoleBuffer.push(line);
@@ -161,6 +168,7 @@ function createContext() {
     // Error lines BYPASS the gate: a background instance's crash must still reach the rail badge.
     const isError = type === 'error' || /\b(ERROR|Exception)\b/.test(line.text);
     if (isError) sendRaw('server:log', line); else send('server:log', line);
+    emitRemote('log', line);
   }
 
   // The ONLY place that pushes 'server:state' — keeps the 4-state machine consistent.
@@ -176,7 +184,9 @@ function createContext() {
     // a tier after a crash. Lazy require + guard so context.js keeps working in bare unit tests.
     try { require('./runtime-state.js').setInstanceStatus(ctx.inst(), status); } catch {}
     // NOT gated: the rail status dot must reflect a background instance's crash/stop.
-    send('server:state', { status, running: status !== 'stopped', instanceId: ctx.inst() });
+    const statePayload = { status, running: status !== 'stopped', instanceId: ctx.inst(), startedAt: ctx.startedAt || 0 };
+    send('server:state', statePayload);
+    emitRemote('state', statePayload);
   }
 
   function pushFiles() {
@@ -291,6 +301,8 @@ function createContext() {
   ctx.send = send;
   ctx.appendLog = appendLog;
   ctx.setServerStatus = setServerStatus;
+  ctx.remoteListeners = remoteListeners;
+  ctx.emitRemote = emitRemote;
   ctx.pushFiles = pushFiles;
   ctx.watchServerFolder = watchServerFolder;
   ctx.edWatchFile = edWatchFile;

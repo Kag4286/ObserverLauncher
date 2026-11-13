@@ -121,8 +121,8 @@ Run `observer --help` for full command flags (`--json`, `--instance <id>`, `temp
 
 ### Remote Web Dashboard & HTTP API
 Enabled under **Launcher settings > Integrations** (off by default):
-- Serves an in-memory web dashboard at `/` (`/ui`) alongside JSON endpoints protected by constant-time Bearer token auth, rate limiting (`300/min`), Origin/Host checks, and optional IP/CIDR allowlisting.
-- Endpoints: `GET /health`, `GET /instances`, `GET /status`, `GET /console`, `GET /players`, plus `POST /action` and `POST /command` (disabled when **Read-only** is enabled).
+- Serves an in-memory web dashboard at `/` (`/ui`) with live SSE streaming, protected by constant-time Bearer token auth, brute-force lockout (`15 fails / 5m`), rate limiting (`300/min`), Origin/Host checks (with optional `remoteAllowedHosts` for reverse proxies), and IP/CIDR allowlisting.
+- Endpoints: `GET /health`, `GET /events` (SSE), `GET /instances`, `GET /status`, `GET /metrics`, `GET /backups`, `GET /console`, `GET /players`, plus `POST /action` (`start`, `stop`, `force_stop`, `restart`, `kick`, `backup`, `whitelist_add`, `whitelist_remove`, `ban`, `unban`) and `POST /command` (disabled when **Read-only** is enabled).
 - Binds to `127.0.0.1` by default for safe tunneling over Tailscale; see [docs/remote.md](docs/remote.md).
 
 ### Docker Export & Prometheus Metrics
