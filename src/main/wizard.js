@@ -148,7 +148,9 @@ async function createServerFiles(ctx, { software, version }) {
         const { openJar } = require('./jar-reader.js');
         const { safeTarget } = require('./fs-utils.js');
         const handle = openJar(tempArchive);
-        for (const entry of handle.list()) {
+        const zipEntries = handle.list();
+        assertSafeArchiveEntries(zipEntries, tempArchive);
+        for (const entry of zipEntries) {
           if (entry.endsWith('/')) continue;
           const parts = entry.split('/');
           if (parts.length > 1 && parts[0].startsWith('horizon-')) parts.shift();
@@ -160,18 +162,13 @@ async function createServerFiles(ctx, { software, version }) {
           require('./fs-utils.js').writeFileAtomic(outPath, handle.read(entry));
         }
       } else {
-        const { isSafeArchiveEntry } = require('./validate.js');
         const entries = await new Promise((res, rej) => {
           require('child_process').execFile('tar', ['-tzf', tempArchive], (err, stdout) => {
             if (err) rej(err);
             else res(String(stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean));
           });
         });
-        const badEntry = entries.find(e => !isSafeArchiveEntry(e));
-        if (badEntry) {
-          fs.rmSync(tempArchive, { force: true });
-          throw new Error(`Horizon archive contains an unsafe path ("${badEntry}") — extraction stopped for safety.`);
-        }
+        assertSafeArchiveEntries(entries, tempArchive);
         await new Promise((res, rej) => {
           require('child_process').execFile('tar', ['--no-same-owner', '-xzf', tempArchive, '--strip-components=1'], { cwd: ctx.currentServerPath }, (err) => {
             if (err) {
@@ -235,6 +232,16 @@ async function createServerFiles(ctx, { software, version }) {
     return { ok: true, files: serverFiles(ctx.currentServerPath), name, version: resolvedVersion };
   } catch (error) { ctx.buildProcess = null; return marketplaceError(error); }
   finally { ctx.wizardAbort = null; }
+}
+
+// Verify all archive entries before extracting so a tampered .zip or .tar.gz fails fast.
+function assertSafeArchiveEntries(entries, tempArchive) {
+  const { isSafeArchiveEntry } = require('./validate.js');
+  const badEntry = (entries || []).find(e => !isSafeArchiveEntry(e));
+  if (badEntry) {
+    if (tempArchive) { try { fs.rmSync(tempArchive, { force: true }); } catch {} }
+    throw new Error(`Horizon archive contains an unsafe path ("${badEntry}") — extraction stopped for safety.`);
+  }
 }
 
 function registerWizard(ipcMain, ctx) {
@@ -413,4 +420,4 @@ function registerWizard(ipcMain, ctx) {
   });
 }
 
-module.exports = { RESOLVERS, registerWizard, createServerFiles };
+module.exports = { RESOLVERS, registerWizard, createServerFiles, assertSafeArchiveEntries };

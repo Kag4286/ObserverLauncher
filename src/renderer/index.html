@@ -146,7 +146,7 @@
           </div>
           <div class="connect-channel">
             <div class="connect-channel-head"><span class="connect-dot dot-wan" aria-hidden="true"></span><span data-i18n="conn.public">Over the internet</span></div>
-            <div class="connect-freq"><svg class="connect-freq-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><input id="connectPublic" readonly value="—" data-i18n-placeholder="conn.publicPh" placeholder="Click Check to look up"></div>
+            <div class="connect-freq"><svg class="connect-freq-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><input id="connectPublic" readonly value="—" data-i18n-placeholder="conn.publicPh" placeholder="Click Check to look up" aria-label="Public IP address"></div>
             <div class="connect-channel-actions"><button class="btn secondary" id="checkPublicIp" data-i18n="conn.check">Check</button><button class="btn secondary" data-copy="#connectPublic" data-i18n="conn.copy">Copy</button></div>
           </div>
         </div>
@@ -171,7 +171,7 @@
           <div class="set-toggle tunnel-auto"><div class="set-toggle-info"><b data-i18n="tun.autoOn">Keep it on automatically</b><small data-i18n="tun.autoSub">Start the Playit service whenever the server runs, and stop it when the server stops.</small></div><label class="switch"><input type="checkbox" id="autoTunnelQuick"><span class="slider"></span></label></div>
           <div class="tunnel-manual">
             <label class="text-muted" data-i18n="tun.manualLabel">Paste your Playit public address here (create it on the dashboard):</label>
-            <div class="tunnel-addr"><input id="tunnelManual" placeholder="name.tun.ply.gg" spellcheck="false"><button class="btn secondary sm" data-copy="#tunnelManual" data-i18n="conn.copy">Copy</button></div>
+            <div class="tunnel-addr"><input id="tunnelManual" placeholder="name.tun.ply.gg" spellcheck="false" aria-label="Manual tunnel address"><button class="btn secondary sm" data-copy="#tunnelManual" data-i18n="conn.copy">Copy</button></div>
           </div>
           </div>
         </details>
@@ -222,7 +222,7 @@
           </div>
           <details class="set-fold">
             <summary><span data-i18n="set.advT">Advanced — JVM arguments</span><span class="set-chevron">▸</span></summary>
-            <div class="set-row-input mono"><input id="jvmArgsInput" spellcheck="false" placeholder="-Xms4G -Xmx6G -XX:+UseG1GC ..."><button type="button" class="btn secondary" id="applyAikarFlags" data-i18n="set.aikar">Use Aikar's flags</button></div>
+            <div class="set-row-input mono"><input id="jvmArgsInput" spellcheck="false" placeholder="-Xms4G -Xmx6G -XX:+UseG1GC ..." aria-label="Custom JVM arguments"><button type="button" class="btn secondary" id="applyAikarFlags" data-i18n="set.aikar">Use Aikar's flags</button></div>
             <!-- v6.0.0 G3: JVM preset library (fills the field from current min/max memory). -->
             <div class="jvm-presets" id="jvmPresetRow"><span class="field-hint" data-i18n="set.presetLabel">Presets:</span><button type="button" class="filter-chip" data-jvm-preset="aikar" data-i18n="set.preset.aikar">Aikar's</button><button type="button" class="filter-chip" data-jvm-preset="g1" data-i18n="set.preset.g1">G1 tuned</button><button type="button" class="filter-chip" data-jvm-preset="zgc" data-i18n="set.preset.zgc">ZGC</button><button type="button" class="filter-chip" data-jvm-preset="shenandoah" data-i18n="set.preset.shenandoah">Shenandoah</button><button type="button" class="filter-chip highlight" id="smartJvmBtn" data-i18n="set.presetSmart">Auto pick</button><button type="button" class="jvm-preset-help" id="jvmPresetHelp" title="Explain presets" aria-label="Explain presets">?</button></div>
             <div class="jvm-preview" id="jvmPreview" hidden></div>
@@ -551,7 +551,7 @@
               <button type="button" class="seg" data-ckind="mod"><span data-i18n="cnt.mods">Mods</span><b class="seg-count" id="contentModsCount">0</b></button>
               <button type="button" class="seg" data-ckind="datapack"><span data-i18n="cnt.datapacks">Datapacks</span><b class="seg-count" id="contentDatapacksCount">0</b></button>
             </div>
-            <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…"><button type="button" class="search-clear" id="contentFilterClear" hidden aria-label="Clear filter">×</button></div>
+            <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…" aria-label="Filter content files"><button type="button" class="search-clear" id="contentFilterClear" hidden aria-label="Clear filter">×</button></div>
           </div>
           <div class="content-filter-chips" id="contentFilterChips" role="group" aria-label="Content quick filters">
             <button type="button" class="filter-chip active" data-qfilter="all"><span data-i18n="cnt.filterAll">All</span> <b class="chip-count" id="chipAllCount">0</b></button>
@@ -623,7 +623,7 @@
         <header class="flat-head">
           <button class="btn sm secondary" id="fbBack">←</button>
           <div class="flat-head-id"><div><b data-i18n="ed.title">Edit file</b></div></div>
-          <input id="fbSearch" class="properties-search" style="flex:1;max-width:360px;margin:0" data-i18n-placeholder="ed.filterPh" placeholder="Filter files…">
+          <input id="fbSearch" class="properties-search" style="flex:1;max-width:360px;margin:0" data-i18n-placeholder="ed.filterPh" placeholder="Filter files…" aria-label="Filter file browser">
           <span class="stat-pill" id="fbCount">—</span>
         </header>
         <div id="fbList" class="file-list" style="padding:10px 16px;max-height:min(56vh,560px)"></div>
@@ -670,7 +670,7 @@
         <button type="button" class="btn sm secondary msb-toggle" id="marketStrictToggle" data-i18n="mkt.strictFilter">Strict Filter</button>
       </div>
       <div class="market-hero">
-        <div class="market-search-bar"><span class="search-icon">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. ViaVersion, Spark, LuckPerms, WorldEdit"><button class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
+        <div class="market-search-bar"><span class="search-icon">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. ViaVersion, Spark, LuckPerms, WorldEdit" aria-label="Search marketplace plugins and mods"><button class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
         <div class="market-quick"><span class="market-quick-label" data-i18n="mkt.popular">Popular</span><button class="quick-chip" data-quick="EssentialsX">EssentialsX</button><button class="quick-chip" data-quick="LuckPerms">LuckPerms</button><button class="quick-chip" data-quick="ViaVersion">ViaVersion</button><button class="quick-chip" data-quick="Spark">Spark</button><button class="quick-chip" data-quick="WorldEdit">WorldEdit</button><button class="quick-chip" data-quick="Vault">Vault</button></div>
       </div>
       <div class="market-type-bar">
@@ -801,7 +801,7 @@
                 </div>
                 <div class="wm-wpmodal-body">
                   <label class="field-label" data-i18n="wm.wpName">Name</label>
-                  <input type="text" id="wmWpNameInput" class="field-input" placeholder="Base, Mine, Portal...">
+                  <input type="text" id="wmWpNameInput" class="field-input" placeholder="Base, Mine, Portal..." aria-label="Waypoint name">
                   <label class="field-label" data-i18n="wm.wpIcon">Icon</label>
                   <div class="wm-icon-selector" id="wmIconSelector">
                     <button type="button" class="filter-chip active" data-icon="star">⭐ Star</button>
@@ -866,6 +866,7 @@
               <button type="submit" class="btn primary sm" data-i18n="prx.add">Add</button>
             </form>
           </div>
+          <div class="sec-head proxy-raw-head" id="proxyRawHead" hidden><h3 data-i18n="prx.rawTitle">Configuration file (velocity.toml)</h3><small data-i18n="prx.rawSub">Direct TOML configuration for advanced proxy settings.</small></div>
           <textarea id="propertiesRaw" class="raw-editor" hidden spellcheck="false" placeholder="velocity.toml will appear here after the server has been started once (Velocity generates it on first run)." aria-label="velocity.toml editor"></textarea>
         </div>
       </div>
@@ -941,7 +942,7 @@
                     <div class="sir-desc">Leave empty or 'java' to auto-detect from system PATH, or specify a custom java.exe.</div>
                   </div>
                   <div class="set-input-box">
-                    <input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false">
+                    <input id="javaPathInput" placeholder="java (auto-detect from PATH)" spellcheck="false" aria-label="Custom Java executable path">
                   </div>
                 </div>
                 <button type="button" class="btn primary wide" id="javaAutoInstall" hidden data-i18n="set.autoInstallJava">Install Java automatically (no admin rights needed)</button>
@@ -1140,7 +1141,7 @@
                 </div>
                 <div class="ab-row ab-custom" id="backupCustomRow" hidden>
                   <span class="ab-label" data-i18n="set.bkEvery">Every</span>
-                  <input id="autoBackupCustomInput" type="number" min="1" placeholder="45">
+                  <input id="autoBackupCustomInput" type="number" min="1" placeholder="45" aria-label="Custom backup interval in minutes">
                   <span class="ab-hint" data-i18n="set.bkMin">minutes</span>
                 </div>
                 <div class="set-item-row" id="backupRetentionRow">
@@ -1270,7 +1271,7 @@
                     <div class="sir-desc">Masked security token for remote client authorization.</div>
                   </div>
                   <div class="remote-token-row set-input-box">
-                    <input id="remoteTokenInput" class="remote-token-input" type="text" readonly value="" placeholder="••••••••••••" spellcheck="false" autocomplete="off">
+                    <input id="remoteTokenInput" class="remote-token-input" type="text" readonly value="" placeholder="••••••••••••" spellcheck="false" autocomplete="off" aria-label="Remote dashboard access token">
                     <button type="button" class="btn secondary sm" id="remoteTokenReveal" data-i18n="remote.tokenReveal">Reveal</button>
                     <button type="button" class="btn secondary sm" id="remoteTokenCopy" data-i18n="remote.tokenCopy">Copy</button>
                     <button type="button" class="btn secondary sm" id="remoteTokenRotate" data-i18n="remote.tokenRotate">Regenerate</button>
@@ -1304,7 +1305,7 @@
                     <div class="sir-desc" data-i18n="set.cfKeySub">Stored only on this PC and sent only to api.curseforge.com. The launcher does not bundle a key. Mods whose author blocks third-party downloads can't be auto-installed — open their page instead.</div>
                   </div>
                   <div class="set-path-row set-input-box">
-                    <input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off">
+                    <input id="cfKeyInput" type="password" placeholder="paste your own key" spellcheck="false" autocomplete="off" aria-label="CurseForge API key">
                     <button type="button" class="btn secondary sm" id="cfKeyGet" data-i18n="set.cfKeyGet">Get a key</button>
                   </div>
                 </div>
@@ -1415,7 +1416,7 @@
                     <div class="sir-desc" data-i18n="wh.urlSub">Paste a Discord webhook URL (Server Settings > Integrations > Webhooks). Leave empty to disable.</div>
                   </div>
                   <div class="set-input-box">
-                    <input id="webhookUrlInput" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off">
+                    <input id="webhookUrlInput" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off" aria-label="Discord webhook URL">
                   </div>
                 </div>
                 <div class="set-item-row">
@@ -1493,7 +1494,7 @@
                     <div class="sir-desc">Port number to bind the metrics scraper.</div>
                   </div>
                   <div class="sir-control">
-                    <input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" style="max-width:120px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 10px;color:var(--text);font:12px var(--font-mono)">
+                    <input id="prometheusPortInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" style="max-width:120px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:7px 10px;color:var(--text);font:12px var(--font-mono)" aria-label="Prometheus metrics port">
                   </div>
                 </div>
                 <div class="input-row" style="margin-top:4px"><p class="hint" id="promStatusLine" hidden style="margin:0"></p><button type="button" class="btn secondary sm" id="promCopyUrl" hidden style="margin-left:auto" data-i18n="prom.copy">Copy URL</button></div>
@@ -1532,10 +1533,10 @@
   </div>
 </div>
 <div id="playerInspectModal" hidden style="display:none"></div>
-<div id="onboardingModal" class="modal-overlay" hidden>
+<div id="onboardingModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="onboardingModalTitle">
   <div class="modal glass onboarding-modal">
     <button type="button" class="modal-close" id="onboardingClose" aria-label="Close">×</button>
-    <div class="onboarding-hero"><span class="hero-icon"><img src="./assets/icons/observer.png" alt=""></span><div><p class="eyebrow" data-i18n="ob.eyebrow">WELCOME TO OBSERVER</p><h2 data-i18n="ob.title">Get started — beginner or pro</h2><p class="text-muted" data-i18n="ob.sub">Pick your language and your path. You can switch anytime in Launcher settings.</p></div></div>
+    <div class="onboarding-hero"><span class="hero-icon"><img src="./assets/icons/observer.png" alt=""></span><div><p class="eyebrow" data-i18n="ob.eyebrow">WELCOME TO OBSERVER</p><h2 id="onboardingModalTitle" data-i18n="ob.title">Get started — beginner or pro</h2><p class="text-muted" data-i18n="ob.sub">Pick your language and your path. You can switch anytime in Launcher settings.</p></div></div>
     <!-- 5.2.0: language + explicit mode picker. The mode chosen here drives the app's rail layout. -->
     <div class="ob-lang-row">
       <label for="obLangSelect" data-i18n="ob.language">Language</label>
@@ -1559,13 +1560,13 @@
     <div class="onboarding-footer"><label class="check"><input type="checkbox" id="onboardingDontShow"> <span data-i18n="ob.dontShow">Don't show this guide again</span></label><span class="text-muted" data-i18n="ob.reopen">You can reopen it from Launcher settings → Show welcome guide again.</span></div>
   </div>
 </div>
-<div id="newServerModal" class="modal-overlay" hidden>
+<div id="newServerModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="nswModalTitle">
   <div class="modal glass wide nsw2">
     <button type="button" class="modal-close" id="newServerClose" aria-label="Close">×</button>
 
     <div class="nsw2-layout">
       <aside class="nsw2-rail">
-        <p class="eyebrow" data-i18n="nsw.eyebrow">NEW SERVER</p>
+        <p class="eyebrow" id="nswModalTitle" data-i18n="nsw.eyebrow">NEW SERVER</p>
         <ol class="nsw2-steps">
           <li class="nsw2-step active" data-dot="1"><i>01</i><div><b data-i18n="nsw.railFolder">Folder</b><small id="nswRailFolderSub">—</small></div></li>
           <li class="nsw2-step" data-dot="2"><i>02</i><div><b data-i18n="nsw.rail1">Software</b><small id="nswRailSub1">Vanilla</small></div></li>
@@ -1648,7 +1649,7 @@
             <label class="nsw-radio-card"><input type="radio" name="nswVersionMode" value="specific"><div><b data-i18n="nsw.specific">Pick a specific version</b><span data-i18n="nsw.specificSub">Live-checked against the official list for this software</span></div><span class="radio-dot"></span></label>
           </div>
           <div class="nsw-version-picker" id="nswVersionPicker" hidden>
-            <div class="nsw-version-search"><span class="search-icon">⌕</span><input id="nswVersionInput" placeholder="Filter below or type a version — e.g. 26.2, 26.1, 1.20.1" autocomplete="off"><button class="version-clear" id="nswVersionClear" hidden title="Clear">×</button></div>
+            <div class="nsw-version-search"><span class="search-icon">⌕</span><input id="nswVersionInput" placeholder="Filter below or type a version — e.g. 26.2, 26.1, 1.20.1" autocomplete="off" aria-label="Filter Minecraft server versions"><button class="version-clear" id="nswVersionClear" hidden title="Clear">×</button></div>
             <div class="nsw-version-chips" id="nswVersionChips"><span class="nsw2-chiploading" data-i18n="nsw.versionsLoading">Loading versions…</span></div>
             <div class="nsw-version-info" id="nswVersionInfo" data-i18n="nsw.verInfo">Versions load live from the official API for the software you picked.</div>
             <div class="nsw-java" id="nswJavaCheck" hidden></div>

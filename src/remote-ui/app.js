@@ -174,7 +174,7 @@
     let picker = $('#instPicker');
     if (!picker) {
       picker = document.createElement('select');
-      picker.id = 'instPicker'; picker.className = 'sel';
+      picker.id = 'instPicker'; picker.className = 'sel'; picker.setAttribute('aria-label', 'Active server instance');
       const right = document.querySelector('.top-right');
       if (right) right.insertBefore(picker, right.firstChild);
       picker.onchange = () => { activeInst = picker.value; loadAll(); };

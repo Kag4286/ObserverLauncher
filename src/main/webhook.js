@@ -56,14 +56,40 @@ async function fire(settings, ev, opts) {
   const doFetch = o.fetchFn || (typeof fetch === 'function' ? fetch : null);
   if (!doFetch) return { sent: false, reason: 'no fetch' };
   const body = JSON.stringify(buildPayload(ev, s.webhookFormat));
+  const MAX_REDIRECTS = 3;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), Number(o.timeoutMs) || 8000) : null;
   try {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), Number(o.timeoutMs) || 8000) : null;
-    const res = await doFetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: controller ? controller.signal : undefined });
-    if (timer) clearTimeout(timer);
-    return { sent: true, status: res && res.status };
+    let curUrl = url;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      // SECURITY (v8.0.3): never auto-follow redirects ('follow'), otherwise a public webhook
+      // host can 301/302/307/308 to 127.0.0.1, LAN, or cloud metadata (169.254.169.254) and bypass
+      // the initial isSafeWebhookUrl check (SSRF).
+      const res = await doFetch(curUrl, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'content-type': 'application/json' },
+        body,
+        signal: controller ? controller.signal : undefined,
+      });
+      if (res && res.status >= 300 && res.status < 400) {
+        try { if (res.body && typeof res.body.cancel === 'function') res.body.cancel(); } catch {}
+        const loc = res.headers && (typeof res.headers.get === 'function' ? res.headers.get('location') : res.headers.location);
+        if (!loc) return { sent: false, status: res.status, reason: 'redirect without location' };
+        let nextUrl;
+        try { nextUrl = new URL(loc, curUrl).href; } catch { return { sent: false, reason: 'invalid redirect url' }; }
+        if (!isSafeWebhookUrl(nextUrl)) return { sent: false, reason: 'unsafe redirect' };
+        if (hop === MAX_REDIRECTS) return { sent: false, reason: 'too many redirects' };
+        curUrl = nextUrl;
+        continue;
+      }
+      return { sent: true, status: res && res.status };
+    }
+    return { sent: false, reason: 'too many redirects' };
   } catch (e) {
     return { sent: false, reason: e?.message || 'request failed' };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

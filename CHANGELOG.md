@@ -10,6 +10,34 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [8.0.3] - 2026-11-13
+
+**Security Hardening, System Resilience, WCAG 2.2 AA Accessibility Completion, and Velocity UI Polish.**
+
+### Security Hardening & Archive / Protocol Guards:
+- **Webhook Redirect SSRF Guard (`src/main/webhook.js`):**
+  - Updated `webhook.fire()` to pass `redirect: 'manual'` instead of following redirects implicitly, manually following up to 3 `3xx` hops while verifying every resolved `Location` target with `isSafeWebhookUrl()` so a remote webhook host cannot redirect requests into loopback, private LAN, or cloud metadata addresses (`169.254.169.254`). Ensured timeout timers are cleared via `finally`.
+- **Editor `SKIP_DIRS` & Dotfile Enforcement (`src/main/editor.js`):**
+  - Extracted shared `validateEditorTarget()` and `isSkippedPath()` helpers enforced in both `openFile()` and `saveFile()`, blocking direct read/write access to paths inside `SKIP_DIRS` (`libraries`, `cache`, `logs`, `versions`, `.git`, `observerlauncher-backups`) and hidden dotfiles/directories (`startsWith('.')`), and aligned `listFiles()` to skip root/nested dotfiles.
+- **RCON Client Buffer Overflow / DoS Cap (`src/main/rcon.js`):**
+  - Added `MAX_BUFFER` (`2 * 1024 * 1024`, 2 MB) to `RconClient._onData()` so malformed or oversized TCP streams cannot cause unbounded memory growth; clears buffers, destroys the socket, and rejects pending requests cleanly when exceeded.
+- **Horizon `.zip` Archive Pre-Validation (`src/main/wizard.js`):**
+  - Extracted shared `assertSafeArchiveEntries()` using `isSafeArchiveEntry()` and applied it to the Horizon `.zip` branch alongside the `.tar.gz` branch so tampered archives fail fast and are deleted before any file is extracted.
+
+### Velocity Proxy UI & DESIGN.md Compliance:
+- **Velocity Configuration Section Header (`src/renderer/index.html`, `src/renderer/css/06-modals.css`, `src/renderer/js/07-overview.js`, `src/renderer/locales/*.js`):**
+  - Added `#proxyRawHead` (`prx.rawTitle` / `prx.rawSub` localized across all 7 languages: `en`, `vi`, `de`, `es`, `pt-BR`, `ru`, `zh-CN`) above `#propertiesRaw` to cleanly separate the Backend Servers panel from the direct `velocity.toml` editor in line with `DESIGN.md` calm sections, toggled its visibility in `refreshUI()`, and set `#properties .raw-editor` `min-height: 380px`.
+
+### Accessibility (WCAG 2.2 AA):
+- **Desktop Form Labels & Modal Dialog ARIA (`src/renderer/index.html`):**
+  - Added explicit `aria-label` attributes to the remaining 14 unlabeled inputs (`#connectPublic`, `#tunnelManual`, `#jvmArgsInput`, `#contentFilter`, `#fbSearch`, `#marketQuery`, `#wmWpNameInput`, `#javaPathInput`, `#autoBackupCustomInput`, `#remoteTokenInput`, `#cfKeyInput`, `#webhookUrlInput`, `#prometheusPortInput`, `#nswVersionInput`).
+  - Added `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` (`onboardingModalTitle`, `nswModalTitle`) to `#onboardingModal` and `#newServerModal`.
+- **Remote Web Dashboard Accessibility (`src/remote-ui/index.html`, `src/remote-ui/app.js`):**
+  - Added `aria-label` attributes to `#langSel`, `#cmdInput`, `#tokenInput`, and dynamically created `#instPicker`, and added `role="dialog"`, `aria-modal="true"`, `aria-labelledby="gateTitle"` to the `#gate` authentication overlay.
+
+### Tests & Release Tooling:
+- Added `tests/v803-audit.test.js` (50 assertions covering webhook redirect SSRF, editor `SKIP_DIRS`/dotfile isolation, RCON buffer cap, Horizon zip safety, WCAG 2.2 AA attributes, and 7-locale Velocity strings).
+
 ## [8.0.2] - 2026-11-12
 
 **Full-Project Security Audit, Modpack Subsystem Overhaul, Orphaned Feature Wiring, and Accessibility (WCAG 2.2 AA) Release.**

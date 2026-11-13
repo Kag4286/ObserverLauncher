@@ -23,13 +23,25 @@ function resolveSafe(root, rel) {
 function extAllowed(rel) {
   return ALLOWED.includes(String(require('path').extname(String(rel || ''))).toLowerCase());
 }
-function openFile(root, rel) {
-  // SECURITY: only allowlisted text extensions are readable/editable. The MCP write/edit path
-  // already enforced this; the IPC editor path did not, so a .jar/.dat could be read or overwritten
-  // as text. Enforce here so BOTH callers share one rule.
-  if (!extAllowed(rel)) return { ok: false, error: 'notAllowed' };
+function isSkippedPath(root, target) {
+  const relFromRoot = path.relative(path.resolve(root || '.'), target);
+  if (!relFromRoot || relFromRoot === '') return true;
+  const parts = relFromRoot.split(/[\\/]/).filter(Boolean);
+  return parts.some(p => SKIP_DIRS.has(p) || p.startsWith('.'));
+}
+function validateEditorTarget(root, rel) {
+  // SECURITY: only allowlisted text extensions are readable/editable, never traversing outside
+  // root, and never entering SKIP_DIRS (.git, observerlauncher-backups, libraries, etc.) or hidden files.
+  if (!extAllowed(rel)) return { error: 'notAllowed' };
   const target = resolveSafe(root, rel);
-  if (!target) return { ok: false, error: 'notFound' };
+  if (!target) return { error: 'notFound' };
+  if (isSkippedPath(root, target)) return { error: 'notAllowed' };
+  return { target };
+}
+function openFile(root, rel) {
+  const chk = validateEditorTarget(root, rel);
+  if (chk.error) return { ok: false, error: chk.error };
+  const target = chk.target;
   let stat;
   try { stat = fs.statSync(target); } catch { return { ok: false, error: 'notFound' }; }
   if (!stat.isFile()) return { ok: false, error: 'notFound' };
@@ -48,9 +60,9 @@ function openFile(root, rel) {
 }
 
 function saveFile(root, rel, content, baseMtime, force) {
-  if (!extAllowed(rel)) return { ok: false, error: 'notAllowed' };
-  const target = resolveSafe(root, rel);
-  if (!target) return { ok: false, error: 'notFound' };
+  const chk = validateEditorTarget(root, rel);
+  if (chk.error) return { ok: false, error: chk.error };
+  const target = chk.target;
   const body = String(content ?? '');
   if (Buffer.byteLength(body, 'utf8') > MAX_EDIT) return { ok: false, error: 'tooBigSave', maxEdit: MAX_EDIT };
   let stat;
@@ -81,6 +93,7 @@ function listFiles(root) {
         if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
         walk(path.join(dir, e.name), relPath, depth + 1);
       } else if (e.isFile()) {
+        if (e.name.startsWith('.')) continue;
         const ext = path.extname(e.name).toLowerCase();
         if (!ALLOWED.includes(ext)) continue;
         let size = 0;

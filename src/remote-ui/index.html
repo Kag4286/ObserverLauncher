@@ -12,7 +12,7 @@
 <header class="top">
   <div class="brand"><span class="dot" id="statusDot"></span><b>ObserverLauncher</b><span class="muted" data-i18n="title">Remote</span></div>
   <div class="top-right">
-    <select id="langSel" class="sel" title="Language"></select>
+    <select id="langSel" class="sel" title="Language" aria-label="Language selector"></select>
     <button class="btn ghost" id="forgetBtn" data-i18n="forget">Forget token</button>
   </div>
 </header>
@@ -49,17 +49,17 @@
   <section class="card" id="cmdCard" hidden>
     <div class="card-head"><h2 data-i18n="commandTitle">Command</h2><span class="muted" data-i18n="commandHint">Single line</span></div>
     <form class="cmd-row" id="cmdForm">
-      <input class="field" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="/list">
+      <input class="field" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="/list" aria-label="Server console command">
       <button class="btn primary" type="submit" data-i18n="send">Send</button>
     </form>
   </section>
 </main>
 
-<div class="overlay" id="gate">
+<div class="overlay" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
   <form class="gate" id="gateForm">
-    <h1>ObserverLauncher</h1>
+    <h1 id="gateTitle">ObserverLauncher</h1>
     <p class="muted" data-i18n="gateHint">Paste your remote token to continue.</p>
-    <input class="field" id="tokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="token">
+    <input class="field" id="tokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="token" aria-label="Remote access token">
     <button class="btn primary" type="submit" data-i18n="connect">Connect</button>
     <p class="err" id="gateErr" hidden></p>
   </form>

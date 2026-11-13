@@ -17,6 +17,7 @@
 const net = require('net');
 
 const TYPE = { RESPONSE: 0, COMMAND: 2, AUTH: 3 };
+const MAX_BUFFER = 2 * 1024 * 1024; // 2 MB cap to prevent unbounded memory growth / DoS
 
 // Pure: build one RCON packet as a Buffer.
 function encodePacket(id, type, body) {
@@ -103,6 +104,15 @@ class RconClient {
   }
 
   _onData(chunk) {
+    if (!Buffer.isBuffer(chunk)) chunk = Buffer.from(chunk);
+    if (this._buf.length + chunk.length > MAX_BUFFER) {
+      this._buf = Buffer.alloc(0);
+      this.connected = false;
+      this._flushPending(new Error('RCON buffer overflow (max 2MB).'));
+      try { if (this.socket) this.socket.destroy(); } catch {}
+      this.socket = null;
+      return;
+    }
     this._buf = Buffer.concat([this._buf, chunk]);
     let off = 0, pkt;
     while ((pkt = decodePacket(this._buf, off))) {
@@ -163,4 +173,4 @@ function desiredRconProps(props, existingPort, existingPassword) {
   return { port, password, next };
 }
 
-module.exports = { TYPE, encodePacket, decodePacket, RconClient, makeRconCreds, desiredRconProps };
+module.exports = { TYPE, MAX_BUFFER, encodePacket, decodePacket, RconClient, makeRconCreds, desiredRconProps };
