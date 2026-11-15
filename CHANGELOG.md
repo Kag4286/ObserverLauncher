@@ -10,6 +10,46 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [9.0.0] - 2026-11-15
+
+**Architectural Identity, Motion 2.0, Native Rust Engines (`Pumpkin 0.2.2` & `Horizon`), Content Pagination & Minecraft `1.21.5–1.21.11` / `26.1–26.3` Parity.**
+
+### Architectural Design System & Anti-AI-Slop Surface Rework:
+- **Design System & Token Consolidation (`DESIGN.md`, `src/renderer/css/01-tokens.css`):**
+  - Preserved the signature obsidian canvas (`#0C0D0F`) and emerald brand green (`#22C55E`) while removing neon halos, glow shadows, decorative gradient cards, and all legacy CSS token aliases (`--panel`, `--accent`, `--text-muted`, `--s1..s5`, `--fs-*`).
+  - Introduced a 4-tier contrast hierarchy (`--text` `#F4F1EA` → `--text-2` `#C8C4BC` → `--text-3` `#8F8B83` → `--text-4` `#76736D`), sharp `4/6/8/10/12px` radii, and hairline structural primitives (`.arch-section`, `.arch-row`, `.arch-strip`).
+- **Stylesheet & Shell Consolidation (`src/renderer/index.html`, `src/renderer/css/02-shell.css`, `src/renderer/js/08-shell.js`):**
+  - Removed obsolete patch layers (`07-polish.css`, `09-pulse.css`) and the ambient background `<canvas id="signalField">`, migrating remaining functional rules cleanly into core modular CSS files.
+  - Added `<span class="rail-glide" id="railGlide">` inside the `220px` sidebar navigation rail, driven via GPU `translate3d`/`scaleY` inside `positionChannelIndicator()`, and expanded `channelOrder` cleanly with `worldmap` and `settings`.
+- **Flat Architectural Views (`03-overview.css`, `04-players.css`, `05-market.css`, `06-modals.css`, `10-dropdown.css`):**
+  - Replaced boxed KPI and settings card grids with flush 4-column Telemetry Strips (`.srv-stats`, `.perf-stats`), 2-row hairline `.connect-channel` tables, flat 2-column 1px-bordered Marketplace grids, hairline lists for Content/Worlds/Backups, sharp `12px` modals, and a focused Single-Column Architectural Settings column (`max-width: 780px`).
+- **Remote Web UI Alignment (`src/remote-ui/style.css`):**
+  - Synced the mobile/remote dashboard to `#0C0D0F` / `#22C55E`, 4-column Telemetry Strip metrics, hairline backup rows, and sharp mobile breakpoints (`<760px`, `<560px`).
+
+### Motion 2.0 — Precision Hydraulics (`src/renderer/css/08-motion.css`, `docs/motion.md`):
+- Eliminated all overshoot/bounce `cubic-bezier(...)` curves (`y > 1`) in favor of exponential braking (`--ease-out: cubic-bezier(.16,1,.3,1)`, `--ease-crisp: cubic-bezier(.22,1,.36,1)`, `--ease-snap: cubic-bezier(.2,0,0,1)`).
+- Implemented GPU-composited curtain tab reveals (`.tab-enter-fwd`/`.tab-enter-back` with `clip-path: inset()`), `.rail-glide` indicator glides, `@starting-style` perspective modals, `0fr -> 1fr` accordions, `.field-trace` focus accents, full `prefers-reduced-motion: reduce` zeroing, and `html.motion-lite` support, bringing raw literal duration debt in `tests/motion-tokens.test.js` down from `124` to `0`.
+
+### Design System Guardrails (`tests/`):
+- Added `tests/design-system-v9.test.js`, `tests/security-csp-v9.test.js`, and `tests/v900-a11y-appearance.test.js`, and updated `tests/motion-tokens.test.js`, `tests/player-inspector-rework.test.js`, `tests/player-stats-rework.test.js`, and `tests/worldmap-overhaul.test.js` to enforce zero legacy tokens, zero bounce curves, consolidated CSS structure, and `0` literal motion durations.
+
+### Native Rust Engines (`Pumpkin 0.2.2` & `Horizon`):
+- Added shared cached GitHub Releases resolver and SHA-256 checksum parser (`src/main/adapters/github-releases.js`) with TTL caching, in-flight coalescing, and offline fallback.
+- Updated `src/main/adapters/pumpkin.js` (default `0.2.2+26.3-26.60`), `src/main/adapters/horizon.js`, `src/main/horizon-prepare.js`, `src/main/wizard.js`, and `src/renderer/js/12-wizard.js` (`tests/horizon-adapter.test.js`).
+
+### Content Pagination, Accessibility & Instances Rail Polish:
+- Added 25 items/page pagination (`CONTENT_PAGE_SIZE = 25`, `#contentPager`) in `src/renderer/js/01-content.js`, `src/renderer/index.html`, and all 7 locale files (`tests/content-pagination.test.js`).
+- Fixed Instances Rail horizontal scrollbars, missing-folder wrapping (`<span class="inst-missing-tag">`), and hover/focus-revealed action buttons (`.inst-acts` right-edge overlay) in `src/renderer/css/02-shell.css` and `src/renderer/js/08-shell.js`.
+- Cleared inherited `ELECTRON_RUN_AS_NODE` in `tests/e2e/helpers.js` so `npm run test:e2e` launches cleanly inside Electron-hosted IDE terminals.
+
+### Minecraft `1.21.5–1.21.11` / `26.1–26.3` Parity & Modded Armor/Item 3D:
+- Extended `src/main/datapack.js` (`FORMAT_RANGES` & `MC_TO_FORMAT`: `1.21.5` = `71`, `1.21.6` = `80`, `1.21.7–1.21.8` = `81`, `1.21.9–1.21.10` = `88.0`, `1.21.11` = `94.1`, `26.1` = `101.1`, `26.2` = `107.1`, `26.3` = `121.0`) and `min_format`/`max_format` support across datapacks and `src/main/resource-pack.js`.
+- Updated `src/main/java.js` (`requiredJavaForJar`) to require **Java 25** for `26.x` server jars, and `src/main/server-files.js` (`findPlayerDataFile`) to check both `<world>/playerdata/<uuid>.dat` and `<world>/players/data/<uuid>.dat`.
+- Improved modded item/armor texture resolution (`src/main/mods-index.js`, `src/main/custom-item-renders.js`, `src/main/textures.js`, `src/renderer/js/03-players.js`, `src/renderer/js/03b-player-3d.js`) for top-level `equipment`, `1.21.2+` humanoid armor paths, `items/*.json` definitions, and a subtle `pd.armorCustomModel` notice for custom 3D modded armor geometry (`tests/v910-mod-armor-26x.test.js`).
+
+### Documentation & Showcase:
+- Replaced and expanded `docs/screenshot-*.png` with 11 `v9.0.0` desktop & Remote Web UI captures, fixed `[Release Notes](docs/release-9.0.0.md)` in `README.md`, and synced `CONTRIBUTING.md` (`185` test files, consolidated CSS list, `github-releases` adapter).
+
 ## [8.1.1] - 2026-11-13
 
 **Process Hygiene & Ultra-Low RAM Optimization.**

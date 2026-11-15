@@ -74,18 +74,22 @@ async function runMarketSearch(page){
   });
   if(seq!==marketReqSeq)return;
   $('#marketSearch').disabled=false;$('#marketSort').disabled=false;status.classList.remove('loading'); status.removeAttribute('aria-busy'); $('#marketResults').removeAttribute('aria-busy');
-  if(!r.ok){
-    const isRateLimit = /429|rate\s*limit/i.test(String(r.error));
-    const errMsg = isRateLimit ? t('mkt.rateLimit') : r.error;
+  if(!r||!r.ok){
+    const errRaw=r&&r.error?r.error:'Failed to load marketplace';
+    const isRateLimit = /429|rate\s*limit/i.test(String(errRaw));
+    const errMsg = isRateLimit ? t('mkt.rateLimit') : errRaw;
     status.textContent=t('mkt.couldNotLoadResults',{m:errMsg});
     const n=$('#marketResults');
     status.hidden=false;
-    n.innerHTML=`<article class="panel"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>${isRateLimit?t('mkt.rateLimitTitle'):t('mkt.couldNotLoadMarket')}</b><p class="text-muted" style="margin:4px 0 0">${esc(errMsg)}</p></div><button class="btn primary" onclick="document.getElementById('marketSearch').click()">${t('mkt.retry')}</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">${isRateLimit?t('mkt.rateLimitHint'):t('mkt.checkInternet')}</p></article>`;
+    n.innerHTML=`<article class="panel"><div style="display:flex;gap:12px;align-items:center"><span style="font-size:18px">⚠</span><div><b>${esc(isRateLimit?t('mkt.rateLimitTitle'):t('mkt.couldNotLoadMarket'))}</b><p class="text-muted" style="margin:4px 0 0">${esc(errMsg)}</p></div><button type="button" class="btn primary" data-market-retry>${esc(t('mkt.retry'))}</button></div><p class="text-muted" style="margin-top:10px;font:500 11px var(--font-ui)">${esc(isRateLimit?t('mkt.rateLimitHint'):t('mkt.checkInternet'))}</p></article>`;
+  const retryBtn=n.querySelector('[data-market-retry]');
+  if(retryBtn) retryBtn.onclick=()=>document.getElementById('marketSearch')?.click();
     $('#marketPager').hidden=true;
     const countEl=$('#marketplaceCount'); if(countEl) countEl.textContent=t('mkt.error');
     toast(errMsg,'error');return;
   }
-  let items=r.items.map(x=>{
+  const rawItems=Array.isArray(r.items)?r.items:[];
+  let items=rawItems.map(x=>{
     let itemKind=kind;
     const lds=(x.loaders||[]).map(l=>String(l).toLowerCase());
     if(kind!=='modpack'&&kind!=='datapack'&&lds.some(l=>/fabric|quilt|neoforge|forge/.test(l))){
@@ -141,7 +145,7 @@ $('#marketQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDe
 function flashMarketField(el){el.classList.remove('just-changed');void el.offsetWidth;el.classList.add('just-changed')}
 $('#marketKind').onchange=e=>{marketKindUserChanged=true;flashMarketField(e.target);runMarketSearch(1)};$('#marketVersion').onchange=e=>{flashMarketField(e.target);runMarketSearch(1)};
 $('#marketSort').onchange=e=>{marketSort=e.target.value;runMarketSearch(1)};
-$$('#marketSourceSeg .seg').forEach(b=>b.onclick=()=>{$$('#marketSourceSeg .seg').forEach(x=>x.classList.toggle('active',x===b));$('#marketSource').value=b.dataset.source;flashMarketField($('#marketSourceSeg'));runMarketSearch(1)});
+$$('#marketSourceSeg .seg').forEach(b=>b.onclick=()=>{$$('#marketSourceSeg .seg').forEach(x=>{const on=x===b;x.classList.toggle('active',on);x.setAttribute('aria-selected',String(on));});$('#marketSource').value=b.dataset.source;flashMarketField($('#marketSourceSeg'));runMarketSearch(1)});
 $$('.quick-chip').forEach(c=>c.onclick=()=>{$('#marketQuery').value=c.dataset.quick;runMarketSearch(1)});
 $('#importModpack').onclick=async()=>{const r=await window.observer.importModpack();if(r.cancelled)return;if(!r.ok)return toast(r.error,'error');state.files=r.files;refreshUI();toast(t('mkt.imported',{n:r.name,c:r.installed,s:r.skipped?t('mkt.importedSkipped',{k:r.skipped}):''}),'success');if(r.blocked&&r.blocked.length)openBlockedDialog(r)};
 let blockedState={list:[],destFolder:'mods'};
@@ -155,7 +159,7 @@ async function refreshCurseforgeSource(){
   seg.hidden=!hasKey;
   if(!hasKey&&$('#marketSource').value==='curseforge'){
     $('#marketSource').value='modrinth';
-    $$('#marketSourceSeg .seg').forEach(x=>x.classList.toggle('active',x.dataset.source==='modrinth'));
+    $$('#marketSourceSeg .seg').forEach(x=>{const on=x.dataset.source==='modrinth';x.classList.toggle('active',on);x.setAttribute('aria-selected',String(on));});
   }
 }
 refreshCurseforgeSource();

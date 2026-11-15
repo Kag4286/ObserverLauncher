@@ -25,6 +25,13 @@ const FORMAT_RANGES = [
   { fmt: 22, mc: '1.20.5–1.20.6' },
   { fmt: 32, mc: '1.21' },
   { fmt: 41, mc: '1.21.1' },
+  { fmt: 57, mc: '1.21.2–1.21.3' },
+  { fmt: 61, mc: '1.21.4' },
+  { fmt: 71, mc: '1.21.5' },
+  { fmt: 80, mc: '1.21.6' },
+  { fmt: 81, mc: '1.21.7–1.21.8' },
+  { fmt: 88.0, mc: '1.21.9–1.21.10' },
+  { fmt: 94.1, mc: '1.21.11' },
   // v6.0.0 C5 fix: 1.21.9+ (26.x) uses min_format / max_format. These are the DATA PACK formats,
   // which differ from resource pack formats. 26.1 = 101.1, 26.2 = 107.1, 26.3 = 121.0.
   { fmt: 101.1, mc: '26.1' },
@@ -37,6 +44,8 @@ const MC_TO_FORMAT = {
   '1.17': 7, '1.17.1': 7, '1.18': 8, '1.18.2': 8, '1.19': 9, '1.19.3': 9, '1.19.4': 10,
   '1.20': 12, '1.20.1': 12, '1.20.2': 15, '1.20.3': 18, '1.20.4': 18, '1.20.5': 22, '1.20.6': 22,
   '1.21': 32, '1.21.1': 41,
+  '1.21.2': 57, '1.21.3': 57, '1.21.4': 61, '1.21.5': 71, '1.21.6': 80,
+  '1.21.7': 81, '1.21.8': 81, '1.21.9': 88.0, '1.21.10': 88.0, '1.21.11': 94.1,
   '26.1': 101.1, '26.2': 107.1, '26.3': 121.0,
 };
 
@@ -107,4 +116,4 @@ function readPackMeta(targetAbs, isDir) {
   catch (e) { return { ok: false, error: e?.message || 'Could not read the .zip.' }; }
 }
 
-module.exports = { FORMAT_RANGES, MC_TO_FORMAT, parsePackMeta, formatRange, formatForMc, classifyFormat, readPackMeta };
+module.exports = { FORMAT_RANGES, MC_TO_FORMAT, normalizeFormat, parsePackMeta, formatRange, formatForMc, classifyFormat, readPackMeta };

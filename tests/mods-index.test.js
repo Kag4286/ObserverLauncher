@@ -204,6 +204,29 @@ t('readArmorTexture extracts layer from jar', () => {
     assert.strictEqual(idx.readTexture('c', 'wrench').toString(), 'WRENCH');
   });
 
+  t('readBlockFaces follows parent chain to resolve multi-face mod block', () => {
+    fs.writeFileSync(path.join(dir, 'modmachine-1.0.jar'), makeZip([
+      ['assets/mekanism/models/item/crusher.json', Buffer.from(JSON.stringify({ parent: 'mekanism:block/crusher' }))],
+      ['assets/mekanism/models/block/crusher.json', Buffer.from(JSON.stringify({
+        parent: 'minecraft:block/orientable',
+        textures: { top: 'mekanism:block/crusher_top', front: 'mekanism:block/crusher_front', side: 'mekanism:block/crusher_side' }
+      }))],
+      ['assets/mekanism/textures/block/crusher_top.png', Buffer.from('TOP_PNG')],
+      ['assets/mekanism/textures/block/crusher_front.png', Buffer.from('FRONT_PNG')],
+      ['assets/mekanism/textures/block/crusher_side.png', Buffer.from('SIDE_PNG')],
+      ['assets/mekanism/models/item/ingot_osmium.json', Buffer.from(JSON.stringify({
+        parent: 'minecraft:item/generated',
+        textures: { layer0: 'mekanism:item/ingot_osmium' }
+      }))],
+    ]));
+    const f = idx.readBlockFaces('mekanism', 'crusher');
+    assert.ok(f && f.shape === 'cube');
+    assert.strictEqual(f.buffers.top.toString(), 'TOP_PNG');
+    assert.strictEqual(f.buffers.front.toString(), 'FRONT_PNG');
+    assert.strictEqual(f.buffers.side.toString(), 'SIDE_PNG');
+    assert.strictEqual(idx.readBlockFaces('mekanism', 'ingot_osmium'), null);
+  });
+
   t('setModsDir(null) disables lookups', () => {
     const empty = new ModsIndex();
     empty.setModsDir(null);

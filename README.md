@@ -13,7 +13,7 @@ Create Java or Rust servers on your own PC, invite friends without touching rout
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square&logo=apache)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows_%7C_Linux-2ea44f?style=flat-square&logo=windows&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
-[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](release.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
+[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.0.0.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
 
 <br>
 
@@ -35,9 +35,24 @@ If you just want to host a Minecraft world on your Windows or Linux PC for frien
 4. Click **Start**. If Java is missing or the wrong version for that server, ObserverLauncher downloads a portable OpenJDK build (Java 8, 17, 21, or 25) automatically. Native Rust servers like Pumpkin and Horizon run without Java at all.
 5. Play over local Wi-Fi using your LAN address, or turn on the built-in Playit.gg or Pinggy tunnel so friends can join over the internet without router port forwarding.
 
+<div align="center">
+  <img src="docs/screenshot-wizard.png" width="850" alt="Create Server Wizard supporting Java and native Rust engines">
+</div>
+
 ---
 
 ## Features for Players and Server Hosts
+
+### Live Console & Performance Telemetry
+- Filter live console logs (`INF`, `WRN`, `ERR`, `CMD`), search output, click any player name in the log to jump straight to their inspector, or export logs.
+- Monitor real-time **TPS**, **MSPT**, **CPU**, and **RAM** charts from 15 minutes up to 30 days with memory-leak and tick-drop diagnostics.
+- When a server crashes, **Crash Doctor** reads the log and explains common causes such as wrong Java versions, missing dependencies, or out-of-memory errors.
+
+<p align="center">
+  <img src="docs/screenshot-console.png" width="48%" alt="Live Server Console with log filters and shortcuts">
+  &nbsp;
+  <img src="docs/screenshot-performance.png" width="48%" alt="Real-time TPS, MSPT, CPU, and RAM performance charts">
+</p>
 
 ### Beginner Mode & Personalization
 New hosts can keep **Beginner mode** turned on to hide advanced tabs and Java memory sliders, leaving just **Overview**, **Console**, **Players**, **Server properties**, and **Launcher settings**. While running, Overview shows a simple **"Your server is running!"** box where you can switch between your Wi-Fi address and your internet tunnel in one click. You can toggle between Beginner and Advanced anytime in **Launcher settings > Personal**.
@@ -52,10 +67,16 @@ Personal settings also include 7 UI languages (`en`, `vi`, `es`, `pt-BR`, `de`, 
 - Support for both standard Java servers and native Rust engines (**Pumpkin** and **Horizon**, typically using ~100 to 250 MB RAM with no Java required).
 
 ### Mods, Plugins, Modpacks & Configs
+- Browse and manage large servers comfortably with **25 items per page** pagination across plugins, mods, and datapacks, plus instant filtering and enable/disable toggles.
 - Search and install plugins, mods, datapacks, and modpacks directly from **Modrinth** (and **CurseForge** when you add your own API key in settings).
-- Enable or disable files, check for updates (with one-click rollback if something breaks), and import or export `.mrpack` bundles.
-- Before starting, a quick checker warns you about duplicate mods, missing dependencies, or wrong-loader jars (such as a Forge mod inside a Fabric folder).
+- Check for updates (with one-click rollback if something breaks), import or export `.mrpack` bundles, and detect duplicate mods, missing dependencies, or wrong-loader jars before startup.
 - Edit plugin configs in the built-in folder tree editor, tweak `server.properties` with search and saved snapshot diffs, or manage backend routes in `velocity.toml` for Velocity proxies.
+
+<p align="center">
+  <img src="docs/screenshot-content.png" width="48%" alt="Paginated Content Manager showing 25 items per page">
+  &nbsp;
+  <img src="docs/screenshot-marketplace.png" width="48%" alt="Integrated Modrinth and CurseForge Marketplace">
+</p>
 
 ### Backups, Schedules & Notifications
 - Create manual world ZIP backups or turn on **Auto-backup** (`15m`, `30m`, `1h`, or a custom interval) with automatic cleanup of old auto-backups.
@@ -79,11 +100,9 @@ Personal settings also include 7 UI languages (`en`, `vi`, `es`, `pt-BR`, `de`, 
   <img src="docs/screenshot-worldmap.png" width="850" alt="World Map Interface">
 </div>
 
-### World Map, Waypoints & Diagnostics
-- Explore your world directly from saved `.mca` region files without installing Dynmap or BlueMap: see biomes, terrain relief, surface blocks, water, structures (across legacy 1.12–1.17 and modern 1.18–1.21+ saves), and a 1:8 Overworld/Nether portal coordinate converter.
+### World Map, Waypoints & Cartography
+- Explore your world directly from saved `.mca` region files without installing Dynmap or BlueMap: see biomes, terrain relief, surface blocks, water, structures (across legacy 1.12–1.17 and modern 1.18–1.21.11 / 26.x saves), and a 1:8 Overworld/Nether portal coordinate converter.
 - Turn on **Low-Resource Mode** on the map for lighter CPU/RAM usage, toggle **Cheat Mode** in settings to keep survival exploration fair by default, import/export **Xaero's Minimap** and **JourneyMap** waypoints, and click players or markers to `/tp`.
-- Filter live console logs (`INF`, `WRN`, `ERR`, `CMD`), click any player name in the log to inspect them, export logs, and view **Performance** charts (TPS, MSPT, CPU, and RAM from 15 minutes up to 30 days) with memory-leak/TPS drop alerts.
-- When a server crashes, **Crash Doctor** reads the log and explains common causes such as wrong Java versions, missing dependencies, or out-of-memory errors.
 
 ---
 
@@ -132,9 +151,11 @@ Enabled under **Launcher settings > Integrations** (off by default):
 ### Local MCP Server
 ObserverLauncher exposes 80 server-management tools via `src/mcp/bridge.js` (stdio bridge forwarding to a per-launch authenticated loopback HTTP RPC server). Tools are grouped into `read` (always allowed), `write` (prompts in-app unless **Auto-allow write tools** is enabled), and `destroy` (always requires explicit GUI confirmation, disabled in **Read-only mode**). File reads pass through `maskSecrets()` to redact RCON passwords and tokens.
 
-<div align="center">
-  <img src="docs/screenshot-MCP.png" width="760" alt="Integrations and MCP Settings">
-</div>
+<p align="center">
+  <img src="docs/screenshot-MCP.png" width="48%" alt="Integrations and 80-tool Local MCP Settings">
+  &nbsp;
+  <img src="docs/screenshot-remote-ui.png" width="48%" alt="Remote Web Dashboard over SSE">
+</p>
 
 ---
 
@@ -162,7 +183,7 @@ cd ObserverLauncher
 
 npm install
 npm start          # Launch Electron app in development mode
-npm test           # Run unit and integration suite (174 test files)
+npm test           # Run unit and integration suite (185 test files)
 npm run test:e2e   # Run Playwright Electron E2E tests
 
 npm run build:win   # Windows installer (.exe)

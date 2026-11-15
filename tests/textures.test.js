@@ -44,6 +44,49 @@ const resp = r('tex://auto/item/diamond.png');
 resp.arrayBuffer().then(ab => {
   const b = Buffer.from(ab);
   check('served bytes are PNG', b.length > 8 && b[0] === 0x89 && b.toString('ascii', 1, 4) === 'PNG');
+
+  // resolveVanillaModelFromMap multi-face & shape resolution
+  const mockModels = {
+    block: {},
+    cube: { parent: 'block/block' },
+    cube_all: { parent: 'block/cube' },
+    cube_bottom_top: { parent: 'block/cube' },
+    orientable: { parent: 'block/cube' },
+    slab: { parent: 'block/block' },
+    stairs: { parent: 'block/block' },
+    leaves: { parent: 'block/block', elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: { up: { texture: '#all', tintindex: 0 }, north: { texture: '#all', tintindex: 0 }, east: { texture: '#all', tintindex: 0 } } }] },
+    grass_block: {
+      parent: 'block/block',
+      textures: { bottom: 'block/dirt', top: 'block/grass_block_top', side: 'block/grass_block_side', overlay: 'block/grass_block_side_overlay' },
+      elements: [
+        { from: [0, 0, 0], to: [16, 16, 16], faces: { up: { texture: '#top', tintindex: 0 }, north: { texture: '#side' }, east: { texture: '#side' } } },
+        { from: [0, 0, 0], to: [16, 16, 16], faces: { north: { texture: '#overlay', tintindex: 0 }, east: { texture: '#overlay', tintindex: 0 } } }
+      ]
+    },
+    crafting_table: {
+      parent: 'minecraft:block/cube',
+      textures: { up: 'minecraft:block/crafting_table_top', north: 'minecraft:block/crafting_table_front', east: 'minecraft:block/crafting_table_side' }
+    },
+    oak_slab: { parent: 'minecraft:block/slab', textures: { top: 'minecraft:block/oak_planks', side: 'minecraft:block/oak_planks' } },
+    oak_stairs: { parent: 'minecraft:block/stairs', textures: { top: 'minecraft:block/oak_planks', side: 'minecraft:block/oak_planks' } },
+    oak_leaves: { parent: 'minecraft:block/leaves', textures: { all: 'minecraft:block/oak_leaves' } },
+    cherry_leaves: { parent: 'minecraft:block/leaves', textures: { all: 'minecraft:block/cherry_leaves' } },
+    glass: { parent: 'minecraft:block/cube_all', textures: { all: { sprite: 'minecraft:block/glass', force_translucent: true } } },
+    chest: { textures: { particle: 'minecraft:block/oak_planks' } },
+    poppy: { parent: 'minecraft:block/cross', textures: { cross: 'minecraft:block/poppy' } },
+  };
+  const gb = textures.resolveVanillaModelFromMap('grass_block', mockModels);
+  check('grass_block resolves top + side + overlay + tints', gb && gb.top.texPath === 'block/grass_block_top' && gb.side.texPath === 'block/grass_block_side' && gb.overlay.texPath === 'block/grass_block_side_overlay' && gb.tintTop === true && gb.tintOverlay === true);
+  const ct = textures.resolveVanillaModelFromMap('crafting_table', mockModels);
+  check('crafting_table resolves distinct top/front/side', ct && ct.top.texPath === 'block/crafting_table_top' && ct.front.texPath === 'block/crafting_table_front' && ct.side.texPath === 'block/crafting_table_side');
+  check('oak_slab resolves shape=slab', textures.resolveVanillaModelFromMap('oak_slab', mockModels)?.shape === 'slab');
+  check('oak_stairs resolves shape=stairs', textures.resolveVanillaModelFromMap('oak_stairs', mockModels)?.shape === 'stairs');
+  check('oak_leaves tints green', textures.resolveVanillaModelFromMap('oak_leaves', mockModels)?.tintTop === true);
+  check('cherry_leaves stays untinted', textures.resolveVanillaModelFromMap('cherry_leaves', mockModels)?.tintTop === false);
+  check('glass sprite object resolves cleanly', textures.resolveVanillaModelFromMap('glass', mockModels)?.top?.texPath === 'block/glass');
+  check('chest skips block cubing', textures.resolveVanillaModelFromMap('chest', mockModels) === null);
+  check('poppy cross skips block cubing', textures.resolveVanillaModelFromMap('poppy', mockModels) === null);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 });

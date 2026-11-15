@@ -1143,9 +1143,11 @@ function wmRenderList() {
       pSec.hidden = false;
       pBox.innerHTML = pList.map(p => {
         const dimStr = p.dim || 'overworld';
+        const dimKey = /nether/i.test(dimStr) ? 'nether' : /end/i.test(dimStr) ? 'end' : 'overworld';
         const coordsStr = p.pos ? `${Math.round(p.pos.x)} ${Math.round(p.pos.z)}` : '—';
         const hpNum = p.health !== undefined ? Math.round(p.health) : null;
-        const hpBadge = hpNum !== null ? `<span class="wm-p-hp"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${hpNum}</span>` : '';
+        const hpCls = hpNum !== null ? (hpNum <= 6 ? ' bad' : hpNum <= 12 ? ' warn' : '') : '';
+        const hpBadge = hpNum !== null ? `<span class="wm-p-hp${hpCls}"><svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${hpNum}</span>` : '';
         const avatarHtml = typeof window.getHeadAvatarHtml === 'function'
           ? window.getHeadAvatarHtml(p.uuid, p.name)
           : (typeof window.playerInitialsAvatar === 'function' ? `<img class="player-avatar" src="${window.playerInitialsAvatar(p.name)}" alt="">` : `<span class="wm-dot" style="background:#00E5FF"></span>`);
@@ -1163,7 +1165,7 @@ function wmRenderList() {
           </div>
           <div class="wm-pcard-meta">
             <div class="wm-pcard-state">
-              <span class="wm-pcard-dim">${esc(dimStr)}</span>
+              <span class="wm-pcard-dim wm-dim-${dimKey}">${esc(dimStr)}</span>
               ${hpBadge}
             </div>
             <span class="wm-pcard-coord mono">${coordsStr}</span>

@@ -34,9 +34,8 @@ for (const f of files) {
   if (n) { perFile[f] = n; total += n; }
 }
 
-// Baseline measured for 1.5.0. Lower it when you convert literal durations to tokens; never raise
-// it without a comment explaining why a new literal is unavoidable.
-const BASELINE = 124;
+// Baseline zeroed for 9.0.0 Motion 2.0 rework. Never raise it without a strong reason.
+const BASELINE = 0;
 const SLACK = 0;
 
 console.log('literal motion durations per CSS file:');

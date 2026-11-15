@@ -1,22 +1,42 @@
-/* css/10-dropdown.css (v4.0.0) — custom animated dropdown replacing the OS <select> popup. */
-.ol-select-native{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}
-.ol-dd{position:relative;display:inline-block;min-width:0}
+/* css/10-dropdown.css — Custom Architectural Dropdown (v9.0.0) */
+.ol-select-native{position:absolute!important;left:0!important;top:0!important;width:1px!important;min-width:0!important;height:1px!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none!important}
+.ol-dd{position:relative;display:inline-block;min-width:0;font-family:var(--font-ui)}
 .ol-dd.ol-dd-wide{display:block;width:100%}
-.ol-dd-btn{display:flex;align-items:center;gap:10px;width:100%;min-width:150px;padding:9px 12px;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font:12.5px var(--font-ui);text-align:left;cursor:pointer;transition:border-color var(--dur-micro) var(--ease-out),box-shadow var(--dur-micro) var(--ease-out),background var(--dur-micro) var(--ease-out)}
+.ol-dd-btn{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  width:100%;min-width:150px;padding:8px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--border);background:var(--field);color:var(--text);
+  font:500 12.5px var(--font-ui);cursor:pointer;text-align:left;
+  transition:border-color var(--dur-micro) var(--ease-snap),background var(--dur-micro) var(--ease-snap);
+}
 .ol-dd-wide .ol-dd-btn{min-width:0}
-.ol-dd-btn:hover{border-color:var(--border-strong);background:var(--surface-2)}
-.ol-dd.open .ol-dd-btn{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.ol-dd-btn:hover{border-color:var(--border-strong);background:var(--surface)}
+.ol-dd-btn:focus-visible{outline:none;border-color:var(--brand)}
+.ol-dd.open .ol-dd-btn{border-color:var(--brand);background:var(--surface)}
 .ol-dd-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ol-dd-caret{color:var(--text-dim);font-size:11px;flex-shrink:0;transition:transform var(--dur-fast) var(--ease-out)}
-.ol-dd.open .ol-dd-caret{transform:rotate(180deg)}
-/* position:fixed + portaled to <body> (JS) so the panel escapes any ancestor stacking context
-   (an animated/transformed toolbar traps position:absolute panels behind later siblings). */
-.ol-dd-panel{position:fixed;top:0;left:0;z-index:90;min-width:180px;max-width:min(360px,80vw);max-height:320px;overflow:auto;padding:4px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--r-sm);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:2px;animation:ddIn var(--dur-fast) var(--ease-out) both}
-@keyframes ddIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-/* flex:0 0 auto is MANDATORY: the panel is a flex column with max-height, and flex items default to
-   flex-shrink:1 — with many options they were SQUASHED/overlapping instead of scrolling. */
-.ol-dd-opt{flex:0 0 auto;border:0;background:transparent;color:var(--text);font:500 12.5px var(--font-ui);text-align:left;padding:9px 11px;border-radius:var(--r-xs);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background var(--dur-micro) var(--ease-out)}
-.ol-dd-opt:hover{background:var(--surface-3)}
-.ol-dd-opt.active{background:var(--brand-soft);color:var(--brand)}
+.ol-dd-caret{color:var(--text-3);font-size:10px;flex-shrink:0;transition:transform var(--dur-fast) var(--ease-out)}
+.ol-dd.open .ol-dd-caret{transform:rotate(180deg);color:var(--brand)}
+.ol-dd-panel{
+  position:fixed;top:0;left:0;z-index:200;min-width:180px;max-width:min(360px,80vw);max-height:320px;
+  overflow:auto;padding:4px;border-radius:var(--r-lg);border:1px solid var(--border-strong);
+  background:var(--bg-elev);box-shadow:var(--shadow-lg);
+  display:flex;flex-direction:column;gap:2px;
+  animation:ddIn var(--dur-fast) var(--ease-out) both;
+}
+@keyframes ddIn{
+  from{opacity:0;transform:translate3d(0,-4px,0) scale(.985);clip-path:inset(0 0 20% 0)}
+  to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}
+}
+.ol-dd-opt{
+  flex:0 0 auto;border:0;background:transparent;color:var(--text-2);
+  font:500 12.5px var(--font-ui);text-align:left;padding:8px 10px;border-radius:var(--r-sm);
+  cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  transition:background var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap);
+}
+.ol-dd-opt:hover,.ol-dd-opt.focused{background:var(--surface-2);color:var(--text)}
+.ol-dd-opt.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.ol-dd-opt.active::after{content:'✓';font-size:11px;font-weight:700;margin-left:8px;flex-shrink:0}
+.ol-dd-opt:disabled{opacity:.4;cursor:not-allowed}
 @media (prefers-reduced-motion:reduce){.ol-dd-panel{animation:none}.ol-dd-caret{transition:none}}
 html.motion-lite .ol-dd-panel{animation:none}

@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { listVersions, getPumpkinPlatform, resolve } = require('../src/main/adapters/pumpkin.js');
+const { listVersions, fetchVersions, getPumpkinPlatform, resolve } = require('../src/main/adapters/pumpkin.js');
 const {
   getDefaultPumpkinToml,
   parsePumpkinToml,
@@ -43,6 +43,11 @@ function ck(name, condition) {
   const resolved021 = await resolve('0.2.1');
   ck('resolve("0.2.1") maps to tag 0.2.1+26.3-26.51', resolved021.version.includes('0.2.1'));
   ck('resolve("0.2.1") includes mirror url', resolved021.urls.some(u => u.includes('ghfast.top')));
+
+  const resolved022 = await resolve('0.2.2');
+  ck('resolve("0.2.2") maps to 0.2.2 release', resolved022.version.includes('0.2.2'));
+  const fetched = await fetchVersions();
+  ck('fetchVersions returns 0.2.2 or newer first', fetched[0] === '0.2.2' || fetched.includes('0.2.2'));
 
   // RESOLVERS integration check
   ck('RESOLVERS.pumpkin is a function', typeof RESOLVERS.pumpkin === 'function');

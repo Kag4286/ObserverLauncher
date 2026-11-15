@@ -9,10 +9,31 @@ const { dataDir } = require('./data-dir.js');
 const HORIZON_VERSION = '26.3';
 const MANIFEST_URL = 'https://piston-meta.mojang.com/v1/packages/5df1795e16eea19d75b923d66ecca9ce183353c5/26.3.json';
 
+function readTargetMcVersion(serverPath) {
+  if (serverPath) {
+    try {
+      const lock = JSON.parse(fs.readFileSync(path.join(serverPath, 'research-lock.json'), 'utf8'));
+      const v = String(lock?.minecraft?.version || '').trim();
+      if (v) return v;
+    } catch {}
+  }
+  return HORIZON_VERSION;
+}
+
+async function resolveMojangManifestUrl(mcVersion) {
+  try {
+    const v2 = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
+    const hit = (v2?.versions || []).find(e => e && e.id === mcVersion);
+    if (hit?.url) return hit.url;
+  } catch {}
+  return mcVersion === HORIZON_VERSION ? MANIFEST_URL : null;
+}
+
 function hasHorizonResources(serverPath) {
   if (!serverPath) return false;
+  const mcVer = readTargetMcVersion(serverPath);
   const p1 = path.join(serverPath, 'resources', 'horizon-resources.json');
-  const p2 = path.join(serverPath, '.local', 'horizon-client', HORIZON_VERSION, 'horizon-resources.json');
+  const p2 = path.join(serverPath, '.local', 'horizon-client', mcVer, 'horizon-resources.json');
   try {
     if (fs.existsSync(p1) && fs.statSync(p1).size > 0) return true;
     if (fs.existsSync(p2) && fs.statSync(p2).size > 0) return true;
@@ -20,15 +41,16 @@ function hasHorizonResources(serverPath) {
   return false;
 }
 
-function getHorizonSharedCacheDir() {
-  return path.join(dataDir(), 'cache', `horizon-resources-${HORIZON_VERSION}`);
+function getHorizonSharedCacheDir(mcVersion = HORIZON_VERSION) {
+  return path.join(dataDir(), 'cache', `horizon-resources-${mcVersion || HORIZON_VERSION}`);
 }
 
 function getHorizonMinecraftCacheDir() {
   return path.join(dataDir(), 'cache', 'horizon-minecraft');
 }
 
-function findLocalMinecraftDir() {
+function findLocalMinecraftDir(mcVersion = HORIZON_VERSION) {
+  const ver = mcVersion || HORIZON_VERSION;
   const home = os.homedir();
   const candidates = [];
   if (process.platform === 'win32') {
@@ -54,8 +76,8 @@ function findLocalMinecraftDir() {
   }
 
   for (const dir of candidates) {
-    const verJson = path.join(dir, 'versions', HORIZON_VERSION, `${HORIZON_VERSION}.json`);
-    const clientJar = path.join(dir, 'versions', HORIZON_VERSION, `${HORIZON_VERSION}.jar`);
+    const verJson = path.join(dir, 'versions', ver, `${ver}.json`);
+    const clientJar = path.join(dir, 'versions', ver, `${ver}.jar`);
     if (fs.existsSync(verJson) && fs.existsSync(clientJar)) {
       return dir;
     }
@@ -63,31 +85,34 @@ function findLocalMinecraftDir() {
   return null;
 }
 
-async function downloadMissingGameFiles(mcCacheDir, onProgress) {
+async function downloadMissingGameFiles(mcCacheDir, onProgress, mcVersion = HORIZON_VERSION) {
+  const ver = mcVersion || HORIZON_VERSION;
   fs.mkdirSync(mcCacheDir, { recursive: true });
-  const verDir = path.join(mcCacheDir, 'versions', HORIZON_VERSION);
+  const verDir = path.join(mcCacheDir, 'versions', ver);
   fs.mkdirSync(verDir, { recursive: true });
 
-  const manifestPath = path.join(verDir, `${HORIZON_VERSION}.json`);
+  const manifestPath = path.join(verDir, `${ver}.json`);
   let manifest = null;
   if (fs.existsSync(manifestPath)) {
     try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch {}
   }
   if (!manifest) {
-    onProgress?.('Fetching Minecraft 26.3 version manifest...');
-    manifest = await json(MANIFEST_URL);
+    onProgress?.(`Fetching Minecraft ${ver} version manifest...`);
+    const manifestUrl = await resolveMojangManifestUrl(ver);
+    if (!manifestUrl) throw new Error(`Could not resolve Mojang manifest URL for Minecraft ${ver}.`);
+    manifest = await json(manifestUrl);
     require('./fs-utils.js').writeFileAtomic(manifestPath, JSON.stringify(manifest, null, 2));
   }
 
-  const clientPath = path.join(verDir, `${HORIZON_VERSION}.jar`);
+  const clientPath = path.join(verDir, `${ver}.jar`);
   if (!fs.existsSync(clientPath) || fs.statSync(clientPath).size === 0) {
-    onProgress?.('Downloading Minecraft 26.3 client JAR (39 MB)...');
+    onProgress?.(`Downloading Minecraft ${ver} client JAR...`);
     await download(manifest.downloads.client.url, clientPath, null, null);
   }
 
   const serverPath = path.join(mcCacheDir, 'server.jar');
   if (!fs.existsSync(serverPath) || fs.statSync(serverPath).size === 0) {
-    onProgress?.('Downloading Minecraft 26.3 server JAR (59 MB)...');
+    onProgress?.(`Downloading Minecraft ${ver} server JAR...`);
     await download(manifest.downloads.server.url, serverPath, null, null);
   }
 
@@ -156,19 +181,6 @@ async function prepareHorizonServer(serverPath, onProgress = null, ctx = null) {
     return { ok: true, cached: true };
   }
 
-  const sharedCache = getHorizonSharedCacheDir();
-  const cacheManifest = path.join(sharedCache, 'horizon-resources.json');
-  if (fs.existsSync(cacheManifest)) {
-    onProgress?.('Deploying prepared Horizon resources from shared cache...');
-    const localTarget = path.join(serverPath, '.local', 'horizon-client', HORIZON_VERSION);
-    const resTarget = path.join(serverPath, 'resources');
-    fs.mkdirSync(path.dirname(localTarget), { recursive: true });
-    fs.cpSync(sharedCache, localTarget, { recursive: true });
-    fs.mkdirSync(resTarget, { recursive: true });
-    fs.cpSync(sharedCache, resTarget, { recursive: true });
-    return { ok: true, fromCache: true };
-  }
-
   const prepareBinName = process.platform === 'win32' ? 'horizon-prepare.exe' : 'horizon-prepare';
   const prepareBin = path.join(serverPath, prepareBinName);
   if (!fs.existsSync(prepareBin)) {
@@ -189,7 +201,21 @@ async function prepareHorizonServer(serverPath, onProgress = null, ctx = null) {
     }
   }
 
-  let mcDir = findLocalMinecraftDir();
+  const mcVer = readTargetMcVersion(serverPath);
+  const sharedCacheForVer = getHorizonSharedCacheDir(mcVer);
+  const cacheManifestForVer = path.join(sharedCacheForVer, 'horizon-resources.json');
+  if (fs.existsSync(cacheManifestForVer)) {
+    onProgress?.('Deploying prepared Horizon resources from shared cache...');
+    const localTarget = path.join(serverPath, '.local', 'horizon-client', mcVer);
+    const resTarget = path.join(serverPath, 'resources');
+    fs.mkdirSync(path.dirname(localTarget), { recursive: true });
+    fs.cpSync(sharedCacheForVer, localTarget, { recursive: true });
+    fs.mkdirSync(resTarget, { recursive: true });
+    fs.cpSync(sharedCacheForVer, resTarget, { recursive: true });
+    return { ok: true, fromCache: true };
+  }
+
+  let mcDir = findLocalMinecraftDir(mcVer);
   let serverJar = null;
 
   if (mcDir) {
@@ -201,16 +227,16 @@ async function prepareHorizonServer(serverPath, onProgress = null, ctx = null) {
     } else if (fs.existsSync(cacheServer)) {
       serverJar = cacheServer;
     } else {
-      onProgress?.('Downloading Minecraft 26.3 server JAR...');
+      onProgress?.(`Downloading Minecraft ${mcVer} server JAR...`);
       const cacheDir = getHorizonMinecraftCacheDir();
       fs.mkdirSync(cacheDir, { recursive: true });
-      const dl = await downloadMissingGameFiles(cacheDir, onProgress);
+      const dl = await downloadMissingGameFiles(cacheDir, onProgress, mcVer);
       serverJar = dl.serverJar;
     }
   } else {
-    onProgress?.('Downloading required Minecraft 26.3 game assets & libraries for Horizon...');
+    onProgress?.(`Downloading required Minecraft ${mcVer} game assets & libraries for Horizon...`);
     const cacheDir = getHorizonMinecraftCacheDir();
-    const dl = await downloadMissingGameFiles(cacheDir, onProgress);
+    const dl = await downloadMissingGameFiles(cacheDir, onProgress, mcVer);
     mcDir = dl.mcDir;
     serverJar = dl.serverJar;
   }
@@ -221,7 +247,7 @@ async function prepareHorizonServer(serverPath, onProgress = null, ctx = null) {
 
   onProgress?.('Running horizon-prepare to compile game definitions & parity models...');
   if (ctx && typeof ctx.appendLog === 'function') {
-    ctx.appendLog('Starting horizon-prepare to generate resources from Minecraft 26.3...', 'system');
+    ctx.appendLog(`Starting horizon-prepare to generate resources from Minecraft ${mcVer}...`, 'system');
   }
 
   const args = [
@@ -258,12 +284,12 @@ async function prepareHorizonServer(serverPath, onProgress = null, ctx = null) {
   }
 
   // Populate shared cache and root resources/
-  const generatedDir = path.join(serverPath, '.local', 'horizon-client', HORIZON_VERSION);
+  const generatedDir = path.join(serverPath, '.local', 'horizon-client', mcVer);
   const rootResDir = path.join(serverPath, 'resources');
   if (fs.existsSync(generatedDir)) {
     try {
-      fs.mkdirSync(sharedCache, { recursive: true });
-      fs.cpSync(generatedDir, sharedCache, { recursive: true });
+      fs.mkdirSync(sharedCacheForVer, { recursive: true });
+      fs.cpSync(generatedDir, sharedCacheForVer, { recursive: true });
       fs.mkdirSync(rootResDir, { recursive: true });
       fs.cpSync(generatedDir, rootResDir, { recursive: true });
     } catch {}

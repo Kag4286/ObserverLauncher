@@ -77,13 +77,13 @@ ck('fmtStat: formats numbers with locale string', fmtStat('minecraft:mob_kills',
 
 // --- Icon style & SVG design consistency ---
 const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'css', '07-polish.css'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'css', '04-players.css'), 'utf8');
 
 ck('hero icons: index.html has no emoji in pdStatsHero', !/#pdStatsHero[\s\S]*?[⏱️⚔️🧭💥]/.test(html));
 ck('hero icons: index.html has 4 vector SVGs in hero cards', (html.match(/class="pd-hero-icon"[\s\S]*?<svg viewBox="0 0 24 24"/g) || []).length === 4);
 ck('damage indicator: 03-players.js uses pd-stat-heart SVG instead of raw emoji', src.includes('class="pd-stat-heart"') && !src.includes('pd-stat-extra">${(v / 2).toFixed(1)} ❤'));
-ck('css styling: 07-polish.css styles .pd-hero-icon svg with 18px size', css.includes('.pd-hero-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;flex-shrink:0;display:block}'));
-ck('css styling: 07-polish.css styles .pd-stat-heart', css.includes('.pd-stat-heart{width:10px;height:10px;fill:var(--danger);flex-shrink:0;display:inline-block;vertical-align:-1px}'));
+ck('css styling: 04-players.css styles .pd-hero-icon svg with 18px size', css.includes('.pd-hero-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;flex-shrink:0;display:block}'));
+ck('css styling: 04-players.css styles .pd-stat-heart', css.includes('.pd-stat-heart{width:10px;height:10px;fill:var(--danger);flex-shrink:0;display:inline-block;vertical-align:-1px}'));
 
 // --- End-to-end renderPdStats execution ---
 const dom = {};

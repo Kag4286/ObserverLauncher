@@ -111,7 +111,6 @@ function rebuildSamples(history,historyLong){
   // v5.3.0: seed the coarse ring used by the 1h/6h ranges from the server's metricsLong snapshot.
   if(Array.isArray(historyLong)) samplesLong=historyLong.slice(-PERF_LONG_CAP).map(s=>({t:Number(s.t)||0,tps:s.tps??null,mspt:s.mspt??null,cpu:s.cpu??null,ram:s.ram??null}));
   computeChartSamples();
-  try{ drawOvSpark(); }catch{}
   try{ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
 }
 // v5.3.0: pick what metricChart draws for the active range. 15m uses the live 38-point ring
@@ -142,9 +141,22 @@ async function setPerfRange(range){
   computeChartSamples();
   try{ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); }catch{}
 }
-const channelOrder=['overview','console','players','performance','content','marketplace','worlds','properties'];
-function positionChannelIndicator(){const nav=$('#nav'),ind=$('#channelIndicator');if(!nav||!ind)return;const active=nav.querySelector('.nav-item.active');if(!active){ind.style.opacity='0';return} // rail is vertical — indicator is left border via CSS, no horizontal calc needed
-  ind.style.opacity='0'; }
+const channelOrder=['overview','console','players','performance','content','marketplace','worlds','worldmap','properties','settings'];
+function positionChannelIndicator(){
+  const nav=$('#nav');if(!nav)return;
+  const ind=$('#channelIndicator');if(ind)ind.style.opacity='0';
+  const glide=nav.querySelector('#railGlide')||nav.querySelector('.rail-glide');
+  if(!glide)return;
+  const active=nav.querySelector('.nav-item.active');
+  if(!active||active.offsetParent===null){glide.classList.remove('ready');nav.classList.remove('has-glide');return;}
+  const navRect=nav.getBoundingClientRect();
+  const actRect=active.getBoundingClientRect();
+  const y=Math.max(0,(actRect.top-navRect.top)+nav.scrollTop+5);
+  const h=Math.max(12,actRect.height-10);
+  glide.style.transform=`translate3d(0,${y.toFixed(1)}px,0) scaleY(${h.toFixed(1)})`;
+  nav.classList.add('has-glide');
+  glide.classList.add('ready');
+}
 let lastTabIdx=0;
 // UX (2.6.0): remember each tab's scroll position so returning to a tab lands where the user left
 // it, instead of snapping back to the top. The scrolling container is `.workspace main`.
@@ -187,17 +199,19 @@ function switchTab(tab){
   const tabIdx=order.indexOf(tab), dir=tabIdx<0?0:Math.sign(tabIdx-lastTabIdx);
   if(tabIdx>=0)lastTabIdx=tabIdx;
   $$('.tab').forEach(s=>s.classList.toggle('active',s.id===tab));
-  $('#pageTitle').textContent=t('nav.'+tab)||titles[tab];
-  const ci=$('#channelIndex'),idx=channelOrder.indexOf(tab);if(ci)ci.textContent=idx>-1?`${String(idx+1).padStart(2,'0')} / ${String(channelOrder.length).padStart(2,'0')}`:'—';
+  if(typeof syncTopbarHeader==='function')syncTopbarHeader(tab);else $('#pageTitle').textContent=t('nav.'+tab)||titles[tab];
   positionChannelIndicator();
   // a11y: focus the new tab panel for screen readers
   const panel=document.getElementById(tab); if(panel){ panel.setAttribute('tabindex','-1'); panel.focus({preventScroll:true});
-    // Retriggerable enter animation (motion lives in css/08-motion.css).
-    panel.classList.remove('tab-enter-fwd','tab-enter-back'); void panel.offsetWidth;
-    panel.classList.add(dir<0?'tab-enter-back':'tab-enter-fwd');
+    // Retriggerable enter + stagger classes (decoupled timers so list staggers outlive the 190ms tab fade).
+    if(panel._tabTimer){clearTimeout(panel._tabTimer);panel._tabTimer=0;}
+    if(panel._staggerTimer){clearTimeout(panel._staggerTimer);panel._staggerTimer=0;}
+    panel.classList.remove('tab-enter-fwd','tab-enter-back','tab-stagger'); void panel.offsetWidth;
+    panel.classList.add(dir<0?'tab-enter-back':'tab-enter-fwd','tab-stagger');
     const onTabEnd=e=>{if(e.target===panel){panel.classList.remove('tab-enter-fwd','tab-enter-back');panel.removeEventListener('animationend',onTabEnd);}};
     panel.addEventListener('animationend',onTabEnd);
-    setTimeout(()=>{panel.classList.remove('tab-enter-fwd','tab-enter-back');panel.removeEventListener('animationend',onTabEnd);},200);
+    panel._tabTimer=setTimeout(()=>{panel.classList.remove('tab-enter-fwd','tab-enter-back');panel.removeEventListener('animationend',onTabEnd);panel._tabTimer=0;},220);
+    panel._staggerTimer=setTimeout(()=>{panel.classList.remove('tab-stagger');panel._staggerTimer=0;},420);
   }
   if(tab==='marketplace'&&!$('#marketResults').innerHTML)$('#marketSearch').click();
   if(tab==='performance'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPerfDiagnostics()}}); requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ try{metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource');}catch{}})}); }
@@ -205,7 +219,7 @@ function switchTab(tab){
   // Floodgate, a mod) surfaces without an app restart, and the Geyser/Bedrock card appears at once.
   // The sparkline was 0-sized while Overview was hidden — redraw on reveal (same class of bug as the
   // hidden world-map canvas). Two rAFs so layout has settled after the tab becomes visible.
-  if(tab==='overview'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});requestAnimationFrame(()=>requestAnimationFrame(()=>{try{drawOvSpark()}catch{}}));}
+  if(tab==='overview'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI()}});}
   if(tab==='players')getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;renderPlayers()}});
   if(tab==='content'){getFilesCached().then(r=>{if(r.ok){state.files=r.files;state.javaRequired=r.javaRequired??state.javaRequired;refreshUI();if(typeof syncContentKindAuto==='function')syncContentKindAuto();}});if(!state.contentUpdates&&typeof loadContentUpdates==='function')loadContentUpdates();if(typeof loadContentConflicts==='function')loadContentConflicts();}
   // World Map loads lazily HERE (single choke point) — 02-worldmap.js must not
@@ -250,6 +264,8 @@ function renderInstanceList(){
   wrap.hidden=list.length===0;
   if(list.length===0)return;
   const activeId=state.activeInstanceId||(list[0]&&list[0].id);
+  const activeInst=list.find(i=>i.id===activeId)||list[0];
+  document.documentElement.style.setProperty('--instance-accent',instAccentCss(activeInst&&activeInst.accent));
   // v6.0.0 E3: the group filter is a rail-scoped display toggle. `instGroupFilterValue` holds the
   // active chip's group ('' = All). Filtering only hides rows; bulk actions still touch every
   // instance on purpose, so a filtered view can never start a server the user cannot see.
@@ -278,6 +294,7 @@ function renderInstanceList(){
     const isMissing=!!inst.missing;
     const row=document.createElement('div');
     row.className='inst-item'+(isActive?' active':'')+(isMissing?' missing':'');
+    row.style.setProperty('--instance-accent',instAccentCss(inst.accent));
     row.dataset.instance=inst.id;
     row.setAttribute('role','listitem');
     row.tabIndex=0;
@@ -287,7 +304,7 @@ function renderInstanceList(){
     row.style.animationDelay=(idx*28)+'ms';
     const groupBadge=inst.group?'<span class="inst-group-badge" title="'+esc(inst.group)+'">'+esc(inst.group)+'</span>':'';
     row.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,isMissing?'stopped':st)
-      +'<span class="inst-name"><span class="inst-name-text">'+esc(inst.name||inst.serverPath||'Server')+'</span>'+(isMissing?' <i class="inst-missing-tag">'+esc(t('inst.missing'))+'</i>':'')+groupBadge+'</span>'
+      +'<span class="inst-name"><span class="inst-name-text">'+esc(inst.name||inst.serverPath||'Server')+'</span>'+(isMissing?'<span class="inst-missing-tag">'+esc(t('inst.missing'))+'</span>':'')+groupBadge+'</span>'
       +'<span class="inst-acts">'
         +'<button type="button" class="inst-act" data-act="group" title="'+esc(t('inst.groupSet'))+'" aria-label="'+esc(t('inst.groupSet'))+'">⊞</button>'
         +(isMissing?'<button type="button" class="inst-act" data-act="relink" title="'+esc(t('inst.relink'))+'" aria-label="'+esc(t('inst.relink'))+'">↻</button>':'')
@@ -341,18 +358,37 @@ function activeInstanceMeta(){
   const id=state.activeInstanceId||(list[0]&&list[0].id);
   return list.find(i=>i.id===id)||null;
 }
+const INST_ACCENT_LABELS={'':'Emerald (Default)',lime:'Lime',violet:'Violet',orange:'Orange',pink:'Pink',blue:'Blue'};
 function renderInstanceAppearance(){
   const host=$('#instAccentRow'),preview=$('#instAccentPreview');
   if(!host||!preview)return;
   const inst=activeInstanceMeta();
   const accent=(inst&&inst.accent)||'';
   const seed=(inst&&inst.artSeed)||0;
+  const keepFocus=host.contains(document.activeElement);
   host.innerHTML=INST_ACCENT_KEYS.map(k=>{
-    const on=k===accent?' active':'';
-    return '<button type="button" class="accent-swatch'+on+'" role="radio" aria-checked="'+(k===accent)+'" data-accent="'+k+'" title="'+esc(k||'brand')+'" style="--sw:'+instAccentCss(k)+'"></button>';
+    const on=k===accent;
+    const lbl=INST_ACCENT_LABELS[k]||k||'Emerald';
+    return '<button type="button" class="accent-swatch'+(on?' active':'')+'" role="radio" aria-checked="'+on+'" tabindex="'+(on?0:-1)+'" data-accent="'+k+'" aria-label="'+esc(lbl)+'" title="'+esc(lbl)+'" style="--sw:'+instAccentCss(k)+'"></button>';
   }).join('');
   host.querySelectorAll('[data-accent]').forEach(b=>b.onclick=()=>setInstanceAppearance({accent:b.dataset.accent}));
-  preview.innerHTML=instAvatarHtml(inst?inst.name:'',seed,accent,'stopped');
+  host.onkeydown=e=>{
+    const radios=[...host.querySelectorAll('[role="radio"]')];
+    if(!radios.length)return;
+    const idx=radios.indexOf(document.activeElement);
+    if(idx===-1)return;
+    let next=-1;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') next=(idx+1)%radios.length;
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp') next=(idx-1+radios.length)%radios.length;
+    else if(e.key==='Home') next=0;
+    else if(e.key==='End') next=radios.length-1;
+    if(next<0)return;
+    e.preventDefault();
+    radios[next].focus();
+    setInstanceAppearance({accent:radios[next].dataset.accent});
+  };
+  if(keepFocus) host.querySelector('[role="radio"][aria-checked="true"]')?.focus();
+  preview.innerHTML=instAvatarHtml(inst?inst.name:'',seed,accent,instanceDotStatus(inst&&inst.id,state.activeInstanceId));
 }
 // Persist an appearance change for the active instance, then repaint the section + rail (avatar).
 async function setInstanceAppearance(patch){
@@ -363,6 +399,7 @@ async function setInstanceAppearance(patch){
   const next=(state.instances||[]).map(i=>i.id===inst.id?{...i,accent:r.accent,artSeed:r.artSeed}:i);
   state={...state,instances:next};
   renderInstanceAppearance();
+  renderInstanceList();
 }
 // Compact instance switcher for narrow screens (rail hidden <1100px). Same state as the rail list:
 // shows the active instance + a menu to switch. Hidden when there is 0-1 instance.
@@ -379,13 +416,16 @@ function renderInstanceDropdown(list, activeId){
   list.forEach(inst=>{
     const isActive=inst.id===activeId;
     const st=instanceDotStatus(inst.id,activeId);
+    const isMissing=!!inst.missing;
     const b=document.createElement('button');
     b.type='button';
-    b.className='inst-item'+(isActive?' active':'');
+    b.className='inst-item'+(isActive?' active':'')+(isMissing?' missing':'');
     b.setAttribute('role','option');
     b.setAttribute('aria-selected',isActive?'true':'false');
     b.dataset.instance=inst.id;
-    b.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,st)+'<span class="inst-name">'+esc(inst.name||inst.serverPath||'Server')+'</span>';
+    if(isMissing) b.title=t('inst.missingTip');
+    b.innerHTML=instAvatarHtml(inst.name||inst.serverPath||'Server',inst.artSeed,inst.accent,isMissing?'stopped':st)
+      +'<span class="inst-name"><span class="inst-name-text">'+esc(inst.name||inst.serverPath||'Server')+'</span>'+(isMissing?'<span class="inst-missing-tag">'+esc(t('inst.missing'))+'</span>':'')+'</span>';
     b.onclick=()=>{ closeInstDd(); switchInstance(inst.id); };
     menu.appendChild(b);
   });
@@ -618,18 +658,13 @@ if(logSearch){
   logSearch.addEventListener('input',onSearch);
   logSearchClear?.addEventListener('click',()=>{ logSearch.value=''; logQuery=''; logSearchClear.hidden=true; reapplyLogFilter(); updateLogHint(); logSearch.focus(); });
 }
-// Auto-scroll toggle: ON pins to the newest line; OFF lets the user read history without being
-// yanked down. Scrolling away by hand turns it off automatically (that is what 'off' means).
-const logAutoBtn=$('#logAutoscroll');
-function setAutoScroll(on){ logAutoScroll=on; logPaused=!on; if(logAutoBtn){ logAutoBtn.classList.toggle('active',on); logAutoBtn.setAttribute('aria-pressed',on?'true':'false'); } if(on){ const o=$('#logOutput'); if(o) o.scrollTop=o.scrollHeight; const j=$('#logJump'); if(j) j.hidden=true; } }
-logAutoBtn?.addEventListener('click',()=>setAutoScroll(!logAutoScroll));
 document.addEventListener('keydown', e=>{
   const isConsole=document.getElementById('console')?.classList.contains('active');
   if(!isConsole) return;
   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='l'){ e.preventDefault(); $('#clearConsole')?.click(); }
   if(e.key==='/' && !e.ctrlKey && document.activeElement?.tagName!=='INPUT' && document.activeElement?.tagName!=='TEXTAREA'){ e.preventDefault(); $('#commandInput')?.focus(); }
 });
-const logOutputEl=$('#logOutput');if(logOutputEl)logOutputEl.addEventListener('scroll',()=>{const atBottom=logOutputEl.scrollHeight-logOutputEl.scrollTop-logOutputEl.clientHeight<40;logPaused=!atBottom;if(atBottom){const j=$('#logJump');if(j)j.hidden=true}/* scrolled away by hand -> reflect it on the auto-scroll toggle */if(!atBottom&&logAutoScroll){logAutoScroll=false;const b=$('#logAutoscroll');if(b){b.classList.remove('active');b.setAttribute('aria-pressed','false')}}});
+const logOutputEl=$('#logOutput');if(logOutputEl)logOutputEl.addEventListener('scroll',()=>{const atBottom=logOutputEl.scrollHeight-logOutputEl.scrollTop-logOutputEl.clientHeight<40;logPaused=!atBottom;if(atBottom){const j=$('#logJump');if(j)j.hidden=true;}});
 const logJumpEl=$('#logJump');if(logJumpEl)logJumpEl.onclick=()=>{logOutputEl.scrollTop=logOutputEl.scrollHeight;logJumpEl.hidden=true;logPaused=false};
 const cmdInputEl=$('#commandInput');if(cmdInputEl)cmdInputEl.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){if(!cmdHistory.length)return;e.preventDefault();cmdHistoryIdx=Math.min(cmdHistory.length-1,cmdHistoryIdx+1);cmdInputEl.value=cmdHistory[cmdHistoryIdx]||''}else if(e.key==='ArrowDown'){e.preventDefault();cmdHistoryIdx=Math.max(-1,cmdHistoryIdx-1);cmdInputEl.value=cmdHistoryIdx===-1?'':cmdHistory[cmdHistoryIdx]}});
 $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
@@ -766,27 +801,9 @@ function applyLiveToUI(live){
   try{
     const tpsText = live?.tps?.toFixed?.(2) ?? '—';
     const msptText = live?.mspt?.toFixed?.(2) ?? '—';
-    const tpsEl=$('#tps'); if(tpsEl && tpsEl.textContent==='—' && live?.tps!=null) tpsEl.textContent=tpsText;
     const perfTpsEl=$('#perfTps'); if(perfTpsEl && perfTpsEl.textContent==='—' && live?.tps!=null) perfTpsEl.textContent=tpsText;
     const msptEl=$('#perfMspt'); if(msptEl && msptEl.textContent==='—' && live?.mspt!=null) msptEl.textContent=msptText;
   }catch{}
-}
-// Sparkline (1.3.0): draw the last ~60 samples as a TPS line + a CPU line on a tiny canvas.
-// Reads the shared `samples` ring (defined in 00-core.js). Guards a hidden/0-size canvas (the
-// Overview may be display:none when this runs) — draw nothing rather than a broken axis.
-function drawOvSpark(){
-  const tab = document.getElementById('overview');
-  if (!tab || !tab.classList.contains('active')) return;
-  const cv=$('#ovSpark'); if(!cv) return;
-  const r=cv.getBoundingClientRect(); if(!r.width||!r.height) return;
-  const d=devicePixelRatio||1;
-  if(cv.width!==Math.round(r.width*d)||cv.height!==Math.round(r.height*d)){cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d)}
-  const ctx=cv.getContext('2d'); ctx.setTransform(d,0,0,d,0,0);
-  const w=r.width,h=r.height; ctx.clearRect(0,0,w,h);
-  const { cAccent: cTps, cWarn: cCpu } = getChartThemeColors();
-  const data=samples.slice(-60); const n=data.length; if(!n) return;
-  const line=(key,color,max)=>{const pts=data.map((s,i)=>({i,v:s[key]})).filter(p=>p.v!=null);if(pts.length<2)return;ctx.beginPath();pts.forEach((p,j)=>{const x=(p.i/(n-1))*w, y=h-2-(Math.min(p.v,max)/max)*(h-4);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke()};
-  line('cpu',cCpu,100); line('tps',cTps,20);
 }
 // v6.0.0 D3/D4: paint the two Performance-tab alert banners from the same rings the charts use.
 // Runs on every metric tick; when there is no anomaly (or no data yet) the banner is hidden. Uses
@@ -819,23 +836,19 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   // initial state snapshot). computeChartSamples() then re-derives chartSamples for the active range.
   const _nowMs=Date.now(), _lastLong=samplesLong[samplesLong.length-1];
   if(!_lastLong||(_nowMs-_lastLong.t)>=PERF_LONG_MS){ samplesLong.push({t:_nowMs,tps:displayTps,mspt:v.running?(displayMspt):null,cpu:v.running?(v.cpu??null):null,ram}); if(samplesLong.length>PERF_LONG_CAP)samplesLong.splice(0,samplesLong.length-PERF_LONG_CAP); }
-  computeChartSamples(); try{drawOvSpark();}catch{} try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?(isNat?(usedMB<1024?`${Math.round(usedMB)} MB`:`${usedGB.toFixed(2)} GB`):`${usedGB.toFixed(1)} / ${limitGB} GB`):'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{$('#serverRam').textContent=ramLabel;}catch{} try{const c=$('#overviewCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} try{const pc=$('#playerCount');if(pc){if(v.running)tweenNumber(pc,(v.players||[]).length);else pc.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
+  computeChartSamples(); try{$('#appMemory').textContent=`${v.appMemory||0} MB`;}catch{} const ramLabel=v.running?(isNat?(usedMB<1024?`${Math.round(usedMB)} MB`:`${usedGB.toFixed(2)} GB`):`${usedGB.toFixed(1)} / ${limitGB} GB`):'—'; try{$('#perfServerRam').textContent=ramLabel;}catch{} try{const c=$('#perfCpu');if(c){if(v.running)tweenNumber(c,v.cpu||0,x=>Math.round(x)+'%');else c.textContent='—';}}catch{} // UX (2.6.0): TPS now tweens like CPU/RAM instead of snapping, so all readouts settle together.
   const tpsFmt=x=>x.toFixed(2);
-  try{const c=$('#tps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{} try{const c=$('#perfTps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{}
+  try{const c=$('#perfTps');if(c){if(v.running&&displayTps!=null)tweenNumber(c,displayTps,tpsFmt);else c.textContent=displayTps?.toFixed?.(2)??'—';}}catch{}
   const msptEl=$('#perfMspt');if(msptEl){msptEl.textContent=displayMspt?.toFixed?.(2)??'—'}
-  // overview color coding
+  // performance color coding (note: never overwrite #metricStatus class, which renders the top hero state label)
   const tpsClass=displayTps==null?'':displayTps>=19?'ok':displayTps>=17?'warn':'bad';
   const cpuClass=v.cpu==null||!v.running?'':v.cpu<60?'ok':v.cpu<85?'warn':'bad';
   const ramClass=ram==null?'':ram<75?'ok':ram<90?'warn':'bad';
-  const tpsOv=$('#tps'), perfTpsEl2=$('#perfTps'), heroTps=$('#metricStatus');
-  if(tpsOv) tpsOv.className=tpsClass;
+  const perfTpsEl2=$('#perfTps');
   if(perfTpsEl2) perfTpsEl2.className=tpsClass;
-  if(heroTps) heroTps.className=tpsClass;
-  const cpuOv=$('#overviewCpu'), perfCpuEl2=$('#perfCpu');
-  if(cpuOv) cpuOv.className=cpuClass;
+  const perfCpuEl2=$('#perfCpu');
   if(perfCpuEl2) perfCpuEl2.className=cpuClass;
-  const ramOv=$('#serverRam'), perfRamEl2=$('#perfServerRam');
-  if(ramOv) ramOv.className=ramClass;
+  const perfRamEl2=$('#perfServerRam');
   if(perfRamEl2) perfRamEl2.className=ramClass;
   // perf badges + bars
   const setBadge=(id,val,good,mid)=>{const el=$(id); if(!el) return; const level=val==null?'':val>=good?'ok':val>=mid?'warn':'bad'; el.className='kpi-badge '+(level||''); el.textContent=val==null?'—':level==='ok'?t('perf.badgeGood'):level==='warn'?t('perf.badgeWarn'):t('perf.badgeCritical'); };
@@ -846,7 +859,7 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   const ramBadge=$('#perfRamBadge'); if(ramBadge && ram!=null){ if(isNat){ ramBadge.className='kpi-badge '+(usedMB<2048?'ok':usedMB<4096?'warn':'bad'); ramBadge.textContent=usedMB<2048?t('perf.badgeGood'):usedMB<4096?t('perf.badgeHigh'):t('perf.badgeCritical'); } else { ramBadge.className='kpi-badge '+(ram<75?'ok':ram<90?'warn':'bad'); ramBadge.textContent=ram<75?t('perf.badgeGood'):ram<90?t('perf.badgeHigh'):t('perf.badgeCritical'); } } else if(ramBadge && ram==null){ ramBadge.className='kpi-badge'; ramBadge.textContent='—'; }
   const bar=(id,pct)=>{const el=$(id); if(el) el.style.width=(pct==null?0:Math.max(4,Math.min(100,pct)))+'%';};
   bar('#perfTpsBar', displayTps!=null? (displayTps/20*100):null); bar('#perfMsptBar', displayMspt!=null? Math.min(100, displayMspt/100*100):null); bar('#perfCpuBar', v.cpu); bar('#perfRamBar', ram);
-  const liveDot=$('#perfLiveDot'), liveText=$('#perfLiveText'), uptimeEl=$('#perfUptime'); if(liveDot){ liveDot.className='live-dot'+(v.running?' on':''); } if(liveText) liveText.textContent=v.running?`${t('con.live')} • ${t('top.running')}`:t('top.offline'); if(uptimeEl) uptimeEl.textContent=uptimeStart? document.getElementById('heroUptime')?.textContent || '—' : '—';
+  const liveDot=$('#perfLiveDot'), liveText=$('#perfLiveText'), uptimeEl=$('#perfUptime'); if(liveDot){ liveDot.className='live-dot'+(v.running?' on':''); } if(liveText) liveText.textContent=v.running?`${t('con.live')} • ${t('top.running')}`:t('top.offline'); if(uptimeEl) uptimeEl.textContent=uptimeStart?(typeof formatUptimeStr==='function'?formatUptimeStr(uptimeStart):'—'):'—';
   const launcherMem=$('#perfLauncherMem'); if(launcherMem) launcherMem.textContent=t('perf.ramLauncher',{n:v.appMemory||0});
   const tickEmpty=$('#tickChartEmpty'), resEmpty=$('#resourceChartEmpty');
   if(tickEmpty){
@@ -861,7 +874,7 @@ window.observer.onLive(v=>{state.live=v; applyLiveToUI(v);
   metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource'); try{renderAnomalies();}catch{}});
  // Fallback: if the main process is slow or misses a push, keep the UI in sync from
  // lastMetrics/live every 2s.
- setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const isNat=state.files?.engineType==='native'||!!state.files?.nativeBinary||(state.files?.target&&(state.files.target.software==='horizon'||state.files.target.software==='pumpkin'))||state.currentSoftware==='horizon'||state.currentSoftware==='pumpkin'; const displayTps=isNat?null:(v.tps??state.live?.tps??null); const displayMspt=isNat?null:(v.mspt??state.live?.mspt??null); if(displayTps!=null){ const el=$('#tps'); if(el && el.textContent==='—') el.textContent=displayTps.toFixed(2); const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
+ setInterval(()=>{ try{ if(lastMetrics){ const v=lastMetrics; const isNat=state.files?.engineType==='native'||!!state.files?.nativeBinary||(state.files?.target&&(state.files.target.software==='horizon'||state.files.target.software==='pumpkin'))||state.currentSoftware==='horizon'||state.currentSoftware==='pumpkin'; const displayTps=isNat?null:(v.tps??state.live?.tps??null); const displayMspt=isNat?null:(v.mspt??state.live?.mspt??null); if(displayTps!=null){ const el2=$('#perfTps'); if(el2 && el2.textContent==='—') el2.textContent=displayTps.toFixed(2); } if(displayMspt!=null){ const el=$('#perfMspt'); if(el && el.textContent==='—') el.textContent=displayMspt.toFixed(2); } } }catch{} }, 2500);
  // Periodically redraw charts while the Performance tab is open (fixes a 0x0 canvas when the tab
  // was hidden as metrics arrived).
  setInterval(()=>{ try{ if(document.getElementById('performance')?.classList.contains('active')){ metricChart($('#perfTickChart'),true,'tick'); metricChart($('#perfResourceChart'),true,'resource'); } }catch{} }, 2000);
@@ -986,12 +999,13 @@ $('#bShareHintBtn')&&($('#bShareHintBtn').onclick=()=>{
 });
 
 async function loadConnectInfo(){
-  const r=await window.observer.networkInfo();if(!r.ok)return;
+  const r=await window.observer.networkInfo();if(!r||!r.ok)return;
   const port=r.port;
   launcherPlatform=r.platform||'win32';
-  const localAddr=r.localIps.length?r.localIps.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
+  const ips=Array.isArray(r.localIps)?r.localIps:[];
+  const localAddr=ips.length?ips.map(ip=>`${ip}:${port}`).join(', '):t('conn.noLan');
   $('#connectLocal').value=localAddr;
-  lastLanAddr=r.localIps.length?`${r.localIps[0]}:${port}`:t('conn.noLan');
+  lastLanAddr=ips.length?`${ips[0]}:${port}`:t('conn.noLan');
   updateBeginnerShareCard();
   $('#allowFirewall').dataset.port=port;
   // Linux cannot auto-open the firewall without sudo; relabel the button so it copies the command.
@@ -1223,8 +1237,8 @@ const modalBusy=overlay=>overlay.id==='newServerModal'&&$('#nswNext').disabled||
 // The overlay's fade-out is now driven by CSS discrete transitions on [hidden] (08-motion.css),
 // so we only flip the attribute — the browser keeps the element painted during the fade and then
 // sets display:none. No manual setTimeout timing to drift out of sync.
-function closeOverlayAnimated(el){ releaseFocus(); el.classList.add('closing'); el.hidden=true; setTimeout(()=>el.classList.remove('closing'),220); }
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=$$('.modal-overlay').find(m=>!m.hidden);if(open&&!modalBusy(open)){ if(open.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(open); }}});
+function closeOverlayAnimated(el){ if(!el)return; releaseFocus(el); el.classList.add('closing'); el.hidden=true; setTimeout(()=>el.classList.remove('closing'),220); }
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=$$('.modal-overlay').filter(m=>!m.hidden&&!m.classList.contains('closing')&&m.id!=='confirmModal'&&m.id!=='promptModal').pop();if(open&&!modalBusy(open)){ if(open.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(open); }}});
 $$('.modal-overlay').forEach(overlay=>overlay.addEventListener('click',e=>{if(e.target===overlay&&!modalBusy(overlay)){ if(overlay.id==='playerInspectModal') closePlayerInspectModal(); else closeOverlayAnimated(overlay); }}));
 
 (async()=>{const langSel=$('#languageSelect');if(langSel&&window.LOCALES_META)langSel.innerHTML=window.LOCALES_META.map(l=>`<option value="${esc(l.code)}">${esc(l.name)}</option>`).join('');
@@ -1263,14 +1277,14 @@ if(updateBtn)updateBtn.onclick=()=>withBusy(updateBtn,async()=>{
   if(st)st.textContent=t('upd.checking');
   try{const r=await window.observer.checkUpdate();if(r&&!r.ok&&st)st.textContent=r.error||t('upd.none');}catch(e){if(st)st.textContent=e?.message||String(e);}
 });
-window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.available',{v:v.version})+' <button class="btn primary sm" id="dlBtn">'+t('upd.download')+'</button>';const b=$('#dlBtn');if(b)b.onclick=()=>withBusy(b,async()=>{const s=$('#updateStatus');try{const r=await window.observer.downloadUpdate();if(r&&!r.ok&&s)s.textContent=r.error||'Download failed.';}catch(e){if(s)s.textContent=e?.message||String(e);}});});
+window.observer.onUpdateAvailable(v=>{const st=$('#updateStatus');if(st){st.textContent=t('upd.available',{v:v.version})+' ';const b=document.createElement('button');b.className='btn primary sm';b.id='dlBtn';b.textContent=t('upd.download');st.appendChild(b);b.onclick=()=>withBusy(b,async()=>{const s=$('#updateStatus');try{const r=await window.observer.downloadUpdate();if(r&&!r.ok&&s)s.textContent=r.error||'Download failed.';}catch(e){if(s)s.textContent=e?.message||String(e);}});}});
 window.observer.onUpdateProgress(p=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.downloading',{p:Math.round(p.percent)});});
-window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st)st.innerHTML=t('upd.ready')+' <button class="btn primary sm" id="installBtn">'+t('upd.install')+'</button>';const b=$('#installBtn');if(b)b.onclick=async()=>{
+window.observer.onUpdateDownloaded(()=>{const st=$('#updateStatus');if(st){st.textContent=t('upd.ready')+' ';const b=document.createElement('button');b.className='btn primary sm';b.id='installBtn';b.textContent=t('upd.install');st.appendChild(b);b.onclick=async()=>{
   // Installing restarts the app, which stops any running server. Warn first so nobody loses an
   // unsaved world without knowing why the launcher is about to close.
   if(state.running&&!await confirmDialog({title:t('upd.install'),body:t('upd.confirmRunning'),ok:t('upd.install')}))return;
   try{await window.observer.quitInstall();}catch(e){const s=$('#updateStatus');if(s)s.textContent=e?.message||String(e);}
-};});
+};}});
 window.observer.onUpdateNone&&window.observer.onUpdateNone(()=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.none');});
 window.observer.onUpdateError&&window.observer.onUpdateError(d=>{const st=$('#updateStatus');if(st)st.textContent=t('upd.error',{m:d&&d.message?d.message:'unknown error'});});
 

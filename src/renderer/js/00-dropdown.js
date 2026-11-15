@@ -17,6 +17,8 @@
     if (!sel || sel.dataset.enhanced === '1') return;
     sel.dataset.enhanced = '1';
     sel.classList.add('ol-select-native'); // hidden via CSS
+    sel.tabIndex = -1;
+    sel.setAttribute('aria-hidden', 'true');
 
     const wrap = document.createElement('div');
     wrap.className = 'ol-dd' + (sel.classList.contains('launcher-select') ? ' ol-dd-wide' : '');
@@ -61,7 +63,7 @@
         b.onclick = () => {
           sel.value = decodeURIComponent(b.dataset.v);
           syncLabel();
-          close();
+          close(true);
           sel.dispatchEvent(new Event('change', { bubbles: true }));
         };
       });
@@ -72,7 +74,10 @@
       panel.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
       panel.style.top = (r.bottom + 6 + h > innerHeight ? r.top - h - 6 : r.bottom + 6) + 'px';
     }
-    function open() {
+    function enabledOpts() {
+      return Array.from(panel.querySelectorAll('.ol-dd-opt:not([disabled])'));
+    }
+    function open(focusList) {
       closeAll(wrap);
       buildPanel();
       document.body.appendChild(panel); // PORTAL: escape any ancestor stacking/clipping context
@@ -80,18 +85,36 @@
       position();
       btn.setAttribute('aria-expanded', 'true');
       wrap.classList.add('open');
-      const on = panel.querySelector('.ol-dd-opt.active');
-      if (on) on.scrollIntoView({ block: 'nearest' });
+      const on = panel.querySelector('.ol-dd-opt.active:not([disabled])') || enabledOpts()[0];
+      if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+      if (focusList && on && on.focus) on.focus();
     }
-    function close() {
+    function close(restoreFocus) {
       panel.hidden = true;
       btn.setAttribute('aria-expanded', 'false');
       wrap.classList.remove('open');
+      if (restoreFocus && btn.focus) try { btn.focus(); } catch {}
     }
-    function toggle() { panel.hidden ? open() : close(); }
+    function toggle() { panel.hidden ? open(false) : close(false); }
+
+    panel.addEventListener('keydown', e => {
+      const opts = enabledOpts();
+      if (!opts.length) return;
+      const idx = opts.indexOf(document.activeElement);
+      let nextIdx = -1;
+      if (e.key === 'ArrowDown') nextIdx = idx < opts.length - 1 ? idx + 1 : 0;
+      else if (e.key === 'ArrowUp') nextIdx = idx > 0 ? idx - 1 : opts.length - 1;
+      else if (e.key === 'Home') nextIdx = 0;
+      else if (e.key === 'End') nextIdx = opts.length - 1;
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); return; }
+      else return;
+      e.preventDefault();
+      const target = opts[nextIdx];
+      if (target && target.focus) target.focus();
+    });
 
     btn.onclick = e => { e.stopPropagation(); toggle(); };
-    btn.onkeydown = e => { if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+    btn.onkeydown = e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(true); } };
     // Keep the label in sync when the value/options change elsewhere (JS sets .value, or options are
     // rebuilt) — cheap: only re-reads the selected option's text.
     try { new MutationObserver(sync).observe(sel, { childList: true, subtree: true }); } catch {}
@@ -99,12 +122,26 @@
     wrap._olSync = sync;
   }
 
-  function closeAll(except) {
-    document.querySelectorAll('.ol-dd.open').forEach(w => { if (w !== except) { w.classList.remove('open'); if (w._olPanel) w._olPanel.hidden = true; if (w._olBtn) w._olBtn.setAttribute('aria-expanded', 'false'); } });
+  function closeAll(except, restoreFocus) {
+    document.querySelectorAll('.ol-dd.open').forEach(w => {
+      if (w !== except) {
+        w.classList.remove('open');
+        if (w._olPanel) w._olPanel.hidden = true;
+        if (w._olBtn) {
+          w._olBtn.setAttribute('aria-expanded', 'false');
+          if (restoreFocus && typeof w._olBtn.focus === 'function') try { w._olBtn.focus(); } catch {}
+        }
+      }
+    });
   }
   // The panel is portaled to <body>, so exclude it too or an option click closes before firing.
-  document.addEventListener('pointerdown', e => { if (!e.target.closest('.ol-dd') && !e.target.closest('.ol-dd-panel')) closeAll(null); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(null); });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.ol-dd') && !e.target.closest('.ol-dd-panel')) closeAll(null, false); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.querySelector('.ol-dd.open')) {
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      closeAll(null, true);
+    }
+  });
   // Reposition any open panel on scroll/resize (fixed coords go stale otherwise).
   const reflow = () => document.querySelectorAll('.ol-dd.open').forEach(w => { const p = w._olPanel, b = w._olBtn; if (p && b) { const r = b.getBoundingClientRect(); const pw = p.offsetWidth || 180, ph = p.offsetHeight || 200; p.style.left = Math.max(8, Math.min(r.left, innerWidth - pw - 8)) + 'px'; p.style.top = (r.bottom + 6 + ph > innerHeight ? r.top - ph - 6 : r.bottom + 6) + 'px'; } });
   window.addEventListener('resize', reflow);

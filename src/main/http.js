@@ -301,4 +301,16 @@ function runPowerShell(command, timeoutMs = 30000) {
   });
   return new Promise(resolve => tryPs('powershell.exe', resolve));
 }
-module.exports = { withTimeout, json, download, marketplaceError, psQuote, runPowerShell };
+async function text(url, extraHeaders, timeoutMs) {
+  const { signal, cancel } = withTimeout(Number(timeoutMs) > 0 ? Number(timeoutMs) : 15000);
+  try {
+    const r = await fetch(url, {
+      signal,
+      headers: { 'User-Agent': 'ObserverLauncher/0.2 (local Minecraft server launcher)', ...(extraHeaders || {}) },
+    });
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return await r.text();
+  } catch (error) { throw error.name === 'AbortError' ? new Error('Request timed out — check your internet connection.') : error; }
+  finally { cancel(); }
+}
+module.exports = { withTimeout, json, text, download, marketplaceError, psQuote, runPowerShell };

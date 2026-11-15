@@ -28,7 +28,7 @@ ck('html: playerInspectModal stub exists', html.includes('id="playerInspectModal
 // --- CSS Styles ---
 ck('css: .players-split-layout defines grid layout', css.includes('.players-split-layout{display:grid'));
 ck('css: .players-roster-pane scrollable', css.includes('.players-roster-pane .players-table{max-height:calc(100vh - 270px)'));
-ck('css: .players-detail-pane styled', css.includes('.players-detail-pane{min-width:0;background:var(--panel)'));
+ck('css: .players-detail-pane styled', css.includes('.players-detail-pane{min-width:0;background:var(--surface)'));
 ck('css: .player-row.is-selected has brand border/glow', css.includes('.player-row.is-selected{background:var(--surface-3);border-color:var(--brand)'));
 ck('css: responsive collapse for narrow screens', css.includes('@media (max-width: 960px){.players-split-layout{grid-template-columns:1fr}}'));
 

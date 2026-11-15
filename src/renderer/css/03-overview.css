@@ -1,360 +1,515 @@
-/* css/03-overview.css — split from style.css (lines 103-240); link in numeric order to keep the cascade. */
-/* overview hero, tabs, console, performance. */
-/* OVERVIEW — hero (redesign): identity + problems-only checklist + stats.
-   One status signal (dot lives INSIDE the pill), no duplicated indicators. */
-.hero{display:flex;flex-direction:column;gap:0;padding:var(--space-6) var(--space-7) var(--space-5);border-radius:var(--r-lg);transition:box-shadow var(--dur-modal) var(--ease-out)}
-/* Alive ≠ loading: a running server gets a soft static ring, never a spinner (DESIGN.md 10.2). */
-.hero.is-running{box-shadow:0 0 0 1px var(--instance-accent),0 0 34px var(--brand-soft)}
-.hero-top{display:flex;align-items:flex-start;gap:var(--space-5);flex-wrap:wrap}
-.hero-id{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:var(--space-2)}
-.hero-id>b{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hero-sub{margin:0;display:flex;align-items:center;gap:var(--space-3);min-width:0;font-size:14px;color:var(--text-muted)}
-.hero-sub #serverHint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.status-pill{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;border:1px solid var(--border-strong);border-radius:999px;padding:4px 11px 4px 8px;background:var(--field)}
-.status-pill .metric-hero-dot.status-dot{width:12px;height:12px;min-width:12px}
-.status-pill .metric-hero-dot.status-dot.lg{width:12px;height:12px}
-.status-pill .metric-hero-dot .sd-core{width:8px;height:8px}
-.status-pill .metric-hero-dot.st-offline .sd-core{width:8px;height:8px}
-.status-pill .sd-ring,.status-pill .sd-spin{display:none}
-.status-pill .sd-core{width:8px;height:8px}
-.status-pill strong{font:700 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
-.status-pill strong.ok{color:var(--success)} .status-pill strong.warn{color:var(--warning)} .status-pill strong.bad{color:var(--danger)}
-.hero-meta{margin:0;display:flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
-.hero-meta small{font-size:11px}
-.hero .welcome-actions{display:flex;gap:var(--space-2);flex:0 0 auto;margin-left:auto;align-self:center;flex-wrap:wrap}
-.hero .welcome-actions .btn{padding:10px 16px;font-size:13.5px}
-.hero.needs-attention{border-color:var(--warning);box-shadow:0 0 0 2px var(--warning-weak)}
-/* Collapsing panels: the connect panel + the RAM/JVM panel (v4.0.0: RAM+JVM live on Overview). */
-.ov-adv,.connect-panel{padding:0}
-.ov-adv-summary,.connect-summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-4) var(--space-5);font:600 14px var(--font-ui);color:var(--text-muted)}
-.ov-adv-summary::-webkit-details-marker,.connect-summary::-webkit-details-marker{display:none}
-.ov-adv-summary:hover,.connect-summary:hover{color:var(--text)}
-.connect-summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-4) var(--space-5);font:600 14px var(--font-ui);color:var(--text-muted)}
-.connect-summary::-webkit-details-marker{display:none}
-.connect-summary:hover{color:var(--text)}
-.ov-adv-chevron{color:var(--text-dim);font-family:var(--font-mono);transition:transform var(--dur-fast) var(--ease-out)}
-.ov-adv[open] .ov-adv-chevron,.connect-panel[open] .ov-adv-chevron{transform:rotate(90deg)}
-.connect-body{padding:0 var(--space-5) var(--space-5)}
-/* Setup checklist: rendered ONLY when something needs attention. */
-.hero-steps{list-style:none;margin:14px 0 0;padding:12px 0 0;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
-.hero-steps li{margin:0;padding:0}
-.step-chip{border:1px solid var(--border);background:var(--field);color:var(--text-muted);border-radius:999px;padding:5px 12px;min-height:28px;display:inline-flex;align-items:center;font:600 11.5px var(--font-ui);cursor:default;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.step-chip.warn{color:var(--warning);border-color:rgba(255,210,63,.35)}
-.step-chip.warn::before{content:'! ';font-weight:700}
-.step-chip.bad{color:var(--danger);border-color:rgba(255,59,92,.4);cursor:pointer}
-.step-chip.bad::before{content:'! ';font-weight:700}
-.step-chip.bad:hover{background:var(--danger-weak)}
-.hero-bottom{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
-.hero-steps[hidden]+.hero-bottom{margin-top:14px}
-/* Stats row: 4 live numbers + RAM cell, hairline dividers. */
-.srv-stats{display:flex;margin:0;padding:0;align-items:stretch}
-.srv-stats>div{padding:0 22px;border-left:1px solid var(--border);min-width:88px;display:flex;flex-direction:column;justify-content:center;gap:5px}
-.srv-stats>div:first-child{border-left:0;padding-left:0}
-.srv-stats dt{font:700 9px var(--font-mono);letter-spacing:.12em;color:var(--text-dim);white-space:nowrap}
-.srv-stats dd{margin:0;font:700 22px var(--font-mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
-.srv-stats dd.ok{color:var(--success)} .srv-stats dd.warn{color:var(--warning)} .srv-stats dd.bad{color:var(--danger)}
-.stat-ram{margin-left:auto;border-left:1px solid var(--border);padding-left:22px;min-width:0}
-.stat-ram dd{display:flex;gap:6px;align-items:center}
-.stat-ram input{width:52px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:6px 4px;color:var(--text);font:600 13px var(--font-mono);font-variant-numeric:tabular-nums;text-align:center;outline:0}
-.stat-ram input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.stat-ram input::-webkit-outer-spin-button,.stat-ram input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.stat-ram .ram-allocate-sep{color:var(--text-dim)}
-.stat-ram .btn{padding:6px 10px;font-size:11px}
-/* Legacy hooks kept for JS compat (welcomeCard toggle). */
-.welcome-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
-@media(max-width:1100px){.hero .welcome-actions{margin-left:0}.srv-stats{flex-wrap:wrap;gap:14px 0}.srv-stats>div{flex:1 1 22%;min-width:0;padding:0 12px}.srv-stats>div:first-child{padding-left:0}.stat-ram{margin-left:0;border-left:0;padding-left:12px}}
-/* ============ v4.0.0 OVERVIEW MOTION (DESIGN.md 10) ============ */
-/* Hero entrance: rises + fades when the tab becomes active, same language as the row stagger. */
-@keyframes heroIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.tab.active .hero{animation:heroIn var(--dur-slow) var(--ease-out) both}
-/* Alive ≠ loading: a running server breathes with a very slow, static-feeling glow (never a spinner). */
-@keyframes heroBreath{0%,100%{box-shadow:0 0 0 1px var(--instance-accent),0 0 26px var(--brand-soft)}50%{box-shadow:0 0 0 1px var(--instance-accent),0 0 40px var(--brand-glow)}}
-.hero.is-running{animation:heroBreath calc(var(--dur-pulse) * 3.4) var(--ease-out) infinite}
-/* Collapsible panels ease open/close (Chromium 131+ interpolate-size). */
-.ov-adv,.connect-panel{interpolate-size:allow-keywords}
-.ov-adv::details-content,.connect-panel::details-content{transition:content-visibility var(--dur-modal) allow-discrete,block-size var(--dur-modal) var(--ease-out);block-size:0;overflow:clip}
-.ov-adv[open]::details-content,.connect-panel[open]::details-content{block-size:auto}
-.ov-adv .ov-adv-body,.connect-panel .connect-body{animation:heroIn var(--dur-modal) var(--ease-out) both}
-.ov-adv-body{padding:0 var(--space-5) var(--space-5)}
-.ov-adv-body .ov-ram-box{border-top:1px solid var(--border);border-radius:0;padding:var(--space-4) 0 0;background:transparent}
-.ov-adv-body .set-fold{margin-top:var(--space-4)}
-@media (prefers-reduced-motion:reduce){.tab.active .hero,.hero.is-running{animation:none!important}}
-html.motion-lite .tab.active .hero{animation:none}
-html.motion-lite .hero.is-running{animation:none;box-shadow:0 0 0 1px var(--instance-accent)}
+/* css/03-overview.css — ObserverLauncher v9.0.0 Architectural Overview, Console & Performance.
+   Flattened typographic hero, 4-column hairline Telemetry Strip, 2-row hairline Connect table,
+   crisp Console terminal with 2px left danger crash indicator, zero card-inside-card chrome. */
 
-/* First-run declutter: before a folder is chosen, only the hero CTA shows. */
+/* ============ TAB VISIBILITY BASE ============ */
+.tab{display:none}
+.tab.active{display:block}
+#console.tab.active,#performance.tab.active{display:flex;flex-direction:column;gap:var(--space-4)}
+
+/* ============ ARCHITECTURAL HERO (#overview) ============ */
+.hero{
+  display:flex;flex-direction:column;gap:var(--space-4);
+  padding:0 0 var(--space-5);margin-bottom:var(--space-4);
+  border-bottom:1px solid var(--border);background:transparent;
+  transition:border-color var(--dur-fast) var(--ease-snap);
+}
+.hero.is-running .hero-id>b{color:var(--text)}
+.hero.needs-attention .hero-top{padding-left:var(--space-3);border-left:2px solid var(--warning)}
+.hero-top{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap}
+.hero-id{min-width:0;display:flex;flex-direction:column;gap:4px}
+.hero-id>b{font:700 22px/1.2 var(--font-ui);letter-spacing:-.025em;color:var(--text)}
+.hero-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:500 12.5px var(--font-ui);color:var(--text-3)}
+.hero-sub #serverHint{color:var(--text-3);font-family:var(--font-mono);font-size:12px}
+.hero-meta{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-top:2px}
+.hero-meta small{font:500 12px var(--font-mono);color:var(--text-4)}
+.hero .welcome-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;flex-shrink:0}
+.hero .welcome-actions .btn{min-height:34px}
+
+/* Status pill inside hero */
+.status-pill .metric-hero-dot.status-dot.lg{width:10px;height:10px}
+.status-pill strong{font:600 12px var(--font-mono);color:var(--text-2)}
+.status-pill strong.ok{color:var(--brand)}
+
+/* Pre-launch checklist chips — exact min-height:28px preserved for WCAG 2.2 AA audit test */
+.hero-steps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.hero-steps li{display:inline-flex}
+.step-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;min-height:28px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-2);font:500 12px var(--font-ui);cursor:pointer;transition:border-color var(--dur-micro) var(--ease-snap),background var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap)}
+.step-chip::before{content:'✓';font:700 11px var(--font-mono);color:var(--brand)}
+.step-chip.warn{border-color:rgba(255,200,87,.35);background:var(--warning-weak);color:var(--warning)}
+.step-chip.warn::before{content:'!';color:var(--warning)}
+.step-chip.bad{border-color:rgba(255,102,125,.35);background:var(--danger-weak);color:var(--danger)}
+.step-chip.bad::before{content:'×';color:var(--danger)}
+.step-chip.bad:hover,.step-chip.warn:hover{border-color:var(--border-strong);color:var(--text)}
+
+.hero-bottom{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap}
+.hero-steps[hidden]+.hero-bottom{margin-top:0}
+.welcome-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+
+/* ============ 4-COLUMN ARCHITECTURAL TELEMETRY STRIP ============ */
+.ov-stats-panel{padding:0 0 var(--space-4);margin-bottom:var(--space-4);border-bottom:1px solid var(--border)}
+.ov-stats-live{font:600 10.5px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-4)}
+.ov-stats-cap{font:500 11.5px var(--font-mono);color:var(--text-3)}
+
+.srv-stats{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
+  margin:0;padding:var(--space-2) 0 0;
+}
+.srv-stats>div{
+  padding:var(--space-2) var(--space-4);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;gap:4px;min-width:0;
+}
+.srv-stats>div:first-child{border-left:0;padding-left:0}
+.srv-stats dt{
+  font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-4);margin:0;
+}
+.srv-stats dd{
+  margin:0;font:600 20px/1.2 var(--font-mono);color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.srv-stats dd.ok{color:var(--brand)}
+
+.ov-spark-cell{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.ov-spark{width:100%;height:34px;display:block;background:transparent;border:0}
+
+@media(max-width:860px){
+  .srv-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3)}
+  .srv-stats>div{border-left:0;border-top:1px solid var(--border);padding:var(--space-3) 0 0}
+  .srv-stats>div:nth-child(-n+2){border-top:0;padding-top:0}
+}
+
+/* Numeric stability — reserve tabular width so live metrics never jitter */
+.metric-hero-value,#tps,#perfTps,#perfMspt,#perfCpu,#overviewCpu,#serverRam,#perfServerRam,#uptime,#perfUptime,#playerCount,.perf-stat strong{
+  font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;
+}
+#tps,#perfTps,#perfMspt,#perfCpu,#overviewCpu,#serverRam,#perfServerRam{min-width:5ch;display:inline-block}
+#uptime,#perfUptime{min-width:7ch;display:inline-block}
+#playerCount{min-width:3ch;display:inline-block}
+
+/* Inline RAM allocation (inside Memory & JVM drawer) */
+.stat-ram dd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stat-ram input,.ov-ram-controls input{
+  width:64px;padding:6px 8px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:var(--field);color:var(--text);font:600 13px var(--font-mono);text-align:center;
+  transition:border-color var(--dur-micro) var(--ease-snap);
+}
+.stat-ram input:focus,.ov-ram-controls input:focus{outline:none;border-color:var(--brand)}
+.ram-allocate-sep{color:var(--text-4);font:500 12px var(--font-mono)}
+
+.ov-ram-box{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);
+  flex-wrap:wrap;padding:var(--space-3) 0;border-bottom:1px solid var(--border);margin-bottom:var(--space-3);
+}
+.ov-ram-info b{display:block;font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.ov-ram-info small{display:block;font:400 12px var(--font-ui);color:var(--text-4);margin-top:2px}
+.ov-ram-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ram-presets{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:4px}
+.ram-presets .ram-preset{
+  padding:4px 9px;min-height:26px;font-size:11.5px;font-family:var(--font-mono);
+  transition:background var(--dur-micro) var(--ease-snap),border-color var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap);
+}
+.ram-presets .ram-preset:disabled{opacity:.45;cursor:not-allowed}
+
+/* ============ OVERVIEW SECTIONS & CHARTS ============ */
+#overview > .activity,#overview > .ov-stats-panel,#overview > .chart-panel{margin-bottom:var(--space-5)}
 #overview:not(.has-server) .ov-adv,
 #overview:not(.has-server) .chart-panel,
 #overview:not(.has-server) #connectPanel,
-#overview:not(.has-server) #javaWarnBanner{display:none}
-/* SERVER STATS panel (1.1.0): two clear halves — 'Live now' readouts on top,
-   memory allocation as its own labelled box below, so read-only numbers never
-   blur into the editable RAM inputs. */
-.ov-stats-panel{padding:0}
-.ov-stats-live{padding:16px 18px 14px}
-.ov-stats-cap{margin:0 0 12px;font:700 10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
-.ov-stats-panel .srv-stats{flex-wrap:wrap;gap:14px 0;margin:0}
-.ov-stats-panel .srv-stats>div{padding:0 22px;min-width:96px}
-.ov-stats-panel .srv-stats>div:first-child{padding-left:0}
-.ov-ram-box{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;border-top:1px solid var(--border);background:var(--field)}
-/* Sparkline (1.3.0): a tiny live TPS/CPU trace in the stats panel — 'numbers are alive'.
-   Sits as the last stat cell; grows to fill remaining width but never below a readable size. */
-.ov-spark-cell{flex:1 1 200px;min-width:160px}
-.ov-spark{width:100%;height:34px;display:block;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:2px}
-@media(max-width:1100px){.ov-spark-cell{flex:1 1 100%}}
-.ov-ram-info{display:flex;flex-direction:column;gap:3px;min-width:180px}
-.ov-ram-info b{font:700 11px var(--font-mono);letter-spacing:.1em;color:var(--text)}
-.ov-ram-info small{font:500 11px var(--font-ui);color:var(--text-dim)}
-.ov-ram-controls{display:flex;align-items:center;gap:8px;margin-left:auto}
-.ov-ram-controls input{width:64px;background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 6px;color:var(--text);font:600 14px var(--font-mono);font-variant-numeric:tabular-nums;text-align:center;outline:0}
-.ov-ram-controls input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.ov-ram-controls input::-webkit-outer-spin-button,.ov-ram-controls input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.ov-ram-controls .ram-allocate-sep{color:var(--text-dim)}
-/* v6.0.0 G1: RAM preset chips (wrap under the inputs on narrow widths). */
-.ram-presets{display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:4px}
-.ram-presets .ram-preset{padding:3px 9px;font:600 11px var(--font-ui);border-radius:var(--r-xs);cursor:pointer}
-.ram-presets .ram-preset:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
-@media(max-width:1100px){.ov-stats-panel .srv-stats>div{flex:1 1 22%;min-width:0;padding:0 12px}.ov-stats-panel .srv-stats>div:first-child{padding-left:0}}
-/* Overview is ONE vertical flow now (no Home/Advanced sub-tabs). Panels stack
-   with a gap; the hero and the java banner supply their own spacing. */
-#overview > .activity, #overview > .ov-stats-panel, #overview > .chart-panel{margin-top:12px}
-.overview-grid{display:grid;grid-template-columns:1.7fr .9fr;gap:12px;margin-top:12px}
-.chart-panel canvas, .large-chart canvas{width:100%;height:140px;display:block;margin-top:10px;background:var(--field);border:1px solid var(--border);border-radius:var(--r)}
-.chart-legend{display:flex;gap:12px;margin-top:8px;font:500 10px var(--font-mono);color:var(--text-muted)}
-.chart-legend i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
-.legend-tps{background:var(--accent)} .legend-cpu{background:var(--warning)} .legend-ram{background:var(--success)} .legend-danger{background:var(--danger)}
-.activity{display:flex;flex-direction:column} .quick-strip{flex:1;display:flex;flex-direction:column;gap:0;margin-top:10px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.quick-strip .quick{border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);padding:0 12px;height:var(--row-h);border-radius:0;font:600 12.5px var(--font-ui);cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px}
-.quick-strip .quick:last-child{border-bottom:0}
-.quick-strip .quick::after{content:'→';color:var(--text-dim);font-family:var(--font-mono);font-size:12px}
-.quick-strip .quick:hover{border-color:var(--border);color:var(--accent);background:var(--accent-weak)}
-.quick-strip .quick:hover::after{color:var(--accent)}
-.connect-panel{margin-top:12px}
-.connect-panel .panel-head{margin-bottom:8px}
-.connect-grid.tuner{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.connect-channel{padding:10px 14px;background:var(--panel);min-width:0} .connect-channel+.connect-channel{border-left:1px solid var(--border)}
-.connect-channel-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font:600 12px var(--font-ui);color:var(--text)}
-/* UX (1.1.0): the old 'CH.01 / CH.02' radio-channel badges read as jargon to a
-   Minecraft user. Replaced with a small status dot that carries the same
-   'two distinct channels' cue without the fake label. */
-.connect-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.connect-dot.dot-lan{background:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.connect-dot.dot-wan{background:var(--success);box-shadow:0 0 0 3px var(--success-weak)}
-.connect-freq{display:flex;gap:10px;align-items:center;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:10px 12px;margin-top:8px;min-width:0}
-.connect-freq:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.connect-freq-icon{width:20px;height:20px;flex-shrink:0;color:var(--accent);stroke:currentColor;fill:none;stroke-width:1.6;display:block}
-.connect-freq input{flex:1;min-width:0;background:transparent;border:0;color:var(--text);font:500 13px var(--font-mono);outline:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.connect-channel-actions{display:flex;gap:8px;margin-top:10px} .connect-channel-actions .btn{flex:1;padding:8px 12px;font-size:12px}
-/* PUBLIC TUNNEL (Playit) — share the server to the internet without port forwarding. */
-.tunnel-box{margin-top:14px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);padding:12px 14px;background:var(--panel)}
-.connect-advanced{margin-top:12px}
-/* v4.0.0: make this a VISIBLE disclosure bar, not a dim 11.5px line users skip over. */
-.connect-advanced>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--space-3);font:600 13.5px var(--font-ui);color:var(--text);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);transition:background var(--dur-micro) var(--ease-out),border-color var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
-.connect-advanced>summary::-webkit-details-marker{display:none}
-.connect-advanced>summary::before{content:'▸';color:var(--brand);font-family:var(--font-mono);font-size:13px;transition:transform var(--dur-fast) var(--ease-out)}
-.connect-advanced[open]>summary::before{transform:rotate(90deg)}
-.connect-advanced>summary:hover{background:var(--surface-3);border-color:var(--border-strong)}
-.connect-advanced[open]>summary{border-radius:var(--r-sm) var(--r-sm) 0 0;border-bottom-color:transparent}
-.connect-advanced p{margin:var(--space-4) var(--space-4) var(--space-3);line-height:1.55}
-.connect-advanced .btn{margin:0 var(--space-4) var(--space-4)}
-.tunnel-help{display:inline-block;margin-left:6px}
-.tunnel-help>summary{cursor:pointer;font:600 11.5px var(--font-ui);color:var(--accent);list-style:none}
-.tunnel-help>summary::-webkit-details-marker{display:none}
-.tunnel-help>summary::before{content:'? '}
-.tunnel-help .tunnel-steps{margin:10px 0 4px}
-.set-path-row{display:flex;gap:8px;align-items:center;width:100%}.set-path-row input{flex:1;min-width:0;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font:500 12.5px var(--font-mono);outline:0;transition:border-color var(--dur-micro),box-shadow var(--dur-micro)}.set-path-row input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}.set-path-row .btn{flex:0 0 auto;white-space:nowrap}
-.chart-wrap{position:relative}
-.chart-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:13px;color:var(--text-dim);background:var(--panel);border-radius:var(--r);pointer-events:none}
-.chart-empty-overlay[hidden]{display:none}
-/* v4.0.0: the perf note is a HINT, not an alarm — quiet text with a subtle left mark (DESIGN.md 17.8). */
-.wm-perf-note{font-size:11.5px;line-height:1.5;color:var(--text-muted);border-left:2px solid var(--border-strong);background:var(--field);border-radius:var(--r-xs);padding:8px 12px;margin:0 0 12px}
-.wm-modded-note{font-size:11.5px;line-height:1.5;color:var(--text-muted);border-left:2px solid var(--brand);background:var(--field);border-radius:var(--r-xs);padding:8px 12px;margin:0 0 12px}
-.wm-modded-note[hidden]{display:none}
-/* Collapsible tunnel box (1.1.0): was fully expanded and dominated the Home view.
-   Now it's a <details> — the head row is the toggle, body hidden until opened. */
-.tunnel-box>summary{list-style:none;cursor:pointer}
-.tunnel-box>summary::-webkit-details-marker{display:none}
-.tunnel-box:not([open]) .tunnel-head{margin-bottom:0}
-.tunnel-box>summary:hover b{color:var(--accent)}
-.tunnel-chevron{margin-left:4px;color:var(--text-dim);transition:transform .15s var(--ease)}
-.tunnel-box[open] .tunnel-chevron{transform:rotate(90deg)}
-.tunnel-body{padding-top:2px}
-.tunnel-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.tunnel-head b{font:600 12.5px var(--font-ui);color:var(--text)}
-.tunnel-pill{margin-left:auto;font:700 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-dim);background:var(--field)}
-.tunnel-pill.running{color:var(--success);border-color:rgba(0,229,160,.35)}
-.tunnel-pill.starting,.tunnel-pill.stopping{color:var(--warning);border-color:rgba(255,210,63,.35)}
-.tunnel-pill.error{color:var(--danger);border-color:rgba(255,59,92,.4)}
-.tunnel-box .text-muted{font-size:12.5px;line-height:1.55;margin:0 0 14px}
-.tunnel-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
-.tunnel-actions .btn{padding:8px 14px;font-size:12px}
-.tunnel-addr{display:flex;gap:8px;align-items:center;margin-top:10px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--r-sm);padding:8px 10px}
-.tunnel-addr input{flex:1;min-width:0;background:transparent;border:0;color:var(--text);font:500 13px var(--font-mono);outline:0}
-.tunnel-msg{margin-top:8px!important;font-size:11.5px;color:var(--warning)}
-.tunnel-manual{margin-top:16px;padding-top:14px;border-top:1px dashed var(--border)}
-.tunnel-manual>label{display:block;font-size:12px;line-height:1.5;margin-bottom:10px}
-#tunnelClaim{margin-top:10px}
-/* TABS (enter animation lives in css/08-motion.css) */
-.tab{display:none} .tab.active{display:block}
-@keyframes glow{0%,100%{box-shadow:0 0 10px var(--accent-glow), 0 0 0 4px var(--accent-weak)}50%{box-shadow:0 0 16px var(--accent-glow), 0 0 0 6px var(--accent-weak)}}
-/* CONSOLE — dense, stream-of-lines terminal. Fixed viewport height so the
-   log scrolls INTERNALLY — the main scroll container can't stretch this tab.
-   (BUGFIX: an earlier rewrite dropped the height cap; with main not being a
-   flex parent, #console flex:1 did nothing and the tab grew forever with
-   every long log line.) */
-#console.tab.active{display:flex;flex-direction:column;height:calc(100vh - 112px);min-height:0;gap:0}
-.console-layout{display:grid;grid-template-columns:1fr 300px;gap:12px;flex:1;min-height:0}
-.terminal{display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;padding:0}
-.terminal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);margin:0}
-.terminal-title{display:flex;gap:10px;align-items:center}
-.terminal-title h2,.terminal-title h3{font-size:16px;font-weight:700;margin:0}
-.terminal-title p{margin:2px 0 0;color:var(--text-muted);font:500 12px var(--font-ui)}
-.live-dot{width:9px;height:9px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
-.live-dot.on{background:var(--success);box-shadow:0 0 6px rgba(0,229,160,.6)}
-.live-dot.busy{background:var(--warning);box-shadow:0 0 6px rgba(255,210,63,.6)}
-.live-label{font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-muted);padding:4px 9px;border:1px solid var(--border);border-radius:3px;background:var(--field)}
-.terminal-actions{display:flex;gap:8px;align-items:center}
-.log-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px 0;margin:0}
-.log-hint{font:500 10px var(--font-mono);color:var(--text-dim);white-space:nowrap;margin-left:auto}
-/* Search box (1.3.0): substring filter over rendered log lines. Sits left of the level chips. */
-.log-search{position:relative;display:flex;align-items:center;flex:1 1 200px;max-width:340px;min-width:120px}
-.log-search input{width:100%;background:var(--field);border:1px solid var(--border);border-radius:3px;padding:6px 26px 6px 10px;color:var(--text);font:500 11.5px var(--font-ui);outline:0;transition:border-color var(--dur-micro) var(--ease-standard)}
-.log-search input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
-.log-search input::-webkit-search-cancel-button{display:none}
-.log-search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:15px;line-height:1;color:var(--text-dim);padding:0 4px}
-.log-search-clear:hover{color:var(--text)}
-/* Auto-scroll toggle: a small square button matching the chip height. */
-.log-autoscroll{border:1px solid var(--border);border-radius:3px;background:var(--panel-raised);color:var(--text-dim);font-size:13px;line-height:1;padding:5px 9px;cursor:pointer;transition:background var(--dur-micro),color var(--dur-micro),border-color var(--dur-micro)}
-.log-autoscroll:hover{border-color:var(--border-strong);color:var(--text)}
-.log-autoscroll.active{background:var(--accent-weak);border-color:var(--accent);color:var(--accent)}
-.log-filters{display:flex;gap:0;flex-shrink:0;border:1px solid var(--border);border-radius:3px;overflow:hidden}
-.log-filters .filter-chip{border:0;border-radius:0;padding:5px 12px;font:600 11px var(--font-ui);background:transparent;color:var(--text-dim);cursor:pointer;border-right:1px solid var(--border)}
-.log-filters .filter-chip:last-child{border-right:0}
-.log-filters .filter-chip.active{background:var(--accent);color:var(--accent-ink)}
-.log-wrap{position:relative;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;margin:10px 14px}
-.log-output{flex:1;min-height:0;overflow:auto;padding:8px 10px;background:var(--field);border:1px solid var(--border);border-radius:3px;font:11.5px/1.7 var(--font-mono);color:var(--text)}
-.log-empty{display:grid;place-items:center;gap:8px;padding:48px 20px;text-align:center;color:var(--text-muted);margin:4px}
-.log-empty b{color:var(--text);font-size:13px}
-.log-empty span{font-size:12px;line-height:1.5}
+#overview:not(.has-server) #javaWarnBanner{display:none!important}
+.overview-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:var(--space-6);margin-bottom:var(--space-5)}
+@media(max-width:960px){.overview-grid{grid-template-columns:1fr}}
+
+.chart-panel{padding-bottom:var(--space-4);border-bottom:1px solid var(--border)}
+.chart-panel canvas,.large-chart canvas{width:100%;display:block}
+.chart-wrap{position:relative;width:100%;min-height:170px}
+.chart-wrap canvas{width:100%;height:auto;display:block}
+.chart-empty,.chart-empty-overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;text-align:center;color:var(--text-3);pointer-events:none;background:transparent;
+}
+.chart-empty b{font:600 13px var(--font-ui);color:var(--text-2)}
+.chart-empty span{font:400 12px var(--font-ui);color:var(--text-3)}
+.chart-empty[hidden],.chart-empty-overlay[hidden]{display:none}
+.chart-legend{display:flex;align-items:center;gap:var(--space-4);padding-top:var(--space-2);font:500 11.5px var(--font-mono);color:var(--text-3)}
+.chart-legend span{display:inline-flex;align-items:center;gap:6px}
+.chart-legend i{width:10px;height:2px;border-radius:1px;display:inline-block}
+.legend-tps{background:var(--chart-tps)}
+.legend-cpu{background:var(--chart-cpu)}
+.legend-ram{background:var(--chart-ram)}
+.legend-danger{background:var(--danger)}
+.chart-live{font:600 10.5px var(--font-mono);color:var(--brand);letter-spacing:.08em}
+
+.activity{padding-bottom:var(--space-4);border-bottom:1px solid var(--border)}
+.quick-strip{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.quick-strip .quick{
+  position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;
+  border-radius:var(--r-sm);border:1px solid var(--border);background:transparent;
+  color:var(--text-2);font:500 12.5px var(--font-ui);cursor:pointer;
+  transition:background var(--dur-micro) var(--ease-snap),border-color var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap);
+}
+.quick-strip .quick:hover{background:var(--surface);border-color:var(--border-strong);color:var(--text)}
+
+/* ============ ARCHITECTURAL HAIRLINE DISCLOSURES (CONNECT, MEMORY, SERVERS) ============ */
+.ov-adv,.connect-panel,.all-servers{
+  border-bottom:1px solid var(--border);margin-bottom:var(--space-3);background:transparent;
+}
+.ov-adv-summary,.connect-summary,.all-servers-summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+  gap:var(--space-3);padding:var(--space-3) 0;font:600 13px var(--font-ui);color:var(--text);
+  transition:color var(--dur-micro) var(--ease-snap);
+}
+.ov-adv-summary::-webkit-details-marker,.connect-summary::-webkit-details-marker,.all-servers-summary::-webkit-details-marker{display:none}
+.ov-adv-summary:hover,.connect-summary:hover,.all-servers-summary:hover{color:var(--brand)}
+.ov-adv-chevron{color:var(--text-3);font-size:12px;transition:transform var(--dur-fast) var(--ease-out)}
+.ov-adv[open] .ov-adv-chevron,.connect-panel[open] .ov-adv-chevron,.all-servers[open] .ov-adv-chevron{transform:rotate(90deg);color:var(--brand)}
+.ov-adv-body,.connect-body,.all-servers-body{padding:0 0 var(--space-4)}
+.ov-adv-body .set-fold{margin-top:var(--space-2)}
+
+/* Connect flat 2-row hairline table */
+.connect-panel .panel-head{margin-bottom:var(--space-2)}
+.connect-grid.tuner{
+  display:flex;flex-direction:column;border-top:1px solid var(--border);margin-bottom:var(--space-3);
+}
+.connect-channel{
+  display:grid;grid-template-columns:minmax(180px,220px) 1fr auto;align-items:center;
+  gap:var(--space-4);padding:var(--space-3) 0;border-bottom:1px solid var(--border);
+}
+@media(max-width:760px){
+  .connect-channel{grid-template-columns:1fr;gap:var(--space-2)}
+}
+.connect-channel-head{display:flex;align-items:center;gap:8px;font:500 13px var(--font-ui);color:var(--text-2)}
+.connect-dot{width:7px;height:7px;border-radius:999px;flex-shrink:0;background:var(--text-4)}
+.connect-dot.dot-lan{background:var(--brand)}
+.connect-dot.dot-wan{background:var(--info)}
+.connect-freq{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;min-width:0;
+  border:1px solid var(--border);border-radius:var(--r-sm);background:var(--field);
+  transition:border-color var(--dur-micro) var(--ease-snap);
+}
+.connect-freq:focus-within{border-color:var(--brand)}
+.connect-freq-icon{width:14px;height:14px;stroke:var(--text-4);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.connect-freq input{
+  flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);
+  font:500 12.5px var(--font-mono);
+}
+.connect-channel-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.connect-note{font-size:12px;color:var(--text-3);margin:0 0 var(--space-3)}
+
+.connect-advanced,.tunnel-help,.tunnel-box{
+  border-top:1px solid var(--border);padding:var(--space-2) 0;
+}
+.connect-advanced>summary,.tunnel-help>summary,.tunnel-box>summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
+  padding:var(--space-2) 0;font:500 12.5px var(--font-ui);color:var(--text-2);
+}
+.connect-advanced>summary::-webkit-details-marker,.tunnel-help>summary::-webkit-details-marker,.tunnel-box>summary::-webkit-details-marker{display:none}
+.connect-advanced>summary::before,.tunnel-help>summary::before{
+  content:'▸';color:var(--text-3);font-size:11px;transition:transform var(--dur-fast) var(--ease-out);
+}
+.connect-advanced[open]>summary::before,.tunnel-help[open]>summary::before{transform:rotate(90deg);color:var(--brand)}
+.connect-advanced>summary:hover,.tunnel-help>summary:hover,.tunnel-box>summary:hover b{color:var(--text)}
+.connect-advanced[open]>summary{color:var(--text)}
+.connect-advanced p{margin:6px 0 var(--space-3);font:400 12.5px/1.55 var(--font-ui);color:var(--text-3)}
+.connect-advanced .btn{margin-bottom:var(--space-2)}
+
+.tunnel-help .tunnel-steps{margin:6px 0 var(--space-2);padding-left:18px;font:400 12.5px/1.6 var(--font-ui);color:var(--text-2)}
+.tunnel-head{justify-content:space-between}
+.tunnel-head b{font:600 13px var(--font-ui);color:var(--text)}
+.tunnel-chevron{color:var(--text-3);font-size:11px;margin-left:auto;transition:transform var(--dur-fast) var(--ease-out)}
+.tunnel-box[open] .tunnel-chevron{transform:rotate(90deg);color:var(--brand)}
+.tunnel-body{padding:var(--space-2) 0 var(--space-3);display:flex;flex-direction:column;gap:var(--space-3)}
+.tunnel-pill{
+  display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--r-xs);
+  border:1px solid var(--border);background:var(--surface);font:600 10.5px var(--font-mono);color:var(--text-3);
+}
+.tunnel-pill.running{background:var(--brand-soft);border-color:rgba(34,197,94,.3);color:var(--brand)}
+.tunnel-pill.starting,.tunnel-pill.stopping{background:var(--warning-weak);border-color:rgba(255,200,87,.3);color:var(--warning)}
+.tunnel-pill.error{background:var(--danger-weak);border-color:rgba(255,102,125,.3);color:var(--danger)}
+.tunnel-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.tunnel-addr{display:flex;align-items:center;gap:var(--space-2)}
+.tunnel-addr input{
+  flex:1;min-width:0;padding:7px 10px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:var(--field);color:var(--text);font:500 12.5px var(--font-mono);
+}
+.tunnel-msg{margin:0;font-size:12px;color:var(--text-2)}
+.tunnel-manual{display:flex;flex-direction:column;gap:6px}
+.tunnel-manual>label{font:500 12px var(--font-ui);color:var(--text-3)}
+.pinggy-block{padding-top:var(--space-3);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:var(--space-2)}
+.pinggy-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
+.pinggy-head b{font:600 12.5px var(--font-ui);color:var(--text)}
+
+/* All servers summary table (inside Overview) */
+.all-servers-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.all-servers-table th{
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);
+  font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-4);
+}
+.all-servers-table th:nth-child(n+3),.all-servers-table td:nth-child(n+3){text-align:right;font-variant-numeric:tabular-nums}
+.all-servers-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text-2);font-family:var(--font-mono);font-size:12px}
+.all-servers-table tr.all-servers-row{cursor:pointer;transition:background var(--dur-micro) var(--ease-snap)}
+.all-servers-table tr.all-servers-row:hover td{background:var(--surface)}
+.all-servers-table tr.active td{color:var(--text);background:var(--surface)}
+.all-servers-table .as-name{font-family:var(--font-ui);font-weight:600;color:var(--text)}
+.all-servers-table .as-status{display:inline-flex;align-items:center;gap:6px}
+
+/* ============ CRASH ANALYSIS STRIP (2px left danger bar, zero box bloat) ============ */
+.crash-panel{
+  background:var(--surface);border:1px solid var(--border);border-left:2px solid var(--danger);
+  border-radius:var(--r);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);
+}
+.crash-head{display:flex;align-items:flex-start;gap:var(--space-3)}
+.crash-ico{color:var(--danger);font-size:16px;line-height:1.2;flex-shrink:0}
+.crash-head b{display:block;font:600 14px var(--font-ui);color:var(--text)}
+.crash-head p{margin:2px 0 0;font:400 12.5px var(--font-ui);color:var(--text-3)}
+.crash-head .text-btn{margin-left:auto;flex-shrink:0}
+.crash-cat{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.crash-badge{
+  display:inline-flex;padding:2px 8px;border-radius:var(--r-xs);border:1px solid var(--border);
+  background:var(--field);font:600 11px var(--font-mono);color:var(--text-2);
+}
+.crash-badge.warn{background:var(--warning-weak);border-color:rgba(255,200,87,.3);color:var(--warning)}
+.crash-hints{margin:0;padding-left:18px;font:400 12.5px/1.55 var(--font-ui);color:var(--text-2)}
+.crash-detail summary{
+  list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  font:500 12px var(--font-ui);color:var(--text-3);
+  transition:color var(--dur-micro) var(--ease-snap);
+}
+.crash-detail summary::-webkit-details-marker{display:none}
+.crash-detail summary::before{content:'▸';font-size:11px;transition:transform var(--dur-fast) var(--ease-out)}
+.crash-detail[open] summary::before{transform:rotate(90deg);color:var(--danger)}
+.crash-detail summary:hover,.crash-detail[open] summary{color:var(--text)}
+.crash-stack{
+  margin:8px 0 0;padding:10px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:var(--field);color:var(--text-2);font:11.5px/1.5 var(--font-mono);
+  max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+}
+
+/* ============ CONSOLE TAB (#console) ============ */
+.console-layout{
+  display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:var(--space-5);
+  height:calc(100vh - 180px);min-height:420px;align-items:stretch;
+}
+@media(max-width:1020px){.console-layout{grid-template-columns:1fr;height:auto;min-height:0}}
+
+.terminal{
+  display:flex;flex-direction:column;min-width:0;min-height:380px;
+  border:1px solid var(--border);border-radius:var(--r);background:var(--field);overflow:hidden;
+}
+.terminal-head{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);
+  padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);background:var(--bg);
+}
+.terminal-title{display:flex;align-items:center;gap:10px;min-width:0}
+.terminal-title h2,.terminal-title h3{font:700 16px var(--font-ui);color:var(--text)}
+.terminal-title p{margin:2px 0 0;font:400 12px var(--font-ui);color:var(--text-3)}
+.live-dot{width:8px;height:8px;border-radius:999px;background:var(--text-4);flex-shrink:0}
+.live-dot.on{background:var(--brand)}
+.live-dot.busy{background:var(--warning);animation:pulse var(--dur-pulse) var(--ease-snap) infinite}
+.live-label{font:600 11px var(--font-mono);color:var(--text-3);text-transform:uppercase;letter-spacing:.08em}
+.terminal-actions{display:flex;align-items:center;gap:var(--space-2);flex-shrink:0}
+
+.log-toolbar{
+  display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;
+  padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border);background:var(--bg);
+}
+.log-search{position:relative;display:flex;align-items:center;flex:1;min-width:180px}
+.log-search input{
+  width:100%;padding:5px 28px 5px 10px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:var(--field);color:var(--text);font:400 12.5px var(--font-mono);
+  transition:border-color var(--dur-micro) var(--ease-snap);
+}
+.log-search input:focus{outline:none;border-color:var(--brand)}
+.log-search input::-webkit-search-cancel-button{-webkit-appearance:none}
+.log-search-clear{position:absolute;right:4px;padding:2px 6px;font-size:14px}
+.log-filters{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.log-filters .filter-chip{padding:4px 9px;min-height:26px;font-size:11.5px}
+.log-autoscroll{
+  padding:4px 9px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:transparent;color:var(--text-3);font:500 11.5px var(--font-ui);cursor:pointer;
+  transition:background var(--dur-micro) var(--ease-snap),border-color var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap);
+}
+.log-autoscroll:hover{color:var(--text);border-color:var(--border-strong)}
+.log-autoscroll.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
+.log-hint{font:400 11.5px var(--font-mono);color:var(--text-4);margin-left:auto}
+
+.log-wrap{position:relative;flex:1 1 auto;min-height:280px;display:flex;flex-direction:column}
+.log-output{
+  flex:1 1 auto;overflow-y:auto;padding:var(--space-3) var(--space-4);
+  font:400 12.5px/1.6 var(--font-mono);color:var(--text-2);background:var(--field);
+}
+.log-empty{
+  height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;text-align:center;color:var(--text-3);
+}
+.log-empty b{font:600 13.5px var(--font-ui);color:var(--text-2)}
+.log-empty span{font:400 12px var(--font-ui);color:var(--text-3)}
 .log-output.has-content .log-empty{display:none}
-.log-line{padding:1px 0 1px 10px;border-left:2px solid transparent;white-space:pre-wrap;word-break:break-all;position:relative;animation:logLineIn .15s var(--ease-out)}
-.log-line[data-level="error"]{color:var(--danger);border-left-color:var(--danger)}
-.log-line[data-level="warn"]{color:var(--warning);border-left-color:var(--warning)}
-.log-line[data-level="command"]{color:var(--accent);border-left-color:var(--accent);background:rgba(34,197,94,.05)}
-.log-line[data-level="system"]{color:var(--success);border-left-color:var(--success)}
-.log-line[data-level="info"]{color:var(--text-muted)}
-.log-line .time{color:var(--text-dim);opacity:.7;margin-right:8px;user-select:none;font-size:10px}
-/* v6.0.0 H6: a known player name in a console line is a link that opens the player inspector.
-   Explicit color/decoration so it never falls back to the browser default link style. */
-.log-line .log-player{color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent-weak);cursor:pointer;padding:0 1px;border-radius:2px;transition:background var(--dur-micro) var(--ease-out),color var(--dur-micro) var(--ease-out)}
-.log-line .log-player:hover{background:var(--accent-weak);color:var(--text)}
-.log-line .log-player:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
-/* Level badge (1.3.0): a fixed-width CMD/INF/WRN/ERR tag so the eye can scan severity down the
-   column. Monospace + tabular so the log text stays aligned across every line. */
-.log-line .lvl{display:inline-block;width:30px;margin-right:6px;font:700 9px var(--font-mono);letter-spacing:.04em;color:var(--text-dim);opacity:.75;user-select:none;vertical-align:baseline}
-.log-line[data-level="error"] .lvl{color:var(--danger);opacity:1}
-.log-line[data-level="warn"] .lvl{color:var(--warning);opacity:1}
-.log-line[data-level="command"] .lvl{color:var(--accent);opacity:1}
-.log-line[data-level="system"] .lvl{color:var(--success);opacity:1}
-@keyframes logLineIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
-/* STREAM SWEEP (1.3.0): a new line carries a brief highlight that sweeps left→right, like a signal
-   landing in a receiver. A ::before overlay (NOT a filter — filter promotes a GPU layer and kills
-   subpixel text AA). One-shot per line; ends at opacity 0. */
-.log-line.sweep::before{content:'';position:absolute;left:0;top:0;bottom:0;width:100%;pointer-events:none;
-  background:linear-gradient(90deg, rgba(34,197,94,.16), transparent 60%);
-  transform:scaleX(0);transform-origin:left;opacity:0;
-  animation:logSweep .5s var(--ease-out) both}
-@keyframes logSweep{0%{transform:scaleX(0);opacity:1}60%{transform:scaleX(1);opacity:.5}100%{transform:scaleX(1);opacity:0}}
-.log-line.sweep[data-level="error"]::before{background:linear-gradient(90deg, rgba(255,59,92,.20), transparent 60%)}
-.log-line.sweep[data-level="warn"]::before{background:linear-gradient(90deg, rgba(255,210,63,.18), transparent 60%)}
-.log-line.sweep[data-level="command"]::before{background:linear-gradient(90deg, rgba(34,197,94,.22), transparent 60%)}
-.log-jump{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);border:1px solid var(--border-strong);background:var(--panel-raised);color:var(--text);border-radius:3px;padding:6px 12px;font:600 11px var(--font-ui);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-.command-row{display:flex;gap:8px;align-items:center;background:var(--field);border:1px solid var(--border-strong);border-radius:3px;padding:0 8px 0 10px;height:36px;flex-shrink:0;margin:0 14px 14px}
-.command-row .prompt{font:700 15px var(--font-mono);color:var(--accent)}
-.command-row:focus-within{border-color:var(--accent)}
-.command-row input{flex:1;background:transparent;border:0;color:var(--text);font:13px var(--font-mono);outline:0}
-.command-row .btn{height:26px;padding:0 12px;font-size:11.5px}
-.command-help{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:14px}
-.help-head{padding:0 0 8px;border-bottom:1px solid var(--border);margin:0}
-.help-head h3{font-size:13px}
-.help-head p{margin:3px 0 0;color:var(--text-muted);font-size:11px}
-.command-group-label{font:700 10px var(--font-mono);letter-spacing:.12em;color:var(--text-dim);margin:0 0 6px;text-transform:uppercase}
-.help-cards{display:grid;gap:5px}
-.help-cards button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:3px;cursor:pointer;transition:border-color .1s,background .1s}
-.help-cards button b{font:700 12px var(--font-mono);color:var(--text)}
-.help-cards button span{font:500 11px var(--font-ui);color:var(--text-muted);white-space:nowrap}
-.help-cards button:hover{border-color:var(--accent);background:var(--accent-weak)}
-.help-cards button:hover b{color:var(--accent)}
-.help-note{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);color:var(--text-dim);font:500 10px var(--font-ui);line-height:1.5}
-.recent-commands{display:grid;gap:5px}
-/* BUGFIX (5.6.0): these buttons had only a border-radius, so every other property fell back to the
-   OS default control style (light chip, system font) and clashed with the dark design system. Give
-   them the same treatment as .help-cards button. */
-.recent-commands button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:var(--panel);border:1px solid var(--border);color:var(--text-muted);padding:7px 10px;border-radius:3px;cursor:pointer;font:500 11px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:border-color .1s,background .1s,color .1s}
-.recent-commands button:hover{border-color:var(--accent);background:var(--accent-weak);color:var(--text)}
-/* PERFORMANCE — glanceable redesign: one status, 4 quiet numbers, 2 calm charts.
-   Details live behind a disclosure so first-time users see ~15 words, not ~150. */
-#performance.tab.active{display:flex;flex-direction:column;flex:1;min-height:0;gap:12px}
-.perf-live{display:flex;gap:8px;align-items:center;border:1px solid var(--border);background:var(--panel);padding:7px 12px;border-radius:999px;font:600 11px var(--font-mono);color:var(--text-muted);flex-shrink:0}
-.perf-live .live-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);box-shadow:0 0 0 4px rgba(255,255,255,.06)}
-.perf-live .live-dot.on{background:var(--success);box-shadow:0 0 8px rgba(0,229,160,.5)}
-.perf-uptime{color:var(--text-dim);font:500 10px var(--font-mono)}
-/* Offline banner: the only sentence a stopped server shows. */
-.perf-status{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--panel);font:500 12.5px var(--font-ui);color:var(--text-muted)}
-.perf-status[hidden]{display:none}
-.perf-status-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
-.perf-status .btn{margin-left:auto;flex-shrink:0}
-#performance.is-live .perf-status{display:none}
-/* v5.3.0: time-range chips for the Performance charts (15m / 1h / 6h). Right-aligned, calm. */
-.perf-range{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
-.perf-range .filter-chip{font:600 11px var(--font-ui);padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--field);color:var(--text-dim);cursor:pointer}
-.perf-range .filter-chip:hover{border-color:var(--border-hover);color:var(--text)}
-.perf-range .filter-chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-/* v4.0.0: KPI numbers live in ONE calm surface divided by hairlines (was 4 neon-topped cards). */
-.perf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.perf-stat{padding:var(--space-4) var(--space-5);display:flex;flex-direction:column;gap:var(--space-2);border-left:1px solid var(--border)}
-.perf-stat:first-child{border-left:0}
-.kpi-head{display:flex;align-items:center;gap:8px;font:700 10px var(--font-mono);letter-spacing:.1em;color:var(--text-dim)}
-.kpi-help{width:16px;height:16px;display:inline-grid;place-items:center;border:1px solid var(--border);border-radius:50%;font:700 10px var(--font-ui);color:var(--text-dim);cursor:help;flex-shrink:0}
-.kpi-help:hover{border-color:var(--brand);color:var(--brand)}
-.kpi-badge{margin-left:auto;font:700 10px var(--font-mono);padding:3px 7px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-muted)}
-.kpi-badge.ok{color:var(--success);border-color:var(--success-weak);background:var(--success-weak)} .kpi-badge.warn{color:var(--warning);border-color:var(--warning-weak);background:var(--warning-weak)} .kpi-badge.bad{color:var(--danger);border-color:var(--danger-weak);background:var(--danger-weak)}
-.perf-stat strong{font:700 32px var(--font-mono);letter-spacing:-.02em;margin:0;font-variant-numeric:tabular-nums}
-/* Thin 3px bar (was 4px + border) — quieter, still glanceable. */
-.kpi-bar{height:3px;background:var(--field);border-radius:999px;overflow:hidden}
-.kpi-bar i{display:block;height:100%;width:0;background:var(--brand);transition:width var(--dur-slow) var(--ease-out)}
-.kpi-bar.mspt i{background:var(--danger)} .kpi-bar.cpu i{background:var(--warning)} .kpi-bar.ram i{background:var(--success)}
-/* Dim the numbers while stopped so "—" reads as resting, not broken. */
-#performance:not(.is-live) .perf-stat strong{color:var(--text-dim)}
-#performance:not(.is-live) .perf-stat .kpi-bar{opacity:.5}
-/* Charts: ONE surface, two columns split by a vertical hairline (was 2 separate glass cards). */
-.perf-charts{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.perf-chart{display:flex;flex-direction:column;padding:var(--space-4) var(--space-5);min-width:0}
-.perf-chart+.perf-chart{border-left:1px solid var(--border)}
-.chart-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:var(--space-3);margin-bottom:var(--space-3);border-bottom:1px solid var(--border)}
-.chart-head h3{font-size:14px;margin:0}
-.chart-wrap{position:relative;flex:1;min-height:200px;min-width:0}
-/* width:100% so the canvas follows its grid track instead of forcing its 1000px attribute width on
-   the track (a canvas without this makes the sibling column collapse). JS re-measures on draw. */
-.chart-wrap canvas{position:relative;z-index:1;width:100%;height:100%;display:block}
-.chart-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center;background:var(--field);border:1px solid var(--border);border-radius:var(--r-sm);z-index:2}
-.chart-empty b{font:700 13px var(--font-ui);color:var(--text)} .chart-empty span{font:500 12px var(--font-ui);color:var(--text-muted)}
-.chart-empty[hidden]{display:none!important}
-.chart-legend{display:flex;gap:14px;margin-top:10px;font:500 11px var(--font-mono);color:var(--text-muted)}
-.chart-live{font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--success);border:1px solid var(--success-weak);background:var(--success-weak);padding:4px 8px;border-radius:999px;flex-shrink:0}
-/* Details disclosure: advanced tools hidden until asked for. */
-.perf-details{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);padding:0}
-.perf-details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:12px 16px;font:600 12.5px var(--font-ui);color:var(--text-muted)}
+
+.log-line{position:relative;padding:1px 4px;white-space:pre-wrap;word-break:break-word;border-radius:2px}
+.log-line .time{color:var(--text-4);margin-right:8px}
+.log-line .lvl{font-weight:600;margin-right:6px}
+.log-line[data-level="info"]{color:var(--text-2)}
+.log-line[data-level="warn"]{color:var(--warning);background:rgba(255,200,87,.05)}
+.log-line[data-level="warn"] .lvl{color:var(--warning)}
+.log-line[data-level="error"]{color:var(--danger);background:rgba(255,102,125,.06)}
+.log-line[data-level="error"] .lvl{color:var(--danger)}
+.log-line[data-level="command"]{color:var(--brand)}
+.log-line[data-level="command"] .lvl{color:var(--brand)}
+.log-line[data-level="system"]{color:var(--info)}
+.log-line[data-level="system"] .lvl{color:var(--info)}
+.log-line .log-player{
+  color:var(--text);text-decoration:underline;text-decoration-color:var(--border-strong);
+  text-underline-offset:2px;cursor:pointer;background:transparent;border:0;padding:0;font:inherit;
+}
+.log-line .log-player:hover,.log-line .log-player:focus-visible{color:var(--brand);text-decoration-color:var(--brand)}
+
+.log-line.sweep::before{
+  content:'';position:absolute;left:0;top:2px;bottom:2px;width:2px;background:var(--brand);
+}
+.log-line.sweep[data-level="warn"]::before{background:var(--warning)}
+.log-line.sweep[data-level="error"]::before{background:var(--danger)}
+.log-line.sweep[data-level="command"]::before{background:var(--brand)}
+
+.log-jump{
+  position:absolute;right:14px;bottom:12px;padding:6px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--border-strong);background:var(--bg-elev);color:var(--text);
+  font:600 11.5px var(--font-mono);cursor:pointer;box-shadow:var(--shadow-sm);
+  transition:border-color var(--dur-micro) var(--ease-snap),background var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap);
+}
+.log-jump:hover{border-color:var(--brand);color:var(--brand)}
+
+.command-row{
+  display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3);
+  border-top:1px solid var(--border);background:var(--bg);
+}
+.command-row .prompt{font:700 15px var(--font-mono);color:var(--brand);padding-left:4px}
+.command-row input{
+  flex:1;min-width:0;background:transparent;border:0;outline:0;padding:6px 4px;
+  color:var(--text);font:500 13px var(--font-mono);
+}
+.command-row:focus-within{border-top-color:var(--brand)}
+
+/* Quick commands side column (hairline rail section, zero box frame) */
+.command-help{
+  border-left:1px solid var(--border);padding-left:var(--space-4);
+  display:flex;flex-direction:column;gap:var(--space-4);min-width:0;
+}
+@media(max-width:1020px){
+  .command-help{border-left:0;border-top:1px solid var(--border);padding-left:0;padding-top:var(--space-4)}
+}
+.help-head h3{font:600 13.5px var(--font-ui);color:var(--text)}
+.help-head p{margin:2px 0 0;font:400 12px var(--font-ui);color:var(--text-3)}
+.command-group-label{
+  margin:0 0 var(--space-2);font:600 10px var(--font-mono);letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text-4);
+}
+.help-cards{display:flex;flex-direction:column;gap:4px}
+.help-cards button{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+  padding:8px 10px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:transparent;color:var(--text-2);text-align:left;cursor:pointer;
+  transition:background var(--dur-micro) var(--ease-snap),border-color var(--dur-micro) var(--ease-snap);
+}
+.help-cards button b{font:600 12px var(--font-mono);color:var(--brand)}
+.help-cards button span{font:400 12px var(--font-ui);color:var(--text-3)}
+.help-cards button:hover{background:var(--surface);border-color:var(--border-strong)}
+.help-cards button:hover b{color:var(--text)}
+.recent-commands{display:flex;flex-wrap:wrap;gap:6px}
+.recent-commands button{
+  padding:4px 8px;border-radius:var(--r-xs);border:1px solid var(--border);
+  background:var(--surface);color:var(--text-2);font:500 11.5px var(--font-mono);cursor:pointer;
+  transition:border-color var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap),background var(--dur-micro) var(--ease-snap);
+}
+.recent-commands button:hover{border-color:var(--brand);color:var(--text)}
+.help-note{margin:auto 0 0;font:400 11.5px/1.5 var(--font-ui);color:var(--text-4)}
+
+/* ============ PERFORMANCE TAB (#performance) ============ */
+.perf-live{
+  display:inline-flex;align-items:center;gap:8px;padding:4px 10px;
+  border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);
+  font:500 12px var(--font-mono);color:var(--text-2);
+}
+.perf-uptime{color:var(--text-3);padding-left:6px;border-left:1px solid var(--border)}
+.perf-status{
+  display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);
+  border:1px solid var(--border);border-radius:var(--r);background:var(--surface);font-size:13px;color:var(--text-2);
+}
+.perf-status[hidden],#performance.is-live .perf-status{display:none}
+.perf-status-dot{width:8px;height:8px;border-radius:999px;background:var(--text-4)}
+.perf-status .btn{margin-left:auto}
+
+.perf-alert{
+  padding:var(--space-3) var(--space-4);border:1px solid var(--border);
+  border-left:2px solid var(--warning);border-radius:var(--r);background:var(--surface);
+  font:400 12.5px var(--font-ui);color:var(--text-2);
+}
+.perf-alert b{color:var(--warning);font-weight:600}
+
+/* 4-Column Telemetry Strip for Performance KPIs (zero card grid) */
+.perf-stats{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
+  padding:var(--space-3) 0;border-bottom:1px solid var(--border);
+}
+.perf-stat{
+  padding:0 var(--space-5);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;gap:6px;min-width:0;
+}
+.perf-stat:first-child{border-left:0;padding-left:0}
+.perf-stat:last-child{padding-right:0}
+@media(max-width:860px){
+  .perf-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4)}
+  .perf-stat{border-left:0;padding:0}
+}
+.kpi-head{display:flex;align-items:center;gap:6px;font:600 10.5px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-4)}
+.kpi-help{
+  width:24px;height:24px;border-radius:999px;border:1px solid var(--border);
+  display:inline-grid;place-items:center;font:600 10.5px var(--font-mono);color:var(--text-3);cursor:help;
+  transition:border-color var(--dur-micro) var(--ease-snap),color var(--dur-micro) var(--ease-snap),background var(--dur-micro) var(--ease-snap);
+}
+.kpi-help:hover,.kpi-help:focus-visible{border-color:var(--brand);color:var(--brand)}
+.kpi-badge{
+  margin-left:auto;padding:1px 6px;border-radius:var(--r-xs);border:1px solid var(--border);
+  font:600 10px var(--font-mono);color:var(--text-3);background:var(--surface);
+}
+.kpi-badge.ok{background:var(--brand-soft);border-color:rgba(34,197,94,.3);color:var(--brand)}
+.perf-stat strong{font:600 22px/1.15 var(--font-mono);color:var(--text)}
+.kpi-bar{height:3px;width:100%;border-radius:2px;background:var(--surface-2);overflow:hidden}
+.kpi-bar i{display:block;height:100%;background:var(--brand);transition:width var(--dur-fast) var(--ease-out)}
+.kpi-bar.mspt i{background:var(--info)}
+.kpi-bar.cpu i{background:var(--warning)}
+.kpi-bar.ram i{background:var(--success)}
+#performance:not(.is-live) .perf-stat strong{color:var(--text-4)}
+#performance:not(.is-live) .perf-stat .kpi-bar{opacity:.35}
+
+.perf-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.perf-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-6);padding:var(--space-2) 0}
+@media(max-width:960px){.perf-charts{grid-template-columns:1fr}}
+.perf-chart{padding-bottom:var(--space-4);border-bottom:1px solid var(--border);min-width:0}
+.chart-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2)}
+.chart-head h3{font:600 13.5px var(--font-ui);color:var(--text)}
+
+.perf-details{border-top:1px solid var(--border);padding-top:var(--space-2)}
+.perf-details>summary{
+  list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  padding:var(--space-2) 0;font:600 13px var(--font-ui);color:var(--text-2);
+}
 .perf-details>summary::-webkit-details-marker{display:none}
-.perf-details>summary::before{content:'▸';color:var(--accent);font-family:var(--font-mono)}
-.perf-details[open]>summary::before{content:'▾'}
+.perf-details>summary::before{content:'▸';color:var(--text-3);font-size:11px;transition:transform var(--dur-fast) var(--ease-out)}
+.perf-details[open]>summary::before{transform:rotate(90deg);color:var(--brand)}
 .perf-details>summary:hover{color:var(--text)}
-.perf-diagnostics{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px}
-.diag-head{display:flex;gap:10px;align-items:center}
-.diag-icon{width:26px;height:26px;display:grid;place-items:center;border-radius:4px;background:var(--field);border:1px solid var(--border);color:var(--accent);font-size:12px;flex-shrink:0}
-.diag-icon.ok{background:var(--success-weak);border-color:rgba(0,229,160,.25);color:var(--success)}
-.diag-head b{font:700 13px var(--font-ui)} .diag-head p{margin:2px 0 0;color:var(--text-muted);font:500 12px var(--font-ui);line-height:1.5}
-.diag-badge{margin-left:auto;font:700 10px var(--font-mono);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--field);color:var(--text-muted);flex-shrink:0}
-.diag-badge.ok{color:var(--success);border-color:rgba(0,229,160,.25);background:var(--success-weak)}
-.diag-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-@media(max-width:1000px){.perf-stats{grid-template-columns:1fr 1fr}.perf-stat:nth-child(odd){border-left:0}.perf-stat:nth-child(3),.perf-stat:nth-child(4){border-top:1px solid var(--border)}.perf-charts{grid-template-columns:1fr}.perf-chart+.perf-chart{border-left:0;border-top:1px solid var(--border)}}
+
+.perf-diagnostics{
+  margin-top:var(--space-2);padding:var(--space-4) 0;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:var(--space-3);
+}
+.diag-head{display:flex;align-items:center;gap:10px}
+.diag-icon{
+  width:24px;height:24px;border-radius:var(--r-xs);border:1px solid var(--border);
+  background:var(--surface);display:grid;place-items:center;font:600 12px var(--font-mono);color:var(--text-3);
+}
+.diag-icon.ok{border-color:rgba(34,197,94,.3);background:var(--brand-soft);color:var(--brand)}
+.diag-head b{font:600 13.5px var(--font-ui);color:var(--text)}
+.diag-badge{padding:2px 7px;border-radius:var(--r-xs);border:1px solid var(--border);font:600 10.5px var(--font-mono);color:var(--text-3)}
+.diag-badge.ok{background:var(--brand-soft);border-color:rgba(34,197,94,.3);color:var(--brand)}
+.diag-actions{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}

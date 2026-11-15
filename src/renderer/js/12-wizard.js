@@ -90,7 +90,7 @@ async function loadNswVersions(software){
   renderNswChips($('#nswVersionInput')?.value.trim()||'');
   // BUGFIX: this used to prefix the resolved version with t('nsw.latest') ("Use the latest version"),
   // which duplicated the card's own <b> title. Show just the version number now.
-  $('#nswLatestLabel').textContent=nswVersions.latest?`v${nswVersions.latest}`:'';
+  $('#nswLatestLabel').textContent=nswVersions.latest?(/^v/i.test(nswVersions.latest)?nswVersions.latest:`v${nswVersions.latest}`):'';
   const mode=$$('input[name="nswVersionMode"]').find(r=>r.checked)?.value;
   if(nswVersions.latest&&mode!=='specific')checkNswJava(isMcFirst()?nswMc:nswVersions.latest);
 }
@@ -157,8 +157,8 @@ function renderNswChips(filter){
     const soft=st&&st.stable===false;
     let tag=soft?` <em class="nsw2-tag warn">${esc((st.channel||'beta').toLowerCase())}</em>`:(st&&st.stable?'':'');
     if(nsw.software==='horizon'||nsw.software==='pumpkin'){
-      const isNightly=/nightly|dev/i.test(v);
-      tag=isNightly?` <em class="nsw2-tag warn">${esc(t('nsw.tagNightly'))}</em>`:` <em class="nsw2-tag accent">${esc(t('nsw.tagStable'))}</em>`;
+      const isNightly=/nightly|canary|dev/i.test(v);
+      tag=isNightly?` <em class="nsw2-tag warn">${esc(v==='canary'?'canary':t('nsw.tagNightly'))}</em>`:` <em class="nsw2-tag accent">${esc(t('nsw.tagStable'))}</em>`;
     }
     return `<button class="version-chip"${chipDelay(i)} data-version="${esc(v)}"${soft?' data-soft="1"':''}>${esc(v)}${tag}</button>`;
   }).join('');
@@ -580,7 +580,8 @@ $('#nswNext').onclick=async()=>{
     nswRender();
     return;
   }
-  $('#newServerModal').hidden=true;nsw={step:1,software:'vanilla',folder:''};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+  const _nm=$('#newServerModal'); if(_nm){_nm.hidden=true; if(typeof releaseFocus==='function')releaseFocus(_nm);}
+  nsw={step:1,software:'vanilla',folder:''};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
   try{const s2=await window.observer.getState();state={...state,...s2}}catch{}
   if(r.building){toast(t('nsw.building',{n:r.name}));switchTab('console');return}
   state.files=r.files;refreshUI();switchTab('overview');
@@ -626,7 +627,7 @@ $('#nswChooseFolder')?.addEventListener('click',async()=>{
     const name=probe.jar||probe.launchScript||'server';
     const importIt=await confirmDialog({title:t('nsw.foundServer'),body:esc(t('nsw.foundServerBody',{n:name})),ok:t('nsw.importIt'),cancel:t('nsw.downloadFresh')});
     if(importIt){
-      $('#newServerModal').hidden=true;
+      const _nm=$('#newServerModal'); if(_nm){_nm.hidden=true; if(typeof releaseFocus==='function')releaseFocus(_nm);}
       await addExistingInstance(f);
       return;
     }
@@ -688,6 +689,11 @@ $('#nswSoftwareFilters')?.addEventListener('click',e=>{
       grp.hidden=!hasVisible;
     }
   });
+});
+$$('#nswCards .nsw2-row img[data-fallback]').forEach(img=>{
+  const apply=()=>{const fb=img.getAttribute('data-fallback');if(fb&&img.getAttribute('src')!==fb)img.src=fb;};
+  if(img.complete&&img.naturalWidth===0) apply();
+  else img.addEventListener('error',apply,{once:true});
 });
 // 5.4.0: the rail now has ONE "Add server" button that opens a choice modal (see 08-shell.js);
 // the 'create new' choice calls openNewServerWizard() from there.

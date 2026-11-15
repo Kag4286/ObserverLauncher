@@ -28,28 +28,24 @@ function itemTooltip(x,label){
   lines.push(`×${x.count} · ${x.id}`);
   return esc(lines.join('\n'));
 }
-function itemTooltipHtml(x,label){
-  const parts=[];
-  parts.push(`<div class="tip-title">${esc(label)}</div>`);
-  if(x.customName&&x.customName!==label)parts.push(`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`);
-  const enchs=[...(x.enchantments||[]),...(x.storedEnchantments||[])];
-  if(enchs.length){
-    parts.push(enchs.map(e=>`<div class="tip-ench">✨ ${esc(itemLabel(e.id))} ${romanNum(e.level)}</div>`).join(''));
-  }
+function itemTooltipSpec(x,label){
+  const enchs=[...(x.enchantments||[]),...(x.storedEnchantments||[])]
+    .map(e=>`✨ ${itemLabel(e.id)} ${romanNum(e.level)}`);
+  const spec={title:String(label||''),count:x.count,id:x.id};
+  if(x.customName&&x.customName!==label) spec.sub=itemLabel(x.id);
+  if(enchs.length) spec.enchs=enchs;
   if(x.durability){
     const pct=Math.round(x.durability.remaining/x.durability.max*100);
-    const col=durColor(x.durability);
-    parts.push(`<div class="tip-dur" style="color:${col}">Durability: ${x.durability.remaining} / ${x.durability.max} (${pct}%)</div>`);
+    spec.dur={remaining:x.durability.remaining,max:x.durability.max,pct,col:durColor(x.durability)};
   }
-  parts.push(`<div class="tip-meta"><span>×${x.count}</span><span>${esc(x.id)}</span></div>`);
-  return parts.join('');
+  return JSON.stringify(spec);
 }
 // ONE place decides which tex:// URL an item id maps to. The inventory grid used to carry this
 // logic inline while the equipment row did not, so a mod item worn as armor fell through to the
 // initials badge even though the mod jar had the texture. Both call this now.
 let iconEpoch = 0;
-function itemIconUrl(id){
-  const s=String(id||'');
+function itemIconUrl(idOrItem){
+  const s=typeof idOrItem==='object'&&idOrItem?String(idOrItem.itemModel||idOrItem.id||''):String(idOrItem||'');
   if(!s) return null;
   const q=iconEpoch?`?e=${iconEpoch}`:'';
   const vanilla=!s.includes(':')||s.startsWith('minecraft:');
@@ -76,12 +72,12 @@ const isoBlockCache = new Map();
 function isBlockItem(id) {
   if (!id || typeof id !== 'string') return false;
   const name = id.includes(':') ? id.split(':')[1] : id;
-  if (/(?:_ingot|_nugget|_sword|_pickaxe|_axe|_shovel|_hoe|_helmet|_chestplate|_leggings|_boots|_horse_armor|_bucket|_bottle|_potion|_stew|_soup|_dust|_shard|_seeds?|_egg|_spawn_egg|_disc|_rod|_arrow|_apple|_bow|_book|_fish|_meat)$/.test(name)) return false;
+  if (/(?:_ingot|_nugget|_sword|_pickaxe|_axe|_shovel|_hoe|_spear|_helmet|_chestplate|_leggings|_boots|_horse_armor|_nautilus_armor|_wolf_armor|_harness|_cushion|_shelf|straw_bed|_bucket|_bottle|_potion|_stew|_soup|_dust|_shard|_seeds?|_egg|_spawn_egg|_disc|_rod|_arrow|_apple|_bow|_book|_fish|_meat)$/.test(name)) return false;
   if (/^(?:redstone|glowstone_dust|clay_ball|amethyst_shard|prismarine_shard|prismarine_crystals|honeycomb|brick|nether_brick|stick|string|feather|flint|coal|charcoal|diamond|emerald|iron_nugget|gold_nugget|copper_ingot|iron_ingot|gold_ingot|netherite_ingot|netherite_scrap|slime_ball|ender_pearl|eye_of_ender|blaze_powder|ghast_tear|magma_cream|sugar|paper|book|name_tag|lead|saddle|compass|clock|bread|cookie)$/.test(name)) return false;
   if (/(?:sapling|flower|tulip|rose|orchid|daisy|allium|dandelion|poppy|lily_pad|sugar_cane|bamboo|cactus|torch|lantern|rail|lever|tripwire_hook|door|trapdoor|carpet|bed|sign|banner|chain|cauldron|hopper|bell|brewing_stand)$/.test(name)) return false;
   if (/(?:^anvil|_anvil)$/.test(name)) return true;
   if (/(?:_block|_ore|_log|_wood|_stem|_hyphae|_planks|_bricks|_leaves|_wool|_terracotta|_concrete(?:_powder)?|_pillar|_crate|_casing|_cobblestone|_stone|waystone)$/.test(name)) return true;
-  return /^(?:stone|cobblestone|mossy_cobblestone|smooth_stone|deepslate|cobbled_deepslate|polished_deepslate|blackstone|polished_blackstone|granite|polished_granite|diorite|polished_diorite|andesite|polished_andesite|dirt|coarse_dirt|rooted_dirt|podzol|mycelium|mud|packed_mud|sand|red_sand|gravel|clay|sandstone|red_sandstone|bedrock|obsidian|crying_obsidian|tnt|crafting_table|furnace|smoker|blast_furnace|dispenser|dropper|observer|sponge|wet_sponge|glowstone|sea_lantern|shroomlight|netherrack|soul_sand|soul_soil|basalt|smooth_basalt|end_stone|ice|packed_ice|blue_ice|sculk|sculk_catalyst|bookshelf|chiseled_bookshelf|beehive|bee_nest|prismarine|dark_prismarine|calcite|tuff|lodestone|target|respawn_anchor)$/.test(name);
+  return /^(?:stone|cobblestone|mossy_cobblestone|smooth_stone|deepslate|cobbled_deepslate|polished_deepslate|blackstone|polished_blackstone|granite|polished_granite|diorite|polished_diorite|andesite|polished_andesite|dirt|coarse_dirt|rooted_dirt|podzol|mycelium|mud|packed_mud|sand|red_sand|gravel|clay|sandstone|red_sandstone|bedrock|obsidian|crying_obsidian|tnt|crafting_table|furnace|smoker|blast_furnace|dispenser|dropper|observer|sponge|wet_sponge|glowstone|sea_lantern|shroomlight|netherrack|soul_sand|soul_soil|basalt|smooth_basalt|end_stone|ice|packed_ice|blue_ice|sculk|sculk_catalyst|bookshelf|chiseled_bookshelf|beehive|bee_nest|prismarine|dark_prismarine|calcite|tuff|lodestone|target|respawn_anchor|grass_block|hay_block|melon|carved_pumpkin|jack_o_lantern|loom|smithing_table|cartography_table|fletching_table|stonecutter|jukebox|note_block|composter|barrel|ancient_debris)$/.test(name);
 }
 
 function drawCubeFace(ctx, img, poly, matrix, tint) {
@@ -116,12 +112,12 @@ function createIsoCanvas(size = 32) {
 }
 
 function renderIsometricBlock(img) {
-  const { canvas, ctx } = createIsoCanvas(32);
+  const { canvas, ctx } = createIsoCanvas(64);
   if (!ctx) return null;
   const w = img.naturalWidth || 16;
-  drawCubeFace(ctx, img, [16, 3, 28, 9, 16, 15, 4, 9], [12 / w, 6 / w, -12 / w, 6 / w, 16, 3], null);
-  drawCubeFace(ctx, img, [4, 9, 16, 15, 16, 27, 4, 21], [12 / w, 6 / w, 0, 12 / w, 4, 9], 'rgba(0,0,0,0.18)');
-  drawCubeFace(ctx, img, [16, 15, 28, 9, 28, 21, 16, 27], [12 / w, -6 / w, 0, 12 / w, 16, 15], 'rgba(0,0,0,0.40)');
+  drawCubeFace(ctx, img, [32, 6, 56, 18, 32, 30, 8, 18], [24 / w, 12 / w, -24 / w, 12 / w, 32, 6], null);
+  drawCubeFace(ctx, img, [8, 18, 32, 30, 32, 56, 8, 44], [24 / w, 12 / w, 0, 26 / w, 8, 18], 'rgba(0,0,0,0.16)');
+  drawCubeFace(ctx, img, [32, 30, 56, 18, 56, 44, 32, 56], [24 / w, -12 / w, 0, 26 / w, 32, 30], 'rgba(0,0,0,0.36)');
   return canvas.toDataURL();
 }
 
@@ -304,17 +300,17 @@ function calculateDefensePoints(armor){
   if(!Array.isArray(armor)) return 0;
   let total=0;
   const BASE_DEF={
-    netherite_helmet:3,diamond_helmet:3,iron_helmet:2,golden_helmet:2,chainmail_helmet:2,turtle_helmet:2,leather_helmet:1,
-    netherite_chestplate:8,diamond_chestplate:8,iron_chestplate:6,golden_chestplate:5,chainmail_chestplate:5,leather_chestplate:3,
-    netherite_leggings:6,diamond_leggings:6,iron_leggings:5,golden_leggings:3,chainmail_leggings:4,leather_leggings:2,
-    netherite_boots:3,diamond_boots:3,iron_boots:2,golden_boots:1,chainmail_boots:1,leather_boots:1
+    netherite_helmet:3,diamond_helmet:3,iron_helmet:2,copper_helmet:2,golden_helmet:2,chainmail_helmet:2,turtle_helmet:2,leather_helmet:1,
+    netherite_chestplate:8,diamond_chestplate:8,iron_chestplate:6,copper_chestplate:4,golden_chestplate:5,chainmail_chestplate:5,leather_chestplate:3,
+    netherite_leggings:6,diamond_leggings:6,iron_leggings:5,copper_leggings:3,golden_leggings:3,chainmail_leggings:4,leather_leggings:2,
+    netherite_boots:3,diamond_boots:3,iron_boots:2,copper_boots:1,golden_boots:1,chainmail_boots:1,leather_boots:1
   };
   for(const it of armor){
     if(!it||!it.id) continue;
     const cleanId=it.id.replace(/^minecraft:/,'').toLowerCase();
     if(BASE_DEF[cleanId]){ total+=BASE_DEF[cleanId]; }
     else {
-      const slot=it.slot||(cleanId.includes('helmet')?'Helmet':cleanId.includes('chestplate')?'Chestplate':cleanId.includes('leggings')?'Leggings':cleanId.includes('boots')?'Boots':'');
+      const slot=it.slot||(/(?:helmet|cap|hood|crown|hat)/.test(cleanId)?'Helmet':/(?:chestplate|cuirass|tunic|robe|vest)/.test(cleanId)?'Chestplate':/(?:leggings|greaves|pants)/.test(cleanId)?'Leggings':/(?:boots|sabatons|shoes)/.test(cleanId)?'Boots':'');
       const isHighTier=/dragon|diamond|netherite|black|scale/i.test(cleanId);
       if(slot==='Helmet') total+=isHighTier?3:2;
       else if(slot==='Chestplate') total+=isHighTier?8:6;
@@ -336,17 +332,18 @@ function populateSlotCell(el, it, defaultLabel){
       dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
     }
     el.className=`inv-cell${enchCls}`;
-    el.innerHTML=itemCellInner(itemIconUrl(it.id),itemLabel(it.id),it.id)+dur;
-    const tipHtml=itemTooltipHtml(it,itemLabel(it.id));
+    const iconRef=it.itemModel||it.id;
+    el.innerHTML=itemCellInner(itemIconUrl(iconRef),itemLabel(it.id),iconRef)+dur;
+    const tipSpec=itemTooltipSpec(it,itemLabel(it.id));
     const tip=itemTooltip(it,itemLabel(it.id));
     el.setAttribute('data-tip', tip);
-    if(tipHtml) el.setAttribute('data-tip-html', tipHtml); else el.removeAttribute('data-tip-html');
+    if(tipSpec) el.setAttribute('data-tip-spec', tipSpec); else el.removeAttribute('data-tip-spec');
     el.onclick=()=>showInvItemDetail(it);
   } else {
     el.className='inv-cell empty';
     el.innerHTML='';
     el.setAttribute('data-tip', `${defaultLabel} (${t('ply.emptySlot')})`);
-    el.removeAttribute('data-tip-html');
+    el.removeAttribute('data-tip-spec');
     el.onclick=null;
   }
 }
@@ -364,7 +361,8 @@ function showInvItemDetail(x){
   const d=$('#invItemDetail');if(!d)return;
   const rawLabel=x.customName||itemLabel(x.id);
   const formattedLabel=parseMinecraftColors(rawLabel);
-  const iconUrl=itemIconUrl(x.id);
+  const iconRef=x.itemModel||x.id;
+  const iconUrl=itemIconUrl(iconRef);
   const enchs=[...(x.enchantments||[]),...(x.storedEnchantments||[])];
   const enchHtml=enchs.length?`<div class="inv-item-detail-enchs">${enchs.map(e=>`<span class="pd-ench-pill">✨ ${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}</div>`:'';
   const durHtml=x.durability?`<div class="inv-item-detail-meta"><span style="color:${durColor(x.durability)}">Durability: ${x.durability.remaining} / ${x.durability.max} (${Math.round(x.durability.remaining/x.durability.max*100)}%)</span></div>`:'';
@@ -373,7 +371,9 @@ function showInvItemDetail(x){
     loreHtml=`<div class="inv-item-lore">${x.lore.map(l=>`<div class="inv-lore-line">${parseMinecraftColors(l)}</div>`).join('')}</div>`;
   }
   d.hidden=false;
-  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,rawLabel,x.id)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${formattedLabel}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==rawLabel?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${loreHtml}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" onclick="resetInvItemDetail()" aria-label="Clear selection">✕</button>`;
+  d.innerHTML=`<div class="inv-item-detail-icon">${itemCellInner(iconUrl,rawLabel,iconRef)}</div><div class="inv-item-detail-info"><div class="inv-item-detail-title"><b>${formattedLabel}</b> ${x.count>1?`<span class="inv-count-tag">×${x.count}</span>`:''}</div>${x.customName&&x.customName!==rawLabel?`<div class="tip-sub">${esc(itemLabel(x.id))}</div>`:''}${loreHtml}${enchHtml}${durHtml}<div class="inv-item-detail-meta"><span>Slot ${x.slot}</span><span>${esc(x.id)}</span></div></div><button type="button" class="btn sm secondary" data-inv-detail-clear aria-label="Clear selection">✕</button>`;
+  const clrBtn=d.querySelector('[data-inv-detail-clear]');
+  if(clrBtn) clrBtn.onclick=()=>resetInvItemDetail();
   scanAndApplyIsoBlocks(d);
 }
 
@@ -447,12 +447,13 @@ function renderItemGrid(id,items){
   n.innerHTML=list.map((x,i)=>{
     if(x.empty) return `<div class="inv-cell empty" data-tip="Slot ${x.slot}"></div>`;
     const label=x.customName||itemLabel(x.id);
-    const iconUrl=itemIconUrl(x.id);
+    const iconRef=x.itemModel||x.id;
+    const iconUrl=itemIconUrl(iconRef);
     const tip=itemTooltip(x,label);
-    const tipHtml=itemTooltipHtml(x,label);
+    const tipSpec=itemTooltipSpec(x,label);
     const ench=x.enchantments?.length||x.storedEnchantments?.length?' enchanted':'';
     const dur=x.durability?`<span class="inv-dur" style="width:${Math.max(2,Math.round(x.durability.remaining/x.durability.max*100))}%;background:${durColor(x.durability)}"></span>`:'';
-    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-html="${esc(tipHtml)}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label,x.id)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
+    return `<div class="inv-cell${ench}" data-tip="${tip}" data-tip-spec="${esc(tipSpec)}" data-slot="${x.slot}" tabindex="0">${itemCellInner(iconUrl,label,iconRef)}${dur}<span class="inv-count">${x.count>1?x.count:''}</span></div>`;
   }).join('');
   scanAndApplyIsoBlocks(n);
 }
@@ -486,7 +487,8 @@ function renderEquipment(armor,offhand,mainhand){
       let dur='';
       let enchList='';
       if(it&&it.id){
-        cell=itemCellInner(itemIconUrl(it.id),itemLabel(it.id),it.id);
+        const iconRef=it.itemModel||it.id;
+        cell=itemCellInner(itemIconUrl(iconRef),itemLabel(it.id),iconRef);
         if(it.durability){
           dur=`<span class="inv-dur" style="width:${Math.max(2,Math.round(it.durability.remaining/it.durability.max*100))}%;background:${durColor(it.durability)}"></span>`;
         }
@@ -498,17 +500,17 @@ function renderEquipment(armor,offhand,mainhand){
           enchList=`<div class="pd-equip-ench-list">${show.map(e=>`<span class="pd-ench-pill" title="${esc(itemLabel(e.id))} ${romanNum(e.level)}">${esc(itemLabel(e.id))} ${romanNum(e.level)}</span>`).join('')}${rem>0?`<span class="pd-ench-pill" title="${allTip}">+${rem} more</span>`:''}</div>`;
         }
       }
-      const tipHtml=it&&it.id?itemTooltipHtml(it,itemLabel(it.id)):'';
+      const tipSpec=it&&it.id?itemTooltipSpec(it,itemLabel(it.id)):'';
       const tip=it&&it.id?itemTooltip(it,itemLabel(it.id)):t('ply.emptySlot');
       return `<div class="pd-equip">
-        <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipHtml?`data-tip-html="${esc(tipHtml)}"`:''} tabindex="0">${cell}${dur}</div>
+        <div class="inv-cell${it&&it.id?'':' empty'}${enchCls}" data-tip="${tip}" ${tipSpec?`data-tip-spec="${esc(tipSpec)}"`:''} tabindex="0">${cell}${dur}</div>
         <span class="pd-equip-slot">${esc(label)}</span>
         ${it&&it.id?`<span class="pd-equip-name" title="${esc(it.customName||itemLabel(it.id))}">${esc(it.customName||itemLabel(it.id))}</span>`:''}
         ${enchList}
       </div>`;
     }).join('');
   }
-  const stage=$('#pdStageOverview');
+  const stage=$('.pd-stage-overview');
   if(stage) scanAndApplyIsoBlocks(stage);
   if(n) scanAndApplyIsoBlocks(n);
 }
@@ -585,7 +587,7 @@ function playerInitialsAvatar(name) {
   let hash = 0;
   for (const c of String(name || '?')) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
   const hue = Math.abs(hash) % 360;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="6" fill="hsl(${hue},32%,24%)"/><text x="32" y="34" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="hsl(${hue},60%,75%)">${initial}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="6" fill="hsl(${hue},32%,24%)"/><text x="32" y="34" dominant-baseline="central" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="hsl(${hue},60%,75%)">${esc(initial)}</text></svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 function getHeadAvatarHtml(uuid, name) {
@@ -1120,7 +1122,7 @@ $('#pdStatsChips')?.addEventListener('click', e => {
   const chip = e.target.closest('.pd-stat-chip');
   if (!chip || !chip.dataset.cat) return;
   pdStatsCat = chip.dataset.cat;
-  $$('.pd-stat-chip').forEach(c => c.classList.toggle('is-active', c === chip));
+  $$('.pd-stat-chip').forEach(c => { const on = c === chip; c.classList.toggle('is-active', on); c.setAttribute('aria-pressed', String(on)); });
   filterAndRenderStatsGrid();
 });
 $('#pdStatsSearch')?.addEventListener('input', e => {
@@ -1133,6 +1135,8 @@ $('#pdStatsSearch')?.addEventListener('input', e => {
 // that <img> has already fired onload by the time the real armor texture is fetched, so without
 // a rebuild the armor would stay invisible for the rest of the session.
 async function renderPlayer3D(canvas,status,uuid,name,armor){
+  const noticeEl=$('#pd3dNotice');
+  if(noticeEl){noticeEl.hidden=true;noticeEl.textContent='';noticeEl.removeAttribute('title');}
   if(!canvas||!status)return;
   status.hidden=false;
   status.textContent=t('pd.loadingSkin');
@@ -1161,8 +1165,26 @@ async function renderPlayer3D(canvas,status,uuid,name,armor){
       toggleBtn.hidden=!equipment;
       toggleBtn.classList.add('active');
     }
+    const armorIssues=new Set();
+    const hasModArmor=Boolean(equipment&&typeof getArmorMaterial==='function'&&['helmet','chest','legs','boots'].some(k=>{
+      const m=equipment[k]?getArmorMaterial(equipment[k]):null;
+      return m&&typeof m==='object'&&m.isMod;
+    }));
+    const onArmorStatus=(slotKey,st)=>{
+      if(!noticeEl||!hasModArmor)return;
+      if(st==='missing'||st==='custom-geo') armorIssues.add(slotKey);
+      else armorIssues.delete(slotKey);
+      if(armorIssues.size>0){
+        const msg=t('pd.armorCustomModel');
+        noticeEl.textContent=msg;
+        noticeEl.title=msg;
+        noticeEl.hidden=false;
+      }else{
+        noticeEl.hidden=true;
+      }
+    };
     try{
-      const rModel=createPlayerRenderer(canvas,skinRes.dataUri,skinRes.model==='slim',equipment);
+      const rModel=createPlayerRenderer(canvas,skinRes.dataUri,skinRes.model==='slim',equipment,{onArmorStatus});
       if(!rModel)throw new Error('WebGL not supported');
       if(toggleBtn&&equipment){
         toggleBtn.onclick=()=>{
@@ -1301,11 +1323,11 @@ async function openPlayerInspector(uuid,name){
   pdStatsCat='all';pdStatsSearchQuery='';
   const invS=$('#invSearch');if(invS)invS.value='';const ecS=$('#ecSearch');if(ecS)ecS.value='';
   const pdS=$('#pdStatsSearch');if(pdS)pdS.value='';
-  $$('.pd-stat-chip').forEach(c=>c.classList.toggle('is-active',c.dataset.cat==='all'));
+  $$('.pd-stat-chip').forEach(c=>{const on=c.dataset.cat==='all';c.classList.toggle('is-active',on);c.setAttribute('aria-pressed',String(on));});
   const invCb=$('#invShowEmpty');if(invCb)invCb.checked=true;const ecCb=$('#ecShowEmpty');if(ecCb)ecCb.checked=true;
   const invSel=$('#invSort');if(invSel)invSel.value='slot';const ecSel=$('#ecSort');if(ecSel)ecSel.value='slot';
   $('#playerDataEmpty').hidden=true;$('#playerDataForm').hidden=false;
-  $('#invSwitchInv')?.classList.add('active');$('#invSwitchEnder')?.classList.remove('active');
+  $('#invSwitchInv')?.classList.add('active');$('#invSwitchInv')?.setAttribute('aria-selected','true');$('#invSwitchEnder')?.classList.remove('active');$('#invSwitchEnder')?.setAttribute('aria-selected','false');
   const _vm=$('#invViewMain');if(_vm)_vm.hidden=false;const _ve=$('#invViewEnder');if(_ve)_ve.hidden=true;
   // BUGFIX: the header avatar used an external mc-heads.net URL, which shows a broken image when
   // offline or when that request is slow. Reuse the 8x8 face we already cached for the roster, then
@@ -1459,11 +1481,11 @@ $('#ecSearch')?.addEventListener('input',e=>{ecSearchQuery=e.target.value;render
 $('#ecShowEmpty')?.addEventListener('change',e=>{ecShowEmpty=e.target.checked;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});
 $('#ecSort')?.addEventListener('change',e=>{ecSortBy=e.target.value;renderItemGrid('#enderChestList',lastInspectData?.enderChest||[])});
 $('#invSwitchInv')?.addEventListener('click',()=>{
-  $('#invSwitchInv')?.classList.add('active');$('#invSwitchEnder')?.classList.remove('active');
+  $('#invSwitchInv')?.classList.add('active');$('#invSwitchInv')?.setAttribute('aria-selected','true');$('#invSwitchEnder')?.classList.remove('active');$('#invSwitchEnder')?.setAttribute('aria-selected','false');
   const vm=$('#invViewMain');if(vm)vm.hidden=false;const ve=$('#invViewEnder');if(ve)ve.hidden=true;
 });
 $('#invSwitchEnder')?.addEventListener('click',()=>{
-  $('#invSwitchEnder')?.classList.add('active');$('#invSwitchInv')?.classList.remove('active');
+  $('#invSwitchEnder')?.classList.add('active');$('#invSwitchEnder')?.setAttribute('aria-selected','true');$('#invSwitchInv')?.classList.remove('active');$('#invSwitchInv')?.setAttribute('aria-selected','false');
   const vm=$('#invViewMain');if(vm)vm.hidden=true;const ve=$('#invViewEnder');if(ve)ve.hidden=false;
 });$('#playerInspectClose').onclick=closePlayerInspectModal;
 $$('[data-player-filter]').forEach(b=>b.onclick=()=>{

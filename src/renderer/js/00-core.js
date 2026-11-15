@@ -32,9 +32,7 @@ function applyLocale(){
   // BUGFIX: the page title (#pageTitle) has no data-i18n — it is set by switchTab. Changing the
   // language from Settings left it in the old language until the user switched tabs. Re-derive it
   // from the active nav item here so it updates immediately.
-  const activeNav = document.querySelector('.nav-item.active');
-  const titleEl = document.getElementById('pageTitle');
-  if (activeNav?.dataset.tab && titleEl) titleEl.textContent = t('nav.' + activeNav.dataset.tab) || titles[activeNav.dataset.tab] || titleEl.textContent;
+  if (typeof syncTopbarHeader === 'function') syncTopbarHeader();
   if (typeof updateMarketServerBanner === 'function') updateMarketServerBanner();
   const f = (window.state && window.state.files) || {};
   const isPumpkin = (f.target && f.target.software === 'pumpkin') || (f.nativeBinary && /pumpkin/i.test(f.nativeBinary)) || f.hasPumpkinConfig;
@@ -90,7 +88,17 @@ let lastInspectData=null; // kept so icons:update can re-render the open inspect
 // up front matches the in-game inventory.
 let invSearchQuery='', invShowEmpty=true, invSortBy='slot';
 let ecSearchQuery='', ecShowEmpty=true, ecSortBy='slot';
-const titles={overview:'Overview',console:'Console',players:'Players',performance:'Performance',content:'Content library',marketplace:'Marketplace',worlds:'Worlds & backups',properties:'Server properties',settings:'Launcher settings'};
+const titles={overview:'Overview',console:'Console',players:'Players',performance:'Performance',content:'Content library',marketplace:'Marketplace',worlds:'Worlds & backups',worldmap:'World Map',properties:'Server properties',settings:'Launcher settings'};
+const eyebrowKeys={overview:'top.eyebrow',console:'top.eyebrow',players:'eyebrow.players',performance:'eyebrow.perf',content:'eyebrow.contentBay',marketplace:'eyebrow.market',worlds:'eyebrow.storage',worldmap:'wm.eyebrow',properties:'eyebrow.rawConfig',settings:'eyebrow.controlDeck'};
+/** Sync topbar eyebrow and single page heading with active tab and proxy mode. */
+function syncTopbarHeader(tab){
+  const cur=tab||document.querySelector('.nav-item.active')?.dataset.tab||window.currentTab||'overview';
+  const proxy=(cur==='properties'&&typeof isProxyServer==='function'&&isProxyServer());
+  const titleEl=document.getElementById('pageTitle');
+  if(titleEl) titleEl.textContent=proxy?t('prop.proxyTitle'):(t('nav.'+cur)||titles[cur]||titleEl.textContent);
+  const eyeEl=document.getElementById('pageEyebrow');
+  if(eyeEl) eyeEl.textContent=t(eyebrowKeys[cur]||'top.eyebrow');
+}
 const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 // SECURITY (mirror of src/main/validate.js — renderer has no require()).
 // Player names are interpolated into console commands (`kick ${name}`) and
@@ -224,20 +232,44 @@ function rafCoalesce(fn){ let pending=0; return function(){ if(pending)return; p
 function lruSet(map,key,val,max){ map.set(key,val); if(map.size>max){ const k=map.keys().next().value; const v=map.get(k); if(v&&typeof v==='object'&&'width' in v&&typeof v.getContext==='function'){ try{v.width=0;v.height=0}catch{} } map.delete(k); } return map; }
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 function focusablesIn(root){ return [...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetParent!==null||el===document.activeElement); }
-let _trapRoot=null,_trapPrev=null;
+let _trapStack=[];
 function trapFocus(root){
-  _trapRoot=root; _trapPrev=document.activeElement;
+  if(!root) return;
+  const prev=document.activeElement;
+  const top=_trapStack[_trapStack.length-1];
+  if(top&&top.root===root) return;
+  if(top) top.root.removeEventListener('keydown',_trapKeydown);
+  _trapStack.push({root,prev});
   root.addEventListener('keydown',_trapKeydown);
+  if(!root.contains(document.activeElement)){
+    const f=focusablesIn(root);
+    const initial=f.find(el=>!el.classList.contains('modal-close'))||f[0]||root;
+    if(initial===root&&!root.hasAttribute('tabindex')) root.setAttribute('tabindex','-1');
+    setTimeout(()=>{ if(!root.hidden&&typeof initial.focus==='function') try{initial.focus()}catch{} },20);
+  }
 }
-function releaseFocus(){
-  if(_trapRoot) _trapRoot.removeEventListener('keydown',_trapKeydown);
-  const prev=_trapPrev; _trapRoot=null; _trapPrev=null;
+function releaseFocus(root){
+  let entry;
+  if(root){
+    const idx=_trapStack.findIndex(x=>x.root===root);
+    if(idx===-1) return;
+    entry=_trapStack.splice(idx,1)[0];
+    entry.root.removeEventListener('keydown',_trapKeydown);
+  } else {
+    entry=_trapStack.pop();
+    if(entry) entry.root.removeEventListener('keydown',_trapKeydown);
+  }
+  const top=_trapStack[_trapStack.length-1];
+  if(top) top.root.addEventListener('keydown',_trapKeydown);
+  const prev=entry&&entry.prev;
   if(prev&&typeof prev.focus==='function'&&document.contains(prev)) try{prev.focus()}catch{}
 }
 function _trapKeydown(e){
-  if(e.key!=='Tab'||!_trapRoot) return;
-  const f=focusablesIn(_trapRoot); if(!f.length) return;
+  const top=_trapStack[_trapStack.length-1];
+  if(e.key!=='Tab'||!top) return;
+  const f=focusablesIn(top.root); if(!f.length) return;
   const first=f[0],last=f[f.length-1];
+  if(!top.root.contains(document.activeElement)){e.preventDefault();first.focus();return;}
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
 }
@@ -265,13 +297,13 @@ function confirmDialog(opts){
 function closeConfirm(result){
   const m=$('#confirmModal');if(!m||m.hidden)return;
   m.classList.remove('show');m.hidden=true;
-  releaseFocus();
+  releaseFocus(m);
   if(_cfResolve){const r=_cfResolve;_cfResolve=null;r(!!result)}
 }
 $('#cfOk')?.addEventListener('click',()=>closeConfirm(true));
 $('#cfCancel')?.addEventListener('click',()=>closeConfirm(false));
 $('#confirmModal')?.addEventListener('click',e=>{if(e.target.id==='confirmModal')closeConfirm(false)});
-document.addEventListener('keydown',e=>{const m=$('#confirmModal');if(!m||m.hidden)return;if(e.key==='Escape')closeConfirm(false);else if(e.key==='Enter')closeConfirm(true)});
+document.addEventListener('keydown',e=>{const m=$('#confirmModal');if(!m||m.hidden)return;if(e.key==='Escape'){if(typeof e.stopImmediatePropagation==='function')e.stopImmediatePropagation();closeConfirm(false)}else if(e.key==='Enter'){if(document.activeElement&&document.activeElement.id==='cfCancel')return;closeConfirm(true)}});
 // BUGFIX (Electron sandbox): window.prompt() is NOT supported in this renderer (it throws
 // "prompt() is not supported"), which broke instance rename. This is a small in-app replacement
 // with the same Promise<string|null> contract as confirmDialog. Returns the trimmed value, or null
@@ -300,7 +332,7 @@ function promptDialog(opts){
 function closePrompt(result){
   const m=$('#promptModal');if(!m||m.hidden)return;
   m.classList.remove('show');m.hidden=true;
-  releaseFocus();
+  releaseFocus(m);
   if(_pmResolve){const r=_pmResolve;_pmResolve=null;r(result===undefined?null:result)}
 }
 function _pmSubmit(){
@@ -314,7 +346,7 @@ $('#pmOk')?.addEventListener('click',_pmSubmit);
 $('#pmCancel')?.addEventListener('click',()=>closePrompt(null));
 $('#promptModal')?.addEventListener('click',e=>{if(e.target.id==='promptModal')closePrompt(null)});
 $('#pmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_pmSubmit()}});
-document.addEventListener('keydown',e=>{const m=$('#promptModal');if(!m||m.hidden)return;if(e.key==='Escape')closePrompt(null)});
+document.addEventListener('keydown',e=>{const m=$('#promptModal');if(!m||m.hidden)return;if(e.key==='Escape'){if(typeof e.stopImmediatePropagation==='function')e.stopImmediatePropagation();closePrompt(null)}});
 // MOTION (1.3.0): tween a number element toward a new value instead of snapping. Restrained:
 // short duration, no spring, and totally skipped under prefers-reduced-motion. Keeps the last
 // tween per element so rapid updates never fight each other.

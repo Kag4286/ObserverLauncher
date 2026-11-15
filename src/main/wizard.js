@@ -316,14 +316,14 @@ function registerWizard(ipcMain, ctx) {
         return { ok: true, versions: all, latest, raw: true, annotated: versions };
       }
       if (s === 'pumpkin') {
-        const { listVersions } = require('./adapters/pumpkin.js');
-        const v = listVersions();
-        return { ok: true, versions: v, latest: v[0], raw: false };
+        const { fetchVersions } = require('./adapters/pumpkin.js');
+        const v = await fetchVersions();
+        return { ok: true, versions: v, latest: v[0] || '0.2.2', raw: false };
       }
       if (s === 'horizon') {
-        const { listVersions } = require('./adapters/horizon.js');
-        const v = listVersions();
-        return { ok: true, versions: v, latest: v[0], raw: false };
+        const { fetchVersions } = require('./adapters/horizon.js');
+        const v = await fetchVersions();
+        return { ok: true, versions: v, latest: v[0] || 'v0.2.97', raw: false };
       }
       if (s === 'spigot') {
         const m = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');

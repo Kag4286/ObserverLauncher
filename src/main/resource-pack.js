@@ -4,6 +4,13 @@
 const fs = require('fs');
 const path = require('path');
 const { openJar } = require('./jar-reader.js');
+const { normalizeFormat } = require('./datapack.js');
+const {
+  parseEquipmentAssetJson,
+  resolveItemDefinitionModels,
+  resolveTexturesFromModelJson,
+  candidateModelEntries,
+} = require('./mods-index.js');
 
 const JAR_CACHE = new Map();
 
@@ -50,7 +57,7 @@ function inspectResourcePack(zipPath) {
           if (typeof description === 'object') {
             description = description.text || JSON.stringify(description);
           }
-          packFormat = parsed.pack.pack_format ?? null;
+          packFormat = normalizeFormat(parsed.pack.pack_format ?? parsed.pack.min_format ?? null);
         }
       } catch {}
     }
@@ -103,16 +110,47 @@ function getCandidates(kind, file) {
   return [];
 }
 
+function readEntryCaseInsensitive(handle, relPath) {
+  const realKey = handle.index.get(String(relPath || '').toLowerCase());
+  if (!realKey) return null;
+  try { return handle.jar.read(realKey); } catch { return null; }
+}
+
 function readPackTexture(zipPath, kind, file) {
   const handle = getJar(zipPath);
   if (!handle) return null;
   const cands = getCandidates(kind, file);
   for (const c of cands) {
-    const realKey = handle.index.get(c.toLowerCase());
-    if (realKey) {
-      try {
-        return handle.jar.read(realKey);
-      } catch {}
+    const buf = readEntryCaseInsensitive(handle, c);
+    if (buf) return buf;
+  }
+  const base = String(file || '').toLowerCase().replace(/\.png$/, '');
+  if (kind === 'armor' || kind === 'armorlegs') {
+    const eqBuf = readEntryCaseInsensitive(handle, `assets/minecraft/equipment/${base}.json`);
+    if (eqBuf) {
+      const eq = parseEquipmentAssetJson(eqBuf.toString('utf8'), 'minecraft');
+      const eqList = eq ? (kind === 'armorlegs' ? eq.humanoid_leggings : eq.humanoid) : [];
+      for (const ep of eqList) {
+        const hit = readEntryCaseInsensitive(handle, ep);
+        if (hit) return hit;
+      }
+    }
+  } else if (kind === 'item' || kind === 'block') {
+    let modelEntries = [];
+    const defBuf = readEntryCaseInsensitive(handle, `assets/minecraft/items/${base}.json`);
+    if (defBuf) {
+      const def = resolveItemDefinitionModels(defBuf.toString('utf8'), 'minecraft');
+      if (def && def.modelEntries.length) modelEntries = def.modelEntries;
+    }
+    if (!modelEntries.length) modelEntries = candidateModelEntries('minecraft', base);
+    for (const me of modelEntries) {
+      const mBuf = readEntryCaseInsensitive(handle, me);
+      if (!mBuf) continue;
+      const texPaths = resolveTexturesFromModelJson(mBuf.toString('utf8'), 'minecraft');
+      for (const tp of texPaths) {
+        const hit = readEntryCaseInsensitive(handle, tp);
+        if (hit) return hit;
+      }
     }
   }
   return null;

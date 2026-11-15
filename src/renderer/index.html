@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="assets/fonts/fonts.css"><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/07-polish.css"><link rel="stylesheet" href="css/08-motion.css"><link rel="stylesheet" href="css/09-pulse.css"><link rel="stylesheet" href="css/10-dropdown.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' tex: https: data:; connect-src 'self' https://api.ipify.org https://api.modrinth.com https://hangar.papermc.io https://api.spiget.org https://piston-meta.mojang.com https://piston-data.mojang.com https://fill.papermc.io https://api.purpurmc.org https://api.leafmc.one https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://hub.spigotmc.org https://api.adoptium.net; object-src 'none'; base-uri 'self';"><title>ObserverLauncher</title><link rel="stylesheet" href="assets/fonts/fonts.css"><link rel="stylesheet" href="css/01-tokens.css"><link rel="stylesheet" href="css/02-shell.css"><link rel="stylesheet" href="css/03-overview.css"><link rel="stylesheet" href="css/04-players.css"><link rel="stylesheet" href="css/05-market.css"><link rel="stylesheet" href="css/06-modals.css"><link rel="stylesheet" href="css/08-motion.css"><link rel="stylesheet" href="css/10-dropdown.css"></head>
 <body>
 <!-- BOOT SEQUENCE (1.3.0): a ~1.1s 'signal acquisition' on launch — hairline draws, rail items
      slide in, one ping, gone. Click anywhere to skip. Never blocks interaction after it ends. -->
@@ -13,7 +13,6 @@
 </div>
 <!-- SIGNAL FIELD: a CSS-only ambient layer that 'breathes' with the poll cycle and shifts with
      server state (offline = cold/still, running = warm/lively). pointer-events:none. -->
-<div class="signal-field" id="signalField" aria-hidden="true"></div>
 <div class="app-shell">
   <aside class="rail">
     <div class="rail-head"><div class="brand"><span class="brand-mark"><img src="./assets/icons/observer.png" alt="Observer"></span><div><b>OBSERVER LAUNCHER</b></div></div></div>
@@ -30,6 +29,7 @@
       <button type="button" class="inst-add" id="addServerBtn"><span aria-hidden="true">+</span> <span data-i18n="nav.addInstance">Add server</span></button>
     </div>
     <nav id="nav" class="rail-nav" role="navigation" aria-label="Main">
+      <span class="rail-glide" id="railGlide" aria-hidden="true"></span>
       <div class="nav-group">
         <p class="nav-group-label" data-i18n="nav.grpServer">Server</p>
         <button class="nav-item active" data-tab="overview" aria-current="page"><img class="nav-icon" src="./assets/icons/ui/grid.svg" alt=""> <span data-i18n="nav.overview">Overview</span></button>
@@ -78,9 +78,9 @@
     <div class="command-bar-path" id="serverPath">No server selected</div>
   </header>
   <div class="channel-strip" hidden></div>
-  <main><header class="topbar"><div><p class="eyebrow" data-i18n="top.eyebrow">LOCAL SERVER</p><h1 id="pageTitle">Overview</h1></div><div class="top-actions"><div class="status-pill"><i id="statusDot" class="status-dot st-offline" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i><span id="statusText" data-i18n="top.offline">Offline</span></div><button id="stopBtn" class="btn secondary" disabled data-i18n="top.stop">Stop server</button><button id="restartBtn" class="btn secondary" disabled hidden data-i18n="top.restart">Restart</button><button id="forceStopBtn" class="btn danger" disabled data-i18n="top.forceStop" data-i18n-title="top.forceStopHint" title="Kill the server process immediately">Force stop</button><button id="startBtn" class="btn primary" data-i18n="top.start">Start server <span>↗</span></button></div></header>
+  <main><header class="topbar"><div><p class="eyebrow" id="pageEyebrow" data-i18n="top.eyebrow">LOCAL SERVER</p><h1 id="pageTitle">Overview</h1></div><div class="top-actions"><div class="status-pill"><i id="statusDot" class="status-dot st-offline" aria-hidden="true"><span class="sd-core"></span><span class="sd-ring r1"></span><span class="sd-ring r2"></span><span class="sd-spin"></span></i><span id="statusText" data-i18n="top.offline">Offline</span></div><button id="stopBtn" class="btn secondary" disabled data-i18n="top.stop">Stop server</button><button id="restartBtn" class="btn secondary" disabled hidden data-i18n="top.restart">Restart</button><button id="forceStopBtn" class="btn danger" disabled data-i18n="top.forceStop" data-i18n-title="top.forceStopHint" title="Kill the server process immediately">Force stop</button><button id="startBtn" class="btn primary" data-i18n="top.start">Start server <span>↗</span></button></div></header>
     <section id="overview" class="tab active">
-      <div class="hero glass" id="welcomeCard">
+      <div class="hero" id="welcomeCard">
         <div class="hero-top">
           <div class="hero-id">
             <b id="serverName">Your Minecraft server</b>
@@ -168,7 +168,7 @@
             </ol>
           </details></div>
           <p class="text-muted tunnel-msg" id="tunnelMsg" hidden></p>
-          <div class="set-toggle tunnel-auto"><div class="set-toggle-info"><b data-i18n="tun.autoOn">Keep it on automatically</b><small data-i18n="tun.autoSub">Start the Playit service whenever the server runs, and stop it when the server stops.</small></div><label class="switch"><input type="checkbox" id="autoTunnelQuick"><span class="slider"></span></label></div>
+          <div class="set-toggle tunnel-auto"><div class="set-toggle-info"><b data-i18n="tun.autoOn">Keep it on automatically</b><small data-i18n="tun.autoSub">Start the Playit service whenever the server runs, and stop it when the server stops.</small></div><label class="switch"><input type="checkbox" id="autoTunnelQuick" aria-label="Keep tunnel on automatically"><span class="slider"></span></label></div>
           <div class="tunnel-manual">
             <label class="text-muted" data-i18n="tun.manualLabel">Paste your Playit public address here (create it on the dashboard):</label>
             <div class="tunnel-addr"><input id="tunnelManual" placeholder="name.tun.ply.gg" spellcheck="false" aria-label="Manual tunnel address"><button class="btn secondary sm" data-copy="#tunnelManual" data-i18n="conn.copy">Copy</button></div>
@@ -215,7 +215,7 @@
           <div class="ov-ram-box">
             <div class="ov-ram-info"><b data-i18n="ov.limit">ALLOCATE RAM (GB)</b><small data-i18n="ov.limitHint">Restart the server to apply a new allocation</small></div>
             <div class="ov-ram-controls">
-              <input id="memoryMinInput" type="number" min="1" title="Minimum memory" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" value="6"><button class="btn primary sm" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button>
+              <input id="memoryMinInput" type="number" min="1" title="Minimum memory" aria-label="Minimum memory (GB)" value="2"><span class="ram-allocate-sep">–</span><input id="memoryMaxInput" type="number" min="1" title="Maximum memory" aria-label="Maximum memory (GB)" value="6"><button class="btn primary sm" id="saveRamOverview" title="Apply" data-i18n="ov.apply">Apply</button>
               <!-- v6.0.0 G1: one-click RAM presets set max (= min). -->
               <span class="ram-presets" id="ramPresets"><button type="button" class="filter-chip ram-preset" data-ram="2">2 GB</button><button type="button" class="filter-chip ram-preset" data-ram="4">4 GB</button><button type="button" class="filter-chip ram-preset" data-ram="6">6 GB</button><button type="button" class="filter-chip ram-preset" data-ram="8">8 GB</button></span>
             </div>
@@ -245,7 +245,7 @@
     <section id="players" class="tab">
       <div id="playersProxyNotice" class="proxy-notice" hidden data-i18n-html="ply.proxyNotice">This server is a <b>proxy (Velocity)</b> — players connect to the backend servers behind it, not to this proxy directly. Player/whitelist/ban management isn't available here.</div>
       <header class="tab-head">
-        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/person.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.players">ROSTER</p><h2 data-i18n="ply.title">Players</h2><p class="sub" data-i18n="ply.sub">Manage online, offline, whitelisted and banned — works even while stopped.</p></div></div>
+        <p class="sub" data-i18n="ply.sub">Manage online, offline, whitelisted and banned — works even while stopped.</p>
         <div class="tab-head-actions"><span class="roster-count" id="rosterCount">— players</span><button class="btn secondary sm" id="toggleLeaderboardBtn" data-i18n="ply.leaderboard">Leaderboard</button><button class="btn secondary sm" id="refreshPlayersBtn" data-i18n="ply.refresh">Refresh list</button></div>
       </header>
       <!-- v6.0.0 Track B - B2: Leaderboard -->
@@ -289,6 +289,7 @@
                     <div class="pd-3d-container" id="pd3dContainer">
                       <canvas id="pd3dCanvas"></canvas>
                       <div id="pd3dStatus" class="pd-3d-status" hidden></div>
+                      <div id="pd3dNotice" class="pd-3d-notice" hidden></div>
                       <button type="button" class="pd-3d-toggle active" id="pd3dToggleArmor" hidden data-i18n-title="pd.toggleArmor" title="Toggle 3D armor preview">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                         <span data-i18n="pd.armorBtn">Armor</span>
@@ -336,12 +337,12 @@
               </div>
               <div class="inspect-panel" id="pdPanelInventory">
                 <div class="inv-unified-toolbar">
-                  <div class="inv-view-switch" role="tablist">
-                    <button type="button" class="inv-switch-btn active" id="invSwitchInv" data-inv-view="inv">
+                  <div class="inv-view-switch" role="tablist" aria-label="Inventory storage">
+                    <button type="button" class="inv-switch-btn active" id="invSwitchInv" data-inv-view="inv" role="tab" aria-selected="true">
                       <span data-i18n="pd.inventory">Inventory</span>
                       <span class="inv-count" id="invCount">0 / 36</span>
                     </button>
-                    <button type="button" class="inv-switch-btn" id="invSwitchEnder" data-inv-view="ender">
+                    <button type="button" class="inv-switch-btn" id="invSwitchEnder" data-inv-view="ender" role="tab" aria-selected="false">
                       <span data-i18n="pd.ender">Ender Chest</span>
                       <span class="inv-count" id="ecCount">0 / 27</span>
                     </button>
@@ -443,12 +444,12 @@
                   </div>
                 </div>
                 <div class="pd-stats-toolbar" id="pdStatsToolbar" hidden>
-                  <div class="pd-stats-chips" id="pdStatsChips" role="tablist">
-                    <button type="button" class="pd-stat-chip is-active" data-cat="all"><span data-i18n="pd.statCatAll">All</span><i id="pdCatCountAll" class="chip-count">0</i></button>
-                    <button type="button" class="pd-stat-chip" data-cat="survival"><span data-i18n="pd.statCatSurvival">Survival</span><i id="pdCatCountSurvival" class="chip-count">0</i></button>
-                    <button type="button" class="pd-stat-chip" data-cat="combat"><span data-i18n="pd.statCatCombat">Combat</span><i id="pdCatCountCombat" class="chip-count">0</i></button>
-                    <button type="button" class="pd-stat-chip" data-cat="movement"><span data-i18n="pd.statCatMovement">Movement</span><i id="pdCatCountMovement" class="chip-count">0</i></button>
-                    <button type="button" class="pd-stat-chip" data-cat="interaction"><span data-i18n="pd.statCatInteraction">Interactions</span><i id="pdCatCountInteraction" class="chip-count">0</i></button>
+                  <div class="pd-stats-chips" id="pdStatsChips" role="group" aria-label="Statistic category filters">
+                    <button type="button" class="pd-stat-chip is-active" data-cat="all" aria-pressed="true"><span data-i18n="pd.statCatAll">All</span><i id="pdCatCountAll" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="survival" aria-pressed="false"><span data-i18n="pd.statCatSurvival">Survival</span><i id="pdCatCountSurvival" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="combat" aria-pressed="false"><span data-i18n="pd.statCatCombat">Combat</span><i id="pdCatCountCombat" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="movement" aria-pressed="false"><span data-i18n="pd.statCatMovement">Movement</span><i id="pdCatCountMovement" class="chip-count">0</i></button>
+                    <button type="button" class="pd-stat-chip" data-cat="interaction" aria-pressed="false"><span data-i18n="pd.statCatInteraction">Interactions</span><i id="pdCatCountInteraction" class="chip-count">0</i></button>
                   </div>
                   <div class="pd-stats-search-wrap">
                     <input type="search" id="pdStatsSearch" class="pd-stats-search-input" placeholder="Search stats…" data-i18n-placeholder="pd.searchStatsPh" aria-label="Search statistics">
@@ -487,7 +488,7 @@
     </section>
     <section id="performance" class="tab">
       <header class="tab-head">
-        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/gauge.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.perf">TELEMETRY</p><h2 data-i18n="perf.title">Performance</h2><p class="sub" data-i18n="perf.headSub">Is your server running smoothly?</p></div></div>
+        <p class="sub" data-i18n="perf.headSub">Is your server running smoothly?</p>
         <div class="tab-head-actions"><span class="perf-live"><span class="live-dot" id="perfLiveDot"></span><span id="perfLiveText">Offline</span><span class="perf-uptime" id="perfUptime">—</span></span></div>
       </header>
       <div class="perf-status" id="perfStatus" hidden>
@@ -519,7 +520,7 @@
     </section>
     <section id="content" class="tab">
       <header class="tab-head">
-        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/funnel.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.contentBay">CONTENT BAY</p><h2 data-i18n="cnt.title">Content library</h2><p class="sub" data-i18n="cnt.sub">Plugins, mods and datapacks — files live inside your server folder.</p></div></div>
+        <p class="sub" data-i18n="cnt.sub">Plugins, mods and datapacks — files live inside your server folder.</p>
         <div class="tab-head-actions">
           <span class="stat-pill" id="contentSummaryPill">0 items</span>
           <span class="stat-pill" id="contentUpdatesPill" hidden></span>
@@ -547,9 +548,9 @@
         <div class="content-toolbar">
           <div class="content-toolbar-main">
             <div class="content-seg" id="contentSeg" role="tablist" aria-label="Content type">
-              <button type="button" class="seg active" data-ckind="plugin"><span data-i18n="cnt.plugins">Plugins</span><b class="seg-count" id="contentPluginsCount">0</b></button>
-              <button type="button" class="seg" data-ckind="mod"><span data-i18n="cnt.mods">Mods</span><b class="seg-count" id="contentModsCount">0</b></button>
-              <button type="button" class="seg" data-ckind="datapack"><span data-i18n="cnt.datapacks">Datapacks</span><b class="seg-count" id="contentDatapacksCount">0</b></button>
+              <button type="button" class="seg active" data-ckind="plugin" role="tab" aria-selected="true"><span data-i18n="cnt.plugins">Plugins</span><b class="seg-count" id="contentPluginsCount">0</b></button>
+              <button type="button" class="seg" data-ckind="mod" role="tab" aria-selected="false"><span data-i18n="cnt.mods">Mods</span><b class="seg-count" id="contentModsCount">0</b></button>
+              <button type="button" class="seg" data-ckind="datapack" role="tab" aria-selected="false"><span data-i18n="cnt.datapacks">Datapacks</span><b class="seg-count" id="contentDatapacksCount">0</b></button>
             </div>
             <div class="content-search"><span class="search-icon">⌕</span><input id="contentFilter" data-i18n-placeholder="cnt.filterPh" placeholder="Filter files…" aria-label="Filter content files"><button type="button" class="search-clear" id="contentFilterClear" hidden aria-label="Clear filter">×</button></div>
           </div>
@@ -590,6 +591,7 @@
           <ul id="pluginsList" class="file-list content-list" data-dk-kind="plugin"></ul>
           <ul id="modsList" class="file-list content-list" data-dk-kind="mod" hidden></ul>
           <ul id="datapacksList" class="file-list content-list" data-dk-kind="datapack" hidden></ul>
+          <div id="contentPager" class="content-pager" hidden><button type="button" class="btn secondary" id="contentPrevPage" aria-label="Previous page" data-i18n="mkt.prev">← Previous</button><span id="contentPageLabel" aria-live="polite">Page 1</span><button type="button" class="btn secondary" id="contentNextPage" aria-label="Next page" data-i18n="mkt.next">Next →</button></div>
         </div>
         <details class="dp-order" id="dpOrderBox" hidden>
           <summary class="dp-order-summary">
@@ -604,7 +606,7 @@
         </details>
         <div class="sec-note center" data-i18n="cnt.restart">New files load on the next server start — the launcher never hot-swaps content while running.</div>
         <details class="modpack-tools" id="modpackTools">
-          <summary class="modpack-tools-summary"><span class="mp-tools-ico" aria-hidden="true">◫</span><span data-i18n="cnt.modpackTools">Modpack tools</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
+          <summary class="modpack-tools-summary"><span class="mp-tools-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span><span data-i18n="cnt.modpackTools">Modpack tools</span><span class="ov-adv-chevron" aria-hidden="true">▸</span></summary>
           <div class="modpack-tools-body">
             <section class="flat-cell">
               <div class="sec-head"><img src="./assets/icons/modrinth.svg" alt=""><h3 data-i18n="cnt.modpackT">Import a modpack</h3></div>
@@ -655,7 +657,7 @@
     </section>
     <section id="marketplace" class="tab">
       <header class="tab-head">
-        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/modrinth.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.market">CONTENT BAY</p><h2 data-i18n="mkt.title">Marketplace</h2><p class="sub" data-i18n="mkt.sub">Official Modrinth, Hangar and Spigot — install directly to your server folder</p></div></div>
+        <p class="sub" data-i18n="mkt.sub">Official Modrinth, Hangar and Spigot — install directly to your server folder</p>
         <div class="tab-head-actions"><span class="stat-pill" id="marketplaceCount">—</span></div>
       </header>
       <div class="market-server-banner" id="marketServerBanner">
@@ -686,7 +688,7 @@
         </div>
       </div>
       <div class="market-toolbar">
-        <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth">Modrinth</button><button type="button" class="seg" data-source="hangar">Hangar</button><button type="button" class="seg" data-source="spigot">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" hidden>CurseForge</button></div>
+        <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth" role="tab" aria-selected="true">Modrinth</button><button type="button" class="seg" data-source="hangar" role="tab" aria-selected="false">Hangar</button><button type="button" class="seg" data-source="spigot" role="tab" aria-selected="false">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" role="tab" aria-selected="false" hidden>CurseForge</button></div>
         <input type="hidden" id="marketSource" value="modrinth">
         <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select" aria-label="Content type"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="neoforge" data-i18n="mkt.neoforgeType">NeoForge mod</option><option value="forge" data-i18n="mkt.forgeType">Forge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
         <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select" aria-label="Minecraft version"><option value="">All versions</option></select></label>
@@ -699,7 +701,7 @@
     <section id="worlds" class="tab">
       <div id="worldsProxyNotice" class="proxy-notice" hidden data-i18n-html="wld.proxyNotice">This server is a <b>proxy (Velocity)</b> — it doesn't have worlds or backups of its own. Manage worlds on the backend servers it connects to instead.</div>
       <header class="tab-head">
-        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/cube.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.storage">STORAGE</p><h2 data-i18n="wld.title">Worlds &amp; backups</h2><p class="sub" data-i18n="wld.sub">World folders and ZIP snapshots — stored locally inside your server folder.</p></div></div>
+        <p class="sub" data-i18n="wld.sub">World folders and ZIP snapshots — stored locally inside your server folder.</p>
       </header>
       <section class="section wld-worlds">
         <div class="section-head"><div><h3><span data-i18n="wld.foldersT">World folders</span> <span class="badge" id="worldsCountPill">0</span></h3><p class="sub" data-i18n-html="wld.foldersHint">from <code>level-name</code></p></div><button class="btn sm secondary" data-open="." data-i18n="wld.serverFolder">Server folder ↗</button></div>
@@ -715,7 +717,7 @@
     </section>
         <section id="worldmap" class="tab">
           <header class="tab-head">
-            <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/folder.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="wm.eyebrow">CARTOGRAPHY</p><h2 data-i18n="nav.worldmap">World Map</h2><p class="sub" id="wmInfo" data-i18n="wm.info">Real data from your world save — seed, spawn, players and your waypoints.</p></div></div>
+            <p class="sub" id="wmInfo" data-i18n="wm.info">Real data from your world save — seed, spawn, players and your waypoints.</p>
             <div class="tab-head-actions">
               <button class="btn sm secondary" id="wmReload" data-i18n="ed.reload">Reload</button>
               <button class="btn sm secondary" id="wmCopySeed" data-i18n="wm.copySeed">Copy seed</button>
@@ -759,9 +761,9 @@
               <button class="filter-chip" id="wmGrid" data-i18n="wm.grid">Grid</button>
               <button class="filter-chip" id="wmNetherLink" data-i18n="wm.netherLink" hidden>Portal link</button>
               <span class="wm-slice-ctrl" id="wmSliceCtrl" hidden>
-                <label id="wmSliceLabel" class="wm-slice-badge">Y: Surface</label>
-                <input type="range" id="wmSliceSlider" min="-64" max="320" value="320" class="wm-slice-slider" title="Vertical elevation slice">
-                <button type="button" class="btn sm secondary" id="wmSliceReset" title="Reset to surface">↺</button>
+                <label id="wmSliceLabel" for="wmSliceSlider" class="wm-slice-badge">Y: Surface</label>
+                <input type="range" id="wmSliceSlider" min="-64" max="320" value="320" class="wm-slice-slider" title="Vertical elevation slice" aria-label="Vertical elevation slice">
+                <button type="button" class="btn sm secondary" id="wmSliceReset" title="Reset to surface" aria-label="Reset elevation slice to surface">↺</button>
               </span>
               <span class="wm-coord mono" id="wmCoord">—</span>
               <span class="wm-goto"><input id="wmGotoInput" class="wm-goto-input mono" data-i18n-placeholder="wm.gotoPh" placeholder="X Z" aria-label="Go to coordinates"><button class="btn sm secondary" id="wmGotoBtn" data-i18n="wm.goto">Go</button></span>
@@ -836,7 +838,7 @@
         </section>
     <section id="properties" class="tab">
       <header class="tab-head">
-        <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/book.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.rawConfig">RAW CONFIG</p><h2 id="propertiesTitle" data-i18n="prop.title">Server properties</h2><p class="sub" id="propertiesHint" data-i18n-html="prop.sub">Tune <code>server.properties</code> — changes apply only when you hit Apply changes.</p></div></div>
+        <p class="sub" id="propertiesHint" data-i18n-html="prop.sub">Tune <code>server.properties</code> — changes apply only when you hit Apply changes.</p>
         <div class="tab-head-actions"><button class="btn primary" id="saveProperties" data-i18n="prop.apply">Apply changes</button></div>
       </header>
       <div class="flat-wrap">
@@ -874,7 +876,7 @@
     <section id="settings" class="tab">
       <div class="flat-wrap">
         <header class="tab-head" id="settingsHead">
-          <div class="tab-head-id"><span class="tab-head-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></span><div class="tab-head-text"><p class="eyebrow" data-i18n="eyebrow.controlDeck">CONTROL DECK</p><h2 data-i18n="set.title">Launcher settings</h2><p class="sub" id="settingsHeadSub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p></div></div>
+          <p class="sub" id="settingsHeadSub">Folder, Java, reliability and JVM arguments — saved locally on this PC.</p>
           <div class="settings-apply"><span class="apply-dirty-hint" id="applyDirtyHint" hidden data-i18n="set.unsaved">Unsaved changes</span><button class="btn primary" id="saveSettings" data-i18n="set.apply">Apply settings</button></div>
         </header>
         <div class="settings-layout">
@@ -911,7 +913,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="autoEulaInput" checked>
+                      <input type="checkbox" id="autoEulaInput" aria-label="Accept Minecraft EULA automatically on first start" checked>
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1037,7 +1039,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="beginnerModeInput">
+                      <input type="checkbox" id="beginnerModeInput" aria-label="Beginner mode">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1049,7 +1051,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="worldmapCheatModeInput">
+                      <input type="checkbox" id="worldmapCheatModeInput" aria-label="Cheat mode for world map">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1104,7 +1106,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="autoRestartInput">
+                      <input type="checkbox" id="autoRestartInput" aria-label="Auto-restart on crash">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1170,7 +1172,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="scheduleEnabledInput">
+                      <input type="checkbox" id="scheduleEnabledInput" aria-label="Enable scheduler">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1214,7 +1216,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="autoTunnelInput">
+                      <input type="checkbox" id="autoTunnelInput" aria-label="Auto-start tunnel with the server">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1248,7 +1250,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="remoteEnabledInput">
+                      <input type="checkbox" id="remoteEnabledInput" aria-label="Enable remote access">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1260,7 +1262,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="remoteReadOnlyInput">
+                      <input type="checkbox" id="remoteReadOnlyInput" aria-label="Remote access read-only mode">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1336,7 +1338,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="mcpEnabledInput">
+                      <input type="checkbox" id="mcpEnabledInput" aria-label="Enable MCP server">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1348,7 +1350,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="mcpAutoWriteInput">
+                      <input type="checkbox" id="mcpAutoWriteInput" aria-label="Auto-allow MCP write tools">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1360,7 +1362,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="mcpReadOnlyInput">
+                      <input type="checkbox" id="mcpReadOnlyInput" aria-label="MCP read-only mode">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1484,7 +1486,7 @@
                   </div>
                   <div class="sir-control">
                     <label class="switch">
-                      <input type="checkbox" id="prometheusEnabledInput">
+                      <input type="checkbox" id="prometheusEnabledInput" aria-label="Enable Prometheus /metrics endpoint">
                       <span class="slider"></span>
                     </label>
                   </div>
@@ -1614,27 +1616,27 @@
             <small class="nsw2-hintbar" data-i18n="nsw.pickHint">New here? Pick <b>Vanilla</b> for plain survival or <b>Paper</b> if you want plugins. Tap the ⓘ on any card to learn what it is.</small>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpStart">Start here</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap" data-groups="featured"><button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="vanilla" aria-label="About Vanilla">i</button></div>
-              <div class="nsw2-cardwrap" data-groups="featured plugin"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/funnel.svg'"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent" data-i18n="nsw.popular">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
-              <div class="nsw2-cardwrap" data-software-wrap="horizon" data-groups="featured native-proxy"><button class="nsw2-row" data-software="horizon"><img src="./assets/software/horizon.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Horizon <em class="nsw2-tag horizon" data-i18n="nsw.badgeNative">Rust Native</em></b><span data-i18n="nsw.desc.horizon">Native Minecraft 26.3 server in Rust. ~150–250MB RAM, zero Java required.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="horizon" aria-label="About Horizon">i</button></div>
-               <div class="nsw2-cardwrap" data-software-wrap="pumpkin" data-groups="featured native-proxy"><button class="nsw2-row" data-software="pumpkin"><img src="./assets/software/pumpkin.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/cube.svg'"><div class="nsw2-rowbody"><b>Pumpkin <em class="nsw2-tag pumpkin" data-i18n="nsw.badgeNative">Rust Native</em></b><span data-i18n="nsw.desc.pumpkin">Fast, multithreaded Minecraft server written in Rust. Instant start, ~100MB RAM, zero Java required.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="pumpkin" aria-label="About Pumpkin">i</button></div>
-              <div class="nsw2-cardwrap" data-software-wrap="leaf" data-groups="featured plugin"><button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Leaf <em class="nsw2-tag leaf" data-i18n="nsw.badgeLeaf">Paper Fork • Max Perf</em></b><span data-i18n="nsw.desc.leaf">Paper fork tuned for maximum tick performance and low latency.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="leaf" aria-label="About Leaf">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="featured"><button class="nsw2-row active" data-software="vanilla"><img src="./assets/software/vanilla.png" alt="" data-fallback="./assets/icons/ui/cube.svg"><div class="nsw2-rowbody"><b>Vanilla <em class="nsw2-tag accent" data-i18n="nsw.badgeRecommended">Recommended</em></b><span data-i18n="nsw.desc.vanilla">Mojang's official server — pure survival, no plugins or mods.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="vanilla" aria-label="About Vanilla">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="featured plugin"><button class="nsw2-row" data-software="paper"><img src="./assets/software/paper.png" alt="" data-fallback="./assets/icons/ui/funnel.svg"><div class="nsw2-rowbody"><b>Paper <em class="nsw2-tag accent" data-i18n="nsw.popular">Popular</em></b><span data-i18n="nsw.desc.paper">High performance + the Bukkit plugin API. 90% of public servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="paper" aria-label="About Paper">i</button></div>
+              <div class="nsw2-cardwrap" data-software-wrap="horizon" data-groups="featured native-proxy"><button class="nsw2-row" data-software="horizon"><img src="./assets/software/horizon.png" alt="" data-fallback="./assets/icons/ui/cube.svg"><div class="nsw2-rowbody"><b>Horizon <em class="nsw2-tag horizon" data-i18n="nsw.badgeNative">Rust Native</em></b><span data-i18n="nsw.desc.horizon">Native Minecraft 26.3 server in Rust. ~150–250MB RAM, zero Java required.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="horizon" aria-label="About Horizon">i</button></div>
+               <div class="nsw2-cardwrap" data-software-wrap="pumpkin" data-groups="featured native-proxy"><button class="nsw2-row" data-software="pumpkin"><img src="./assets/software/pumpkin.png" alt="" data-fallback="./assets/icons/ui/cube.svg"><div class="nsw2-rowbody"><b>Pumpkin <em class="nsw2-tag pumpkin" data-i18n="nsw.badgeNative">Rust Native</em></b><span data-i18n="nsw.desc.pumpkin">Fast, multithreaded Minecraft server written in Rust. Instant start, ~100MB RAM, zero Java required.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="pumpkin" aria-label="About Pumpkin">i</button></div>
+              <div class="nsw2-cardwrap" data-software-wrap="leaf" data-groups="featured plugin"><button class="nsw2-row" data-software="leaf"><img src="./assets/software/leaf.png" alt="" data-fallback="./assets/icons/ui/grid.svg"><div class="nsw2-rowbody"><b>Leaf <em class="nsw2-tag leaf" data-i18n="nsw.badgeLeaf">Paper Fork • Max Perf</em></b><span data-i18n="nsw.desc.leaf">Paper fork tuned for maximum tick performance and low latency.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="leaf" aria-label="About Leaf">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpPlugin">Plugin servers</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/shield.svg'"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="purpur" aria-label="About Purpur">i</button></div>
-              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/grid.svg'"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="folia" aria-label="About Folia">i</button></div>
-              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/bolt.svg'"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button><button type="button" class="nsw-info" data-info="spigot" aria-label="About Spigot">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="purpur"><img src="./assets/software/purpur.png" alt="" data-fallback="./assets/icons/ui/shield.svg"><div class="nsw2-rowbody"><b>Purpur</b><span data-i18n="nsw.desc.purpur">Paper fork with extra gameplay config (rideable mobs, keep-inventory…).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="purpur" aria-label="About Purpur">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="folia"><img src="./assets/software/folia.png" alt="" data-fallback="./assets/icons/ui/grid.svg"><div class="nsw2-rowbody"><b>Folia <em class="nsw2-tag warn" data-i18n="nsw.badgeExpert">Expert</em></b><span data-i18n="nsw.desc.folia">Paper's region-threaded fork — only helps 100+ player servers.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="folia" aria-label="About Folia">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="plugin"><button class="nsw2-row" data-software="spigot"><img src="./assets/software/spigot.png" alt="" data-fallback="./assets/icons/ui/bolt.svg"><div class="nsw2-rowbody"><b>Spigot <em class="nsw2-tag warn" data-i18n="nsw.badgeCompiles">Compiles</em></b><span data-i18n="nsw.desc.spigot">Built from source with BuildTools — takes 5–10 min.</span><small class="nsw2-req warn" data-i18n="nsw.reqGitJdk">Needs Git + a full JDK</small></div></button><button type="button" class="nsw-info" data-info="spigot" aria-label="About Spigot">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpModded">Modded servers</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/coin.svg'"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="fabric" aria-label="About Fabric">i</button></div>
-              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/book.svg'"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="neoforge" aria-label="About NeoForge">i</button></div>
-              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/hook.svg'"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="forge" aria-label="About Forge">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="fabric"><img src="./assets/software/fabric.png" alt="" data-fallback="./assets/icons/ui/coin.svg"><div class="nsw2-rowbody"><b>Fabric <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.fabric">Lightweight mod loader — Sodium/Lithium etc. Clients need Fabric too.</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="fabric" aria-label="About Fabric">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="neoforge"><img src="./assets/software/neoforge.png" alt="" data-fallback="./assets/icons/ui/book.svg"><div class="nsw2-rowbody"><b>NeoForge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.neoforge">Maintained Forge successor (1.20.5+). Installer generates run files.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="neoforge" aria-label="About NeoForge">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="modded"><button class="nsw2-row" data-software="forge"><img src="./assets/software/forge.png" alt="" data-fallback="./assets/icons/ui/hook.svg"><div class="nsw2-rowbody"><b>Forge <em class="nsw2-tag" data-i18n="nsw.badgeModded">Modded</em></b><span data-i18n="nsw.desc.forge">The classic loader (1.12–1.20.4) with the largest mod library.</span><small class="nsw2-req" data-i18n="nsw.reqInstaller">Runs an installer (auto)</small></div></button><button type="button" class="nsw-info" data-info="forge" aria-label="About Forge">i</button></div>
             </div>
             <p class="eyebrow nsw2-group" data-i18n="nsw.grpProxy">Proxy (advanced)</p>
             <div class="nsw2-grid">
-              <div class="nsw2-cardwrap" data-groups="native-proxy"><button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" onerror="this.onerror=null;this.src='./assets/icons/ui/gem.svg'"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="velocity" aria-label="About Velocity">i</button></div>
+              <div class="nsw2-cardwrap" data-groups="native-proxy"><button class="nsw2-row" data-software="velocity"><img src="./assets/software/velocity.png" alt="" data-fallback="./assets/icons/ui/gem.svg"><div class="nsw2-rowbody"><b>Velocity <em class="nsw2-tag" data-i18n="nsw.badgeProxy">Proxy</em></b><span data-i18n="nsw.desc.velocity">Not a world — connects several servers behind one IP (velocity.toml).</span><small class="nsw2-req" data-i18n="nsw.reqNone">No extra tools needed</small></div></button><button type="button" class="nsw-info" data-info="velocity" aria-label="About Velocity">i</button></div>
             </div>
           </div>
           <div id="nswInfoPop" class="nsw-info-pop" hidden role="dialog" aria-label="Software details"></div>

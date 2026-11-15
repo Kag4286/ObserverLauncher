@@ -111,7 +111,7 @@ test('dismiss button has zero OS-default chrome and content native notice uses S
   const fs = require('fs');
   const path = require('path');
   const html = fs.readFileSync(path.join(__dirname, '../src/renderer/index.html'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '../src/renderer/css/07-polish.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../src/renderer/css/05-market.css'), 'utf8');
   assert.ok(css.includes('.wm-perf-dismiss{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;background:transparent;border:1px solid transparent'), 'Dismiss button must neutralize OS chrome');
   assert.ok(!html.includes('class="info-badge" aria-hidden="true">ℹ</span>'), 'Must not use raw unicode ℹ in content native notice');
   assert.ok(html.includes('class="content-native-notice"'), 'Must have content-native-notice container');

@@ -17,8 +17,8 @@ const ck = (n, c) => c ? (pass++, console.log('PASS', n)) : (fail++, console.log
 // layout constants back out. createPlayerRenderer is never called -- no WebGL needed.
 const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'js', '03b-player-3d.js'), 'utf8');
 const ctx = vm.createContext({ console, Math, Float32Array, Image: function () {} });
-vm.runInContext(src + '\n;globalThis.__layout = { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, uvcMirrored, buildCube, getArmorMaterial };', ctx);
-const { PLAYER_PARTS, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, uvcMirrored, buildCube, getArmorMaterial } = ctx.__layout;
+vm.runInContext(src + '\n;globalThis.__layout = { PLAYER_PARTS, ARMOR_GEO, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, uvcMirrored, buildCube, getArmorMaterial };', ctx);
+const { PLAYER_PARTS, ARMOR_GEO, MODEL_HEIGHT, HIP_Y, SHOULDER_Y, ARM_X, ARM_X_SLIM, partPos, LEG_X, TORSO_HALF_W, UV, uvc, uvcMirrored, buildCube, getArmorMaterial } = ctx.__layout;
 
 const box = name => {
   const [x, y, w, h, d] = PLAYER_PARTS[name];
@@ -205,6 +205,19 @@ ck('UV.hornTip defined and within 64x64 bounds', Boolean(UV.hornTip && UV.hornTi
   const hollowCube = buildCube(2, 2, 2, dummyFaces, { noBottom: true });
   ck('standard cube has 36 vertices (6 faces)', standardCube.count === 36 && standardCube.p.length === 36 * 3);
   ck('hollow helmet cube has 30 vertices (5 faces, no bottom)', hollowCube.count === 30 && hollowCube.p.length === 30 * 3);
+}
+
+// --- Armor seam alignment invariants ---
+{
+  const thighOuterX = ARMOR_GEO.legging.x + ARMOR_GEO.legging.w / 2;
+  const thighInnerX = ARMOR_GEO.legging.x - ARMOR_GEO.legging.w / 2;
+  ck('leggings thighs do not interpenetrate at X=0', thighInnerX >= 0);
+  ck('leggings thighs fit flush inside waist width (no overhanging hip skirt)', Math.abs((ARMOR_GEO.waist.w / 2) - thighOuterX) <= 0.05);
+  ck('leggings waist overlaps thighs at Y=12 hip seam', (ARMOR_GEO.waist.y - ARMOR_GEO.waist.h / 2) < HIP_Y && (ARMOR_GEO.legging.y + ARMOR_GEO.legging.h / 2) > HIP_Y);
+  ck('arm armor depth matches chestplate within 0.05 (no shoulder notch)', Math.abs(ARMOR_GEO.chest.d - ARMOR_GEO.armArmor.d) <= 0.05);
+  ck('slim arm armor depth matches chestplate within 0.05', Math.abs(ARMOR_GEO.chest.d - ARMOR_GEO.armArmorSlim.d) <= 0.05);
+  ck('armor sleeve cubes always sample 4px UV.rightArm (never slim 3px UV)', !/c(?:Right|Left)ArmArmor\d+\s*=\s*buildCube\([^\n]*rightArmSlim/.test(src));
+  ck('player renderer scales canvas by devicePixelRatio', src.includes('devicePixelRatio'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

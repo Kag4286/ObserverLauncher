@@ -7,7 +7,9 @@
 function renderMarket(items){
   const n=$('#marketResults');
   if(!items?.length){
-    n.innerHTML=`<article class="panel market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button class="btn secondary" onclick="document.getElementById('marketQuery').value='';document.getElementById('marketVersion').value='';document.getElementById('marketSearch').click()">${esc(t('mkt.clear'))}</button></div></article>`;
+    n.innerHTML=`<article class="panel market-empty"><p class="text-muted">${esc(t('mkt.noResults'))}</p><div class="market-empty-actions"><button type="button" class="btn secondary" data-market-clear>${esc(t('mkt.clear'))}</button></div></article>`;
+  const clrBtn=n.querySelector('[data-market-clear]');
+  if(clrBtn) clrBtn.onclick=()=>{const q=document.getElementById('marketQuery'),v=document.getElementById('marketVersion'),s=document.getElementById('marketSearch');if(q)q.value='';if(v)v.value='';if(s)s.click();};
     return;
   }
   const srv=imDetectServer();
@@ -134,7 +136,9 @@ function imRenderCompat(){
   if(item.kind==='modpack'&&chosen){
     const gv=chosen.gameVersions||[];
     const match=!gameV||gv.includes(gameV);
-    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(match,gv.length?esc([...gv].reverse().slice(0,3).join(', ')):'—',!match)}${match?'':`<small class="im-sub">${t('mkt.serverShort',{v:esc(gameV||'unknown')})}</small>`}</div>`);
+    const gvFull=gv.length?[...gv].reverse().join(', '):'—';
+    const gvText=gv.length?[...gv].reverse().slice(0,3).join(', '):'—';
+    cells.push(`<div class="im-compat-cell im-compat-mc" title="${esc(gvFull)}"><small>MINECRAFT</small>${imBadge(match,esc(gvText),!match)}${match?'':`<small class="im-sub">${t('mkt.serverShort',{v:esc(gameV||'unknown')})}</small>`}</div>`);
     const ld=(chosen.loaders||[]).filter(l=>!/datapack|minecraft/i.test(l));
     const loaderOk=srv.loader==='unknown'?null:(ld.length?ld.some(l=>l===srv.loader||(srv.loader==='paper'&&/paper|spigot|bukkit/.test(l))):null);
     cells.push(`<div class="im-compat-cell"><small>LOADER</small>${imBadge(ld.length?(loaderOk===null?null:loaderOk):null,ld.length?esc(ld.join(' / ')):'vanilla',loaderOk===false)}</div>`);
@@ -145,8 +149,9 @@ function imRenderCompat(){
     // whether the server's version is inside that list.
     const buildMc=(chosen&&chosen.gameVersions||[]).filter(Boolean);
     const buildMcLabel=esc(buildMc.length?(buildMc.length>2?`${buildMc[0]} – ${buildMc[buildMc.length-1]}`:buildMc.join(', ')):(gameV||t('mkt.allVersionsShort')));
+    const buildMcTitle=buildMc.length?buildMc.join(', '):(gameV||'');
     const mcMatches=!(chosen&&gameV&&buildMc.length&&!buildMc.includes(gameV));
-    cells.push(`<div class="im-compat-cell"><small>MINECRAFT</small>${imBadge(mcMatches,buildMcLabel,!mcMatches)}${(!mcMatches&&gameV)?`<small class="im-sub">${esc(t('mkt.serverShort',{v:gameV}))}</small>`:''}</div>`);
+    cells.push(`<div class="im-compat-cell im-compat-mc"${buildMcTitle?` title="${esc(buildMcTitle)}"`:''}><small>MINECRAFT</small>${imBadge(mcMatches,buildMcLabel,!mcMatches)}${(!mcMatches&&gameV)?`<small class="im-sub">${esc(t('mkt.serverShort',{v:gameV}))}</small>`:''}</div>`);
     const chosenLds=(chosen&&chosen.loaders&&chosen.loaders.length)?chosen.loaders:(item.loaders||[]);
     let match=null;
     if(item.kind==='datapack'||chosenLds.map(l=>String(l).toLowerCase()).includes('datapack')){
@@ -174,7 +179,7 @@ function imRenderCompat(){
   }
   if(chosen?.size)cells.push(`<div class="im-compat-cell"><small>SIZE</small>${imBadge(null,imFmtBytes(chosen.size))}</div>`);
   if(chosen?.date)cells.push(`<div class="im-compat-cell"><small>UPDATED</small>${imBadge(null,new Date(chosen.date).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}))}</div>`);
-  el.innerHTML=cells.map(c=>`<div class="im-compat-cell">${c}</div>`).join('');
+  el.innerHTML=cells.join('');
 }
 function imChosenVersion(){
   const {detail,versionId}=installState;
@@ -386,7 +391,7 @@ function imRenderVersionPicker(){
       const ch=v.versionType||'release';
       const chLabel=ch==='release'?t('im.channelRelease'):ch==='beta'?t('im.channelBeta'):t('im.channelAlpha');
       const mcList=(v.gameVersions||[]).filter(Boolean);
-      const mcBadge=mcList.length?(mcList.length>2?`${mcList[0]}–${mcList[mcList.length-1]}`:mcList.join(',')):'';
+      const mcBadge=mcList.length?(mcList.length>2?`${mcList[0]} – ${mcList[mcList.length-1]}`:mcList.join(', ')):'';
       return `<div class="im-vcard${isSel?' selected':''}" data-vid="${esc(v.id)}">`
         + `<div class="im-vcard-top"><span class="im-vcard-num">${esc(v.number||v.name||v.id)}</span>`
         + `${isRec?`<span class="im-vcard-badge rec">${esc(t('im.recBadge'))}</span>`:''}`
@@ -571,7 +576,7 @@ function closeInstallModal(){
   if(m.hidden)return;
   releaseFocus();
   m.classList.add('closing');
-  m._closeTimer=setTimeout(()=>{m.hidden=true;m.classList.remove('closing');m._closeTimer=0},140);
+  m._closeTimer=setTimeout(()=>{m.hidden=true;m.classList.remove('closing');m._closeTimer=0},210);
   installState.done=false;
   const btn=$('#imInstall');btn.textContent=t('mkt.install');
 }

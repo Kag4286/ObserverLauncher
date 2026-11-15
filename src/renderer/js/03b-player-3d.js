@@ -29,14 +29,38 @@ const PLAYER_PARTS = {
   legR:  [-LEG_X, HIP_Y / 2, 4, 12, 4],
   legL:  [LEG_X, HIP_Y / 2, 4, 12, 4],
 };
+const ARMOR_GEO = {
+  // Harmonized armor proportions so waist/thighs, chestplate/arms, and boots seal cleanly without
+  // shoulder steps, hip ledges, thigh Z-fighting, or hollow neck seams.
+  waist:        { w: 8.6,  h: 5.2,   d: 4.6,  y: HIP_Y + 2.45 },
+  legging:      { w: 4.28, h: 12.3,  d: 4.58, x: 2.15, y: HIP_Y / 2 },
+  boot:         { w: 4.56, h: 6.4,   d: 4.84, x: 2.22, y: 3.2 },
+  chest:        { w: 9.0,  h: 12.8,  d: 5.0,  y: HIP_Y + 6 },
+  armArmor:     { w: 4.5,  h: 12.78, d: 4.98, x: 6.45, y: HIP_Y + 6 },
+  armArmorSlim: { w: 3.6,  h: 12.78, d: 4.98, x: 5.95, y: HIP_Y + 6 },
+  helmet:       { w: 8.9,  h: 8.9,   d: 8.9 },
+  helmetOverlay:{ w: 9.35, h: 9.35,  d: 9.35 },
+};
 const partPos = (name, isSlim) => { if (isSlim && (name === 'armR' || name === 'armL')) return { x: (name === 'armR' ? -1 : 1) * ARM_X_SLIM, y: HIP_Y + 6 }; const p = PLAYER_PARTS[name]; return { x: p[0], y: p[1] }; };
 
-function getArmorMaterial(id) {
-  if (!id) return null;
-  const s = String(id).toLowerCase();
+function getArmorMaterial(idOrItem) {
+  if (!idOrItem) return null;
+  const rawId = typeof idOrItem === 'object' ? idOrItem.id : idOrItem;
+  const eqAsset = typeof idOrItem === 'object' ? idOrItem.equippableAsset : null;
+  const s = String(rawId || '').toLowerCase();
+  if (/(?:_horse_armor|_nautilus_armor|_wolf_armor)$/.test(s)) return null;
+  if (eqAsset) {
+    const eq = String(eqAsset).toLowerCase();
+    const eqNs = eq.includes(':') ? eq.split(':')[0] : 'minecraft';
+    const eqMat = eq.includes(':') ? eq.slice(eq.indexOf(':') + 1) : eq;
+    if (/^(?:horse|nautilus|wolf|llama|happy_ghast)/.test(eqMat)) return null;
+    if (eqNs === 'minecraft' && eqMat) return eqMat === 'golden' ? 'gold' : eqMat;
+    if (eqNs && eqMat) return { isMod: true, ns: eqNs, mat: eqMat };
+  }
+  if (!s) return null;
   if (s.includes(':') && !s.startsWith('minecraft:')) {
     const [ns, name] = s.split(':');
-    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots)$/, '');
+    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots|greaves|cuirass|pauldrons|sabatons|cap|tunic|pants|shoes|hat|hood|mask|crown|tiara|shroud|cloak|robe|vest|plates)$/, '');
     if (mat && ns) return { isMod: true, ns, mat };
   }
   if (s.includes('turtle')) return 'turtle';
@@ -199,7 +223,7 @@ function buildCube(w, h, d, faces, opts) {
   return { p: new Float32Array(p), t: new Float32Array(t), count };
 }
 
-function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
+function createPlayerRenderer(canvas, skinUrl, isSlim, equipment, opts = {}) {
   if (canvas && canvas._playerRenderer && typeof canvas._playerRenderer.destroy === 'function') {
     canvas._playerRenderer.destroy();
   }
@@ -239,27 +263,38 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   let texHelmet = null, texChest = null, texBoots = null, texLegs = null;
   let texHelmetH = 32, texChestH = 32, texBootsH = 32, texLegsH = 32;
   let showArmor = true;
-  const helmetMat = equipment ? getMaterial(equipment.helmet?.id) : null;
-  const chestMat = equipment ? getMaterial(equipment.chest?.id) : null;
-  const bootsMat = equipment ? getMaterial(equipment.boots?.id) : null;
-  const legsMat = equipment ? getMaterial(equipment.legs?.id) : null;
+  const getMat = (item) => getArmorMaterial(item);
+  const helmetMat = equipment ? getMat(equipment.helmet) : null;
+  const chestMat = equipment ? getMat(equipment.chest) : null;
+  const bootsMat = equipment ? getMat(equipment.boots) : null;
+  const legsMat = equipment ? getMat(equipment.legs) : null;
   const armorTexCache = new Map();
   const allCreatedTextures = [tex];
-  const fetchArmor = (kind, mat, cb) => {
+  const notifyArmorStatus = (slotKey, status) => {
+    if (opts && typeof opts.onArmorStatus === 'function') opts.onArmorStatus(slotKey, status);
+  };
+  const fetchArmor = (slotKey, kind, mat, dyeRgb, cb) => {
     if (!mat) return;
     const isMod = typeof mat === 'object' && mat && mat.isMod;
     const effectiveKind = isMod ? (kind === 'armorlegs' ? 'armormodlegs' : 'armormod') : kind;
     const matStr = isMod ? `${encodeURIComponent(mat.ns)}~${encodeURIComponent(mat.mat)}` : String(mat);
-    const key = effectiveKind + ':' + matStr;
+    const dyeKey = typeof dyeRgb === 'number' ? `:dye${dyeRgb}` : '';
+    const key = effectiveKind + ':' + matStr + dyeKey;
     if (armorTexCache.has(key)) {
-      cb(armorTexCache.get(key));
+      const cached = armorTexCache.get(key);
+      if (cached.status) notifyArmorStatus(slotKey, cached.status);
+      if (cached.texture) cb(cached);
       return;
     }
-    loadArmor(effectiveKind, matStr, (t, texH) => {
-      const res = { texture: t, texH };
+    loadArmor(effectiveKind, matStr, dyeRgb, (t, texH) => {
+      const res = { texture: t, texH, status: 'ok' };
       armorTexCache.set(key, res);
       allCreatedTextures.push(t);
+      notifyArmorStatus(slotKey, 'ok');
       cb(res);
+    }, (missStatus) => {
+      armorTexCache.set(key, { texture: null, texH: 32, status: missStatus });
+      notifyArmorStatus(slotKey, missStatus);
     });
   };
 
@@ -268,7 +303,8 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // Binding it would give the armor cube a fully transparent texture and the alpha test in the
   // fragment shader would discard every fragment -- the armor would silently vanish.
   const upload = (texture, image) => {
-    if (!image || image.naturalWidth <= 1) return false;
+    const nw = image ? (image.naturalWidth ?? image.width ?? 0) : 0;
+    if (nw <= 1) return false;
     try {
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
@@ -286,22 +322,70 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   // the same texture file per material, so one fetch per material serves every piece.
   // 'armor' / 'armorlegs' map to the two layouts (pre-1.21.2 <mat>_layer_N vs 1.21.2+ humanoid/);
   // textures.js picks per version and falls back to the other on a miss.
-  const loadArmor = (kind, material, onReady) => {
+  const prepareArmorSource = (image, dyeRgb) => {
+    const w = image.naturalWidth || 64;
+    const h = image.naturalHeight || 32;
+    let texH = (h >= w) ? 64 : 32;
+    let src = image;
+    try {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(image, 0, 0);
+        if (h >= w && h >= 64) {
+          const halfY = Math.floor(h / 2);
+          const bottom = ctx.getImageData(0, halfY, w, h - halfY).data;
+          let hasBottom = false;
+          for (let i = 3; i < bottom.length; i += 4) {
+            if (bottom[i] > 0) { hasBottom = true; break; }
+          }
+          if (!hasBottom) texH = 32;
+        }
+        if (typeof dyeRgb === 'number') {
+          const rMul = ((dyeRgb >> 16) & 255) / 255;
+          const gMul = ((dyeRgb >> 8) & 255) / 255;
+          const bMul = (dyeRgb & 255) / 255;
+          const idata = ctx.getImageData(0, 0, w, h);
+          const d = idata.data;
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] === 0) continue;
+            d[i] = Math.round(d[i] * rMul);
+            d[i + 1] = Math.round(d[i + 1] * gMul);
+            d[i + 2] = Math.round(d[i + 2] * bMul);
+          }
+          ctx.putImageData(idata, 0, 0);
+          src = c;
+        }
+      }
+    } catch {}
+    return { src, texH };
+  };
+
+  const loadArmor = (kind, material, dyeRgb, onReady, onMiss) => {
     const texture = gl.createTexture();
     const image = new Image();
-    // crossOrigin IS required: WebGL texImage2D refuses a cross-origin image that is not
-    // CORS-clean (it would throw SecurityError). The original failure was NOT this attribute but
-    // the tex:// scheme itself missing CORS support; that is now fixed in main.js (corsEnabled)
-    // and textures.js (Access-Control-Allow-Origin). Both halves are needed.
     image.crossOrigin = 'anonymous';
+    const url = `tex://auto/${kind}/${material}.png`;
     image.onload = () => {
-      if (upload(texture, image)) {
-        const texH = (image.naturalHeight && image.naturalHeight >= image.naturalWidth) ? 64 : 32;
+      if (image.naturalWidth <= 1) {
+        try { gl.deleteTexture(texture); } catch {}
+        if (typeof onMiss === 'function') {
+          if (typeof fetch === 'function') {
+            fetch(url).then(r => onMiss(r.headers.get('x-observer-armor-status') || 'missing')).catch(() => onMiss('missing'));
+          } else {
+            onMiss('missing');
+          }
+        }
+        return;
+      }
+      const { src, texH } = prepareArmorSource(image, dyeRgb);
+      if (upload(texture, src)) {
         onReady(texture, texH);
       }
     };
-    image.onerror = () => {};
-    image.src = `tex://auto/${kind}/${material}.png`;
+    image.onerror = () => { if (typeof onMiss === 'function') onMiss('missing'); };
+    image.src = url;
   };
 
   const img = new Image();
@@ -327,17 +411,17 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     })();
 
     if (isLegacy) {
-      // Legacy skin: use right arm/leg UVs for the left side.
-      cLArm = buildCube(armW, 12, 4, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, SKIN));
+      // Legacy skin: use right arm/leg UVs for the left side, keeping +0.04 joint overlap.
+      cLArm = buildCube(armW + 0.04, 12.04, 4.04, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, SKIN));
       cLSleeve = buildCube(armW+0.25, 12.25, 4.25, uvc(isSlim ? UV.rightSleeveSlim : UV.rightSleeve, SKIN, SKIN));
-      cLLeg = buildCube(4, 12, 4, uvc(UV.rightLeg, SKIN, SKIN));
+      cLLeg = buildCube(4.06, 12.04, 4.04, uvc(UV.rightLeg, SKIN, SKIN));
       cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.rightPants, SKIN, SKIN));
     }
 
-    if (helmetMat) fetchArmor('armor', helmetMat, r => { texHelmet = r.texture; texHelmetH = r.texH; draw(); });
-    if (chestMat) fetchArmor('armor', chestMat, r => { texChest = r.texture; texChestH = r.texH; draw(); });
-    if (bootsMat) fetchArmor('armor', bootsMat, r => { texBoots = r.texture; texBootsH = r.texH; draw(); });
-    if (legsMat) fetchArmor('armorlegs', legsMat, r => { texLegs = r.texture; texLegsH = r.texH; draw(); });
+    if (helmetMat) fetchArmor('helmet', 'armor', helmetMat, equipment?.helmet?.dyedColor, r => { texHelmet = r.texture; texHelmetH = r.texH; draw(); });
+    if (chestMat) fetchArmor('chest', 'armor', chestMat, equipment?.chest?.dyedColor, r => { texChest = r.texture; texChestH = r.texH; draw(); });
+    if (bootsMat) fetchArmor('boots', 'armor', bootsMat, equipment?.boots?.dyedColor, r => { texBoots = r.texture; texBootsH = r.texH; draw(); });
+    if (legsMat) fetchArmor('legs', 'armorlegs', legsMat, equipment?.legs?.dyedColor, r => { texLegs = r.texture; texLegsH = r.texH; draw(); });
     draw();
   };
 
@@ -362,33 +446,35 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
   let cLLeg = buildCube(4.06, 12.04, 4.04, uvc(UV.leftLeg, SKIN, SKIN));
   let cLPants = buildCube(4.25, 12.25, 4.25, uvc(UV.leftPants, SKIN, SKIN));
 
-  // Level 2: Inner armor parts (Leggings: waist belt height 5.0 at y=14.5, legs height 12.2)
-  const cLeggings32 = buildCube(8.7, 5.0, 4.7, uvc(UV.belt, SKIN, 32));
-  const cLeggings64 = buildCube(8.7, 5.0, 4.7, uvc(UV.belt, SKIN, 64));
-  const cRightLeggings32 = buildCube(4.55, 12.2, 4.55, uvc(UV.rightLeg, SKIN, 32));
-  const cRightLeggings64 = buildCube(4.55, 12.2, 4.55, uvc(UV.rightLeg, SKIN, 64));
-  const cLeftLeggings32 = buildCube(4.55, 12.2, 4.55, uvcMirrored(UV.rightLeg, SKIN, 32));
-  const cLeftLeggings64 = buildCube(4.55, 12.2, 4.55, uvcMirrored(UV.rightLeg, SKIN, 64));
+  // Level 2: Inner armor parts (Leggings: flush waist + non-overlapping inner thighs)
+  const { waist, legging, boot, chest, helmet, helmetOverlay } = ARMOR_GEO;
+  const armSpec = isSlim ? ARMOR_GEO.armArmorSlim : ARMOR_GEO.armArmor;
+  const cLeggings32 = buildCube(waist.w, waist.h, waist.d, uvc(UV.belt, SKIN, 32));
+  const cLeggings64 = buildCube(waist.w, waist.h, waist.d, uvc(UV.belt, SKIN, 64));
+  const cRightLeggings32 = buildCube(legging.w, legging.h, legging.d, uvc(UV.rightLeg, SKIN, 32));
+  const cRightLeggings64 = buildCube(legging.w, legging.h, legging.d, uvc(UV.rightLeg, SKIN, 64));
+  const cLeftLeggings32 = buildCube(legging.w, legging.h, legging.d, uvcMirrored(UV.rightLeg, SKIN, 32));
+  const cLeftLeggings64 = buildCube(legging.w, legging.h, legging.d, uvcMirrored(UV.rightLeg, SKIN, 64));
 
-  // Level 3: Outer armor parts (Boots: height 6.3; Chestplate: height 12.8; Helmet + Horns)
-  const cRightBoot32 = buildCube(4.75, 6.3, 4.75, uvc(UV.boot, SKIN, 32));
-  const cRightBoot64 = buildCube(4.75, 6.3, 4.75, uvc(UV.boot, SKIN, 64));
-  const cLeftBoot32 = buildCube(4.75, 6.3, 4.75, uvcMirrored(UV.boot, SKIN, 32));
-  const cLeftBoot64 = buildCube(4.75, 6.3, 4.75, uvcMirrored(UV.boot, SKIN, 64));
+  // Level 3: Outer armor parts (Worn armor always uses full 4px UV.rightArm even for slim skins)
+  const cRightBoot32 = buildCube(boot.w, boot.h, boot.d, uvc(UV.boot, SKIN, 32));
+  const cRightBoot64 = buildCube(boot.w, boot.h, boot.d, uvc(UV.boot, SKIN, 64));
+  const cLeftBoot32 = buildCube(boot.w, boot.h, boot.d, uvcMirrored(UV.boot, SKIN, 32));
+  const cLeftBoot64 = buildCube(boot.w, boot.h, boot.d, uvcMirrored(UV.boot, SKIN, 64));
 
-  const cHelmet32 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 32), { noBottom: true });
-  const cHelmet64 = buildCube(9.2, 9.2, 9.2, uvc(UV.head, SKIN, 64), { noBottom: true });
-  const cHelmetOverlay32 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 32), { noBottom: true });
-  const cHelmetOverlay64 = buildCube(9.7, 9.7, 9.7, uvc(UV.hat, SKIN, 64), { noBottom: true });
+  const cHelmet32 = buildCube(helmet.w, helmet.h, helmet.d, uvc(UV.head, SKIN, 32), { noBottom: true });
+  const cHelmet64 = buildCube(helmet.w, helmet.h, helmet.d, uvc(UV.head, SKIN, 64), { noBottom: true });
+  const cHelmetOverlay32 = buildCube(helmetOverlay.w, helmetOverlay.h, helmetOverlay.d, uvc(UV.hat, SKIN, 32), { noBottom: true });
+  const cHelmetOverlay64 = buildCube(helmetOverlay.w, helmetOverlay.h, helmetOverlay.d, uvc(UV.hat, SKIN, 64), { noBottom: true });
   const cHorn = buildCube(2.0, 3.0, 5.0, uvc(UV.horn, SKIN, 64));
   const cHornTip = buildCube(1.2, 2.0, 3.0, uvc(UV.hornTip, SKIN, 64));
 
-  const cChestplate32 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 32));
-  const cChestplate64 = buildCube(9.2, 12.8, 5.2, uvc(UV.body, SKIN, 64));
-  const cRightArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
-  const cRightArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvc(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
-  const cLeftArmArmor32 = buildCube(armW+0.8, 12.6, 4.8, uvcMirrored(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 32));
-  const cLeftArmArmor64 = buildCube(armW+0.8, 12.6, 4.8, uvcMirrored(isSlim ? UV.rightArmSlim : UV.rightArm, SKIN, 64));
+  const cChestplate32 = buildCube(chest.w, chest.h, chest.d, uvc(UV.body, SKIN, 32));
+  const cChestplate64 = buildCube(chest.w, chest.h, chest.d, uvc(UV.body, SKIN, 64));
+  const cRightArmArmor32 = buildCube(armSpec.w, armSpec.h, armSpec.d, uvc(UV.rightArm, SKIN, 32));
+  const cRightArmArmor64 = buildCube(armSpec.w, armSpec.h, armSpec.d, uvc(UV.rightArm, SKIN, 64));
+  const cLeftArmArmor32 = buildCube(armSpec.w, armSpec.h, armSpec.d, uvcMirrored(UV.rightArm, SKIN, 32));
+  const cLeftArmArmor64 = buildCube(armSpec.w, armSpec.h, armSpec.d, uvcMirrored(UV.rightArm, SKIN, 64));
 
   let rotX = 0, rotY = 0;
   let dragging = false, lastX = 0, lastY = 0;
@@ -443,12 +529,16 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     // 'INVALID_OPERATION: uniformMatrix4fv: location is not from the associated program'.
     gl.useProgram(prog);
     const rect = canvas.getBoundingClientRect();
-    if (canvas.width !== rect.width) canvas.width = rect.width;
-    if (canvas.height !== rect.height) canvas.height = rect.height;
+    const dpr = Math.min((typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1, 2);
+    const targetW = Math.max(1, Math.round(rect.width * dpr));
+    const targetH = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== targetW) canvas.width = targetW;
+    if (canvas.height !== targetH) canvas.height = targetH;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0,0,0,0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
+    if (typeof gl.depthFunc === 'function') gl.depthFunc(gl.LEQUAL);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -458,7 +548,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
     // so nothing is ever clipped by depth.
     const tanHalf = Math.tan(Math.PI / 8); // fov 45deg -> tan(22.5deg)
     const dist = (MODEL_HEIGHT / 2) / (0.78 * tanHalf);
-    const proj = mat4Perspective(Math.PI/4, rect.width/rect.height, 0.1, dist * 4);
+    const proj = mat4Perspective(Math.PI/4, canvas.width/canvas.height, 0.1, dist * 4);
     // Look at the model's mid-height so the feet and the crown are both comfortably inside.
     const view = mat4Translate(0, -MODEL_HEIGHT / 2, -dist);
     const rot = mat4Multiply(mat4RotateX(rotX), mat4RotateY(rotY));
@@ -516,25 +606,26 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment) {
         setOffset(-1.0, -2.0);
         gl.bindTexture(gl.TEXTURE_2D, texLegs);
         const is64 = texLegsH === 64;
-        drawPart(is64 ? cLeggings64 : cLeggings32, p('body').x, HIP_Y + 2.5, 0);
-        drawPart(is64 ? cRightLeggings64 : cRightLeggings32, p('legR').x, p('legR').y, 0);
-        drawPart(is64 ? cLeftLeggings64 : cLeftLeggings32, p('legL').x, p('legL').y, 0);
+        drawPart(is64 ? cLeggings64 : cLeggings32, 0, waist.y, 0);
+        drawPart(is64 ? cRightLeggings64 : cRightLeggings32, -legging.x, legging.y, 0);
+        drawPart(is64 ? cLeftLeggings64 : cLeftLeggings32, legging.x, legging.y, 0);
       }
 
       if (texBoots && equipment && equipment.boots) {
         setOffset(-1.8, -2.8);
         gl.bindTexture(gl.TEXTURE_2D, texBoots);
         const is64 = texBootsH === 64;
-        drawPart(is64 ? cRightBoot64 : cRightBoot32, p('legR').x, 3.15, 0);
-        drawPart(is64 ? cLeftBoot64 : cLeftBoot32, p('legL').x, 3.15, 0);
+        drawPart(is64 ? cRightBoot64 : cRightBoot32, -boot.x, boot.y, 0);
+        drawPart(is64 ? cLeftBoot64 : cLeftBoot32, boot.x, boot.y, 0);
       }
       if (texChest && equipment && equipment.chest) {
         gl.bindTexture(gl.TEXTURE_2D, texChest);
         const is64 = texChestH === 64;
         setOffset(-2.4, -3.4);
-        drawPart(is64 ? cChestplate64 : cChestplate32, p('body').x, p('body').y, 0);
-        drawPart(is64 ? cRightArmArmor64 : cRightArmArmor32, p('armR').x, p('armR').y, 0);
-        drawPart(is64 ? cLeftArmArmor64 : cLeftArmArmor32, p('armL').x, p('armL').y, 0);
+        drawPart(is64 ? cChestplate64 : cChestplate32, 0, chest.y, 0);
+        setOffset(-2.5, -3.5);
+        drawPart(is64 ? cRightArmArmor64 : cRightArmArmor32, -armSpec.x, armSpec.y, 0);
+        drawPart(is64 ? cLeftArmArmor64 : cLeftArmArmor32, armSpec.x, armSpec.y, 0);
       }
       if (texHelmet && equipment && equipment.helmet) {
         gl.bindTexture(gl.TEXTURE_2D, texHelmet);

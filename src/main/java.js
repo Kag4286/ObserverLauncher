@@ -27,7 +27,7 @@ function detectJava(javaPath = 'java') {
 // minimum Java version or validation silently skips (the old regex only knew 1.x, so a Java 17
 // install passed the pre-start check for a 26.x jar and crashed later with an obscure JVM error).
 // Verified live against Mojang's version manifest javaVersion field (piston-meta):
-//   26.1/26.2 → Java 25 (java-runtime-epsilon), 1.20.5+/1.21.x → Java 21, 1.18+ → 17, 1.17 → 16, older → 8.
+//   26.1–26.3 → Java 25 (java-runtime-epsilon), 1.20.5+/1.21.x → Java 21, 1.18+ → 17, 1.17 → 16, older → 8.
 function requiredJavaForJar(jar) {
   const s = String(jar || '');
   let m = s.match(/\b1\.(\d{1,2})(?:\.(\d{1,2}))?\b/);

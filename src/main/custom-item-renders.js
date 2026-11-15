@@ -265,11 +265,293 @@ const TNT_3D_PNG = Buffer.from(
   'base64'
 );
 
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const DEFAULT_BIOME_TINT = [124 / 255, 189 / 255, 107 / 255];
+
+/**
+ * Decode an interlaced=0 PNG buffer (color types 0, 2, 3, 4, 6; 1/2/4/8/16-bit) into RGBA bytes.
+ * Returns null if the input is not a valid supported PNG.
+ */
+function decodePngRgba(png) {
+  if (!Buffer.isBuffer(png) || png.length < 33 || !png.subarray(0, 8).equals(PNG_SIG)) return null;
+  let off = 8;
+  let w = 0, h = 0, bitDepth = 8, colorType = 6, interlace = 0;
+  let plte = null, trns = null;
+  const idats = [];
+
+  try {
+    while (off + 8 <= png.length) {
+      const len = png.readUInt32BE(off);
+      const type = png.toString('ascii', off + 4, off + 8);
+      const dataEnd = off + 8 + len;
+      if (dataEnd + 4 > png.length) break;
+      const data = png.subarray(off + 8, dataEnd);
+      if (type === 'IHDR' && data.length >= 13) {
+        w = data.readUInt32BE(0);
+        h = data.readUInt32BE(4);
+        bitDepth = data[8];
+        colorType = data[9];
+        interlace = data[12];
+      } else if (type === 'PLTE') {
+        plte = data;
+      } else if (type === 'tRNS') {
+        trns = data;
+      } else if (type === 'IDAT') {
+        idats.push(data);
+      } else if (type === 'IEND') {
+        break;
+      }
+      off = dataEnd + 4;
+    }
+    if (!w || !h || w > 1024 || h > 16384 || interlace !== 0 || !idats.length) return null;
+    const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[colorType];
+    if (!channels || ![1, 2, 4, 8, 16].includes(bitDepth)) return null;
+
+    const raw = zlib.inflateSync(Buffer.concat(idats));
+    const rowBytes = Math.ceil((w * channels * bitDepth) / 8);
+    if (raw.length < h * (1 + rowBytes)) return null;
+
+    const bpp = Math.max(1, Math.ceil((channels * bitDepth) / 8));
+    const unfiltered = Buffer.alloc(h * rowBytes);
+    let rOff = 0;
+    for (let y = 0; y < h; y++) {
+      const filter = raw[rOff++];
+      const curr = y * rowBytes;
+      const prev = y > 0 ? (y - 1) * rowBytes : -1;
+      for (let x = 0; x < rowBytes; x++) {
+        let val = raw[rOff++];
+        const a = x >= bpp ? unfiltered[curr + x - bpp] : 0;
+        const b = prev >= 0 ? unfiltered[prev + x] : 0;
+        const c = (prev >= 0 && x >= bpp) ? unfiltered[prev + x - bpp] : 0;
+        if (filter === 1) val = (val + a) & 0xff;
+        else if (filter === 2) val = (val + b) & 0xff;
+        else if (filter === 3) val = (val + ((a + b) >> 1)) & 0xff;
+        else if (filter === 4) {
+          const pr = a + b - c;
+          const pa = Math.abs(pr - a), pb = Math.abs(pr - b), pc = Math.abs(pr - c);
+          val = (val + ((pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c))) & 0xff;
+        }
+        unfiltered[curr + x] = val;
+      }
+    }
+
+    const rgba = Buffer.alloc(w * h * 4);
+    const scaleGray = bitDepth === 1 ? 255 : bitDepth === 2 ? 85 : bitDepth === 4 ? 17 : 1;
+    const maxSample = (1 << bitDepth) - 1;
+    const readSample = (rowOff, idx) => {
+      if (bitDepth === 8) return unfiltered[rowOff + idx];
+      if (bitDepth === 16) return unfiltered[rowOff + idx * 2];
+      const byteIdx = (idx * bitDepth) >> 3;
+      const shift = 8 - bitDepth - ((idx * bitDepth) & 7);
+      return (unfiltered[rowOff + byteIdx] >> shift) & maxSample;
+    };
+
+    for (let y = 0; y < h; y++) {
+      const rowOff = y * rowBytes;
+      for (let x = 0; x < w; x++) {
+        const out = (y * w + x) * 4;
+        if (colorType === 6) {
+          const si = x * 4;
+          rgba[out] = readSample(rowOff, si);
+          rgba[out + 1] = readSample(rowOff, si + 1);
+          rgba[out + 2] = readSample(rowOff, si + 2);
+          rgba[out + 3] = readSample(rowOff, si + 3);
+        } else if (colorType === 2) {
+          const si = x * 3;
+          const r = readSample(rowOff, si), g = readSample(rowOff, si + 1), b = readSample(rowOff, si + 2);
+          let a = 255;
+          if (trns && trns.length >= 6 && r === trns.readUInt16BE(0) && g === trns.readUInt16BE(2) && b === trns.readUInt16BE(4)) a = 0;
+          rgba[out] = r; rgba[out + 1] = g; rgba[out + 2] = b; rgba[out + 3] = a;
+        } else if (colorType === 3) {
+          const palIdx = readSample(rowOff, x);
+          if (plte && palIdx * 3 + 2 < plte.length) {
+            rgba[out] = plte[palIdx * 3];
+            rgba[out + 1] = plte[palIdx * 3 + 1];
+            rgba[out + 2] = plte[palIdx * 3 + 2];
+          }
+          rgba[out + 3] = (trns && palIdx < trns.length) ? trns[palIdx] : 255;
+        } else if (colorType === 0) {
+          const v = readSample(rowOff, x) * scaleGray;
+          let a = 255;
+          if (trns && trns.length >= 2 && readSample(rowOff, x) === trns.readUInt16BE(0)) a = 0;
+          rgba[out] = v; rgba[out + 1] = v; rgba[out + 2] = v; rgba[out + 3] = a;
+        } else if (colorType === 4) {
+          const si = x * 2;
+          const v = readSample(rowOff, si);
+          rgba[out] = v; rgba[out + 1] = v; rgba[out + 2] = v; rgba[out + 3] = readSample(rowOff, si + 1);
+        }
+      }
+    }
+    return { w, h, rgba };
+  } catch {
+    return null;
+  }
+}
+
+function cropSquareFrame(img) {
+  if (!img || !img.w || !img.h || !img.rgba) return null;
+  if (img.h > img.w && img.h % img.w === 0) {
+    return { w: img.w, h: img.w, rgba: img.rgba.subarray(0, img.w * img.w * 4) };
+  }
+  return img;
+}
+
+function toDecodedImg(src) {
+  if (!src) return null;
+  if (Buffer.isBuffer(src)) return cropSquareFrame(decodePngRgba(src));
+  if (src.rgba && src.w && src.h) return cropSquareFrame(src);
+  return null;
+}
+
+function parseTintRgb(tint) {
+  if (!tint) return null;
+  if (tint === true) return DEFAULT_BIOME_TINT;
+  if (Array.isArray(tint) && tint.length >= 3) {
+    return [0, 1, 2].map(i => (tint[i] > 1 ? tint[i] / 255 : tint[i]));
+  }
+  if (typeof tint === 'string') {
+    const hex = tint.replace(/^#/, '');
+    if (/^[0-9a-f]{6}$/i.test(hex)) {
+      return [
+        parseInt(hex.slice(0, 2), 16) / 255,
+        parseInt(hex.slice(2, 4), 16) / 255,
+        parseInt(hex.slice(4, 6), 16) / 255,
+      ];
+    }
+  }
+  return null;
+}
+
+function sampleTexel(tex, u, v) {
+  const sx = Math.min(tex.w - 1, Math.max(0, Math.floor(u * tex.w)));
+  const sy = Math.min(tex.h - 1, Math.max(0, Math.floor(v * tex.h)));
+  const idx = (sy * tex.w + sx) * 4;
+  return [tex.rgba[idx], tex.rgba[idx + 1], tex.rgba[idx + 2], tex.rgba[idx + 3]];
+}
+
+function compositePixel(out, px, py, size, tex, u, v, shade, tint, overlayTex, overlayTint) {
+  let [r, g, b, a] = sampleTexel(tex, u, v);
+  if (tint) { r *= tint[0]; g *= tint[1]; b *= tint[2]; }
+  r *= shade; g *= shade; b *= shade;
+  if (overlayTex) {
+    const [or, og, ob, oa] = sampleTexel(overlayTex, u, v);
+    if (oa > 0) {
+      const ot = overlayTint || tint || [1, 1, 1];
+      const sr = or * ot[0] * shade, sg = og * ot[1] * shade, sb = ob * ot[2] * shade;
+      const sa = oa / 255, da = a / 255;
+      const outA = sa + da * (1 - sa);
+      if (outA > 0) {
+        r = (sr * sa + r * da * (1 - sa)) / outA;
+        g = (sg * sa + g * da * (1 - sa)) / outA;
+        b = (sb * sa + b * da * (1 - sa)) / outA;
+        a = outA * 255;
+      }
+    }
+  }
+  if (a < 8) return;
+  const oIdx = (py * size + px) * 4;
+  if (a >= 250 || out[oIdx + 3] === 0) {
+    out[oIdx] = Math.min(255, Math.round(r));
+    out[oIdx + 1] = Math.min(255, Math.round(g));
+    out[oIdx + 2] = Math.min(255, Math.round(b));
+    out[oIdx + 3] = Math.min(255, Math.round(a));
+  } else {
+    const sa = a / 255, da = out[oIdx + 3] / 255;
+    const outA = sa + da * (1 - sa);
+    out[oIdx] = Math.min(255, Math.round((r * sa + out[oIdx] * da * (1 - sa)) / outA));
+    out[oIdx + 1] = Math.min(255, Math.round((g * sa + out[oIdx + 1] * da * (1 - sa)) / outA));
+    out[oIdx + 2] = Math.min(255, Math.round((b * sa + out[oIdx + 2] * da * (1 - sa)) / outA));
+    out[oIdx + 3] = Math.min(255, Math.round(outA * 255));
+  }
+}
+
+function drawIsoBox(out, size, box) {
+  const s = size / 64;
+  const cx = 32 * s, topY = 6 * s, halfW = 24 * s, halfH = 12 * s, cubeH = 26 * s;
+  const { x0, x1, y0, y1, z0, z1, topTex, leftTex, rightTex, tintTop, tintLeft, tintRight, overlayTop, overlayLeft, overlayRight, tintOverlay } = box;
+  const dyShift = (1 - y1) * cubeH;
+
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const fx = px + 0.5, fy = py + 0.5;
+      if (topTex) {
+        const dx = fx - cx, dy = fy - topY - dyShift;
+        const X = 0.5 * (dy / halfH + dx / halfW);
+        const Z = 0.5 * (dy / halfH - dx / halfW);
+        if (X >= x0 && X < x1 && Z >= z0 && Z < z1) {
+          compositePixel(out, px, py, size, topTex, X, Z, 1.0, tintTop, overlayTop, tintOverlay);
+          continue;
+        }
+      }
+      if (leftTex) {
+        const dx = fx - (cx - z1 * halfW), dy = fy - (topY + z1 * halfH);
+        const X = dx / halfW;
+        const vDown = (dy - X * halfH) / cubeH;
+        const Y = 1 - vDown;
+        if (X >= x0 && X < x1 && Y >= y0 && Y < y1) {
+          compositePixel(out, px, py, size, leftTex, X, vDown, 0.84, tintLeft, overlayLeft, tintOverlay);
+          continue;
+        }
+      }
+      if (rightTex) {
+        const Z = x1 - (fx - cx) / halfW;
+        const vDown = ((fy - topY) - (x1 + Z) * halfH) / cubeH;
+        const Y = 1 - vDown;
+        if (Z >= z0 && Z < z1 && Y >= y0 && Y < y1) {
+          compositePixel(out, px, py, size, rightTex, 1 - Z, vDown, 0.64, tintRight, overlayRight, tintOverlay);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Render an isometric 3D block PNG from multi-face PNG buffers/decoded textures.
+ * Supports full cubes, bottom slabs (`shape: 'slab'`), stairs (`shape: 'stairs'`),
+ * overlays (grass_block_side_overlay), and biome tinting.
+ */
+function renderIsometricBlockPng(faces, size = 64) {
+  if (!faces || typeof faces !== 'object') return null;
+  const topRaw = toDecodedImg(faces.top);
+  const frontRaw = toDecodedImg(faces.front);
+  const sideRaw = toDecodedImg(faces.side);
+  const topTex = topRaw || frontRaw || sideRaw;
+  const leftTex = frontRaw || sideRaw || topTex;
+  const rightTex = sideRaw || frontRaw || topTex;
+  if (!topTex || !leftTex || !rightTex) return null;
+
+  const overlay = toDecodedImg(faces.overlay);
+  const overlayTop = toDecodedImg(faces.overlayTop) || null;
+  const overlayLeft = toDecodedImg(faces.overlayFront) || overlay;
+  const overlayRight = toDecodedImg(faces.overlaySide) || overlay;
+  const tintTop = parseTintRgb(faces.tintTop);
+  const tintLeft = parseTintRgb(faces.tintFront ?? faces.tintSide);
+  const tintRight = parseTintRgb(faces.tintSide);
+  const tintOverlay = parseTintRgb(faces.tintOverlay ?? DEFAULT_BIOME_TINT);
+
+  const out = Buffer.alloc(size * size * 4);
+  const baseOpts = {
+    topTex, leftTex, rightTex,
+    tintTop, tintLeft, tintRight,
+    overlayTop, overlayLeft, overlayRight, tintOverlay,
+  };
+  const shape = String(faces.shape || 'cube').toLowerCase();
+  if (shape === 'slab') {
+    drawIsoBox(out, size, { ...baseOpts, x0: 0, x1: 1, y0: 0, y1: 0.5, z0: 0, z1: 1 });
+  } else if (shape === 'stairs') {
+    drawIsoBox(out, size, { ...baseOpts, x0: 0, x1: 1, y0: 0, y1: 0.5, z0: 0, z1: 1 });
+    drawIsoBox(out, size, { ...baseOpts, x0: 0, x1: 0.5, y0: 0.5, y1: 1, z0: 0, z1: 1 });
+  } else {
+    drawIsoBox(out, size, { ...baseOpts, x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1 });
+  }
+  return encodePng(size, size, out);
+}
+
 function renderCustomVanillaItem(name) {
   const nm = String(name || '').toLowerCase();
   if (nm === 'tnt') return TNT_3D_PNG;
   return null;
 }
 
-module.exports = { renderCustomModItem, renderCustomVanillaItem, renderBackpack, renderWaystone, encodePng };
+module.exports = { renderCustomModItem, renderCustomVanillaItem, renderBackpack, renderWaystone, encodePng, decodePngRgba, renderIsometricBlockPng };
 

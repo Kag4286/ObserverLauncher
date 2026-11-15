@@ -266,7 +266,7 @@ const ARMOR_MAX = {
   copper: [121, 176, 165, 143],
 };
 const TOOL_MAX = {
-  // every sword / pickaxe / axe / shovel / hoe of a material shares one value
+  // every sword / pickaxe / axe / shovel / hoe / spear of a material shares one value
   wooden: 59, stone: 131, copper: 190, iron: 250, golden: 32, diamond: 1561, netherite: 2031,
 };
 const MISC_MAX = {
@@ -275,7 +275,7 @@ const MISC_MAX = {
   brush: 64, wolf_armor: 64, turtle_helmet: 275,
 };
 const ARMOR_ORDER = ['helmet', 'chestplate', 'leggings', 'boots'];
-const TOOL_ORDER = ['sword', 'pickaxe', 'axe', 'shovel', 'hoe'];
+const TOOL_ORDER = ['sword', 'pickaxe', 'axe', 'shovel', 'hoe', 'spear'];
 function maxDamageFor(id) {
   const path = String(id || '').split(':').pop();
   if (MISC_MAX[path] !== undefined) return MISC_MAX[path];
@@ -381,8 +381,19 @@ function stackOf(item) {
   if (enchants.length) out.enchantments = enchants;
   const stored = enchantmentsOf(components, tag, 'minecraft:stored_enchantments', 'StoredEnchantments');
   if (stored.length) out.storedEnchantments = stored;
-  const custom = textOf(components['minecraft:custom_name']) ?? textOf(tag.display && tag.display.Name);
+  const custom = textOf(components['minecraft:custom_name']) ?? textOf(components['minecraft:item_name']) ?? textOf(tag.display && tag.display.Name);
   if (custom) out.customName = custom;
+  const eqAsset = components['minecraft:equippable']?.asset_id;
+  if (eqAsset) out.equippableAsset = String(eqAsset);
+  const itemModel = components['minecraft:item_model'];
+  if (itemModel) out.itemModel = String(itemModel);
+  const rawDye = components['minecraft:dyed_color'] ?? (tag.display && tag.display.color);
+  const dyedColor = typeof rawDye === 'number' ? rawDye : (rawDye && typeof rawDye.rgb === 'number' ? rawDye.rgb : null);
+  if (dyedColor !== null) out.dyedColor = dyedColor;
+  const trimComp = components['minecraft:trim'] || tag.Trim;
+  if (trimComp && typeof trimComp === 'object' && (trimComp.pattern || trimComp.material)) {
+    out.trim = { pattern: String(trimComp.pattern || ''), material: String(trimComp.material || '') };
+  }
   return out;
 }
 async function readPlayerData(root, uuid, name) {
@@ -445,8 +456,14 @@ async function readPlayerData(root, uuid, name) {
   // category, e.g. minecraft:custom -> { minecraft:deaths: N }). Read defensively; missing -> {}.
   let stats = {};
   try {
-    const statsFile = path.join(path.dirname(file), '..', 'stats', `${path.basename(file).replace(/\.dat$/, '')}.json`);
-    if (fs.existsSync(statsFile)) stats = JSON.parse(fs.readFileSync(statsFile, 'utf8')) || {};
+    const statId = path.basename(file).replace(/\.dat$/, '');
+    const candidates = [
+      path.join(path.dirname(file), '..', 'stats', `${statId}.json`),
+      uuid ? path.join(path.dirname(file), 'stats', `${uuid}.json`) : null,
+    ].filter(Boolean);
+    for (const statsFile of candidates) {
+      if (fs.existsSync(statsFile)) { stats = JSON.parse(fs.readFileSync(statsFile, 'utf8')) || {}; break; }
+    }
   } catch { stats = {}; }
   let dim = simple.Dimension ?? 'minecraft:overworld';
   if (dim === 0 || dim === '0') dim = 'minecraft:overworld';

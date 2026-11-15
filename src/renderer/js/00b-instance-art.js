@@ -5,10 +5,10 @@
 // Settings preview tile.
 
 // Map an accent palette key (as stored in settings) to the CSS variable that carries its colour.
-// '' = brand default. Unknown keys fall back to brand too. lime -> --brand (the v4 brand IS green).
+// '' = brand default. Unknown keys fall back to brand too. lime -> --lime (distinct from emerald brand).
 const INST_ACCENT_VARS = {
   '': 'var(--brand)',
-  lime: 'var(--brand)',
+  lime: 'var(--lime)',
   violet: 'var(--violet)',
   orange: 'var(--orange)',
   pink: 'var(--pink)',

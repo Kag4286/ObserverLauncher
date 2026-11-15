@@ -130,7 +130,7 @@ function setContentKind(kind){
   const isNat = f.engineType === 'native' || !!f.nativeBinary || (f.target && (f.target.software === 'horizon' || f.target.software === 'pumpkin'));
   if (isNat && kind === 'mod') kind = 'plugin';
   contentKind=kind;
-  $$('#contentSeg .seg').forEach(b=>b.classList.toggle('active',b.dataset.ckind===kind));
+  $$('#contentSeg .seg').forEach(b=>{const on=b.dataset.ckind===kind;b.classList.toggle('active',on);b.setAttribute('aria-selected',String(on));});
   $('#pluginsList').hidden=kind!=='plugin';
   $('#modsList').hidden=kind!=='mod';
   $('#datapacksList').hidden=kind!=='datapack';
@@ -318,7 +318,7 @@ async function jumpToModConfig(fileName, kind) {
     } else {
       if (typeof openFileBrowser === 'function') {
         openFileBrowser();
-        const searchBox = $('#fbFilter');
+        const searchBox = $('#fbSearch');
         if (searchBox && (modId || clean)) {
           searchBox.value = modId || clean;
           searchBox.dispatchEvent(new Event('input'));
@@ -404,16 +404,23 @@ function updateContentToolbarState() {
   }
 }
 
+const CONTENT_PAGE_SIZE = 25;
+let contentPageByKind = { plugin: 0, mod: 0, datapack: 0 };
+
 function filterContentList() {
   const q = ($('#contentFilter')?.value || '').trim().toLowerCase();
   const clearBtn = $('#contentFilterClear');
   if (clearBtn) clearBtn.hidden = !q;
 
   const list = $(contentKind === 'plugin' ? '#pluginsList' : contentKind === 'mod' ? '#modsList' : '#datapacksList');
-  if (!list) return;
+  const pager = $('#contentPager');
+  if (!list) {
+    if (pager) pager.hidden = true;
+    return;
+  }
 
-  let visibleCount = 0;
   const rows = list.querySelectorAll('.content-row');
+  const matched = [];
   rows.forEach(li => {
     const name = (li.dataset.name || '').toLowerCase();
     const title = (li.dataset.title || '').toLowerCase();
@@ -425,13 +432,35 @@ function filterContentList() {
     else if (contentQuickFilter === 'updates') matchesFilter = li.dataset.hasUpdate === '1';
     else if (contentQuickFilter === 'issues') matchesFilter = li.dataset.hasIssue === '1';
 
-    const show = matchesQuery && matchesFilter;
-    li.hidden = !show;
-    if (show) visibleCount++;
+    if (matchesQuery && matchesFilter) matched.push(li);
+    else li.hidden = true;
   });
 
+  const totalMatched = matched.length;
+  const totalPages = Math.max(1, Math.ceil(totalMatched / CONTENT_PAGE_SIZE));
+  const page = Math.max(0, Math.min(contentPageByKind[contentKind] || 0, totalPages - 1));
+  contentPageByKind[contentKind] = page;
+  const start = page * CONTENT_PAGE_SIZE;
+  const end = Math.min(start + CONTENT_PAGE_SIZE, totalMatched);
+
+  for (let i = 0; i < totalMatched; i++) {
+    matched[i].hidden = i < start || i >= end;
+  }
+
+  if (pager) {
+    pager.hidden = totalMatched === 0 || totalPages <= 1;
+    if (!pager.hidden) {
+      const lbl = $('#contentPageLabel');
+      if (lbl) lbl.textContent = `${t('ply.page')} ${page + 1} / ${totalPages} (${start + 1}–${end} / ${totalMatched})`;
+      const prevBtn = $('#contentPrevPage');
+      const nextBtn = $('#contentNextPage');
+      if (prevBtn) prevBtn.disabled = page <= 0;
+      if (nextBtn) nextBtn.disabled = page >= totalPages - 1;
+    }
+  }
+
   let emptyMsg = list.querySelector('.cr-empty-search');
-  if (rows.length > 0 && visibleCount === 0) {
+  if (rows.length > 0 && totalMatched === 0) {
     if (!emptyMsg) {
       emptyMsg = document.createElement('li');
       emptyMsg.className = 'cr-empty-search';
@@ -440,6 +469,7 @@ function filterContentList() {
       emptyMsg.querySelector('#crClearFilterBtn').onclick = () => {
         const inp = $('#contentFilter'); if (inp) inp.value = '';
         contentQuickFilter = 'all';
+        contentPageByKind[contentKind] = 0;
         $$('#contentFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.qfilter === 'all'));
         filterContentList();
       };
@@ -581,12 +611,13 @@ function renderFiles(id, files, kind) {
 
 // Wire the segmented switch + filter once (delegation-free: elements are static in index.html).
 $$('#contentSeg .seg').forEach(b=>b.onclick=()=>setContentKind(b.dataset.ckind));
-$('#contentFilter')?.addEventListener('input',filterContentList);
+$('#contentFilter')?.addEventListener('input',()=>{contentPageByKind[contentKind]=0;filterContentList();});
 
 // Wire quick filter chips & clear button
 $$('#contentFilterChips .filter-chip').forEach(btn => {
   btn.onclick = () => {
     contentQuickFilter = btn.dataset.qfilter || 'all';
+    contentPageByKind[contentKind] = 0;
     $$('#contentFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c === btn));
     filterContentList();
   };
@@ -594,8 +625,17 @@ $$('#contentFilterChips .filter-chip').forEach(btn => {
 $('#contentFilterClear')?.addEventListener('click', () => {
   const inp = $('#contentFilter');
   if (inp) { inp.value = ''; inp.focus(); }
+  contentPageByKind[contentKind] = 0;
   filterContentList();
 });
+function stepContentPage(delta) {
+  contentPageByKind[contentKind] = Math.max(0, (contentPageByKind[contentKind] || 0) + delta);
+  filterContentList();
+  const tb = document.querySelector('#content .content-toolbar');
+  if (tb && tb.getBoundingClientRect().top < 0) tb.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+$('#contentPrevPage')?.addEventListener('click', () => stepContentPage(-1));
+$('#contentNextPage')?.addEventListener('click', () => stepContentPage(1));
 document.addEventListener('keydown', e => {
   if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
     const activeTab = document.querySelector('.tab.active');

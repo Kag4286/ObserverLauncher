@@ -13,10 +13,12 @@ const path = require('path');
 
 async function launchApp() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ob-e2e-'));
+  const env = { ...process.env, OBSERVER_E2E: '1' };
+  delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${userDataDir}`],
     cwd: path.join(__dirname, '..', '..'),
-    env: { ...process.env, OBSERVER_E2E: '1' },
+    env,
   });
   const win = await app.firstWindow();
   await win.waitForLoadState('domcontentloaded');

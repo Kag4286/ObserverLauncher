@@ -21,10 +21,18 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { dataDir } = require('./data-dir.js');
-const { singleton: modsIndex } = require('./mods-index.js');
+const {
+  singleton: modsIndex,
+  resolveModelFacesFromChain,
+  parseEquipmentAssetJson,
+  resolveItemDefinitionModels,
+  resolveTexturesFromModelJson,
+  compositeLayerBuffers,
+  resolveModelChain,
+} = require('./mods-index.js');
 const { openJar } = require('./jar-reader.js');
 const { readPackTexture } = require('./resource-pack.js');
-const { renderCustomModItem, renderCustomVanillaItem, encodePng } = require('./custom-item-renders.js');
+const { renderCustomModItem, renderCustomVanillaItem, encodePng, decodePngRgba, renderIsometricBlockPng } = require('./custom-item-renders.js');
 
 // Hybrid CDN: jsDelivr is Cloudflare-backed, high-speed, and accessible worldwide (not blocked by
 // ISPs that block raw.githubusercontent.com). raw.githubusercontent is retained as a second fallback.
@@ -56,7 +64,7 @@ const CDN_BASES = [
 // `enchanted_golden_apple.png` 404s and the slot rendered as an empty label. Aliases map an id to
 // the texture that actually exists. Kept tiny and explicit so a wrong guess cannot hide a real
 // missing icon behind the wrong picture.
-const WOOD_TYPES = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'mangrove', 'cherry', 'bamboo'];
+const WOOD_TYPES = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'mangrove', 'cherry', 'bamboo', 'pale_oak', 'poplar'];
 const ITEM_ALIASES = {
   enchanted_golden_apple: 'golden_apple',
   enchanted_book: 'book',
@@ -175,10 +183,19 @@ function itemCandidateUrls(file) {
   } else if (base.endsWith('_trapdoor')) {
     push(`blocks/${base}.png`);
     push(`items/${base}.png`);
+  } else if (base === 'straw_bed') {
+    push('blocks/hay_block_side.png');
+    push(`items/${base}.png`);
   } else if (base.endsWith('_bed')) {
     const color = base.slice(0, -4);
     push(`blocks/${color}_wool.png`);
     push(`items/${base}.png`);
+  } else if (base.endsWith('_cushion')) {
+    const color = base.slice(0, -8);
+    push(`blocks/${color}_wool.png`);
+  } else if (base.endsWith('_shelf')) {
+    const root = base.slice(0, -6);
+    if (WOOD_TYPES.includes(root)) push(`blocks/${root}_planks.png`);
   } else if (base.endsWith('_banner')) {
     const color = base.slice(0, -7);
     push(`blocks/${color}_wool.png`);
@@ -320,9 +337,43 @@ function getClientJarHandle(version) {
   }
 }
 
-function readFromLocalClientJar(version, file) {
+function readJarTexLayers(jar, entryPaths) {
+  const bufs = [];
+  for (let i = 0; i < entryPaths.length; i++) {
+    const ep = entryPaths[i];
+    if (i > 0 && /_overlay\.png$/i.test(ep)) continue;
+    try {
+      const data = jar.read(ep);
+      if (data && data.length) bufs.push(data);
+    } catch {}
+  }
+  return compositeLayerBuffers(bufs);
+}
+
+function openClientItemDef(version, file) {
   const jar = getClientJarHandle(version);
   if (!jar) return null;
+  const name = String(file || '').replace(/\.png$/, '');
+  const def = readJarJsonSafe(jar, `assets/minecraft/items/${name}.json`);
+  const parsedDef = def ? resolveItemDefinitionModels(def, 'minecraft') : null;
+  return { jar, name, parsedDef };
+}
+
+function readFromLocalClientJar(version, file) {
+  const ctx = openClientItemDef(version, file);
+  if (!ctx) return null;
+  const { jar, name, parsedDef } = ctx;
+  if (parsedDef && parsedDef.modelEntries.length) {
+    const layerBufs = [];
+    for (const me of parsedDef.modelEntries) {
+      const mObj = readJarJsonSafe(jar, me);
+      if (!mObj) continue;
+      const hit = readJarTexLayers(jar, resolveTexturesFromModelJson(mObj, 'minecraft'));
+      if (hit) layerBufs.push(hit);
+    }
+    const merged = compositeLayerBuffers(layerBufs);
+    if (merged) return merged;
+  }
   const rels = itemCandidateUrls(file);
   const candidates = [
     `assets/minecraft/textures/item/${file}`,
@@ -337,13 +388,116 @@ function readFromLocalClientJar(version, file) {
       if (data && data.length) return data;
     } catch {}
   }
+  const modelObj = readJarJsonSafe(jar, `assets/minecraft/models/item/${name}.json`)
+    || readJarJsonSafe(jar, `assets/minecraft/models/block/${name}.json`);
+  if (modelObj) {
+    const mHit = readJarTexLayers(jar, resolveTexturesFromModelJson(modelObj, 'minecraft'));
+    if (mHit) return mHit;
+  }
   return null;
+}
+
+function readFromLocalClientJarArmor(version, file, legs) {
+  const jar = getClientJarHandle(version);
+  if (!jar) return null;
+  const mat = String(file || '').replace(/\.png$/, '').toLowerCase();
+  const eqObj = readJarJsonSafe(jar, `assets/minecraft/equipment/${mat}.json`);
+  const eq = eqObj ? parseEquipmentAssetJson(eqObj, 'minecraft') : null;
+  const candidates = [];
+  if (eq) candidates.push(...(legs ? eq.humanoid_leggings : eq.humanoid));
+  for (const [dir, sfx] of armorCandidates(version, legs)) {
+    candidates.push(`assets/minecraft/textures/${dir}/${mat}${sfx}.png`);
+  }
+  for (const c of candidates) {
+    try {
+      const d = jar.read(c);
+      if (d && d.length) return d;
+    } catch {}
+  }
+  return null;
+}
+
+function readJarJsonSafe(jar, entryPath) {
+  try {
+    const b = jar.read(entryPath);
+    if (b && b.length) return JSON.parse(b.toString('utf8'));
+  } catch {}
+  return null;
+}
+
+function renderFacesIso64(faces, { top, front, side, overlay }) {
+  return renderIsometricBlockPng({
+    shape: faces.shape,
+    top: top || null,
+    front: front || null,
+    side: side || null,
+    overlay: overlay || null,
+    tintTop: faces.tintTop,
+    tintFront: faces.tintFront,
+    tintSide: faces.tintSide,
+    tintOverlay: faces.tintOverlay,
+  }, 64);
+}
+
+function readFromLocalClientJarBlock3D(version, file) {
+  const ctx = openClientItemDef(version, file);
+  if (!ctx) return null;
+  const { jar, name, parsedDef } = ctx;
+  if (parsedDef && (parsedDef.isSpecial || parsedDef.isComposite)) return null;
+  let root = null;
+  if (parsedDef && parsedDef.modelEntries.length) {
+    for (const me of parsedDef.modelEntries) {
+      root = readJarJsonSafe(jar, me);
+      if (root) break;
+    }
+  }
+  if (!root) {
+    root = readJarJsonSafe(jar, `assets/minecraft/models/item/${name}.json`)
+      || readJarJsonSafe(jar, `assets/minecraft/models/block/${name}.json`);
+  }
+  if (!root) return null;
+
+  const chain = resolveModelChain((_ns, entry) => readJarJsonSafe(jar, entry), root, 'minecraft', true);
+
+  const faces = resolveModelFacesFromChain(chain, 'minecraft', name);
+  if (!faces) return null;
+
+  const readLoc = (loc) => {
+    if (!loc) return null;
+    try {
+      const d = jar.read(loc.entryPath);
+      if (d && d.length) return d;
+    } catch {}
+    return null;
+  };
+  return renderFacesIso64(faces, {
+    top: readLoc(faces.top),
+    front: readLoc(faces.front),
+    side: readLoc(faces.side),
+    overlay: readLoc(faces.overlay),
+  });
 }
 
 let serverNames = () => [];
 let notifyIcon = null;
 let modsDirOf = () => null;
 const inflight = new Set();
+
+function versionTargets(version) {
+  return [version, mirrorVersion(version)].filter((v, i, a) => v && a.indexOf(v) === i);
+}
+
+function runInflight(key, asyncFn) {
+  if (inflight.has(key)) return;
+  inflight.add(key);
+  (async () => {
+    try {
+      await asyncFn();
+    } catch {} finally {
+      inflight.delete(key);
+    }
+  })();
+}
 
 // 1×1 TRANSPARENT PNG — served on a cache miss instead of a 404 so the DevTools console isn't
 // spammed with failed icon loads while the real icon downloads in the background.
@@ -449,26 +603,47 @@ function handle(request) {
   // newly discovered model JSON definitions or updated mod jars take immediate effect
   // and update any existing disk cache rather than being bypassed by stale files.
   if (kind === 'itemmod') {
-    const parts = splitModFile(file);
-    if (parts) {
-      const custom = renderCustomModItem(parts.namespace, parts.name);
+    const modParts = splitModFile(file);
+    if (modParts) {
+      const custom = renderCustomModItem(modParts.namespace, modParts.name);
       if (custom) return respondWithCachedPng(custom, version, kind, file);
     }
-    const modBuf = readModTexture(file);
+    const modBuf = readModTexture(file, version);
     if (modBuf) return respondWithCachedPng(modBuf, version, kind, file);
+    return new Response(PLACEHOLDER_PNG, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
   }
 
   if (kind === 'armormod' || kind === 'armormodlegs') {
     const layer = kind === 'armormodlegs' ? 2 : 1;
-    const modBuf = readModArmorTexture(file, layer);
-    if (modBuf) return respondWithCachedPng(modBuf, version, kind, file);
+    const armorInfo = readModArmorInfo(file, layer);
+    if (armorInfo.buffer) return respondWithCachedPng(armorInfo.buffer, version, kind, file);
+    return new Response(PLACEHOLDER_PNG, {
+      headers: {
+        ...PNG_HEADERS,
+        'cache-control': 'no-store',
+        'x-observer-armor-status': armorInfo.isCustomGeo ? 'custom-geo' : 'missing',
+      },
+    });
+  }
+
+  if (kind === 'item' || kind === 'block') {
+    const isoLocal = resolveLocal(version, 'iso3d-v2', file);
+    if (isoLocal) return pngResponse(isoLocal);
+
+    const baseName = file.replace(/\.png$/, '');
+    const customVanilla = renderCustomVanillaItem(baseName);
+    if (customVanilla) return respondWithCachedPng(customVanilla, version, kind, file);
+
+    // Offline-first 3D Client JAR block model composite
+    const jar3d = readFromLocalClientJarBlock3D(version, file);
+    if (jar3d) return respondWithCachedPng(jar3d, version, 'iso3d-v2', file);
   }
 
   const local = resolveLocal(version, kind, file);
   if (local) {
     if (kind === 'item' || kind === 'block') {
-      const customVanilla = renderCustomVanillaItem(file.replace(/\.png$/, ''));
-      if (customVanilla) return respondWithCachedPng(customVanilla, version, kind, file);
+      // Lazily upgrade any pre-v9.1 single-face cached block PNG to 64x64 multi-face 3D iso
+      queueBlockCompositeIfNeeded(version, kind, file);
       if (file.endsWith('_bed.png')) {
         try {
           if (fs.statSync(local).size <= 500) fs.unlinkSync(local);
@@ -488,11 +663,6 @@ function handle(request) {
     if (alias) { const a = resolveLocal(version, kind, alias); if (a) return pngResponse(a); }
   }
 
-  if (kind === 'item' || kind === 'block') {
-    const customVanilla = renderCustomVanillaItem(file.replace(/\.png$/, ''));
-    if (customVanilla) return respondWithCachedPng(customVanilla, version, kind, file);
-  }
-
   // Hybrid: Try reading from a local Minecraft client JAR if available on the system (0ms offline)
   if (kind === 'item' || kind === 'block') {
     const localBuf = readFromLocalClientJar(version, file);
@@ -500,6 +670,13 @@ function handle(request) {
       const dest = path.join(cacheRoot(), version, kind, file);
       try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, localBuf); } catch {}
       return new Response(localBuf, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
+    }
+  } else if (kind === 'armor' || kind === 'armorlegs') {
+    const localArmor = readFromLocalClientJarArmor(version, file, kind === 'armorlegs');
+    if (localArmor && localArmor.length) {
+      const dest = path.join(cacheRoot(), version, kind, file);
+      try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, localArmor); } catch {}
+      return new Response(localArmor, { headers: { ...PNG_HEADERS, 'cache-control': 'no-store' } });
     }
   }
 
@@ -535,14 +712,167 @@ function armorCandidates(version, legs) {
   return newArmorLayout(version) ? [build(true), build(false)] : [build(false), build(true)];
 }
 
+const blocksModelsMem = new Map();
+const blocksModelsInflight = new Map();
+const nonBlockCompositeSkip = new Set();
+
+function resolveVanillaModelFromMap(blockName, modelsMap) {
+  if (!modelsMap || typeof modelsMap !== 'object' || !blockName) return null;
+  const cleanName = String(blockName).replace(/^minecraft:/, '').replace(/^block\//, '');
+  const root = modelsMap[cleanName];
+  if (!root || typeof root !== 'object') return null;
+  const chain = [root];
+  const seen = new Set([cleanName]);
+  let cur = root;
+  for (let depth = 0; depth < 8 && cur && typeof cur.parent === 'string'; depth++) {
+    const pKey = cur.parent.replace(/^minecraft:/, '').replace(/^block\//, '');
+    if (seen.has(pKey)) break;
+    seen.add(pKey);
+    const next = modelsMap[pKey];
+    if (!next || typeof next !== 'object') break;
+    chain.push(next);
+    cur = next;
+  }
+  return resolveModelFacesFromChain(chain, 'minecraft', cleanName);
+}
+
+async function ensureBlocksModels(targets) {
+  for (const ver of targets) {
+    if (blocksModelsMem.has(ver)) {
+      const hit = blocksModelsMem.get(ver);
+      if (hit) return { ver, map: hit };
+      continue;
+    }
+    const diskPath = path.join(cacheRoot(), ver, 'blocks_models.json');
+    try {
+      if (fs.existsSync(diskPath)) {
+        const parsed = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
+        if (parsed && typeof parsed === 'object') {
+          blocksModelsMem.set(ver, parsed);
+          return { ver, map: parsed };
+        }
+      }
+    } catch {}
+    if (!blocksModelsInflight.has(ver)) {
+      blocksModelsInflight.set(ver, (async () => {
+        for (const baseCdn of CDN_BASES) {
+          const buf = await downloadBuffer(`${baseCdn}/${encodeURIComponent(ver)}/blocks_models.json`);
+          if (!buf || !buf.length) continue;
+          try {
+            const parsed = JSON.parse(buf.toString('utf8'));
+            if (parsed && typeof parsed === 'object') {
+              try { fs.mkdirSync(path.dirname(diskPath), { recursive: true }); fs.writeFileSync(diskPath, buf); } catch {}
+              blocksModelsMem.set(ver, parsed);
+              return parsed;
+            }
+          } catch {}
+        }
+        blocksModelsMem.set(ver, null);
+        return null;
+      })().finally(() => blocksModelsInflight.delete(ver)));
+    }
+    const fetched = await blocksModelsInflight.get(ver);
+    if (fetched) return { ver, map: fetched };
+  }
+  return null;
+}
+
+function cdnPathFromTexLoc(loc) {
+  const tp = String(loc.texPath || '').replace(/^\/+/, '');
+  const rel = tp.startsWith('block/') ? 'blocks/' + tp.slice(6)
+    : tp.startsWith('item/') ? 'items/' + tp.slice(5)
+    : tp;
+  return `${rel}.png`;
+}
+
+async function fetchRawFaceTexture(loc, targets, version) {
+  if (!loc || !loc.texPath) return null;
+  if (loc.ns === 'minecraft') {
+    const jar = getClientJarHandle(version);
+    if (jar) {
+      try {
+        const jb = jar.read(loc.entryPath);
+        if (jb && jb.length) return jb;
+      } catch {}
+    }
+  }
+  const safeName = `${loc.ns}_${loc.texPath.replace(/[^\w.-]/g, '_')}.png`;
+  const rawCache = path.join(cacheRoot(), version, 'raw_tex', safeName);
+  try {
+    if (fs.existsSync(rawCache)) return fs.readFileSync(rawCache);
+  } catch {}
+  if (loc.ns !== 'minecraft') return null;
+  const cdnRel = cdnPathFromTexLoc(loc);
+  for (const baseCdn of CDN_BASES) {
+    for (const v of targets) {
+      const buf = await downloadBuffer(`${baseCdn}/${encodeURIComponent(v)}/${cdnRel}`);
+      if (buf && buf.length > 32) {
+        try { fs.mkdirSync(path.dirname(rawCache), { recursive: true }); fs.writeFileSync(rawCache, buf); } catch {}
+        return buf;
+      }
+    }
+  }
+  return null;
+}
+
+async function compositeVanillaBlockIso(version, file, targets) {
+  const name = String(file || '').replace(/\.png$/, '');
+  const skipKey = `${version}/${name}`;
+  if (nonBlockCompositeSkip.has(skipKey)) return false;
+  const bm = await ensureBlocksModels(targets);
+  if (!bm || !bm.map) return false;
+  const faces = resolveVanillaModelFromMap(name, bm.map);
+  if (!faces) {
+    nonBlockCompositeSkip.add(skipKey);
+    return false;
+  }
+
+  // Deduplicate unique texture fetches cleanly
+  const uniqueLocs = new Map();
+  for (const loc of [faces.top, faces.front, faces.side, faces.overlay]) {
+    if (loc && !uniqueLocs.has(loc.entryPath)) {
+      uniqueLocs.set(loc.entryPath, fetchRawFaceTexture(loc, targets, version));
+    }
+  }
+  const resolved = new Map();
+  await Promise.all([...uniqueLocs.entries()].map(async ([k, p]) => { resolved.set(k, await p); }));
+
+  const isoBuf = renderFacesIso64(faces, {
+    top: faces.top ? resolved.get(faces.top.entryPath) : null,
+    front: faces.front ? resolved.get(faces.front.entryPath) : null,
+    side: faces.side ? resolved.get(faces.side.entryPath) : null,
+    overlay: faces.overlay ? resolved.get(faces.overlay.entryPath) : null,
+  });
+  if (!isoBuf) return false;
+
+  const dest = path.join(cacheRoot(), version, 'iso3d-v2', file);
+  try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, isoBuf); } catch {}
+  return true;
+}
+
+function queueBlockCompositeIfNeeded(version, kind, file) {
+  const name = String(file || '').replace(/\.png$/, '');
+  if (nonBlockCompositeSkip.has(`${version}/${name}`)) return;
+  runInflight(`${version}/iso3d-v2/${file}`, async () => {
+    const targets = versionTargets(version);
+    if (await compositeVanillaBlockIso(version, file, targets)) {
+      broadcast('icons:update', { rel: `${version}/${kind}/${file}` });
+    }
+  });
+}
+
 function queueRemote(version, kind, file) {
-  const key = `${version}/${kind}/${file}`;
-  if (inflight.has(key)) return;
-  inflight.add(key);
-  (async () => {
+  runInflight(`${version}/${kind}/${file}`, async () => {
     const mat = file.replace(/\.png$/, '');
-    // Mirror version first, then fallback. Build targets and candidate paths.
-    const targets = [version, mirrorVersion(version)].filter((v, i, a) => v && a.indexOf(v) === i);
+    const targets = versionTargets(version);
+
+    if (kind === 'item' || kind === 'block') {
+      if (await compositeVanillaBlockIso(version, file, targets)) {
+        broadcast('icons:update', { rel: `${version}/${kind}/${file}` });
+        return;
+      }
+    }
+
     const candidateRels = [];
     if (kind === 'armor' || kind === 'armorlegs') {
       for (const [dir, sfx] of armorCandidates(targets[0], kind === 'armorlegs')) {
@@ -577,7 +907,7 @@ function queueRemote(version, kind, file) {
         return;
       }
     }
-  })().catch(() => {}).finally(() => inflight.delete(key));
+  });
 }
 
 async function downloadBuffer(url) {
@@ -644,36 +974,66 @@ function prepareModLookup(file) {
   return parts;
 }
 
-function readModTexture(file) {
+function queueModHybridComposite(file, parts, faces, version) {
+  runInflight(`itemmod3d:${version}/${file}`, async () => {
+    const targets = versionTargets(version);
+    const pickBuf = async (loc, jarBuf) => {
+      if (jarBuf && jarBuf.length) return jarBuf;
+      if (loc && loc.ns === 'minecraft') return await fetchRawFaceTexture(loc, targets, version);
+      return null;
+    };
+    const [top, front, side, overlay] = await Promise.all([
+      pickBuf(faces.top, faces.buffers.top),
+      pickBuf(faces.front, faces.buffers.front),
+      pickBuf(faces.side, faces.buffers.side),
+      pickBuf(faces.overlay, faces.buffers.overlay),
+    ]);
+    const isoBuf = renderFacesIso64(faces, { top, front, side, overlay });
+    if (isoBuf) {
+      modsIndex.extractCache.set(`iso3d:${parts.namespace}:${parts.name}`, isoBuf);
+      broadcast('icons:update', { rel: `${version}/itemmod/${file}` });
+    }
+  });
+}
+
+function readModTexture(file, version = DEFAULT_VERSION) {
   const parts = prepareModLookup(file);
   if (!parts) return null;
   const custom = renderCustomModItem(parts.namespace, parts.name);
   if (custom) return custom;
-  return modsIndex.readTexture(parts.namespace, parts.name);
-}
 
-function decodePngRgba(png) {
-  let off = 8, w, h, idats = [];
-  while (off < png.length) {
-    const l = png.readUInt32BE(off), t = png.toString('ascii', off + 4, off + 8);
-    if (t === 'IHDR') { w = png.readUInt32BE(off + 8); h = png.readUInt32BE(off + 12); }
-    else if (t === 'IDAT') idats.push(png.subarray(off + 8, off + 8 + l));
-    off += 12 + l;
-  }
-  const raw = zlib.inflateSync(Buffer.concat(idats)), stride = w * 4, img = Buffer.alloc(w * h * 4);
-  let rOff = 0;
-  for (let y = 0; y < h; y++) {
-    const f = raw[rOff++], prev = y > 0 ? (y - 1) * stride : null, curr = y * stride;
-    for (let x = 0; x < stride; x++) {
-      let val = raw[rOff++], a = x >= 4 ? img[curr + x - 4] : 0, b = prev !== null ? img[prev + x] : 0, c = (prev !== null && x >= 4) ? img[prev + x - 4] : 0;
-      if (f === 1) val = (val + a) & 0xff;
-      else if (f === 2) val = (val + b) & 0xff;
-      else if (f === 3) val = (val + Math.floor((a + b) / 2)) & 0xff;
-      else if (f === 4) { const pr = a + b - c, pa = Math.abs(pr - a), pb = Math.abs(pr - b), pc = Math.abs(pr - c); val = (val + ((pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c))) & 0xff; }
-      img[curr + x] = val;
+  const isoKey = `iso3d:${parts.namespace}:${parts.name}`;
+  if (modsIndex.extractCache.has(isoKey)) return modsIndex.extractCache.get(isoKey);
+
+  const faces = modsIndex.readBlockFaces(parts.namespace, parts.name);
+  if (faces) {
+    const jar = getClientJarHandle(version);
+    const jarOrBuf = (loc, modBuf) => {
+      if (modBuf && modBuf.length) return modBuf;
+      if (jar && loc && loc.ns === 'minecraft') {
+        try { const d = jar.read(loc.entryPath); if (d && d.length) return d; } catch {}
+      }
+      return null;
+    };
+    const top = jarOrBuf(faces.top, faces.buffers.top);
+    const front = jarOrBuf(faces.front, faces.buffers.front);
+    const side = jarOrBuf(faces.side, faces.buffers.side);
+    const overlay = jarOrBuf(faces.overlay, faces.buffers.overlay);
+    const needsMissingVanilla =
+      (!top && faces.top?.ns === 'minecraft') ||
+      (!front && faces.front?.ns === 'minecraft') ||
+      (!side && faces.side?.ns === 'minecraft');
+    if (needsMissingVanilla) {
+      queueModHybridComposite(file, parts, faces, version);
+    } else if (top || front || side) {
+      const isoBuf = renderFacesIso64(faces, { top, front, side, overlay });
+      if (isoBuf) {
+        modsIndex.extractCache.set(isoKey, isoBuf);
+        return isoBuf;
+      }
     }
   }
-  return { w, h, img };
+  return modsIndex.readTexture(parts.namespace, parts.name);
 }
 
 function patchIceAndFireArmorBlack(blackBuf) {
@@ -692,11 +1052,11 @@ function patchIceAndFireArmorBlack(blackBuf) {
     for (let y = 0; y < 64; y++) {
       for (let x = 0; x < 64; x++) {
         const idx = (y * 64 + x) * 4;
-        const ga = gray.img[idx + 3];
+        const ga = gray.rgba[idx + 3];
         if (ga > 10) {
-          combined[idx] = Math.round(gray.img[idx] * 0.50);
-          combined[idx + 1] = Math.round(gray.img[idx + 1] * 0.50);
-          combined[idx + 2] = Math.round(gray.img[idx + 2] * 0.50);
+          combined[idx] = Math.round(gray.rgba[idx] * 0.50);
+          combined[idx + 1] = Math.round(gray.rgba[idx + 1] * 0.50);
+          combined[idx + 2] = Math.round(gray.rgba[idx + 2] * 0.50);
           combined[idx + 3] = ga;
         }
       }
@@ -707,15 +1067,19 @@ function patchIceAndFireArmorBlack(blackBuf) {
   }
 }
 
-function readModArmorTexture(file, layer) {
+function readModArmorInfo(file, layer) {
   const parts = prepareModLookup(file);
-  if (!parts) return null;
-  const buf = modsIndex.readArmorTexture(parts.namespace, parts.name, layer);
-  if (!buf) return null;
+  if (!parts) return { buffer: null, isCustomGeo: false };
+  const info = modsIndex.readArmorTextureInfo(parts.namespace, parts.name, layer);
+  if (!info.buffer) return info;
   if (parts.namespace === 'iceandfire' && Number(layer) === 1 && parts.name === 'armor_black') {
-    return patchIceAndFireArmorBlack(buf);
+    return { buffer: patchIceAndFireArmorBlack(info.buffer), isCustomGeo: info.isCustomGeo };
   }
-  return buf;
+  return info;
 }
 
-module.exports = { init, handle, setActiveResourcePackPath, getActiveResourcePackPath, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf, readModArmorTexture };
+function readModArmorTexture(file, layer) {
+  return readModArmorInfo(file, layer).buffer;
+}
+
+module.exports = { init, handle, setActiveResourcePackPath, getActiveResourcePackPath, detectMcVersion, newArmorLayout, armorCandidates, mirrorVersion, MIRROR_VERSIONS, splitModFile, itemAliasOf, readModArmorTexture, readModArmorInfo, resolveVanillaModelFromMap };

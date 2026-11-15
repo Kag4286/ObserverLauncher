@@ -32,15 +32,19 @@ let propsDirty=false;
 // the next redraw at the next whole-second boundary of uptime keeps visible steps at
 // exactly ~1s no matter when the server started or how often refreshUI runs.
 let uptimeTimer=null;
-function updateUptime(){
-  const el=$('#heroUptime');
-  clearTimeout(uptimeTimer);uptimeTimer=null;
-  if(!el)return;
-  if(!uptimeStart){el.textContent='—';return}
-  const ms=Date.now()-uptimeStart;
-  const secs=Math.max(0,Math.floor(ms/1000));
+function formatUptimeStr(startMs){
+  if(!startMs) return '—';
+  const secs=Math.max(0,Math.floor((Date.now()-startMs)/1000));
   const h=String(Math.floor(secs/3600)).padStart(2,'0'),m=String(Math.floor(secs%3600/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0');
-  el.textContent=`${h}:${m}:${s}`;
+  return `${h}:${m}:${s}`;
+}
+function updateUptime(){
+  const el=$('#perfUptime');
+  clearTimeout(uptimeTimer);uptimeTimer=null;
+  const str=formatUptimeStr(uptimeStart);
+  if(el) el.textContent=str;
+  if(!uptimeStart) return;
+  const ms=Date.now()-uptimeStart;
   uptimeTimer=setTimeout(updateUptime,1000-(ms%1000)+5);
 }
 // FEATURE: capability-aware diagnostics — one quiet line inside a collapsed
@@ -91,7 +95,8 @@ function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=
   $('#worldsProxyNotice').hidden=!proxy;$('#playersProxyNotice').hidden=!proxy;
   $('#propertiesGrid').hidden=proxy;$('#propertiesRaw').hidden=!proxy;if($('#proxyRawHead'))$('#proxyRawHead').hidden=!proxy;if($('#proxyServersPanel'))$('#proxyServersPanel').hidden=!proxy;$('#saveProperties').textContent=proxy?'Save velocity.toml':t('prop.apply');
   const pt=$('.prop-toolbar');if(pt)pt.hidden=proxy;
-  $('#propertiesTitle').textContent=proxy?t('prop.proxyTitle'):t('prop.title');$('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
+  $('#propertiesHint').textContent=proxy?t('prop.proxySub'):t('prop.sub');
+  if(typeof syncTopbarHeader==='function')syncTopbarHeader();
   try{ if(proxy){ if(!propsDirty) refreshProxyProperties(); } else if(!propsDirty) renderProperties(f.properties||{}); }catch(e){console.warn('props render error:',e)}
   const cur = typeof currentTab === 'string' ? currentTab : (typeof _lastTab === 'string' ? _lastTab : (window.currentTab || 'overview'));
   try{
