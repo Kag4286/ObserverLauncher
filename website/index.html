@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ObserverLauncher — Desktop Minecraft Server Manager for Windows &amp; Linux</title>
+  <title>ObserverLauncher: Desktop Minecraft Server Manager for Windows &amp; Linux</title>
   <meta name="description" content="Open-source desktop launcher to host Java and Rust Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, offline World Map, 3D Player Inspector, and an 80-tool MCP server.">
   <meta name="theme-color" content="#0C0D0F">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ObserverLauncher v9.0.0 — Desktop Minecraft Server Manager">
-  <meta property="og:description" content="Host Java &amp; Rust (Pumpkin/Horizon) Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, offline .mca World Map, 3D Player Inspector, and an 80-tool MCP server.">
+  <meta property="og:title" content="ObserverLauncher v9.0.0: Desktop Minecraft Server Manager">
+  <meta property="og:description" content="Host Java and Rust (Pumpkin/Horizon) Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, offline .mca World Map, 3D Player Inspector, and an 80-tool MCP server.">
   <meta property="og:url" content="https://kag4286.github.io/ObserverLauncher/">
   <meta property="og:image" content="https://kag4286.github.io/ObserverLauncher/docs/screenshot-overview.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -20,19 +20,20 @@
   <header class="site-header">
     <div class="wrap header-inner">
       <a class="brand" href="#top">
-        <img data-asset="build/icon.png" src="build/icon.png" alt="ObserverLauncher icon">
+        <img data-asset="build/icon.png" src="build/icon.png" width="28" height="28" alt="ObserverLauncher icon">
         <span>ObserverLauncher</span>
         <span class="ver-badge" id="headerVersion">v9.0.0</span>
       </a>
 
       <nav class="nav-links" aria-label="Main navigation">
-        <a href="#pillars" data-i18n="nav.features">Features</a>
-        <a href="#showcase" data-i18n="nav.showcase">Screenshots</a>
-        <a href="#engines" data-i18n="nav.engines">Engines</a>
-        <a href="#smartscreen" data-i18n="nav.faq">SmartScreen &amp; FAQ</a>
+        <a href="#workbench" data-i18n="nav.workbench">Workflow</a>
+        <a href="#spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
+        <a href="#ecosystem" data-i18n="nav.engines">Engines</a>
+        <a href="#preflight" data-i18n="nav.faq">SmartScreen &amp; Scope</a>
       </nav>
 
       <div class="header-actions">
+        <label class="sr-only" for="langSelect">Language</label>
         <select id="langSelect" class="lang-select" aria-label="Interface language">
           <option value="en">English</option>
           <option value="vi">Tiếng Việt</option>
@@ -46,243 +47,367 @@
       </div>
     </div>
 
-    <nav class="mobile-subnav" aria-label="Quick section jump">
+    <nav class="mobile-subnav" aria-label="Quick section navigation">
       <div class="wrap mobile-subnav-inner">
-        <a href="#pillars" data-i18n="nav.features">Features</a>
-        <a href="#showcase" data-i18n="nav.showcase">Screenshots</a>
-        <a href="#engines" data-i18n="nav.engines">Engines</a>
-        <a href="#smartscreen" data-i18n="nav.faq">SmartScreen &amp; FAQ</a>
+        <a href="#workbench" data-i18n="nav.workbench">Workflow</a>
+        <a href="#spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
+        <a href="#ecosystem" data-i18n="nav.engines">Engines</a>
+        <a href="#preflight" data-i18n="nav.faq">SmartScreen &amp; Scope</a>
       </div>
     </nav>
     <div class="scroll-meter" id="scrollMeter" aria-hidden="true"></div>
   </header>
 
   <main id="top">
-    <section class="arch-band hero-band">
-      <div class="wrap">
-        <p class="eyebrow hero-stagger" style="--hi:0"><span class="live-dot" aria-hidden="true"></span> <span data-i18n="hero.eyebrow">WINDOWS &amp; LINUX · APACHE-2.0 · ZERO TELEMETRY</span></p>
-        <h1 class="hero-stagger" style="--hi:1" data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
-        <p class="lead hero-stagger" style="--hi:2" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window—complete with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
+    <!-- Band 1: Asymmetric Split Hero (44% Copy & Release / 56% Interactive Control Deck) -->
+    <section class="hero-band">
+      <div class="wrap hero-split">
+        <div class="hero-copy">
+          <p class="hero-kicker mono" data-i18n="hero.kicker">Windows 10/11 &amp; Linux x86_64 · Apache-2.0 · No telemetry</p>
+          <h1 data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
+          <p class="lead" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
 
-        <div class="hero-actions hero-stagger" id="heroActions" style="--hi:3">
-          <a id="dlWin" class="btn primary" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
-            <span data-i18n="hero.dlWin">Download Windows (.exe)</span>
-            <span class="btn-sub" id="dlWinMeta">v9.0.0</span>
-          </a>
-          <a id="dlLinux" class="btn" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
-            <span data-i18n="hero.dlLinux">Download Linux (.AppImage)</span>
-            <span class="btn-sub" id="dlLinuxMeta">v9.0.0</span>
-          </a>
-          <a class="btn" href="https://github.com/Kag4286/ObserverLauncher/releases" target="_blank" rel="noopener noreferrer" data-i18n="hero.allReleases">All Releases</a>
+          <div class="hero-actions" id="heroActions">
+            <a id="dlWin" class="btn primary" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
+              <span data-i18n="hero.dlWin">Download Windows (.exe)</span>
+              <span class="btn-sub" id="dlWinMeta">v9.0.0</span>
+            </a>
+            <a id="dlLinux" class="btn" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
+              <span data-i18n="hero.dlLinux">Download Linux (.AppImage)</span>
+              <span class="btn-sub" id="dlLinuxMeta">v9.0.0</span>
+            </a>
+          </div>
+          <p class="release-status mono" id="releaseStatus" aria-live="polite" data-i18n="rel.loading">Checking latest GitHub release...</p>
+
+          <div class="hero-source-row">
+            <div class="cli-pill">
+              <code>git clone https://github.com/Kag4286/ObserverLauncher.git &amp;&amp; npm install &amp;&amp; npm start</code>
+              <button type="button" id="copyCliBtn" class="cli-copy" data-i18n="hero.copy">Copy</button>
+            </div>
+            <a class="inline-anchor" href="#preflight" data-i18n="hero.smartscreenNote">Windows SmartScreen instructions</a>
+          </div>
+
+          <dl class="hero-facts">
+            <div>
+              <dt data-i18n="fact.testsLbl">Automated tests</dt>
+              <dd class="mono" data-i18n="fact.testsVal">185 unit + 17 E2E</dd>
+            </div>
+            <div>
+              <dt data-i18n="fact.versionsLbl">Minecraft range</dt>
+              <dd class="mono">1.12 to 26.3</dd>
+            </div>
+            <div>
+              <dt data-i18n="fact.mcpLbl">Local automation</dt>
+              <dd class="mono" data-i18n="fact.mcpVal">80 MCP tools + CLI</dd>
+            </div>
+          </dl>
         </div>
 
-        <div class="hero-meta hero-stagger" style="--hi:4">
-          <span class="cli-pill">
-            <span>git clone https://github.com/Kag4286/ObserverLauncher.git &amp;&amp; npm install &amp;&amp; npm start</span>
-            <button type="button" id="copyCliBtn" class="cli-copy" data-i18n="hero.copy">Copy</button>
-          </span>
-          <a href="#smartscreen" data-i18n="hero.smartscreenNote">Windows SmartScreen note ↓</a>
-        </div>
+        <div class="hero-deck">
+          <div class="deck-toolbar">
+            <div class="deck-tabs" role="tablist" aria-label="Core application screens" id="heroDeckTabs">
+              <span class="deck-glide" id="deckGlide" aria-hidden="true"></span>
+              <button type="button" class="deck-tab active" data-shot="0" role="tab" aria-selected="true" data-i18n="sc.0.tab">Overview</button>
+              <button type="button" class="deck-tab" data-shot="1" role="tab" aria-selected="false" data-i18n="sc.1.tab">Create Wizard</button>
+              <button type="button" class="deck-tab" data-shot="2" role="tab" aria-selected="false" data-i18n="sc.2.tab">Console</button>
+              <button type="button" class="deck-tab" data-shot="3" role="tab" aria-selected="false" data-i18n="sc.3.tab">Performance</button>
+            </div>
+            <button type="button" class="deck-inspect-btn" id="heroZoomBtn" data-i18n="sc.zoom">Full view</button>
+          </div>
 
-        <div class="proof-strip hero-stagger" style="--hi:4" aria-label="Technical metrics">
-          <div class="proof-cell">
-            <strong class="mono proof-num" data-count="185">185</strong>
-            <span data-i18n="proof.tests">Automated Test Files</span>
+          <div class="deck-stage" id="heroDeckStage">
+            <button type="button" class="shot-trigger" id="heroShotTrigger" aria-label="Inspect screenshot fullscreen">
+              <img id="heroDeckImg" data-asset="docs/screenshot-overview.png" src="docs/screenshot-overview.png" width="1360" height="860" fetchpriority="high" decoding="sync" alt="ObserverLauncher Overview Control Deck">
+            </button>
           </div>
-          <div class="proof-cell">
-            <strong class="mono proof-num" data-count="80">80</strong>
-            <span data-i18n="proof.mcp">Local MCP Tools</span>
-          </div>
-          <div class="proof-cell">
-            <strong class="mono proof-num" data-count="12">12</strong>
-            <span data-i18n="proof.engines">Java &amp; Rust Engines</span>
-          </div>
-          <div class="proof-cell">
-            <strong class="mono proof-num" data-count="120" data-prefix="~" data-suffix=" MB">~120 MB</strong>
-            <span data-i18n="proof.ram">Rust Idle RAM</span>
-          </div>
-          <div class="proof-cell">
-            <strong class="mono">1.12–26.3</strong>
-            <span data-i18n="proof.mc">Minecraft Versions</span>
-          </div>
-        </div>
 
-        <div class="shot-frame hero-stagger" style="--hi:5">
-          <div class="shot-chrome">
-            <span class="shot-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span id="heroFrameLabel">ObserverLauncher v9.0.0 — Control Deck</span>
-            <button type="button" class="zoom-pill" id="heroZoomBtn" data-i18n="sc.zoom">Inspect ↗</button>
+          <div class="deck-caption">
+            <div>
+              <h2 id="heroDeckTitle" data-i18n="sc.0.title">Overview Control Deck</h2>
+              <p id="heroDeckDesc" data-i18n="sc.0.desc">Multi-instance sidebar with group filters, live server status, LAN sharing, Playit/Pinggy tunnel controls, and Geyser status.</p>
+            </div>
+            <span class="mono deck-index" id="heroDeckCounter">01 / 04</span>
           </div>
-          <button type="button" class="shot-trigger" id="heroShotTrigger" aria-label="Open Overview screenshot fullscreen">
-            <img data-asset="docs/screenshot-overview.png" src="docs/screenshot-overview.png" alt="ObserverLauncher Overview Control Deck">
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section id="pillars" class="arch-band">
-      <div class="wrap">
-        <p class="eyebrow" data-i18n="pillars.eyebrow">WHY DESKTOP INSTEAD OF BATCH SCRIPTS</p>
-        <h2 data-i18n="pillars.title">Everything local hosts usually wire up by hand, in one process.</h2>
-        <p class="section-sub" data-i18n="pillars.sub">Plain Electron and Node.js with zero frontend bundler—custom NBT, Anvil .mca chunk, LZ4, and ZIP readers written directly in JS.</p>
-
-        <div class="pillar-grid" id="pillarGrid">
-          <article class="pillar-cell reveal-item" style="--ri:0">
-            <span class="pillar-num">01 / CONNECT</span>
-            <h3 data-i18n="p1.title">Play without port forwarding</h3>
-            <p data-i18n="p1.desc">Built-in Playit.gg (Java TCP) and Pinggy (Bedrock UDP) tunnels work behind CGNAT, plus automatic Geyser &amp; Floodgate config checks with backup.</p>
-          </article>
-          <article class="pillar-cell reveal-item" style="--ri:1">
-            <span class="pillar-num">02 / ENGINES</span>
-            <h3 data-i18n="p2.title">Java 8–25 &amp; Rust native</h3>
-            <p data-i18n="p2.desc">Auto-downloads portable OpenJDK for Paper, Fabric, Forge, NeoForge, or boots Pumpkin 0.2.2 and Horizon in Rust (~100–250 MB RAM) with zero Java.</p>
-          </article>
-          <article class="pillar-cell reveal-item" style="--ri:2">
-            <span class="pillar-num">03 / INSPECT</span>
-            <h3 data-i18n="p3.title">World Map &amp; 3D Player view</h3>
-            <p data-i18n="p3.desc">Parses .mca region chunks directly in a worker thread—biomes, relief, 1:8 portals, Xaero waypoints—and inspects skins, armor, and inventories without server plugins.</p>
-          </article>
-          <article class="pillar-cell reveal-item" style="--ri:3">
-            <span class="pillar-num">04 / AUTOMATE</span>
-            <h3 data-i18n="p4.title">CLI, Remote UI &amp; 80-tool MCP</h3>
-            <p data-i18n="p4.desc">Run the backend headless via observer CLI, manage from phone/browser over SSE Remote Dashboard, export Dockerfiles, or connect Claude/Cursor via local MCP.</p>
-          </article>
         </div>
       </div>
     </section>
 
-    <section id="showcase" class="arch-band">
-      <div class="wrap">
-        <p class="eyebrow" data-i18n="sc.eyebrow">INTERFACE WALKTHROUGH</p>
-        <h2 data-i18n="sc.title">Every view from v9.0.0, captured live.</h2>
-        <p class="section-sub" data-i18n="sc.sub">Click through or swipe all 11 screens below—no mockups, rendered directly from the desktop app and remote web dashboard.</p>
+    <!-- Band 2: Contrast Mineral Stone Workbench (Manual Host vs ObserverLauncher Diff) -->
+    <section id="workbench" class="band-stone">
+      <div class="wrap workbench-layout">
+        <div class="workbench-intro">
+          <span class="band-code mono">01 / WORKBENCH</span>
+          <h2 data-i18n="wb.title">What you normally wire up by hand versus one desktop workspace.</h2>
+          <p data-i18n="wb.sub">Pick how your group plays below to compare the fragmented manual setup against what ObserverLauncher automates locally.</p>
 
-        <div class="showcase-shell reveal-item" style="--ri:0">
-          <div class="showcase-rail" role="tablist" aria-label="Application screenshots" id="showcaseRail">
-            <span class="sc-glide" id="scGlide" aria-hidden="true"></span>
+          <div class="wb-scenarios" role="tablist" aria-label="Hosting scenarios" id="wbScenarioTabs">
+            <button type="button" class="wb-btn active" data-scenario="cgnat" role="tab" aria-selected="true" data-i18n="wb.sc.cgnat">Friends SMP behind CGNAT</button>
+            <button type="button" class="wb-btn" data-scenario="modpack" role="tab" aria-selected="false" data-i18n="wb.sc.modpack">100+ Modpack testing</button>
+            <button type="button" class="wb-btn" data-scenario="crossplay" role="tab" aria-selected="false" data-i18n="wb.sc.crossplay">PC (Java) + Phone (Bedrock)</button>
+            <button type="button" class="wb-btn" data-scenario="rust" role="tab" aria-selected="false" data-i18n="wb.sc.rust">Lightweight Rust server</button>
           </div>
-          <div class="showcase-stage" id="showcaseStage">
-            <div class="showcase-head">
-              <div class="showcase-caption">
-                <div class="showcase-kicker"><span class="mono" id="scCounter">01 / 11</span><span class="sc-swipe-hint" data-i18n="sc.swipeHint">Tap image to zoom · Swipe</span></div>
-                <h3 id="scTitle">Overview</h3>
-                <p id="scDesc"></p>
+        </div>
+
+        <div class="workbench-diff" id="wbDiffPanel">
+          <div class="diff-col diff-manual">
+            <div class="diff-col-head">
+              <span class="mono" data-i18n="wb.manualTag">TYPICAL MANUAL STEPS</span>
+              <span class="mono" id="wbManualCount">5 separate tools</span>
+            </div>
+            <ul class="diff-list" id="wbManualList"></ul>
+          </div>
+
+          <div class="diff-col diff-observer">
+            <div class="diff-col-head">
+              <span class="mono" data-i18n="wb.obsTag">IN OBSERVERLAUNCHER</span>
+              <span class="mono" id="wbObsOutcome">Handled inside app</span>
+            </div>
+            <div class="diff-summary" id="wbObsSummary"></div>
+            <p class="diff-module mono" id="wbObsModules"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Band 3: Asymmetric Flagship Spotlight (Cartography + Interactive 1:8 Calculator & 3D Player Data) -->
+    <section id="spotlight" class="band-dark">
+      <div class="wrap">
+        <div class="section-head-split">
+          <div>
+            <span class="band-code mono">02 / INSPECT WITHOUT PLUGINS</span>
+            <h2 data-i18n="spot.title">Read regions and player data straight from disk.</h2>
+          </div>
+          <p data-i18n="spot.sub">Built-in JavaScript parsers handle Anvil .mca chunk decompression in an idle-reclaimed worker thread, plus NBT equipment across 1.12 through 26.3 saves.</p>
+        </div>
+
+        <!-- Spotlight Row A: World Map + Live 1:8 Nether Calculator -->
+        <div class="spot-row-a reveal-item" style="--ri:0">
+          <div class="spot-media">
+            <button type="button" class="shot-trigger" data-lightbox-idx="8" aria-label="Open World Map screenshot fullscreen">
+              <img data-asset="docs/screenshot-worldmap.png" src="docs/screenshot-worldmap.png" width="1360" height="860" loading="lazy" alt="ObserverLauncher offline .mca World Map">
+            </button>
+            <div class="spot-media-bar">
+              <div>
+                <h3 data-i18n="sc.8.title">Offline .mca World Map</h3>
+                <p data-i18n="sc.8.desc">Explore biomes, terrain relief, structures, 1:8 Nether portal links, and Xaero/JourneyMap waypoints without server plugins.</p>
               </div>
-              <div class="showcase-nav">
-                <button type="button" class="btn sm" id="scZoomBtn" data-i18n="sc.zoom">Inspect ↗</button>
-                <button type="button" class="btn sm" id="scPrev" aria-label="Previous screenshot">←</button>
-                <button type="button" class="btn sm" id="scNext" aria-label="Next screenshot">→</button>
+              <button type="button" class="btn sm" data-lightbox-idx="8" data-i18n="sc.zoom">Full view</button>
+            </div>
+          </div>
+
+          <aside class="calc-panel" aria-label="Overworld and Nether 1:8 coordinate bridge">
+            <div class="calc-head">
+              <span class="mono calc-kicker" data-i18n="calc.kicker">LIVE PORTAL BRIDGE (WORLDMAP.JS)</span>
+              <h3 data-i18n="calc.title">Overworld / Nether 1:8 Calculator</h3>
+              <p data-i18n="calc.sub">Same floor-division coordinate conversion built into the launcher World Map.</p>
+            </div>
+
+            <div class="calc-dir-row">
+              <button type="button" class="calc-dir-btn active" id="calcDirO2N" data-dir="o2n" data-i18n="calc.o2n">Overworld to Nether</button>
+              <button type="button" class="calc-dir-btn" id="calcDirN2O" data-dir="n2o" data-i18n="calc.n2o">Nether to Overworld</button>
+            </div>
+
+            <div class="calc-inputs">
+              <div class="calc-field">
+                <label for="coordX">X</label>
+                <input id="coordX" type="number" inputmode="numeric" value="800" step="1">
+              </div>
+              <div class="calc-field">
+                <label for="coordZ">Z</label>
+                <input id="coordZ" type="number" inputmode="numeric" value="-1600" step="1">
               </div>
             </div>
-            <div class="showcase-img-wrap">
-              <button type="button" class="shot-trigger" id="scImgTrigger" aria-label="Zoom active screenshot">
-                <img id="scImg" src="docs/screenshot-overview.png" alt="ObserverLauncher screenshot">
-              </button>
+
+            <div class="calc-output" id="calcOutput" aria-live="polite">
+              <span class="mono calc-out-label" id="calcOutDim">NETHER TARGET COORDS</span>
+              <strong class="mono calc-out-coords" id="calcOutCoords">X: 100 · Z: -200</strong>
             </div>
+
+            <div class="calc-footer">
+              <button type="button" class="btn sm" id="calcResetBtn" data-i18n="calc.reset">Reset</button>
+              <span class="mono calc-hint" id="calcFormula">floor(X / 8), floor(Z / 8)</span>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Spotlight Row B: 3D Player Inspector & Inventory -->
+        <div class="spot-row-b reveal-item" style="--ri:1">
+          <div class="spot-player-copy">
+            <h3 data-i18n="ply.spotTitle">3D Player Inspector &amp; 9x4 Inventory</h3>
+            <p data-i18n="ply.spotDesc">Inspect Mojang or SkinsRestorer skins, equipped armor, XP, and Ender Chests offline or live (including native Rust players before .dat files exist).</p>
+
+            <div class="ply-switch" role="tablist" aria-label="Player preview modes" id="plySwitch">
+              <button type="button" class="ply-tab active" data-shot="6" role="tab" aria-selected="true" data-i18n="sc.6.tab">3D Inspector</button>
+              <button type="button" class="ply-tab" data-shot="7" role="tab" aria-selected="false" data-i18n="sc.7.tab">Inventory</button>
+            </div>
+
+            <dl class="nbt-ledger">
+              <div>
+                <dt data-i18n="nbt.d1k">Save paths checked</dt>
+                <dd class="mono">&lt;world&gt;/playerdata/ + players/data/ (26.1+)</dd>
+              </div>
+              <div>
+                <dt data-i18n="nbt.d2k">Armor formats</dt>
+                <dd class="mono">Inventory slots &amp; top-level equipment NBT</dd>
+              </div>
+              <div>
+                <dt data-i18n="nbt.d3k">Custom modded 3D armor</dt>
+                <dd data-i18n="nbt.d3v">Surfaces fallback warning notice cleanly for GeckoLib/AzureLib sets</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="spot-media">
+            <button type="button" class="shot-trigger" id="plySpotTrigger" data-lightbox-idx="6" aria-label="Open Player screenshot fullscreen">
+              <img id="plySpotImg" data-asset="docs/screenshot-player-inspector.png" src="docs/screenshot-player-inspector.png" width="1360" height="860" loading="lazy" alt="ObserverLauncher 3D Player Inspector">
+            </button>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="engines" class="arch-band">
+    <!-- Band 4: Ecosystem Filmstrip & Interactive Runtime Ledger -->
+    <section id="ecosystem" class="band-dark">
       <div class="wrap">
-        <p class="eyebrow" data-i18n="eng.eyebrow">COMPATIBILITY &amp; HONEST SCOPE</p>
-        <h2 data-i18n="eng.title">Supported server engines &amp; where ObserverLauncher fits.</h2>
-        <p class="section-sub" data-i18n="eng.sub">Covers Java servers (1.12 through 1.21.11 and 26.1–26.3), Velocity proxies, and Rust clean-room implementations.</p>
-
-        <div class="mode-bar" role="tablist" aria-label="Runtime profiles" id="modeBar">
-          <button type="button" class="mode-pill active" data-mode="all" role="tab" aria-selected="true" data-i18n="mode.all">All Engines</button>
-          <button type="button" class="mode-pill" data-mode="java" role="tab" aria-selected="false" data-i18n="mode.java">Java · Paper / Fabric</button>
-          <button type="button" class="mode-pill" data-mode="rust" role="tab" aria-selected="false" data-i18n="mode.rust">Rust · Pumpkin / Horizon</button>
-          <button type="button" class="mode-pill" data-mode="crossplay" role="tab" aria-selected="false" data-i18n="mode.crossplay">Crossplay · Geyser + Pinggy</button>
-          <button type="button" class="mode-pill" data-mode="automation" role="tab" aria-selected="false" data-i18n="mode.automation">Headless · CLI &amp; 80 MCP</button>
+        <div class="section-head-split">
+          <div>
+            <span class="band-code mono">03 / CONTENT, MARKETPLACE &amp; AUTOMATION</span>
+            <h2 data-i18n="eco.title">Paginated mod folders, Modrinth/CurseForge, Remote Web UI, and 80 MCP tools.</h2>
+          </div>
+          <p data-i18n="eco.sub">Scroll or swipe the remaining screens horizontally. Tap any capture to inspect full resolution.</p>
         </div>
 
-        <div class="mode-specs" id="modeSpecs">
-          <div class="mode-spec">
-            <span class="mode-spec-lbl" data-i18n="spec.bootLbl">BOOT / RUNTIME</span>
-            <strong class="mono" id="specBoot">Java 8–25 &amp; Rust</strong>
-          </div>
-          <div class="mode-spec">
-            <span class="mode-spec-lbl" data-i18n="spec.ramLbl">TYPICAL IDLE RAM</span>
-            <strong class="mono" id="specRam">~120 MB – 4 GB</strong>
-          </div>
-          <div class="mode-spec">
-            <span class="mode-spec-lbl" data-i18n="spec.setupLbl">JAVA PROVISIONING</span>
-            <strong class="mono" id="specJava" data-i18n="spec.javaAll">Auto OpenJDK / None on Rust</strong>
-          </div>
-          <div class="mode-spec">
-            <span class="mode-spec-lbl" data-i18n="spec.netLbl">SHARING &amp; CONTROL</span>
-            <strong class="mono" id="specNet">Playit · Pinggy · SSE · MCP</strong>
-          </div>
+        <div class="filmstrip" id="filmstrip" aria-label="Additional interface screens">
+          <article class="film-card reveal-item" style="--ri:0">
+            <button type="button" class="shot-trigger" data-lightbox-idx="4" aria-label="Inspect Content pagination screenshot">
+              <img data-asset="docs/screenshot-content.png" src="docs/screenshot-content.png" width="1360" height="860" loading="lazy" alt="Paginated Content Manager">
+            </button>
+            <div class="film-meta">
+              <span class="mono">05 / CONTENT</span>
+              <h3 data-i18n="sc.4.title">Paginated Content Manager</h3>
+              <p data-i18n="sc.4.desc">Browse large mod or plugin folders cleanly at 25 items per page with instant filtering, toggles, and config tree editor.</p>
+            </div>
+          </article>
+
+          <article class="film-card reveal-item" style="--ri:1">
+            <button type="button" class="shot-trigger" data-lightbox-idx="5" aria-label="Inspect Marketplace screenshot">
+              <img data-asset="docs/screenshot-marketplace.png" src="docs/screenshot-marketplace.png" width="1360" height="860" loading="lazy" alt="Modrinth and CurseForge Marketplace">
+            </button>
+            <div class="film-meta">
+              <span class="mono">06 / MARKETPLACE</span>
+              <h3 data-i18n="sc.5.title">Modrinth &amp; CurseForge Browser</h3>
+              <p data-i18n="sc.5.desc">Filter by loader and game version, install plugins or mods directly, and import or export .mrpack bundles.</p>
+            </div>
+          </article>
+
+          <article class="film-card reveal-item" style="--ri:2">
+            <button type="button" class="shot-trigger" data-lightbox-idx="9" aria-label="Inspect 80-tool MCP settings screenshot">
+              <img data-asset="docs/screenshot-MCP.png" src="docs/screenshot-MCP.png" width="1360" height="860" loading="lazy" alt="Local MCP Server Settings">
+            </button>
+            <div class="film-meta">
+              <span class="mono">07 / LOCAL MCP</span>
+              <h3 data-i18n="sc.9.title">Local MCP Server (80 Tools)</h3>
+              <p data-i18n="sc.9.desc">Connect Claude Desktop or Cursor over stdio MCP with read, write, and destroy confirmation gates plus secret redaction.</p>
+            </div>
+          </article>
+
+          <article class="film-card reveal-item" style="--ri:3">
+            <button type="button" class="shot-trigger" data-lightbox-idx="10" aria-label="Inspect Remote Web Dashboard screenshot">
+              <img data-asset="docs/screenshot-remote-ui.png" src="docs/screenshot-remote-ui.png" width="1360" height="860" loading="lazy" alt="Remote Web Dashboard">
+            </button>
+            <div class="film-meta">
+              <span class="mono">08 / REMOTE WEB</span>
+              <h3 data-i18n="sc.10.title">Remote Web Dashboard (SSE)</h3>
+              <p data-i18n="sc.10.desc">Monitor status, live console logs, players, and backups from phone or browser behind constant-time Bearer auth.</p>
+            </div>
+          </article>
         </div>
 
-        <div class="engine-strip" id="engineStrip">
-          <div class="engine-item reveal-item" style="--ri:0" data-modes="all java crossplay automation"><img data-asset="software/paper.png" src="software/paper.png" alt="Paper"><div><b>Paper</b><span>Java 17–25 · Plugins</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:1" data-modes="all java crossplay"><img data-asset="software/purpur.png" src="software/purpur.png" alt="Purpur"><div><b>Purpur / Leaf</b><span>Java 17–25 · Plugins</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:2" data-modes="all java"><img data-asset="software/folia.png" src="software/folia.png" alt="Folia"><div><b>Folia</b><span>Regionized · Java 21+</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:3" data-modes="all java"><img data-asset="software/fabric.png" src="software/fabric.png" alt="Fabric"><div><b>Fabric / Quilt</b><span>Mods · Java 8–25</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:4" data-modes="all java"><img data-asset="software/forge.png" src="software/forge.png" alt="Forge"><div><b>Forge</b><span>Mods · Java 8–25</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:5" data-modes="all java"><img data-asset="software/neoforge.png" src="software/neoforge.png" alt="NeoForge"><div><b>NeoForge</b><span>Mods · Java 21–25</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:6" data-modes="all java automation"><img data-asset="software/vanilla.png" src="software/vanilla.png" alt="Vanilla"><div><b>Vanilla / Spigot</b><span>Java 8–25 · Official</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:7" data-modes="all java crossplay"><img data-asset="software/velocity.png" src="software/velocity.png" alt="Velocity"><div><b>Velocity</b><span>Proxy · velocity.toml</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:8" data-modes="all rust automation"><img data-asset="software/pumpkin.png" src="software/pumpkin.png" alt="Pumpkin"><div><b>Pumpkin 0.2.2</b><span>Rust Native · No Java</span></div></div>
-          <div class="engine-item reveal-item" style="--ri:9" data-modes="all rust automation"><img data-asset="software/horizon.png" src="software/horizon.png" alt="Horizon"><div><b>Horizon</b><span>Rust Native · MC 26.3</span></div></div>
-        </div>
-
-        <div class="scope-grid">
-          <div class="scope-col reveal-item" style="--ri:0">
-            <h3><span class="scope-tag-yes">●</span> <span data-i18n="scope.goodTitle">Built specifically for</span></h3>
-            <ul class="scope-list">
-              <li data-i18n="scope.good1">Hosting dedicated Java or Rust servers on your Windows/Linux PC for friends without router setup.</li>
-              <li data-i18n="scope.good2">Testing modpacks locally with 25/page Content pagination, conflict checks, and update rollback.</li>
-              <li data-i18n="scope.good3">Inspecting offline playerdata/equipment and .mca worlds without adding heavy server plugins.</li>
-              <li data-i18n="scope.good4">Java + Bedrock crossplay setups using Playit.gg, Pinggy UDP, and Geyser diagnostics.</li>
-            </ul>
+        <!-- Runtime Profile Switcher & Engine Grid -->
+        <div class="engines-block">
+          <div class="engines-head">
+            <h3 data-i18n="eng.title">Supported engines by runtime mode</h3>
+            <div class="mode-bar" role="tablist" aria-label="Runtime profiles" id="modeBar">
+              <button type="button" class="mode-pill active" data-mode="all" role="tab" aria-selected="true" data-i18n="mode.all">All Engines</button>
+              <button type="button" class="mode-pill" data-mode="java" role="tab" aria-selected="false" data-i18n="mode.java">Java (Paper/Fabric)</button>
+              <button type="button" class="mode-pill" data-mode="rust" role="tab" aria-selected="false" data-i18n="mode.rust">Rust (Pumpkin/Horizon)</button>
+              <button type="button" class="mode-pill" data-mode="crossplay" role="tab" aria-selected="false" data-i18n="mode.crossplay">Crossplay (Geyser)</button>
+              <button type="button" class="mode-pill" data-mode="automation" role="tab" aria-selected="false" data-i18n="mode.automation">Headless (CLI/MCP)</button>
+            </div>
           </div>
-          <div class="scope-col reveal-item" style="--ri:1">
-            <h3><span class="scope-tag-no">●</span> <span data-i18n="scope.limitTitle">Honest limitations</span></h3>
-            <ul class="scope-list">
-              <li data-i18n="scope.limit1">Windows 10/11 (x64) and Linux (x86_64) only—no macOS build yet.</li>
-              <li data-i18n="scope.limit2">Built for personal PCs, not 24/7 multi-node VPS clusters (use Pterodactyl or Crafty for those).</li>
-              <li data-i18n="scope.limit3">Pumpkin and Horizon are upstream WIP Rust engines; Bukkit JVM plugins do not run identically on Rust.</li>
-              <li data-i18n="scope.limit4">Release installers are currently unsigned—Windows SmartScreen prompts once on first launch.</li>
-            </ul>
+
+          <div class="mode-specs" id="modeSpecs">
+            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.bootLbl">BOOT / RUNTIME</span><strong class="mono" id="specBoot">Java 8 to 25 &amp; Rust</strong></div>
+            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.ramLbl">TYPICAL IDLE RAM</span><strong class="mono" id="specRam">~120 MB to 4 GB</strong></div>
+            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.setupLbl">JAVA PROVISIONING</span><strong class="mono" id="specJava" data-i18n="spec.javaAll">Auto OpenJDK / None on Rust</strong></div>
+            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.netLbl">SHARING &amp; CONTROL</span><strong class="mono" id="specNet">Playit, Pinggy, SSE, MCP</strong></div>
+          </div>
+
+          <div class="engine-strip" id="engineStrip">
+            <div class="engine-item" data-modes="all java crossplay automation"><img data-asset="software/paper.png" src="software/paper.png" width="24" height="24" alt="Paper"><div><b>Paper</b><span>Java 17 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/purpur.png" src="software/purpur.png" width="24" height="24" alt="Purpur"><div><b>Purpur / Leaf</b><span>Java 17 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/folia.png" src="software/folia.png" width="24" height="24" alt="Folia"><div><b>Folia</b><span>Regionized JVM</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/fabric.png" src="software/fabric.png" width="24" height="24" alt="Fabric"><div><b>Fabric / Quilt</b><span>Mods Java 8 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/forge.png" src="software/forge.png" width="24" height="24" alt="Forge"><div><b>Forge</b><span>Mods Java 8 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/neoforge.png" src="software/neoforge.png" width="24" height="24" alt="NeoForge"><div><b>NeoForge</b><span>Mods Java 21 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java automation"><img data-asset="software/vanilla.png" src="software/vanilla.png" width="24" height="24" alt="Vanilla"><div><b>Vanilla / Spigot</b><span>Official Mojang</span></div></div>
+            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/velocity.png" src="software/velocity.png" width="24" height="24" alt="Velocity"><div><b>Velocity</b><span>velocity.toml proxy</span></div></div>
+            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/pumpkin.png" src="software/pumpkin.png" width="24" height="24" alt="Pumpkin"><div><b>Pumpkin 0.2.2</b><span>Rust, zero Java</span></div></div>
+            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/horizon.png" src="software/horizon.png" width="24" height="24" alt="Horizon"><div><b>Horizon</b><span>Rust, MC 26.3</span></div></div>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="smartscreen" class="arch-band">
-      <div class="wrap">
-        <p class="eyebrow" data-i18n="faq.eyebrow">BEFORE YOU RUN</p>
-        <h2 data-i18n="faq.title">SmartScreen, Linux permissions &amp; technical questions</h2>
+    <!-- Band 5: Pre-flight Technical Sheet (SmartScreen & Honest Scope) -->
+    <section id="preflight" class="band-dark">
+      <div class="wrap preflight-grid">
+        <div class="preflight-col">
+          <span class="band-code mono">04 / BEFORE YOU RUN</span>
+          <h2 data-i18n="faq.title">Windows SmartScreen &amp; Linux setup</h2>
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary data-i18n="faq.q1">Why does Windows SmartScreen warn when opening the .exe?</summary>
+              <div class="faq-body" data-i18n-html="faq.a1">
+                Open-source installers without a paid EV code-signing certificate trigger Windows SmartScreen initially. Click <strong>More info</strong>, then <strong>Run anyway</strong>, or launch straight from source via <code>npm install &amp;&amp; npm start</code>.
+              </div>
+            </details>
+            <details class="faq-item">
+              <summary data-i18n="faq.q2">How do I run the Linux .AppImage?</summary>
+              <div class="faq-body" data-i18n-html="faq.a2">
+                Download the latest <code>.AppImage</code> (or <code>.deb</code>), run <code>chmod +x ObserverLauncher-*.AppImage</code>, and launch normally on Ubuntu or Debian <code>x86_64</code> (glibc 2.31+).
+              </div>
+            </details>
+            <details class="faq-item">
+              <summary data-i18n="faq.q3">Does ObserverLauncher collect telemetry or require an account?</summary>
+              <div class="faq-body" data-i18n="faq.a3">
+                No. Zero analytics or telemetry. Network requests run strictly for server/mod/OpenJDK downloads, Mojang skins, and tunnels or webhooks you turn on.
+              </div>
+            </details>
+          </div>
+        </div>
 
-        <div class="faq-list">
-          <details class="faq-item reveal-item" style="--ri:0" open>
-            <summary data-i18n="faq.q1">Why does Windows SmartScreen warn when opening the .exe?</summary>
-            <div class="faq-body" data-i18n-html="faq.a1">
-              Open-source installers distributed without a paid EV code-signing certificate trigger Windows Defender SmartScreen until enough users run them. Click <strong>More info</strong> → <strong>Run anyway</strong>, or audit and launch straight from source via <code>npm install &amp;&amp; npm start</code>.
+        <div class="preflight-col">
+          <span class="band-code mono">05 / HONEST SCOPE</span>
+          <h2 data-i18n="scope.title">Where it fits, and where it does not</h2>
+          <div class="scope-ledger">
+            <div class="scope-group">
+              <h3 data-i18n="scope.goodTitle">Built for</h3>
+              <ul>
+                <li data-i18n="scope.good1">Hosting dedicated Java or Rust servers on your Windows/Linux PC for friends without router setup.</li>
+                <li data-i18n="scope.good2">Testing modpacks locally with 25/page pagination, conflict checks, and update rollback.</li>
+                <li data-i18n="scope.good3">Inspecting offline playerdata and .mca worlds without installing extra web map plugins.</li>
+              </ul>
             </div>
-          </details>
-          <details class="faq-item reveal-item" style="--ri:1">
-            <summary data-i18n="faq.q2">How do I run the Linux .AppImage?</summary>
-            <div class="faq-body" data-i18n-html="faq.a2">
-              Download the latest <code>.AppImage</code> (or <code>.deb</code>), mark it executable with <code>chmod +x ObserverLauncher-*.AppImage</code>, and launch it normally. Tested on Ubuntu / Debian <code>x86_64</code> (glibc 2.31+).
+            <div class="scope-group">
+              <h3 data-i18n="scope.limitTitle">Current limitations</h3>
+              <ul>
+                <li data-i18n="scope.limit1">Windows 10/11 (x64) and Linux (x86_64) only. No macOS build yet.</li>
+                <li data-i18n="scope.limit2">Designed for personal PCs, not 24/7 multi-node VPS clusters (use Pterodactyl or Crafty for those).</li>
+                <li data-i18n="scope.limit3">Pumpkin and Horizon are upstream WIP Rust engines; Bukkit JVM plugins do not run identically on Rust.</li>
+              </ul>
             </div>
-          </details>
-          <details class="faq-item reveal-item" style="--ri:2">
-            <summary data-i18n="faq.q3">Does ObserverLauncher collect telemetry or require an account?</summary>
-            <div class="faq-body" data-i18n="faq.a3">
-              No. There is zero analytics or telemetry. Network calls happen strictly for server/mod/OpenJDK downloads, Mojang player skins, and tunnels or webhooks you explicitly turn on.
-            </div>
-          </details>
-          <details class="faq-item reveal-item" style="--ri:3">
-            <summary data-i18n="faq.q4">What tests back the v9.0.0 release?</summary>
-            <div class="faq-body" data-i18n="faq.a4">
-              Every build on main runs 185 Node unit/integration test files (NBT, world map chunks, path traversal guards, SSRF filters, design tokens, 7-locale i18n completeness) plus 17 Playwright Electron E2E tests on Windows and Linux.
-            </div>
-          </details>
+          </div>
         </div>
       </div>
     </section>
@@ -290,18 +415,18 @@
 
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <span data-i18n="footer.copy">ObserverLauncher · Independent open-source project (Apache-2.0). Not affiliated with Mojang or Microsoft.</span>
+      <span data-i18n="footer.copy">ObserverLauncher. Independent open-source project (Apache-2.0). Not affiliated with Mojang or Microsoft.</span>
       <div class="footer-links">
-        <a href="https://github.com/Kag4286/ObserverLauncher" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">Releases</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-9.0.0.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.notes">Release Notes</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues">Report Bug</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">Releases ↗</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog ↗</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-9.0.0.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.notes">Release Notes ↗</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues">Issues ↗</a>
       </div>
     </div>
   </footer>
 
-  <!-- Fullscreen Lightbox -->
+  <!-- Fullscreen Lightbox (Zero Blur Overlay) -->
   <div id="shotLightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-labelledby="lbTitle">
     <div class="lightbox-card">
       <div class="lightbox-head">
@@ -311,24 +436,24 @@
           <p id="lbDesc"></p>
         </div>
         <div class="lightbox-actions">
-          <button type="button" class="btn sm" id="lbPrev" aria-label="Previous screenshot">←</button>
-          <button type="button" class="btn sm" id="lbNext" aria-label="Next screenshot">→</button>
-          <button type="button" class="btn sm" id="lbClose" aria-label="Close fullscreen preview">✕</button>
+          <button type="button" class="btn sm" id="lbPrev" aria-label="Previous screenshot" data-i18n="lb.prev">Prev</button>
+          <button type="button" class="btn sm" id="lbNext" aria-label="Next screenshot" data-i18n="lb.next">Next</button>
+          <button type="button" class="btn sm" id="lbClose" aria-label="Close fullscreen preview" data-i18n="lb.close">Close</button>
         </div>
       </div>
       <div class="lightbox-stage">
-        <img id="lbImg" src="" alt="">
+        <img id="lbImg" width="1360" height="860" src="" alt="">
       </div>
     </div>
   </div>
 
-  <!-- Mobile Sticky Download Dock -->
+  <!-- Single Glass Surface Allowed (R-10 Dose Cap): Mobile Sticky Bottom Dock -->
   <div id="mobileDock" class="mobile-dock" aria-label="Quick download bar">
     <a id="dockDl" class="btn primary dock-dl" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
       <span id="dockDlLabel" data-i18n="hero.dlWin">Download Windows (.exe)</span>
       <span class="btn-sub" id="dockDlMeta">v9.0.0</span>
     </a>
-    <a class="btn dock-faq" href="#smartscreen" data-i18n="dock.faq">FAQ</a>
+    <a class="btn dock-faq" href="#preflight" data-i18n="dock.faq">SmartScreen</a>
   </div>
 
   <script src="i18n.js"></script>
