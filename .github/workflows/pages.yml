@@ -1,0 +1,54 @@
+name: Deploy Website to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "website/**"
+      - "docs/screenshot-*.png"
+      - "build/icon.png"
+      - "src/renderer/assets/fonts/**"
+      - "src/renderer/assets/software/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage static site artifacts
+        run: |
+          mkdir -p _site/docs _site/build _site/fonts _site/software
+          cp -r website/. _site/
+          cp docs/screenshot-*.png _site/docs/
+          cp build/icon.png _site/build/icon.png
+          cp src/renderer/assets/fonts/* _site/fonts/
+          cp src/renderer/assets/software/*.png _site/software/
+          touch _site/.nojekyll
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

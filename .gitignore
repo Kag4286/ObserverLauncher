@@ -24,9 +24,6 @@ Thumbs.db
 .agent/
 handoff-*.md
 
-# Website (built separately, deployed on its own; not committed to this repo)
-website/
-
 # Editor
 .vscode/
 .idea/
