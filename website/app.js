@@ -1,5 +1,7 @@
-// website/app.js — Dynamic asset path resolution, 7-locale i18n, GitHub Releases download links & 11-screen switcher
+// website/app.js — Motion 2.0 gliding tabs, lightbox, touch swipe, runtime switcher, 7-locale i18n & GitHub Releases hydration
 (() => {
+  document.documentElement.classList.add('has-motion-js');
+
   const SUPPORTED_LANGS = ['en', 'vi', 'es', 'pt-BR', 'de', 'ru', 'zh-CN'];
   const SHOTS = [
     { file: 'docs/screenshot-overview.png', tabKey: 'sc.0.tab', titleKey: 'sc.0.title', descKey: 'sc.0.desc', fbTab: 'Overview', fbTitle: 'Overview Control Deck', fbDesc: 'Multi-instance sidebar, live server status, LAN/Tunnel quick sharing, and Geyser status.' },
@@ -15,7 +17,14 @@
     { file: 'docs/screenshot-remote-ui.png', tabKey: 'sc.10.tab', titleKey: 'sc.10.title', descKey: 'sc.10.desc', fbTab: 'Remote Web UI', fbTitle: 'Remote Web Dashboard (SSE)', fbDesc: 'Manage status, console logs, players, and backups from browser behind Bearer auth.' },
   ];
 
-  // When opened directly inside website/ locally, parent repo holds docs/, build/, and src/renderer/assets/
+  const RUNTIME_PROFILES = {
+    all: { boot: 'Java 8–25 & Rust', ram: '~120 MB – 4 GB', javaKey: 'spec.javaAll', net: 'Playit · Pinggy · SSE · MCP' },
+    java: { boot: '3 – 18 s', ram: '1.2 – 4.0 GB', javaKey: 'spec.javaAuto', net: 'Playit TCP · Modrinth · CurseForge' },
+    rust: { boot: '< 0.4 s', ram: '~100 – 250 MB', javaKey: 'spec.javaNone', net: 'Playit · server.toml / pumpkin.toml' },
+    crossplay: { boot: '4 – 14 s', ram: '1.5 – 3.5 GB', javaKey: 'spec.javaAuto', netKey: 'spec.netCross' },
+    automation: { boot: 'Headless Node 22+', ram: '~45 MB Controller', javaKey: 'spec.javaAll', netKey: 'spec.netCli' },
+  };
+
   const isLocalWebsiteSubdir = /\/website(\/|$)/.test(location.pathname);
   function assetUrl(rel) {
     if (!isLocalWebsiteSubdir) return rel;
@@ -23,7 +32,6 @@
     return '../' + rel;
   }
 
-  // Rewrite static asset paths on load so both GitHub Pages root and local preview work cleanly
   const fontsLink = document.getElementById('fontsStylesheet');
   if (fontsLink) fontsLink.href = assetUrl('fonts/fonts.css');
   const fav = document.getElementById('faviconLink');
@@ -33,8 +41,13 @@
     if (rel) el.setAttribute('src', assetUrl(rel));
   });
 
+  const prefersReducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   let activeShot = 0;
+  let lastShot = 0;
+  let activeMode = 'all';
   let currentLang = detectInitialLang();
+  let lbLastTrigger = null;
 
   function detectInitialLang() {
     try {
@@ -47,8 +60,7 @@
     if (low.startsWith('pt')) return 'pt-BR';
     if (low.startsWith('zh')) return 'zh-CN';
     const base = low.split('-')[0];
-    if (SUPPORTED_LANGS.includes(base)) return base;
-    return 'en';
+    return SUPPORTED_LANGS.includes(base) ? base : 'en';
   }
 
   function t(key, fallback = '') {
@@ -72,14 +84,40 @@
       const v = t(el.getAttribute('data-i18n-html'));
       if (v) el.innerHTML = v;
     });
-    renderShowcaseRail();
-    renderActiveShot();
+    renderShowcaseRail(false);
+    renderActiveShot(0);
+    applyRuntimeMode(activeMode);
+    syncDockWithVisitorOs();
+    syncLightboxContent();
   }
 
-  function renderShowcaseRail() {
+  // Showcase Tabs + GPU Gliding Indicator (#scGlide)
+  function glideToActiveTab() {
     const rail = document.getElementById('showcaseRail');
+    const glide = document.getElementById('scGlide');
+    const btn = rail?.querySelector('.sc-tab.active');
+    if (!rail || !glide || !btn) return;
+    const isHorizontal = window.innerWidth <= 960;
+    if (isHorizontal) {
+      glide.style.setProperty('--sc-gx', `${btn.offsetLeft}px`);
+      glide.style.setProperty('--sc-gsx', `${Math.max(0.2, btn.offsetWidth / 48)}`);
+    } else {
+      glide.style.setProperty('--sc-gy', `${btn.offsetTop + 4}px`);
+      glide.style.setProperty('--sc-gsy', `${Math.max(0.2, (btn.offsetHeight - 8) / 36)}`);
+    }
+  }
+
+  function preloadShot(idx) {
+    if (idx < 0 || idx >= SHOTS.length) return;
+    const img = new Image();
+    img.src = assetUrl(SHOTS[idx].file);
+  }
+
+  function renderShowcaseRail(centerActive = false) {
+    const rail = document.getElementById('showcaseRail');
+    const glide = document.getElementById('scGlide');
     if (!rail) return;
-    rail.innerHTML = '';
+    rail.querySelectorAll('.sc-tab').forEach((n) => n.remove());
     SHOTS.forEach((s, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -88,34 +126,251 @@
       btn.setAttribute('aria-selected', idx === activeShot ? 'true' : 'false');
       const num = String(idx + 1).padStart(2, '0');
       btn.innerHTML = `<span>${t(s.tabKey, s.fbTab)}</span><span class="sc-tab-num">${num}</span>`;
-      btn.addEventListener('click', () => { activeShot = idx; renderShowcaseRail(); renderActiveShot(); });
+      btn.addEventListener('click', () => selectShot(idx, true));
       rail.appendChild(btn);
+    });
+    if (glide && glide.parentElement !== rail) rail.prepend(glide);
+    requestAnimationFrame(() => {
+      glideToActiveTab();
+      if (centerActive && window.innerWidth <= 960) {
+        const activeBtn = rail.querySelector('.sc-tab.active');
+        if (activeBtn && activeBtn.scrollIntoView) {
+          activeBtn.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', inline: 'center', block: 'nearest' });
+        }
+      }
     });
   }
 
-  function renderActiveShot() {
+  function renderActiveShot(dir = 0) {
     const s = SHOTS[activeShot];
     const img = document.getElementById('scImg');
     const title = document.getElementById('scTitle');
     const desc = document.getElementById('scDesc');
+    const counter = document.getElementById('scCounter');
+    if (counter) counter.textContent = `${String(activeShot + 1).padStart(2, '0')} / ${SHOTS.length}`;
     if (img) {
+      if (dir !== 0 && !prefersReducedMotion()) {
+        img.classList.remove('stage-enter-fwd', 'stage-enter-back');
+        void img.offsetWidth;
+        img.classList.add(dir > 0 ? 'stage-enter-fwd' : 'stage-enter-back');
+      }
       img.src = assetUrl(s.file);
       img.alt = t(s.titleKey, s.fbTitle);
     }
     if (title) title.textContent = t(s.titleKey, s.fbTitle);
     if (desc) desc.textContent = t(s.descKey, s.fbDesc);
+    preloadShot((activeShot + 1) % SHOTS.length);
+    preloadShot((activeShot - 1 + SHOTS.length) % SHOTS.length);
   }
 
-  // Highlight visitor's OS primary CTA while keeping both downloadable
-  function highlightVisitorOs() {
+  function selectShot(idx, centerTab = false) {
+    const next = (idx + SHOTS.length) % SHOTS.length;
+    const dir = next === activeShot ? 0 : (next > activeShot ? 1 : -1);
+    lastShot = activeShot;
+    activeShot = next;
+    renderShowcaseRail(centerTab);
+    renderActiveShot(dir);
+    syncLightboxContent();
+  }
+
+  // Lightbox Modal Controller
+  function syncLightboxContent() {
+    const lb = document.getElementById('shotLightbox');
+    if (!lb || lb.hidden) return;
+    const s = SHOTS[activeShot];
+    const img = document.getElementById('lbImg');
+    const title = document.getElementById('lbTitle');
+    const desc = document.getElementById('lbDesc');
+    const counter = document.getElementById('lbCounter');
+    if (counter) counter.textContent = `${String(activeShot + 1).padStart(2, '0')} / ${SHOTS.length}`;
+    if (title) title.textContent = t(s.titleKey, s.fbTitle);
+    if (desc) desc.textContent = t(s.descKey, s.fbDesc);
+    if (img) {
+      img.src = assetUrl(s.file);
+      img.alt = t(s.titleKey, s.fbTitle);
+    }
+  }
+
+  function openLightbox(idx, triggerEl) {
+    const lb = document.getElementById('shotLightbox');
+    if (!lb) return;
+    lbLastTrigger = triggerEl || document.activeElement;
+    activeShot = (idx + SHOTS.length) % SHOTS.length;
+    lb.hidden = false;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('mobileDock')?.classList.remove('visible');
+    syncLightboxContent();
+    renderShowcaseRail(false);
+    renderActiveShot(0);
+    document.getElementById('lbClose')?.focus();
+  }
+
+  function closeLightbox() {
+    const lb = document.getElementById('shotLightbox');
+    if (!lb || lb.hidden) return;
+    lb.hidden = true;
+    document.body.style.overflow = '';
+    updateScrollState();
+    if (lbLastTrigger && lbLastTrigger.focus) lbLastTrigger.focus();
+  }
+
+  // Touch Swipe Helper (horizontal >=42px with limited vertical drift)
+  function attachSwipe(el, onPrev, onNext) {
+    if (!el) return;
+    let sx = 0, sy = 0;
+    el.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+    }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      if (!e.changedTouches.length) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      if (Math.abs(dx) >= 42 && Math.abs(dy) < 55) {
+        if (dx < 0) onNext();
+        else onPrev();
+      }
+    }, { passive: true });
+  }
+
+  // Runtime Mode Switcher (#engines)
+  function applyRuntimeMode(mode) {
+    activeMode = RUNTIME_PROFILES[mode] ? mode : 'all';
+    const prof = RUNTIME_PROFILES[activeMode];
+    document.querySelectorAll('#modeBar .mode-pill').forEach((b) => {
+      const match = b.getAttribute('data-mode') === activeMode;
+      b.classList.toggle('active', match);
+      b.setAttribute('aria-selected', match ? 'true' : 'false');
+    });
+    const elBoot = document.getElementById('specBoot');
+    const elRam = document.getElementById('specRam');
+    const elJava = document.getElementById('specJava');
+    const elNet = document.getElementById('specNet');
+    if (elBoot) elBoot.textContent = prof.boot;
+    if (elRam) elRam.textContent = prof.ram;
+    if (elJava) elJava.textContent = t(prof.javaKey, 'Auto OpenJDK / None on Rust');
+    if (elNet) elNet.textContent = prof.netKey ? t(prof.netKey, prof.net || '') : prof.net;
+
+    document.querySelectorAll('#engineStrip .engine-item').forEach((card) => {
+      const modes = (card.getAttribute('data-modes') || '').split(/\s+/);
+      const isMatch = activeMode === 'all' || modes.includes(activeMode);
+      card.classList.toggle('is-dimmed', !isMatch);
+      card.classList.toggle('is-match', activeMode !== 'all' && isMatch);
+    });
+  }
+
+  // Count-up Tween + Scroll Reveal Choreography
+  function tweenProofNumbers() {
+    const nodes = document.querySelectorAll('.proof-num[data-count]');
+    if (prefersReducedMotion()) {
+      nodes.forEach((n) => {
+        const target = Number(n.getAttribute('data-count')) || 0;
+        const pre = n.getAttribute('data-prefix') || '';
+        const suf = n.getAttribute('data-suffix') || '';
+        n.textContent = `${pre}${target}${suf}`;
+      });
+      return;
+    }
+    const start = performance.now();
+    const dur = 680;
+    function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      nodes.forEach((n) => {
+        const target = Number(n.getAttribute('data-count')) || 0;
+        const pre = n.getAttribute('data-prefix') || '';
+        const suf = n.getAttribute('data-suffix') || '';
+        n.textContent = `${pre}${Math.round(target * eased)}${suf}`;
+      });
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function setupScrollReveals() {
+    const items = document.querySelectorAll('.reveal-item');
+    if (!('IntersectionObserver' in window) || prefersReducedMotion()) {
+      items.forEach((el) => el.classList.add('is-revealed'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-revealed');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -24px 0px' });
+    items.forEach((el) => io.observe(el));
+  }
+
+  // Desktop-only subtle cursor border/wash coordinates
+  function setupCursorSpotlight() {
+    if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    document.querySelectorAll('#pillarGrid .pillar-cell, #engineStrip .engine-item').forEach((cell) => {
+      cell.addEventListener('pointermove', (e) => {
+        const r = cell.getBoundingClientRect();
+        cell.style.setProperty('--mx', `${e.clientX - r.left}px`);
+        cell.style.setProperty('--my', `${e.clientY - r.top}px`);
+      }, { passive: true });
+    });
+  }
+
+  // Scroll Meter + Sticky Mobile Download Dock
+  let heroPast = false;
+  function updateScrollState() {
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const p = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+    const meter = document.getElementById('scrollMeter');
+    if (meter) meter.style.setProperty('--scroll-p', p.toFixed(4));
+
+    const dock = document.getElementById('mobileDock');
+    const lbOpen = !document.getElementById('shotLightbox')?.hidden;
+    if (dock) dock.classList.toggle('visible', heroPast && !lbOpen);
+  }
+
+  let scrollScheduled = false;
+  window.addEventListener('scroll', () => {
+    if (scrollScheduled) return;
+    scrollScheduled = true;
+    requestAnimationFrame(() => { scrollScheduled = false; updateScrollState(); });
+  }, { passive: true });
+
+  const heroActions = document.getElementById('heroActions');
+  if (heroActions && 'IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      heroPast = !entries[0].isIntersecting && window.scrollY > 120;
+      updateScrollState();
+    }, { threshold: 0 }).observe(heroActions);
+  }
+
+  // OS Detection & GitHub Releases Assets
+  const isVisitorLinux = () => {
     const ua = (navigator.userAgent || '').toLowerCase();
-    const isLinux = ua.includes('linux') && !ua.includes('android');
+    return ua.includes('linux') && !ua.includes('android');
+  };
+
+  function syncDockWithVisitorOs() {
+    const isLinux = isVisitorLinux();
+    const srcBtn = document.getElementById(isLinux ? 'dlLinux' : 'dlWin');
+    const srcMeta = document.getElementById(isLinux ? 'dlLinuxMeta' : 'dlWinMeta');
+    const dockBtn = document.getElementById('dockDl');
+    const dockLabel = document.getElementById('dockDlLabel');
+    const dockMeta = document.getElementById('dockDlMeta');
+    if (dockBtn && srcBtn) dockBtn.href = srcBtn.href;
+    if (dockLabel) dockLabel.textContent = t(isLinux ? 'hero.dlLinux' : 'hero.dlWin');
+    if (dockMeta && srcMeta) dockMeta.textContent = srcMeta.textContent;
+  }
+
+  function highlightVisitorOs() {
     const winBtn = document.getElementById('dlWin');
     const linuxBtn = document.getElementById('dlLinux');
-    if (isLinux && winBtn && linuxBtn) {
+    if (isVisitorLinux() && winBtn && linuxBtn) {
       winBtn.classList.remove('primary');
       linuxBtn.classList.add('primary');
     }
+    syncDockWithVisitorOs();
   }
 
   function formatSize(bytes) {
@@ -152,6 +407,7 @@
     } else if (linuxMeta) {
       linuxMeta.textContent = tag;
     }
+    syncDockWithVisitorOs();
   }
 
   async function hydrateLatestRelease() {
@@ -177,29 +433,42 @@
     } catch {}
   }
 
+  // Event Wiring
   document.getElementById('langSelect')?.addEventListener('change', (e) => applyLocale(e.target.value));
-  document.getElementById('scPrev')?.addEventListener('click', () => {
-    activeShot = (activeShot - 1 + SHOTS.length) % SHOTS.length;
-    renderShowcaseRail();
-    renderActiveShot();
+  document.getElementById('scPrev')?.addEventListener('click', () => selectShot(activeShot - 1, true));
+  document.getElementById('scNext')?.addEventListener('click', () => selectShot(activeShot + 1, true));
+  document.getElementById('scZoomBtn')?.addEventListener('click', (e) => openLightbox(activeShot, e.currentTarget));
+  document.getElementById('scImgTrigger')?.addEventListener('click', (e) => openLightbox(activeShot, e.currentTarget));
+  document.getElementById('heroZoomBtn')?.addEventListener('click', (e) => openLightbox(0, e.currentTarget));
+  document.getElementById('heroShotTrigger')?.addEventListener('click', (e) => openLightbox(0, e.currentTarget));
+
+  document.getElementById('lbPrev')?.addEventListener('click', () => selectShot(activeShot - 1, false));
+  document.getElementById('lbNext')?.addEventListener('click', () => selectShot(activeShot + 1, false));
+  document.getElementById('lbClose')?.addEventListener('click', closeLightbox);
+  document.getElementById('shotLightbox')?.addEventListener('click', (e) => {
+    if (e.target.id === 'shotLightbox') closeLightbox();
   });
-  document.getElementById('scNext')?.addEventListener('click', () => {
-    activeShot = (activeShot + 1) % SHOTS.length;
-    renderShowcaseRail();
-    renderActiveShot();
-  });
+
   document.getElementById('showcaseRail')?.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
       e.preventDefault();
-      activeShot = (activeShot + 1) % SHOTS.length;
-      renderShowcaseRail();
-      renderActiveShot();
+      selectShot(activeShot + 1, true);
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
       e.preventDefault();
-      activeShot = (activeShot - 1 + SHOTS.length) % SHOTS.length;
-      renderShowcaseRail();
-      renderActiveShot();
+      selectShot(activeShot - 1, true);
     }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    const lb = document.getElementById('shotLightbox');
+    if (!lb || lb.hidden) return;
+    if (e.key === 'Escape') closeLightbox();
+    else if (e.key === 'ArrowLeft') selectShot(activeShot - 1, false);
+    else if (e.key === 'ArrowRight') selectShot(activeShot + 1, false);
+  });
+
+  document.querySelectorAll('#modeBar .mode-pill').forEach((btn) => {
+    btn.addEventListener('click', () => applyRuntimeMode(btn.getAttribute('data-mode')));
   });
 
   document.getElementById('copyCliBtn')?.addEventListener('click', async () => {
@@ -213,7 +482,19 @@
     } catch {}
   });
 
+  attachSwipe(document.getElementById('showcaseStage'), () => selectShot(activeShot + 1, true), () => selectShot(activeShot - 1, true));
+  attachSwipe(document.getElementById('shotLightbox'), () => selectShot(activeShot + 1, false), () => selectShot(activeShot - 1, false));
+  window.addEventListener('resize', () => requestAnimationFrame(glideToActiveTab), { passive: true });
+  window.addEventListener('load', () => {
+    SHOTS.forEach((_, i) => setTimeout(() => preloadShot(i), i * 80));
+  });
+
+  // Boot
   highlightVisitorOs();
   applyLocale(currentLang);
+  setupScrollReveals();
+  setupCursorSpotlight();
+  tweenProofNumbers();
+  updateScrollState();
   hydrateLatestRelease();
 })();
