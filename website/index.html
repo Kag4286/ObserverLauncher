@@ -104,7 +104,7 @@
             </div>
             <div>
               <dt data-i18n="fact.versionsLbl">Minecraft range</dt>
-              <dd class="mono">1.12 to 26.3</dd>
+              <dd class="mono" data-i18n="fact.versionsVal">1.12 to 26.3</dd>
             </div>
             <div>
               <dt data-i18n="fact.mcpLbl">Local automation</dt>
@@ -151,7 +151,7 @@
     <section id="workbench" class="band-stone rule-band">
       <div class="wrap workbench-layout">
         <div class="workbench-intro">
-          <span class="band-code mono">01 / WORKBENCH</span>
+          <span class="band-code mono" data-i18n="band.wb">01 / WORKBENCH</span>
           <h2 data-i18n="wb.title">What you normally wire up by hand versus one desktop workspace.</h2>
           <p data-i18n="wb.sub">Pick how your group plays below to compare the fragmented manual setup against what ObserverLauncher automates locally.</p>
 
@@ -201,7 +201,7 @@
       <div class="wrap">
         <div class="section-head-split">
           <div>
-            <span class="band-code mono">02 / INSPECT WITHOUT PLUGINS</span>
+            <span class="band-code mono" data-i18n="band.spot">02 / INSPECT WITHOUT PLUGINS</span>
             <h2 data-i18n="spot.title">Read regions and player data straight from disk.</h2>
           </div>
           <p data-i18n="spot.sub">Built-in JavaScript parsers handle Anvil .mca chunk decompression in an idle-reclaimed worker thread, plus NBT equipment across 1.12 through 26.3 saves.</p>
@@ -333,7 +333,7 @@
       <div class="wrap">
         <div class="section-head-split">
           <div>
-            <span class="band-code mono">03 / CONTENT, MARKETPLACE &amp; AUTOMATION</span>
+            <span class="band-code mono" data-i18n="band.eco">03 / MODS, AUTOMATION &amp; SELF-HOST</span>
             <h2 data-i18n="eco.title">Paginated mod folders, Modrinth/CurseForge, Remote Web UI, and 80 MCP tools.</h2>
           </div>
           <p data-i18n="eco.sub">Scroll or swipe the remaining screens horizontally. Tap any capture to inspect full resolution.</p>
@@ -345,7 +345,7 @@
               <img data-asset="docs/screenshot-content.png" src="docs/screenshot-content.png" width="1360" height="860" loading="lazy" alt="Paginated Content Manager">
             </button>
             <div class="film-meta">
-              <span class="mono">05 / CONTENT</span>
+              <span class="mono" data-i18n="film.tag4">05 / CONTENT</span>
               <h3 data-i18n="sc.4.title">Paginated Content Manager</h3>
               <p data-i18n="sc.4.desc">Browse large mod or plugin folders cleanly at 25 items per page with instant filtering, toggles, and config tree editor.</p>
             </div>
@@ -356,7 +356,7 @@
               <img data-asset="docs/screenshot-marketplace.png" src="docs/screenshot-marketplace.png" width="1360" height="860" loading="lazy" alt="Modrinth and CurseForge Marketplace">
             </button>
             <div class="film-meta">
-              <span class="mono">06 / MARKETPLACE</span>
+              <span class="mono" data-i18n="film.tag5">06 / MARKETPLACE</span>
               <h3 data-i18n="sc.5.title">Modrinth &amp; CurseForge Browser</h3>
               <p data-i18n="sc.5.desc">Filter by loader and game version, install plugins or mods directly, and import or export .mrpack bundles.</p>
             </div>
@@ -367,7 +367,7 @@
               <img data-asset="docs/screenshot-MCP.png" src="docs/screenshot-MCP.png" width="1360" height="860" loading="lazy" alt="Local MCP Server Settings">
             </button>
             <div class="film-meta">
-              <span class="mono">07 / LOCAL MCP</span>
+              <span class="mono" data-i18n="film.tag6">07 / LOCAL MCP</span>
               <h3 data-i18n="sc.9.title">Local MCP Server (80 Tools)</h3>
               <p data-i18n="sc.9.desc">Connect Claude Desktop or Cursor over stdio MCP with read, write, and destroy confirmation gates plus secret redaction.</p>
             </div>
@@ -378,7 +378,7 @@
               <img data-asset="docs/screenshot-remote-ui.png" src="docs/screenshot-remote-ui.png" width="1360" height="860" loading="lazy" alt="Remote Web Dashboard">
             </button>
             <div class="film-meta">
-              <span class="mono">08 / REMOTE WEB</span>
+              <span class="mono" data-i18n="film.tag7">08 / REMOTE WEB</span>
               <h3 data-i18n="sc.10.title">Remote Web Dashboard (SSE)</h3>
               <p data-i18n="sc.10.desc">Monitor status, live console logs, players, and backups from phone or browser behind constant-time Bearer auth.</p>
             </div>
@@ -415,16 +415,41 @@
           </div>
 
           <div class="engine-strip" id="engineStrip">
-            <div class="engine-item" data-modes="all java crossplay automation"><img data-asset="software/paper.png" src="software/paper.png" width="24" height="24" alt="Paper"><div><b>Paper</b><span>Java 17 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/purpur.png" src="software/purpur.png" width="24" height="24" alt="Purpur"><div><b>Purpur / Leaf</b><span>Java 17 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/folia.png" src="software/folia.png" width="24" height="24" alt="Folia"><div><b>Folia</b><span>Regionized JVM</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/fabric.png" src="software/fabric.png" width="24" height="24" alt="Fabric"><div><b>Fabric / Quilt</b><span>Mods Java 8 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/forge.png" src="software/forge.png" width="24" height="24" alt="Forge"><div><b>Forge</b><span>Mods Java 8 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/neoforge.png" src="software/neoforge.png" width="24" height="24" alt="NeoForge"><div><b>NeoForge</b><span>Mods Java 21 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java automation"><img data-asset="software/vanilla.png" src="software/vanilla.png" width="24" height="24" alt="Vanilla"><div><b>Vanilla / Spigot</b><span>Official Mojang</span></div></div>
-            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/velocity.png" src="software/velocity.png" width="24" height="24" alt="Velocity"><div><b>Velocity</b><span>velocity.toml proxy</span></div></div>
-            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/pumpkin.png" src="software/pumpkin.png" width="24" height="24" alt="Pumpkin"><div><b>Pumpkin 0.2.2</b><span>Rust, zero Java</span></div></div>
-            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/horizon.png" src="software/horizon.png" width="24" height="24" alt="Horizon"><div><b>Horizon</b><span>Rust, MC 26.3</span></div></div>
+            <div class="engine-item" data-modes="all java crossplay automation"><img data-asset="software/paper.png" src="software/paper.png" width="24" height="24" alt="Paper"><div><b>Paper</b><span data-i18n="eng.paper">Java 17 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/purpur.png" src="software/purpur.png" width="24" height="24" alt="Purpur"><div><b>Purpur / Leaf</b><span data-i18n="eng.purpur">Java 17 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/folia.png" src="software/folia.png" width="24" height="24" alt="Folia"><div><b>Folia</b><span data-i18n="eng.folia">Regionized JVM</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/fabric.png" src="software/fabric.png" width="24" height="24" alt="Fabric"><div><b>Fabric / Quilt</b><span data-i18n="eng.fabric">Mods Java 8 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/forge.png" src="software/forge.png" width="24" height="24" alt="Forge"><div><b>Forge</b><span data-i18n="eng.forge">Mods Java 8 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java"><img data-asset="software/neoforge.png" src="software/neoforge.png" width="24" height="24" alt="NeoForge"><div><b>NeoForge</b><span data-i18n="eng.neoforge">Mods Java 21 to 25</span></div></div>
+            <div class="engine-item" data-modes="all java automation"><img data-asset="software/vanilla.png" src="software/vanilla.png" width="24" height="24" alt="Vanilla"><div><b>Vanilla / Spigot</b><span data-i18n="eng.vanilla">Official Mojang</span></div></div>
+            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/velocity.png" src="software/velocity.png" width="24" height="24" alt="Velocity"><div><b>Velocity</b><span data-i18n="eng.velocity">velocity.toml proxy</span></div></div>
+            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/pumpkin.png" src="software/pumpkin.png" width="24" height="24" alt="Pumpkin"><div><b>Pumpkin 0.2.2</b><span data-i18n="eng.pumpkin">Rust, zero Java</span></div></div>
+            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/horizon.png" src="software/horizon.png" width="24" height="24" alt="Horizon"><div><b>Horizon</b><span data-i18n="eng.horizon">Rust, MC 26.3</span></div></div>
+          </div>
+
+          <!-- CLI, Docker, Headless & MCP Self-Host Stack Switcher -->
+          <div class="ops-panel" id="opsPanel">
+            <div class="ops-head">
+              <div>
+                <h3 data-i18n="ops.title">Run headless in terminal, Docker, Prometheus, or AI clients</h3>
+                <p data-i18n="ops.sub">Switch tools below to copy exact commands powered by the same desktop backend.</p>
+              </div>
+              <div class="ops-tabs" role="tablist" aria-label="Automation and self-host modes" id="opsTabs">
+                <span class="ops-glide" id="opsGlide" aria-hidden="true"></span>
+                <button type="button" class="ops-tab active" data-ops="cli" role="tab" aria-selected="true" data-i18n="ops.tab.cli">CLI (observer)</button>
+                <button type="button" class="ops-tab" data-ops="docker" role="tab" aria-selected="false" data-i18n="ops.tab.docker">Docker Compose</button>
+                <button type="button" class="ops-tab" data-ops="headless" role="tab" aria-selected="false" data-i18n="ops.tab.headless">Headless Daemon</button>
+                <button type="button" class="ops-tab" data-ops="mcp" role="tab" aria-selected="false" data-i18n="ops.tab.mcp">MCP (80 Tools)</button>
+              </div>
+            </div>
+
+            <div class="ops-body">
+              <div class="ops-cmd-row">
+                <code class="mono" id="opsCmdText">node src/cli.js status --json &amp;&amp; node src/cli.js install luckperms --kind plugin</code>
+                <button type="button" id="copyOpsBtn" class="cli-copy" data-i18n="hero.copy">Copy</button>
+              </div>
+              <p class="ops-desc" id="opsDescText"></p>
+            </div>
           </div>
         </div>
       </div>
@@ -434,7 +459,7 @@
     <section id="preflight" class="band-dark rule-band">
       <div class="wrap preflight-grid">
         <div class="preflight-col">
-          <span class="band-code mono">04 / BEFORE YOU RUN</span>
+          <span class="band-code mono" data-i18n="band.faq">04 / BEFORE YOU RUN</span>
           <h2 data-i18n="faq.title">Windows SmartScreen &amp; Linux setup</h2>
           <div class="faq-list">
             <details class="faq-item" open>
@@ -459,7 +484,7 @@
         </div>
 
         <div class="preflight-col">
-          <span class="band-code mono">05 / HONEST SCOPE</span>
+          <span class="band-code mono" data-i18n="band.scope">05 / HONEST SCOPE</span>
           <h2 data-i18n="scope.title">Where it fits, and where it does not</h2>
           <div class="scope-ledger">
             <div class="scope-group">

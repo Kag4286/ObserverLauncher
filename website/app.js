@@ -17,148 +17,12 @@
     { file: 'docs/screenshot-remote-ui.png', tabKey: 'sc.10.tab', titleKey: 'sc.10.title', descKey: 'sc.10.desc', fbTab: 'Remote Web UI', fbTitle: 'Remote Web Dashboard (SSE)', fbDesc: 'Manage status, console logs, players, and backups from browser behind Bearer auth.' },
   ];
 
-  // Workbench manual-vs-observer comparisons (en & vi detailed, others cleanly fall back or localize labels)
-  const WORKBENCH = {
-    cgnat: {
-      en: {
-        count: '5 separate tools',
-        manual: ['Find and install matching Java 8/17/21/25 manually', 'Download Paper.jar, write run.bat, run once to flip eula.txt', 'Configure Playit agent or Radmin VPN outside the console', 'Install Dynmap/BlueMap + open web ports just to view biomes', 'Run separate backup zip scripts'],
-        outcome: '1 window, 0 port forwarding',
-        summary: 'Pick a folder and Paper version, click Start (OpenJDK downloads if missing), toggle Playit.gg in Overview, and open the built-in .mca World Map without installing Dynmap.',
-        modules: 'wizard.js + java.js + tunnel.js + worldmap-worker.js',
-      },
-      vi: {
-        count: '5 công cụ rời rạc',
-        manual: ['Tự tìm tải đúng bản Java 8/17/21/25 cho từng bản MC', 'Tải Paper.jar, tạo run.bat, chạy lỗi lần đầu để sửa eula.txt', 'Cài thêm Playit CLI hoặc Radmin VPN ở cửa sổ ngoài', 'Cài plugin Dynmap/BlueMap nặng máy để xem bản đồ', 'Tự nén thư mục world thủ công nếu sợ hỏng save'],
-        outcome: '1 cửa sổ, khỏi mở port modem',
-        summary: 'Chọn thư mục và phiên bản Paper, bấm Start (thiếu Java tự kéo OpenJDK), bật công tắc Playit.gg ngay trong Overview, và mở thẳng World Map .mca không cần plugin.',
-        modules: 'wizard.js + java.js + tunnel.js + worldmap-worker.js',
-      },
-    },
-    modpack: {
-      en: {
-        count: 'Slow folder hunting',
-        manual: ['Scroll endless 200-mod folders in Windows Explorer', 'Discover duplicate mod IDs or Forge/Fabric mismatch only on crash', 'Hunt missing libraries manually in latest.log', 'Compare server.properties text diffs by eye', 'Lose world files if an updated mod breaks startup'],
-        outcome: 'Paginated + pre-flight checked',
-        summary: 'Paginates mods cleanly at 25 items per page, scans duplicate modIds and loader mismatches before boot, tracks server.properties snapshots, and supports one-click update rollback.',
-        modules: '01-content.js (25/pg) + content-conflicts.js + rollback',
-      },
-      vi: {
-        count: 'Quản lý file thủ công',
-        manual: ['Kéo danh sách 200+ file mod dài lê thê trong Explorer', 'Chỉ phát hiện trùng modId hoặc nhầm Forge/Fabric lúc server văng crash', 'Lội log dài để tìm thư viện phụ thuộc bị thiếu', 'Sửa file config/properties không có lịch sử hoàn tác', 'Hỏng save khi lỡ tay cập nhật một mod lỗi'],
-        outcome: '25 mục/trang + quét lỗi trước khi chạy',
-        summary: 'Chia trang 25 mod mỗi trang gọn gàng, quét trùng lặp và sai loader trước khi khởi động, kèm cây sửa file config và nút rollback nếu cập nhật lỗi.',
-        modules: '01-content.js (25/trang) + content-conflicts.js + rollback',
-      },
-    },
-    crossplay: {
-      en: {
-        count: 'Fragile crossplay YAML',
-        manual: ['Download Geyser and Floodgate separately and match versions', 'Run a TCP tunnel without UDP support (Bedrock phones time out)', 'Edit config.yml clone-remote-port and auth-type by trial and error', 'Strip YAML comments when GUI editors rewrite configs'],
-        outcome: 'UDP Pinggy + line-level repair',
-        summary: 'Runs Pinggy UDP alongside Playit TCP for Bedrock crossplay, inspects Geyser config.yml for the 4 common failures, backs up first, and patches line by line keeping your comments.',
-        modules: 'geyser.js + pinggy-tunnel.js + tunnel-manager.js',
-      },
-      vi: {
-        count: 'Dễ sai cấu hình YAML',
-        manual: ['Tải rời Geyser và Floodgate rồi tự ghép bản tương thích', 'Dùng tunnel chỉ có TCP nên điện thoại (Bedrock) không vào được', 'Loay hoay sửa clone-remote-port, auth-type trong config.yml', 'Mất sạch comment ghi chú khi tool bên ngoài ghi đè file'],
-        outcome: 'Pinggy UDP + tự sửa từng dòng có backup',
-        summary: 'Chạy song song Pinggy UDP cho Bedrock và Playit TCP cho Java, tự kiểm tra 4 lỗi hay gặp trong Geyser config.yml, sao lưu trước rồi sửa đúng dòng lỗi mà giữ nguyên comment.',
-        modules: 'geyser.js + pinggy-tunnel.js + tunnel-manager.js',
-      },
-    },
-    rust: {
-      en: {
-        count: 'CLI flags & TOML juggling',
-        manual: ['Track upstream Rust binary releases for Pumpkin or Horizon by hand', 'Verify SHA-256 asset hashes manually in PowerShell/bash', 'Monitor non-JVM process memory without playerdata .dat support', 'Fail JVM startup scripts looking for server.jar or eula.txt'],
-        outcome: '~120 MB idle RAM, zero Java',
-        summary: 'Pulls verified Pumpkin (0.2.2) and Horizon releases via cached GitHub checksums, syncs pumpkin.toml / server.toml, and inspects live players even before .dat saves exist.',
-        modules: 'pumpkin.js + horizon.js + github-releases.js + 03-players.js',
-      },
-      vi: {
-        count: 'Chỉnh tay binary & TOML',
-        manual: ['Tự canh bản release mới của Pumpkin hoặc Horizon trên GitHub', 'Tự kiểm tra mã SHA-256 bằng PowerShell/Terminal', 'Script cũ báo lỗi vì tìm Java, eula.txt và server.jar', 'Không soi được người chơi vì server Rust chưa tạo file .dat'],
-        outcome: '~120 MB RAM chờ, không cần Java',
-        summary: 'Tự tải Pumpkin (0.2.2) và Horizon kèm kiểm tra SHA-256, đồng bộ file TOML và xem trước người chơi trực tiếp ngay cả khi thế giới chưa lưu file .dat.',
-        modules: 'pumpkin.js + horizon.js + github-releases.js + 03-players.js',
-      },
-    },
-  };
-
-  // Plain-language (End-User / Player) Workbench scenarios
-  const WORKBENCH_SIMPLE = {
-    cgnat: {
-      en: {
-        count: '5 separate setups',
-        manual: ['Find and install the exact Java version Minecraft needs', 'Write a startup batch script and manually edit EULA text files', 'Install external tunnel tools on the side just to invite friends', 'Install heavy map plugins just to view biomes on a browser', 'Remember to zip your world folder manually before testing anything'],
-        outcome: '1 window, share link ready',
-        summary: 'Pick a world folder, press Start (Java downloads automatically if missing), flip on the built-in friend invite link, and view your world map without plugins.',
-        modules: '',
-      },
-      vi: {
-        count: '5 app rời rạc',
-        manual: ['Tự mò tải đúng bản Java cho từng đời Minecraft hay báo lỗi', 'Tự viết file .bat chạy server rồi sửa file EULA bằng tay', 'Cài thêm phần mềm mạng ngoài mới gửi được IP cho bạn bè', 'Cài thêm plugin bản đồ gây nặng máy chỉ để soi đường', 'Phải tự nén thư mục world lưu riêng nếu sợ mất map'],
-        outcome: '1 nút bấm, có link mời ngay',
-        summary: 'Chọn thư mục và bản game rồi bấm Start (thiếu Java app tự tải), bật công tắc mời bạn online khỏi đụng modem, và mở bản đồ thế giới ngay trong app.',
-        modules: '',
-      },
-    },
-    modpack: {
-      en: {
-        count: 'Trial and error crashing',
-        manual: ['Scroll endless 200-file mod folders in Windows Explorer', 'Find duplicate or incompatible mods only after a full server crash', 'Dig through giant text log files to guess which library mod is missing', 'Edit config text files without any backup history', 'Lose hours of progress if one bad mod update breaks startup'],
-        outcome: 'Clean pages + safe undo',
-        summary: 'Splits big mod folders into clean 25-item pages, warns about duplicate or broken mods before launch, and lets you roll back bad updates in one click.',
-        modules: '',
-      },
-      vi: {
-        count: 'Dò lỗi rất mất thời gian',
-        manual: ['Lướt mỏi tay hơn 200 file mod xếp chung một thư mục', 'Chỉ biết bị trùng mod hay nhầm bản khi server đã sập giữa chừng', 'Đọc file log dài hàng nghìn dòng để đoán thiếu mod nền nào', 'Sửa nhầm file cài đặt là hỏng luôn không có bản sao để lùi', 'Dễ mất công sức nếu lỡ tay cập nhật trúng một mod lỗi'],
-        outcome: 'Gọn 25 món/trang + tự quét lỗi',
-        summary: 'Chia trang mod gọn gàng, tự báo mod trùng hoặc thiếu trước khi mở server, lưu lịch sử cài đặt và cho phép hoàn tác ngay nếu lỡ cập nhật lỗi.',
-        modules: '',
-      },
-    },
-    crossplay: {
-      en: {
-        count: 'Phones keep timing out',
-        manual: ['Hunt down matching Geyser and Floodgate plugins separately', 'Share only a PC link so friends on phones get stuck connecting', 'Edit long YAML text configs by guessing port and account settings', 'Accidentally break config formatting when editing by hand'],
-        outcome: 'PC + Phone auto-configured',
-        summary: 'Turns on mobile-friendly UDP sharing alongside PC sharing, automatically detects common Geyser mistakes, backs up your file first, and fixes broken lines safely.',
-        modules: '',
-      },
-      vi: {
-        count: 'Điện thoại hay lỗi kết nối',
-        manual: ['Tự tải rời hai plugin Geyser và Floodgate rồi ghép đúng bản', 'Mở mạng chỉ hỗ trợ máy tính nên bạn dùng điện thoại không vào được', 'Mò chỉnh sửa file cài đặt dài dễ sai định dạng dấu cách', 'Chỉ cần gõ nhầm một dòng là cả hệ thống không nhận người chơi mobile'],
-        outcome: 'Tự bật UDP + tự sửa lỗi kết nối',
-        summary: 'Chạy sẵn luồng mạng riêng cho điện thoại (Bedrock) lẫn PC, tự soi 4 lỗi phổ biến khiến mobile không vào được và sao lưu trước khi sửa giúp bạn.',
-        modules: '',
-      },
-    },
-    rust: {
-      en: {
-        count: 'Requires manual setup',
-        manual: ['Track fast-moving Rust server downloads on GitHub yourself', 'Verify file checksums manually in terminal windows', 'Old Java startup scripts break completely on Rust servers', 'Normal inventory tools cannot preview online Rust players yet'],
-        outcome: '~120 MB RAM, opens in < 0.4s',
-        summary: 'Downloads verified ultra-light Rust servers in one click, keeps config files tidy, and still lets you inspect players live even before classic save files exist.',
-        modules: '',
-      },
-      vi: {
-        count: 'Phải tải và chỉnh tay',
-        manual: ['Tự canh bản tải mới của server Rust trên GitHub', 'Phải gõ lệnh kiểm tra file tải về bằng terminal', 'Cách mở server kiểu Java cũ không chạy được loại này', 'Không xem được đồ người chơi vì cấu trúc file lưu khác hoàn toàn'],
-        outcome: 'Chỉ ~120 MB RAM, bật chưa tới 0.4 giây',
-        summary: 'Tải sẵn server Rust siêu nhẹ cho máy yếu, tự cấu hình file cài đặt gọn gàng và vẫn soi được người chơi ngay cả khi máy chủ vừa mở.',
-        modules: '',
-      },
-    },
-  };
-
   const RUNTIME_PROFILES = {
-    all: { boot: 'Java 8 to 25 & Rust', ram: '~120 MB to 4 GB', javaKey: 'spec.javaAll', net: 'Playit, Pinggy, SSE, MCP', bootMeter: 0.72, ramMeter: 0.78 },
-    java: { boot: '3 to 18 s', ram: '1.2 to 4.0 GB', javaKey: 'spec.javaAuto', net: 'Playit TCP, Modrinth, CurseForge', bootMeter: 0.85, ramMeter: 0.88 },
-    rust: { boot: '< 0.4 s', ram: '~100 to 250 MB', javaKey: 'spec.javaNone', net: 'Playit, server.toml, pumpkin.toml', bootMeter: 0.08, ramMeter: 0.14 },
-    crossplay: { boot: '4 to 14 s', ram: '1.5 to 3.5 GB', javaKey: 'spec.javaAuto', netKey: 'spec.netCross', bootMeter: 0.68, ramMeter: 0.82 },
-    automation: { boot: 'Headless Node 22+', ram: '~45 MB Controller', javaKey: 'spec.javaAll', netKey: 'spec.netCli', bootMeter: 0.18, ramMeter: 0.10 },
+    all: { bootKey: 'prof.all.boot', ramKey: 'prof.all.ram', javaKey: 'spec.javaAll', netKey: 'prof.all.net', bootMeter: 0.72, ramMeter: 0.78 },
+    java: { bootKey: 'prof.java.boot', ramKey: 'prof.java.ram', javaKey: 'spec.javaAuto', netKey: 'prof.java.net', bootMeter: 0.85, ramMeter: 0.88 },
+    rust: { bootKey: 'prof.rust.boot', ramKey: 'prof.rust.ram', javaKey: 'spec.javaNone', netKey: 'prof.rust.net', bootMeter: 0.08, ramMeter: 0.14 },
+    crossplay: { bootKey: 'prof.cross.boot', ramKey: 'prof.cross.ram', javaKey: 'spec.javaAuto', netKey: 'spec.netCross', bootMeter: 0.68, ramMeter: 0.82 },
+    automation: { bootKey: 'prof.auto.boot', ramKey: 'prof.auto.ram', javaKey: 'spec.javaAll', netKey: 'spec.netCli', bootMeter: 0.18, ramMeter: 0.10 },
   };
 
   const isLocalWebsiteSubdir = /\/website(\/|$)/.test(location.pathname);
@@ -184,6 +48,7 @@
   let plyShotIdx = 6;
   let activeScenario = 'cgnat';
   let activeMode = 'all';
+  let activeOps = 'cli';
   let calcDir = 'o2n';
   let currentLang = detectInitialLang();
   let currentTone = detectInitialTone();
@@ -284,6 +149,7 @@
     updateCalculator(false);
     selectPlayerSpot(plyShotIdx, false);
     applyRuntimeMode(activeMode);
+    renderOps(activeOps, false);
     syncDockWithVisitorOs();
     syncLightboxContent();
     syncReleaseStatusText();
@@ -352,14 +218,16 @@
   }
 
   function renderWorkbench(key, animate = true) {
-    activeScenario = WORKBENCH[key] ? key : 'cgnat';
+    const wbMap = window.WEB_WORKBENCH || {};
+    activeScenario = wbMap[key] ? key : 'cgnat';
     document.querySelectorAll('#wbScenarioTabs .wb-btn').forEach((btn) => {
       const match = btn.getAttribute('data-scenario') === activeScenario;
       btn.classList.toggle('active', match);
       btn.setAttribute('aria-selected', match ? 'true' : 'false');
     });
-    const sourcePack = currentTone === 'simple' && WORKBENCH_SIMPLE[activeScenario] ? WORKBENCH_SIMPLE[activeScenario] : WORKBENCH[activeScenario];
-    const data = sourcePack[currentLang] || sourcePack.en || WORKBENCH[activeScenario].en;
+    const toneBucket = wbMap[activeScenario]?.[currentTone === 'simple' ? 'simple' : 'tech'] || wbMap[activeScenario]?.tech || {};
+    const data = toneBucket[currentLang] || toneBucket.en;
+    if (!data) return;
     const listEl = document.getElementById('wbManualList');
     if (listEl) {
       listEl.innerHTML = '';
@@ -377,8 +245,9 @@
     if (cEl) cEl.textContent = data.count;
     if (oEl) oEl.textContent = data.outcome;
     if (sEl) sEl.textContent = data.summary;
-    const techData = WORKBENCH[activeScenario][currentLang] || WORKBENCH[activeScenario].en;
-    if (mEl) mEl.textContent = techData.modules;
+    const techBucket = wbMap[activeScenario]?.tech || {};
+    const techData = techBucket[currentLang] || techBucket.en;
+    if (mEl && techData) mEl.textContent = techData.modules;
 
     if (animate) fireWbBus();
     requestAnimationFrame(glideWbTabs);
@@ -412,7 +281,7 @@
         const rzMca = Math.floor(cz / 32);
         chunkTag.textContent = `Chunk [${cx}, ${cz}] · r.${rxMca}.${rzMca}.mca`;
       } else {
-        chunkTag.textContent = `OW (${owX}, ${owZ}) -> Nether (${neX}, ${neZ})`;
+        chunkTag.textContent = `${t('radar.ow', 'OVERWORLD')} (${owX}, ${owZ}) -> ${t('radar.nether', 'NETHER')} (${neX}, ${neZ})`;
       }
     }
   }
@@ -431,8 +300,10 @@
     });
     outDim.textContent = t(calcDir === 'o2n' ? 'calc.outNether' : 'calc.outOver');
     if (formula) {
-      if (currentTone === 'tech') formula.textContent = calcDir === 'o2n' ? 'floor(X / 8), floor(Z / 8)' : 'X * 8, Z * 8';
-      else formula.textContent = calcDir === 'o2n' ? 'Distance / 8 (Nether shortcut)' : 'Distance x 8 (Back to surface)';
+      const fKey = currentTone === 'tech'
+        ? (calcDir === 'o2n' ? 'calc.formulaTechO2N' : 'calc.formulaTechN2O')
+        : (calcDir === 'o2n' ? 'calc.formulaSimpleO2N' : 'calc.formulaSimpleN2O');
+      formula.textContent = t(fKey, 'floor(X / 8), floor(Z / 8)');
     }
 
     const xStr = String(xRaw).trim();
@@ -561,10 +432,10 @@
     const elNet = document.getElementById('specNet');
     const meterBoot = document.getElementById('meterBoot');
     const meterRam = document.getElementById('meterRam');
-    if (elBoot) elBoot.textContent = prof.boot;
-    if (elRam) elRam.textContent = prof.ram;
+    if (elBoot) elBoot.textContent = t(prof.bootKey);
+    if (elRam) elRam.textContent = t(prof.ramKey);
     if (elJava) elJava.textContent = t(prof.javaKey, 'Auto OpenJDK / None on Rust');
-    if (elNet) elNet.textContent = prof.netKey ? t(prof.netKey, prof.net || '') : prof.net;
+    if (elNet) elNet.textContent = t(prof.netKey);
     if (meterBoot) meterBoot.style.setProperty('--meter', String(prof.bootMeter || 0.5));
     if (meterRam) meterRam.style.setProperty('--meter', String(prof.ramMeter || 0.5));
 
@@ -574,6 +445,54 @@
       card.classList.toggle('is-dimmed', !isMatch);
       card.classList.toggle('is-match', activeMode !== 'all' && isMatch);
     });
+  }
+
+  // Automation & Self-Host Stack Switcher (CLI, Docker, Headless, MCP)
+  function renderInlineCode(el, text) {
+    el.textContent = '';
+    const parts = String(text || '').split(/(`[^`]+`)/g);
+    parts.forEach((part) => {
+      if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+        const c = document.createElement('code');
+        c.textContent = part.slice(1, -1);
+        el.appendChild(c);
+      } else if (part) {
+        el.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+
+  function glideOpsTabs() {
+    const glide = document.getElementById('opsGlide');
+    const active = document.querySelector('#opsTabs .ops-tab.active');
+    if (!glide || !active || !active.offsetWidth) return;
+    glide.style.setProperty('--ogx', `${active.offsetLeft - 3}px`);
+    glide.style.setProperty('--ogsx', `${Math.max(0.2, active.offsetWidth / 64)}`);
+  }
+
+  function renderOps(key, animate = true) {
+    const opsMap = window.WEB_OPS || {};
+    activeOps = opsMap[key] ? key : 'cli';
+    document.querySelectorAll('#opsTabs .ops-tab').forEach((btn) => {
+      const match = btn.getAttribute('data-ops') === activeOps;
+      btn.classList.toggle('active', match);
+      btn.setAttribute('aria-selected', match ? 'true' : 'false');
+    });
+    const entry = opsMap[activeOps];
+    if (!entry) return;
+    const cmdEl = document.getElementById('opsCmdText');
+    const descEl = document.getElementById('opsDescText');
+    if (cmdEl) cmdEl.textContent = entry.cmd;
+    if (descEl) {
+      const toneBucket = entry[currentTone === 'simple' ? 'simple' : 'tech'] || entry.tech || {};
+      renderInlineCode(descEl, toneBucket[currentLang] || toneBucket.en || '');
+      if (animate && !prefersReducedMotion()) {
+        descEl.classList.remove('tone-morph');
+        void descEl.offsetWidth;
+        descEl.classList.add('tone-morph');
+      }
+    }
+    requestAnimationFrame(glideOpsTabs);
   }
 
   // Band Boundary Rule Trace + Workbench Initial Pulse + Scroll-Linked Hero Pitch
@@ -778,6 +697,22 @@
     btn.addEventListener('click', () => applyRuntimeMode(btn.getAttribute('data-mode')));
   });
 
+  document.querySelectorAll('#opsTabs .ops-tab').forEach((btn) => {
+    btn.addEventListener('click', () => renderOps(btn.getAttribute('data-ops')));
+  });
+
+  document.getElementById('copyOpsBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('copyOpsBtn');
+    const cmd = document.getElementById('opsCmdText')?.textContent || '';
+    try {
+      await navigator.clipboard.writeText(cmd);
+      if (btn) {
+        btn.textContent = t('hero.copied', 'Copied');
+        setTimeout(() => { btn.textContent = t('hero.copy', 'Copy'); }, 1500);
+      }
+    } catch {}
+  });
+
   document.getElementById('copyCliBtn')?.addEventListener('click', async () => {
     const btn = document.getElementById('copyCliBtn');
     try {
@@ -905,8 +840,8 @@
     syncFilmRail();
   }
 
-  window.addEventListener('resize', () => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); glideToneSwitch(); }), { passive: true });
-  document.fonts?.ready?.then(() => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); glideToneSwitch(); }));
+  window.addEventListener('resize', () => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); glideToneSwitch(); glideOpsTabs(); }), { passive: true });
+  document.fonts?.ready?.then(() => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); glideToneSwitch(); glideOpsTabs(); }));
   window.addEventListener('load', () => {
     SHOTS.forEach((s, i) => setTimeout(() => { const img = new Image(); img.src = assetUrl(s.file); }, i * 80));
   });
