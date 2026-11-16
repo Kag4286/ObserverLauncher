@@ -63,11 +63,11 @@
     <section class="hero-band">
       <div class="wrap hero-split">
         <div class="hero-copy">
-          <p class="hero-kicker mono" data-i18n="hero.kicker">Windows 10/11 &amp; Linux x86_64 · Apache-2.0 · No telemetry</p>
-          <h1 data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
-          <p class="lead" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
+          <p class="hero-kicker mono hero-stagger" style="--hi:0" data-i18n="hero.kicker">Windows 10/11 &amp; Linux x86_64 · Apache-2.0 · No telemetry</p>
+          <h1 class="hero-stagger" style="--hi:1" data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
+          <p class="lead hero-stagger" style="--hi:2" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
 
-          <div class="hero-actions" id="heroActions">
+          <div class="hero-actions hero-stagger" id="heroActions" style="--hi:3">
             <a id="dlWin" class="btn primary" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
               <span data-i18n="hero.dlWin">Download Windows (.exe)</span>
               <span class="btn-sub" id="dlWinMeta">v9.0.0</span>
@@ -103,7 +103,7 @@
           </dl>
         </div>
 
-        <div class="hero-deck">
+        <div class="hero-deck hero-stagger" style="--hi:4">
           <div class="deck-toolbar">
             <div class="deck-tabs" role="tablist" aria-label="Core application screens" id="heroDeckTabs">
               <span class="deck-glide" id="deckGlide" aria-hidden="true"></span>
@@ -135,12 +135,13 @@
     <!-- Band 2: Contrast Mineral Stone Workbench (Manual Host vs ObserverLauncher Diff) -->
     <section id="workbench" class="band-stone">
       <div class="wrap workbench-layout">
-        <div class="workbench-intro">
+        <div class="workbench-intro reveal-item" style="--ri:0">
           <span class="band-code mono">01 / WORKBENCH</span>
           <h2 data-i18n="wb.title">What you normally wire up by hand versus one desktop workspace.</h2>
           <p data-i18n="wb.sub">Pick how your group plays below to compare the fragmented manual setup against what ObserverLauncher automates locally.</p>
 
           <div class="wb-scenarios" role="tablist" aria-label="Hosting scenarios" id="wbScenarioTabs">
+            <span class="wb-glide" id="wbGlide" aria-hidden="true"></span>
             <button type="button" class="wb-btn active" data-scenario="cgnat" role="tab" aria-selected="true" data-i18n="wb.sc.cgnat">Friends SMP behind CGNAT</button>
             <button type="button" class="wb-btn" data-scenario="modpack" role="tab" aria-selected="false" data-i18n="wb.sc.modpack">100+ Modpack testing</button>
             <button type="button" class="wb-btn" data-scenario="crossplay" role="tab" aria-selected="false" data-i18n="wb.sc.crossplay">PC (Java) + Phone (Bedrock)</button>
@@ -148,7 +149,7 @@
           </div>
         </div>
 
-        <div class="workbench-diff" id="wbDiffPanel">
+        <div class="workbench-diff reveal-item" id="wbDiffPanel" style="--ri:1">
           <div class="diff-col diff-manual">
             <div class="diff-col-head">
               <span class="mono" data-i18n="wb.manualTag">TYPICAL MANUAL STEPS</span>
@@ -324,7 +325,7 @@
         </div>
 
         <!-- Runtime Profile Switcher & Engine Grid -->
-        <div class="engines-block">
+        <div class="engines-block reveal-item" style="--ri:0">
           <div class="engines-head">
             <h3 data-i18n="eng.title">Supported engines by runtime mode</h3>
             <div class="mode-bar" role="tablist" aria-label="Runtime profiles" id="modeBar">
@@ -362,7 +363,7 @@
     <!-- Band 5: Pre-flight Technical Sheet (SmartScreen & Honest Scope) -->
     <section id="preflight" class="band-dark">
       <div class="wrap preflight-grid">
-        <div class="preflight-col">
+        <div class="preflight-col reveal-item" style="--ri:0">
           <span class="band-code mono">04 / BEFORE YOU RUN</span>
           <h2 data-i18n="faq.title">Windows SmartScreen &amp; Linux setup</h2>
           <div class="faq-list">
@@ -387,7 +388,7 @@
           </div>
         </div>
 
-        <div class="preflight-col">
+        <div class="preflight-col reveal-item" style="--ri:1">
           <span class="band-code mono">05 / HONEST SCOPE</span>
           <h2 data-i18n="scope.title">Where it fits, and where it does not</h2>
           <div class="scope-ledger">

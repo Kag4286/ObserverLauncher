@@ -275,6 +275,35 @@ input:focus-visible {
   opacity: 0.86;
 }
 
+/* Motion 2.0 Entrances & Scroll Choreography */
+@keyframes heroRise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes diffSlide {
+  from { opacity: 0; transform: translate3d(14px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes calcSnap {
+  from { opacity: 0.45; transform: translate3d(0, 4px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+.has-motion-js .hero-stagger {
+  animation: heroRise var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(var(--hi, 0) * 55ms);
+}
+
+.diff-animate { animation: diffSlide var(--dur-tab) var(--ease-crisp) both; }
+.diff-list li {
+  animation: heroRise var(--dur-tab) var(--ease-out) both;
+  animation-delay: calc(var(--di, 0) * 35ms);
+}
+
+.calc-snap { animation: calcSnap var(--dur-fast) var(--ease-crisp) both; }
+
 /* Band 1: Asymmetric Split Hero (44% Copy / 56% Interactive App Deck) */
 .hero-band {
   padding: 56px 0 64px;
@@ -542,14 +571,16 @@ h1 {
   flex-shrink: 0;
 }
 
-/* Band 2: Contrast Mineral Stone Workbench (RHYTHM 3) */
+/* Band 2: Contrast Obsidian-Slate Workbench (RHYTHM 3 without jarring white block) */
 .band-stone {
-  --s-bg: #EDEBE4;
-  --s-surface: #E2DFD6;
-  --s-ink: #111317;
-  --s-muted: #4A4D48;
-  --s-border: #C9C5BA;
-  --s-brand: #15803D;
+  --s-bg: #111317;
+  --s-surface: #15171B;
+  --s-elev: #1B1E23;
+  --s-ink: #F4F1EA;
+  --s-muted: #A4A097;
+  --s-border: #242830;
+  --s-border-strong: #383E48;
+  --s-brand: #22C55E;
 
   background: var(--s-bg);
   color: var(--s-ink);
@@ -592,48 +623,64 @@ h1 {
 }
 
 .wb-scenarios {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.wb-glide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 44px;
+  background: var(--brand);
+  border-radius: 2px;
+  pointer-events: none;
+  transform: translate3d(0, var(--wgy, 0px), 0) scaleY(var(--wgsy, 1));
+  transform-origin: top center;
+  transition: transform var(--dur-tab) var(--ease-crisp);
+  z-index: 2;
 }
 
 .wb-btn {
   appearance: none;
   text-align: left;
   min-height: 44px;
-  padding: 11px 14px;
+  padding: 11px 14px 11px 18px;
   background: transparent;
   border: 1px solid var(--s-border);
   border-radius: var(--r-sm);
-  color: var(--s-ink);
+  color: var(--s-muted);
   font-family: var(--font-ui);
   font-size: 14px;
   font-weight: 600;
   touch-action: manipulation;
-  transition: background var(--dur-micro) var(--ease-crisp), border-color var(--dur-micro) var(--ease-crisp);
+  transition: background var(--dur-micro) var(--ease-crisp), border-color var(--dur-micro) var(--ease-crisp), color var(--dur-micro) var(--ease-crisp);
 }
 
-.wb-btn:hover { background: var(--s-surface); }
+.wb-btn:hover { background: var(--s-surface); color: var(--s-ink); border-color: var(--s-border-strong); }
 
 .wb-btn.active {
-  background: var(--s-ink);
-  border-color: var(--s-ink);
-  color: #F4F1EA;
+  background: var(--s-elev);
+  border-color: var(--s-border-strong);
+  color: var(--s-ink);
 }
 
 .workbench-diff {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--s-border);
+  border: 1px solid var(--s-border-strong);
   border-radius: var(--r);
-  background: #F6F4EE;
+  background: var(--bg);
   overflow: hidden;
 }
 
 .diff-col { padding: 20px; }
 .diff-observer {
   border-left: 1px solid var(--s-border);
-  background: #FFFFFF;
+  background: var(--s-surface);
 }
 
 .diff-col-head {
@@ -661,29 +708,30 @@ h1 {
 }
 
 .diff-list li {
-  padding: 7px 0;
+  padding: 8px 0;
   border-bottom: 1px dashed var(--s-border);
   font-size: 13.5px;
-  color: var(--s-muted);
+  color: var(--text-3);
 }
 
 .diff-list li:last-child { border-bottom: 0; }
 
 .diff-summary {
   font-size: 14.5px;
-  font-weight: 600;
-  color: var(--s-ink);
-  line-height: 1.55;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.58;
   margin-bottom: 14px;
 }
 
 .diff-module {
   margin: 0;
   padding: 8px 10px;
-  background: var(--s-bg);
+  background: var(--bg);
+  border: 1px solid var(--s-border);
   border-radius: var(--r-xs);
   font-size: 11.5px;
-  color: var(--s-muted);
+  color: var(--text-3);
 }
 
 /* Dark Bands */
@@ -828,6 +876,10 @@ h1 {
   gap: 10px;
 }
 
+.calc-field {
+  position: relative;
+}
+
 .calc-field label {
   display: block;
   font-family: var(--font-mono);
@@ -836,6 +888,7 @@ h1 {
   margin-bottom: 4px;
 }
 
+/* Eliminate OS-default number spin buttons per DESIGN.md */
 .calc-field input {
   width: 100%;
   min-height: 44px;
@@ -846,6 +899,39 @@ h1 {
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 15px;
+  color-scheme: dark;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  transition: border-color var(--dur-fast) var(--ease-crisp), background var(--dur-fast) var(--ease-crisp);
+}
+
+.calc-field input::-webkit-outer-spin-button,
+.calc-field input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.calc-field input:hover {
+  border-color: var(--border-strong);
+}
+
+.calc-field::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 0;
+  height: 2px;
+  background: var(--brand);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--dur-fast) var(--ease-out);
+  pointer-events: none;
+}
+
+.calc-field:focus-within::after {
+  transform: scaleX(1);
 }
 
 .calc-output {
@@ -1357,9 +1443,30 @@ h1 {
   .lightbox-head { flex-direction: column; align-items: flex-start; }
 }
 
+/* Desktop-only precision cursor wash & deck depth hover */
+@media (hover: hover) and (pointer: fine) {
+  .hero-deck {
+    transition: transform var(--dur-fast) var(--ease-crisp), border-color var(--dur-fast) var(--ease-crisp);
+  }
+  .hero-deck:hover { border-color: var(--border-strong); }
+
+  .film-card,
+  .engine-item {
+    position: relative;
+    transition: transform var(--dur-fast) var(--ease-crisp), border-color var(--dur-fast) var(--ease-crisp), opacity var(--dur-fast) var(--ease-crisp);
+  }
+  .film-card:hover { transform: translate3d(0, -3px, 0); border-color: var(--border-strong); }
+  .engine-item:hover { transform: translate3d(0, -2px, 0); border-color: var(--border-strong); }
+  .engine-item.is-dimmed:hover { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .has-motion-js .hero-stagger,
   .has-motion-js .reveal-item,
+  .diff-animate,
+  .diff-list li,
+  .calc-snap,
   .stage-enter-fwd,
   .stage-enter-back {
     animation: none !important;

@@ -158,9 +158,9 @@
       if (v) el.innerHTML = v;
     });
     selectHeroDeck(heroShotIdx, 0);
-    renderWorkbench(activeScenario);
-    updateCalculator();
-    selectPlayerSpot(plyShotIdx);
+    renderWorkbench(activeScenario, false);
+    updateCalculator(false);
+    selectPlayerSpot(plyShotIdx, false);
     applyRuntimeMode(activeMode);
     syncDockWithVisitorOs();
     syncLightboxContent();
@@ -212,8 +212,16 @@
     requestAnimationFrame(glideHeroDeck);
   }
 
-  // Workbench Diff Renderer
-  function renderWorkbench(key) {
+  // Workbench Diff Renderer + Vertical Tab Glide
+  function glideWbTabs() {
+    const glide = document.getElementById('wbGlide');
+    const active = document.querySelector('#wbScenarioTabs .wb-btn.active');
+    if (!glide || !active) return;
+    glide.style.setProperty('--wgy', `${active.offsetTop}px`);
+    glide.style.setProperty('--wgsy', `${Math.max(0.2, active.offsetHeight / 44)}`);
+  }
+
+  function renderWorkbench(key, animate = true) {
     activeScenario = WORKBENCH[key] ? key : 'cgnat';
     document.querySelectorAll('#wbScenarioTabs .wb-btn').forEach((btn) => {
       const match = btn.getAttribute('data-scenario') === activeScenario;
@@ -225,8 +233,9 @@
     const listEl = document.getElementById('wbManualList');
     if (listEl) {
       listEl.innerHTML = '';
-      data.manual.forEach((line) => {
+      data.manual.forEach((line, idx) => {
         const li = document.createElement('li');
+        li.style.setProperty('--di', String(idx));
         li.textContent = line;
         listEl.appendChild(li);
       });
@@ -239,10 +248,18 @@
     if (oEl) oEl.textContent = data.outcome;
     if (sEl) sEl.textContent = data.summary;
     if (mEl) mEl.textContent = data.modules;
+
+    const panel = document.getElementById('wbDiffPanel');
+    if (panel && animate && !prefersReducedMotion()) {
+      panel.classList.remove('diff-animate');
+      void panel.offsetWidth;
+      panel.classList.add('diff-animate');
+    }
+    requestAnimationFrame(glideWbTabs);
   }
 
   // Live 1:8 Overworld / Nether Coordinate Bridge (exact worldmap.js math)
-  function updateCalculator() {
+  function updateCalculator(animate = true) {
     const xRaw = document.getElementById('coordX')?.value ?? '';
     const zRaw = document.getElementById('coordZ')?.value ?? '';
     const outBox = document.getElementById('calcOutput');
@@ -270,11 +287,18 @@
     const rx = calcDir === 'o2n' ? Math.floor(x / 8) : Math.trunc(x * 8);
     const rz = calcDir === 'o2n' ? Math.floor(z / 8) : Math.trunc(z * 8);
     outCoords.textContent = `X: ${rx} · Z: ${rz}`;
+    if (animate && !prefersReducedMotion()) {
+      outCoords.classList.remove('calc-snap');
+      void outCoords.offsetWidth;
+      outCoords.classList.add('calc-snap');
+    }
   }
 
   // Player 3D / Inventory Spotlight Switch
-  function selectPlayerSpot(idx) {
+  function selectPlayerSpot(idx, animate = true) {
+    const prev = plyShotIdx;
     plyShotIdx = idx === 7 ? 7 : 6;
+    const dir = plyShotIdx === prev ? 0 : (plyShotIdx > prev ? 1 : -1);
     document.querySelectorAll('#plySwitch .ply-tab').forEach((b) => {
       const match = Number(b.getAttribute('data-shot')) === plyShotIdx;
       b.classList.toggle('active', match);
@@ -284,6 +308,11 @@
     const trigger = document.getElementById('plySpotTrigger');
     const s = SHOTS[plyShotIdx];
     if (img) {
+      if (animate && dir !== 0 && !prefersReducedMotion()) {
+        img.classList.remove('stage-enter-fwd', 'stage-enter-back');
+        void img.offsetWidth;
+        img.classList.add(dir > 0 ? 'stage-enter-fwd' : 'stage-enter-back');
+      }
       img.src = assetUrl(s.file);
       img.alt = t(s.titleKey, s.fbTitle);
     }
@@ -587,7 +616,8 @@
 
   attachSwipe(document.getElementById('heroDeckStage'), () => selectHeroDeck((heroShotIdx + 3) % 4, -1), () => selectHeroDeck((heroShotIdx + 1) % 4, 1));
   attachSwipe(document.getElementById('shotLightbox'), () => stepLightbox(-1), () => stepLightbox(1));
-  window.addEventListener('resize', () => requestAnimationFrame(glideHeroDeck), { passive: true });
+  window.addEventListener('resize', () => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); }), { passive: true });
+  document.fonts?.ready?.then(() => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); }));
   window.addEventListener('load', () => {
     SHOTS.forEach((s, i) => setTimeout(() => { const img = new Image(); img.src = assetUrl(s.file); }, i * 80));
   });
