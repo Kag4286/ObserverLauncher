@@ -85,12 +85,80 @@
     },
   };
 
+  // Plain-language (End-User / Player) Workbench scenarios
+  const WORKBENCH_SIMPLE = {
+    cgnat: {
+      en: {
+        count: '5 separate setups',
+        manual: ['Find and install the exact Java version Minecraft needs', 'Write a startup batch script and manually edit EULA text files', 'Install external tunnel tools on the side just to invite friends', 'Install heavy map plugins just to view biomes on a browser', 'Remember to zip your world folder manually before testing anything'],
+        outcome: '1 window, share link ready',
+        summary: 'Pick a world folder, press Start (Java downloads automatically if missing), flip on the built-in friend invite link, and view your world map without plugins.',
+        modules: '',
+      },
+      vi: {
+        count: '5 app rời rạc',
+        manual: ['Tự mò tải đúng bản Java cho từng đời Minecraft hay báo lỗi', 'Tự viết file .bat chạy server rồi sửa file EULA bằng tay', 'Cài thêm phần mềm mạng ngoài mới gửi được IP cho bạn bè', 'Cài thêm plugin bản đồ gây nặng máy chỉ để soi đường', 'Phải tự nén thư mục world lưu riêng nếu sợ mất map'],
+        outcome: '1 nút bấm, có link mời ngay',
+        summary: 'Chọn thư mục và bản game rồi bấm Start (thiếu Java app tự tải), bật công tắc mời bạn online khỏi đụng modem, và mở bản đồ thế giới ngay trong app.',
+        modules: '',
+      },
+    },
+    modpack: {
+      en: {
+        count: 'Trial and error crashing',
+        manual: ['Scroll endless 200-file mod folders in Windows Explorer', 'Find duplicate or incompatible mods only after a full server crash', 'Dig through giant text log files to guess which library mod is missing', 'Edit config text files without any backup history', 'Lose hours of progress if one bad mod update breaks startup'],
+        outcome: 'Clean pages + safe undo',
+        summary: 'Splits big mod folders into clean 25-item pages, warns about duplicate or broken mods before launch, and lets you roll back bad updates in one click.',
+        modules: '',
+      },
+      vi: {
+        count: 'Dò lỗi rất mất thời gian',
+        manual: ['Lướt mỏi tay hơn 200 file mod xếp chung một thư mục', 'Chỉ biết bị trùng mod hay nhầm bản khi server đã sập giữa chừng', 'Đọc file log dài hàng nghìn dòng để đoán thiếu mod nền nào', 'Sửa nhầm file cài đặt là hỏng luôn không có bản sao để lùi', 'Dễ mất công sức nếu lỡ tay cập nhật trúng một mod lỗi'],
+        outcome: 'Gọn 25 món/trang + tự quét lỗi',
+        summary: 'Chia trang mod gọn gàng, tự báo mod trùng hoặc thiếu trước khi mở server, lưu lịch sử cài đặt và cho phép hoàn tác ngay nếu lỡ cập nhật lỗi.',
+        modules: '',
+      },
+    },
+    crossplay: {
+      en: {
+        count: 'Phones keep timing out',
+        manual: ['Hunt down matching Geyser and Floodgate plugins separately', 'Share only a PC link so friends on phones get stuck connecting', 'Edit long YAML text configs by guessing port and account settings', 'Accidentally break config formatting when editing by hand'],
+        outcome: 'PC + Phone auto-configured',
+        summary: 'Turns on mobile-friendly UDP sharing alongside PC sharing, automatically detects common Geyser mistakes, backs up your file first, and fixes broken lines safely.',
+        modules: '',
+      },
+      vi: {
+        count: 'Điện thoại hay lỗi kết nối',
+        manual: ['Tự tải rời hai plugin Geyser và Floodgate rồi ghép đúng bản', 'Mở mạng chỉ hỗ trợ máy tính nên bạn dùng điện thoại không vào được', 'Mò chỉnh sửa file cài đặt dài dễ sai định dạng dấu cách', 'Chỉ cần gõ nhầm một dòng là cả hệ thống không nhận người chơi mobile'],
+        outcome: 'Tự bật UDP + tự sửa lỗi kết nối',
+        summary: 'Chạy sẵn luồng mạng riêng cho điện thoại (Bedrock) lẫn PC, tự soi 4 lỗi phổ biến khiến mobile không vào được và sao lưu trước khi sửa giúp bạn.',
+        modules: '',
+      },
+    },
+    rust: {
+      en: {
+        count: 'Requires manual setup',
+        manual: ['Track fast-moving Rust server downloads on GitHub yourself', 'Verify file checksums manually in terminal windows', 'Old Java startup scripts break completely on Rust servers', 'Normal inventory tools cannot preview online Rust players yet'],
+        outcome: '~120 MB RAM, opens in < 0.4s',
+        summary: 'Downloads verified ultra-light Rust servers in one click, keeps config files tidy, and still lets you inspect players live even before classic save files exist.',
+        modules: '',
+      },
+      vi: {
+        count: 'Phải tải và chỉnh tay',
+        manual: ['Tự canh bản tải mới của server Rust trên GitHub', 'Phải gõ lệnh kiểm tra file tải về bằng terminal', 'Cách mở server kiểu Java cũ không chạy được loại này', 'Không xem được đồ người chơi vì cấu trúc file lưu khác hoàn toàn'],
+        outcome: 'Chỉ ~120 MB RAM, bật chưa tới 0.4 giây',
+        summary: 'Tải sẵn server Rust siêu nhẹ cho máy yếu, tự cấu hình file cài đặt gọn gàng và vẫn soi được người chơi ngay cả khi máy chủ vừa mở.',
+        modules: '',
+      },
+    },
+  };
+
   const RUNTIME_PROFILES = {
-    all: { boot: 'Java 8 to 25 & Rust', ram: '~120 MB to 4 GB', javaKey: 'spec.javaAll', net: 'Playit, Pinggy, SSE, MCP' },
-    java: { boot: '3 to 18 s', ram: '1.2 to 4.0 GB', javaKey: 'spec.javaAuto', net: 'Playit TCP, Modrinth, CurseForge' },
-    rust: { boot: '< 0.4 s', ram: '~100 to 250 MB', javaKey: 'spec.javaNone', net: 'Playit, server.toml, pumpkin.toml' },
-    crossplay: { boot: '4 to 14 s', ram: '1.5 to 3.5 GB', javaKey: 'spec.javaAuto', netKey: 'spec.netCross' },
-    automation: { boot: 'Headless Node 22+', ram: '~45 MB Controller', javaKey: 'spec.javaAll', netKey: 'spec.netCli' },
+    all: { boot: 'Java 8 to 25 & Rust', ram: '~120 MB to 4 GB', javaKey: 'spec.javaAll', net: 'Playit, Pinggy, SSE, MCP', bootMeter: 0.72, ramMeter: 0.78 },
+    java: { boot: '3 to 18 s', ram: '1.2 to 4.0 GB', javaKey: 'spec.javaAuto', net: 'Playit TCP, Modrinth, CurseForge', bootMeter: 0.85, ramMeter: 0.88 },
+    rust: { boot: '< 0.4 s', ram: '~100 to 250 MB', javaKey: 'spec.javaNone', net: 'Playit, server.toml, pumpkin.toml', bootMeter: 0.08, ramMeter: 0.14 },
+    crossplay: { boot: '4 to 14 s', ram: '1.5 to 3.5 GB', javaKey: 'spec.javaAuto', netKey: 'spec.netCross', bootMeter: 0.68, ramMeter: 0.82 },
+    automation: { boot: 'Headless Node 22+', ram: '~45 MB Controller', javaKey: 'spec.javaAll', netKey: 'spec.netCli', bootMeter: 0.18, ramMeter: 0.10 },
   };
 
   const isLocalWebsiteSubdir = /\/website(\/|$)/.test(location.pathname);
@@ -118,9 +186,20 @@
   let activeMode = 'all';
   let calcDir = 'o2n';
   let currentLang = detectInitialLang();
+  let currentTone = detectInitialTone();
   let lbLastTrigger = null;
   let releaseState = 'loading'; // 'loading' | 'live' | 'fallback'
   let latestReleaseTag = '';
+
+  function detectInitialTone() {
+    try {
+      const urlTone = new URLSearchParams(location.search).get('tone');
+      if (urlTone === 'simple' || urlTone === 'tech') return urlTone;
+      const saved = localStorage.getItem('observer_web_tone');
+      if (saved === 'simple' || saved === 'tech') return saved;
+    } catch {}
+    return 'simple';
+  }
 
   function detectInitialLang() {
     try {
@@ -137,14 +216,56 @@
   }
 
   function t(key, fallback = '') {
+    const simpleLang = (window.WEB_SIMPLE_OVERRIDES && window.WEB_SIMPLE_OVERRIDES[currentLang]) || {};
+    const simpleEn = (window.WEB_SIMPLE_OVERRIDES && window.WEB_SIMPLE_OVERRIDES.en) || {};
     const dict = (window.WEB_LOCALES && window.WEB_LOCALES[currentLang]) || {};
     const en = (window.WEB_LOCALES && window.WEB_LOCALES.en) || {};
+    if (currentTone === 'simple') {
+      if (simpleLang[key] != null) return simpleLang[key];
+      if (dict[key] != null && currentLang !== 'en') return dict[key];
+      if (simpleEn[key] != null) return simpleEn[key];
+    }
     return dict[key] ?? en[key] ?? fallback;
+  }
+
+  function glideToneSwitch() {
+    document.querySelectorAll('.tone-switch').forEach((wrap) => {
+      const thumb = wrap.querySelector('.tone-thumb');
+      const active = wrap.querySelector('.tone-btn.active');
+      if (!thumb || !active || !active.offsetWidth) return;
+      thumb.style.setProperty('--tx', `${active.offsetLeft - 3}px`);
+      thumb.style.setProperty('--tsx', `${Math.max(0.2, active.offsetWidth / 64)}`);
+    });
+  }
+
+  function syncToneUi() {
+    document.documentElement.dataset.tone = currentTone;
+    document.querySelectorAll('.tone-switch .tone-btn').forEach((btn) => {
+      const match = btn.getAttribute('data-tone') === currentTone;
+      btn.classList.toggle('active', match);
+      btn.setAttribute('aria-checked', match ? 'true' : 'false');
+    });
+    requestAnimationFrame(glideToneSwitch);
+  }
+
+  function setTone(nextTone, animate = true) {
+    currentTone = nextTone === 'tech' ? 'tech' : 'simple';
+    try { localStorage.setItem('observer_web_tone', currentTone); } catch {}
+    syncToneUi();
+    applyLocale(currentLang);
+    if (animate && !prefersReducedMotion()) {
+      document.querySelectorAll('.hero-copy h1, .hero-copy .lead, .workbench-intro h2, .section-head-split h2, .calc-head h3').forEach((el) => {
+        el.classList.remove('tone-morph');
+        void el.offsetWidth;
+        el.classList.add('tone-morph');
+      });
+    }
   }
 
   function applyLocale(lang) {
     currentLang = SUPPORTED_LANGS.includes(lang) ? lang : 'en';
     document.documentElement.lang = currentLang;
+    document.documentElement.dataset.tone = currentTone;
     try { localStorage.setItem('observer_web_lang', currentLang); } catch {}
     const sel = document.getElementById('langSelect');
     if (sel) sel.value = currentLang;
@@ -157,6 +278,7 @@
       const v = t(el.getAttribute('data-i18n-html'));
       if (v) el.innerHTML = v;
     });
+    syncToneUi();
     selectHeroDeck(heroShotIdx, 0);
     renderWorkbench(activeScenario, false);
     updateCalculator(false);
@@ -221,6 +343,14 @@
     glide.style.setProperty('--wgsy', `${Math.max(0.2, active.offsetHeight / 44)}`);
   }
 
+  function fireWbBus() {
+    const panel = document.getElementById('wbDiffPanel');
+    if (!panel || prefersReducedMotion()) return;
+    panel.classList.remove('bus-firing');
+    void panel.offsetWidth;
+    panel.classList.add('bus-firing');
+  }
+
   function renderWorkbench(key, animate = true) {
     activeScenario = WORKBENCH[key] ? key : 'cgnat';
     document.querySelectorAll('#wbScenarioTabs .wb-btn').forEach((btn) => {
@@ -228,8 +358,8 @@
       btn.classList.toggle('active', match);
       btn.setAttribute('aria-selected', match ? 'true' : 'false');
     });
-    const pack = WORKBENCH[activeScenario];
-    const data = pack[currentLang] || pack.en;
+    const sourcePack = currentTone === 'simple' && WORKBENCH_SIMPLE[activeScenario] ? WORKBENCH_SIMPLE[activeScenario] : WORKBENCH[activeScenario];
+    const data = sourcePack[currentLang] || sourcePack.en || WORKBENCH[activeScenario].en;
     const listEl = document.getElementById('wbManualList');
     if (listEl) {
       listEl.innerHTML = '';
@@ -247,18 +377,46 @@
     if (cEl) cEl.textContent = data.count;
     if (oEl) oEl.textContent = data.outcome;
     if (sEl) sEl.textContent = data.summary;
-    if (mEl) mEl.textContent = data.modules;
+    const techData = WORKBENCH[activeScenario][currentLang] || WORKBENCH[activeScenario].en;
+    if (mEl) mEl.textContent = techData.modules;
 
-    const panel = document.getElementById('wbDiffPanel');
-    if (panel && animate && !prefersReducedMotion()) {
-      panel.classList.remove('diff-animate');
-      void panel.offsetWidth;
-      panel.classList.add('diff-animate');
-    }
+    if (animate) fireWbBus();
     requestAnimationFrame(glideWbTabs);
   }
 
-  // Live 1:8 Overworld / Nether Coordinate Bridge (exact worldmap.js math)
+  // Live 1:8 Overworld / Nether Coordinate Bridge + Interactive Chunk Radar
+  function syncPortalRadar(owX, owZ, neX, neZ) {
+    const owDot = document.getElementById('radarOwDot');
+    const neDot = document.getElementById('radarNeDot');
+    const radar = document.getElementById('portalRadar');
+    const chunkTag = document.getElementById('radarChunkTag');
+    const ratioLbl = document.getElementById('radarRatioLbl');
+    if (!owDot || !neDot) return;
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    // Map world [-2048..2048] cleanly across the 130x84 pad (center 71,48 for OW; 249,48 for Nether)
+    const owPx = clamp(71 + (owX / 2048) * 56, 14, 128);
+    const owPy = clamp(48 + (owZ / 2048) * 34, 14, 82);
+    const nePx = clamp(249 + (neX / 2048) * 56, 192, 306);
+    const nePy = clamp(48 + (neZ / 2048) * 34, 14, 82);
+    owDot.setAttribute('transform', `translate(${owPx.toFixed(1)} ${owPy.toFixed(1)})`);
+    neDot.setAttribute('transform', `translate(${nePx.toFixed(1)} ${nePy.toFixed(1)})`);
+
+    if (radar) radar.classList.toggle('is-n2o', calcDir === 'n2o');
+    if (ratioLbl) ratioLbl.textContent = calcDir === 'o2n' ? '1:8 ->' : '<- x8';
+    if (chunkTag) {
+      if (currentTone === 'tech') {
+        const cx = Math.floor(owX / 16);
+        const cz = Math.floor(owZ / 16);
+        const rxMca = Math.floor(cx / 32);
+        const rzMca = Math.floor(cz / 32);
+        chunkTag.textContent = `Chunk [${cx}, ${cz}] · r.${rxMca}.${rzMca}.mca`;
+      } else {
+        chunkTag.textContent = `OW (${owX}, ${owZ}) -> Nether (${neX}, ${neZ})`;
+      }
+    }
+  }
+
   function updateCalculator(animate = true) {
     const xRaw = document.getElementById('coordX')?.value ?? '';
     const zRaw = document.getElementById('coordZ')?.value ?? '';
@@ -272,7 +430,10 @@
       b.classList.toggle('active', b.getAttribute('data-dir') === calcDir);
     });
     outDim.textContent = t(calcDir === 'o2n' ? 'calc.outNether' : 'calc.outOver');
-    if (formula) formula.textContent = calcDir === 'o2n' ? 'floor(X / 8), floor(Z / 8)' : 'X * 8, Z * 8';
+    if (formula) {
+      if (currentTone === 'tech') formula.textContent = calcDir === 'o2n' ? 'floor(X / 8), floor(Z / 8)' : 'X * 8, Z * 8';
+      else formula.textContent = calcDir === 'o2n' ? 'Distance / 8 (Nether shortcut)' : 'Distance x 8 (Back to surface)';
+    }
 
     const xStr = String(xRaw).trim();
     const zStr = String(zRaw).trim();
@@ -287,6 +448,9 @@
     const rx = calcDir === 'o2n' ? Math.floor(x / 8) : Math.trunc(x * 8);
     const rz = calcDir === 'o2n' ? Math.floor(z / 8) : Math.trunc(z * 8);
     outCoords.textContent = `X: ${rx} · Z: ${rz}`;
+    if (calcDir === 'o2n') syncPortalRadar(x, z, rx, rz);
+    else syncPortalRadar(rx, rz, x, z);
+
     if (animate && !prefersReducedMotion()) {
       outCoords.classList.remove('calc-snap');
       void outCoords.offsetWidth;
@@ -395,10 +559,14 @@
     const elRam = document.getElementById('specRam');
     const elJava = document.getElementById('specJava');
     const elNet = document.getElementById('specNet');
+    const meterBoot = document.getElementById('meterBoot');
+    const meterRam = document.getElementById('meterRam');
     if (elBoot) elBoot.textContent = prof.boot;
     if (elRam) elRam.textContent = prof.ram;
     if (elJava) elJava.textContent = t(prof.javaKey, 'Auto OpenJDK / None on Rust');
     if (elNet) elNet.textContent = prof.netKey ? t(prof.netKey, prof.net || '') : prof.net;
+    if (meterBoot) meterBoot.style.setProperty('--meter', String(prof.bootMeter || 0.5));
+    if (meterRam) meterRam.style.setProperty('--meter', String(prof.ramMeter || 0.5));
 
     document.querySelectorAll('#engineStrip .engine-item').forEach((card) => {
       const modes = (card.getAttribute('data-modes') || '').split(/\s+/);
@@ -408,22 +576,23 @@
     });
   }
 
-  // Scroll Reveal + Scroll Meter + Sticky Mobile Dock
-  function setupScrollReveals() {
-    const items = document.querySelectorAll('.reveal-item');
+  // Band Boundary Rule Trace + Workbench Initial Pulse + Scroll-Linked Hero Pitch
+  function setupBandRules() {
+    const bands = document.querySelectorAll('.rule-band');
     if (!('IntersectionObserver' in window) || prefersReducedMotion()) {
-      items.forEach((el) => el.classList.add('is-revealed'));
+      bands.forEach((el) => el.classList.add('is-banded'));
       return;
     }
     const io = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          entry.target.classList.add('is-revealed');
+          entry.target.classList.add('is-banded');
+          if (entry.target.id === 'workbench') fireWbBus();
           io.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.1, rootMargin: '0px 0px -20px 0px' });
-    items.forEach((el) => io.observe(el));
+    }, { threshold: 0.14 });
+    bands.forEach((el) => io.observe(el));
   }
 
   let heroPast = false;
@@ -432,6 +601,12 @@
     const p = Math.min(1, Math.max(0, window.scrollY / maxScroll));
     const meter = document.getElementById('scrollMeter');
     if (meter) meter.style.setProperty('--scroll-p', p.toFixed(4));
+
+    const heroDeck = document.getElementById('heroDeck');
+    if (heroDeck && !prefersReducedMotion()) {
+      const heroP = Math.min(1, Math.max(0, window.scrollY / 560));
+      heroDeck.style.setProperty('--hero-p', heroP.toFixed(3));
+    }
 
     const dock = document.getElementById('mobileDock');
     const lbOpen = !document.getElementById('shotLightbox')?.hidden;
@@ -616,8 +791,122 @@
 
   attachSwipe(document.getElementById('heroDeckStage'), () => selectHeroDeck((heroShotIdx + 3) % 4, -1), () => selectHeroDeck((heroShotIdx + 1) % 4, 1));
   attachSwipe(document.getElementById('shotLightbox'), () => stepLightbox(-1), () => stepLightbox(1));
-  window.addEventListener('resize', () => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); }), { passive: true });
-  document.fonts?.ready?.then(() => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); }));
+
+  // Register Switcher (Player / End-User vs Technical / Power-User)
+  document.querySelectorAll('.tone-switch .tone-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setTone(btn.getAttribute('data-tone')));
+  });
+
+  // Hero Viewport Crosshair HUD (Mouse/Pointer only)
+  const heroStage = document.getElementById('heroDeckStage');
+  const hudLineX = document.getElementById('hudLineX');
+  const hudLineY = document.getElementById('hudLineY');
+  const hudCoords = document.getElementById('hudCoords');
+  if (heroStage && hudLineX && hudLineY && hudCoords) {
+    let hudRaf = false;
+    heroStage.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' || prefersReducedMotion() || hudRaf) return;
+      hudRaf = true;
+      requestAnimationFrame(() => {
+        hudRaf = false;
+        const rect = heroStage.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+        hudLineX.style.setProperty('--hx', `${x.toFixed(1)}px`);
+        hudLineY.style.setProperty('--hy', `${y.toFixed(1)}px`);
+        const px = Math.round((x / rect.width) * 1360);
+        const py = Math.round((y / rect.height) * 860);
+        hudCoords.textContent = `PX: ${px}, ${py} · 1360x860`;
+      });
+    }, { passive: true });
+  }
+
+  // Interactive .mca Portal Radar Drag/Click
+  const radarPad = document.getElementById('radarSourcePad');
+  const radarWrap = document.getElementById('portalRadar');
+  const radarSvg = document.getElementById('radarSvg');
+  if (radarPad && radarSvg) {
+    let radarDragging = false;
+    const applyRadarPointer = (clientX, clientY) => {
+      const rect = radarSvg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const svgX = ((clientX - rect.left) / rect.width) * 320;
+      const svgY = ((clientY - rect.top) / rect.height) * 96;
+      const normX = Math.max(-1, Math.min(1, (svgX - 71) / 56));
+      const normZ = Math.max(-1, Math.min(1, (svgY - 48) / 34));
+      const snapBlock = (v) => Math.round((v * 2048) / 16) * 16;
+      const owX = snapBlock(normX);
+      const owZ = snapBlock(normZ);
+      const cxEl = document.getElementById('coordX');
+      const czEl = document.getElementById('coordZ');
+      if (cxEl && czEl) {
+        cxEl.value = String(calcDir === 'o2n' ? owX : Math.floor(owX / 8));
+        czEl.value = String(calcDir === 'o2n' ? owZ : Math.floor(owZ / 8));
+      }
+      updateCalculator(!radarDragging);
+    };
+    radarPad.addEventListener('pointerdown', (e) => {
+      radarDragging = true;
+      radarWrap?.classList.add('is-dragging');
+      if (radarPad.setPointerCapture) radarPad.setPointerCapture(e.pointerId);
+      applyRadarPointer(e.clientX, e.clientY);
+    });
+    radarPad.addEventListener('pointermove', (e) => {
+      if (!radarDragging) return;
+      applyRadarPointer(e.clientX, e.clientY);
+    });
+    const endRadarDrag = () => {
+      if (!radarDragging) return;
+      radarDragging = false;
+      radarWrap?.classList.remove('is-dragging');
+    };
+    radarPad.addEventListener('pointerup', endRadarDrag);
+    radarPad.addEventListener('pointercancel', endRadarDrag);
+  }
+
+  // Horizontal Filmstrip Scrub Rail + Desktop Pointer Drag
+  const filmstrip = document.getElementById('filmstrip');
+  const railBar = document.getElementById('filmRailBar');
+  if (filmstrip) {
+    const syncFilmRail = () => {
+      if (!railBar) return;
+      const maxScroll = Math.max(1, filmstrip.scrollWidth - filmstrip.clientWidth);
+      const ratio = filmstrip.clientWidth / Math.max(1, filmstrip.scrollWidth);
+      const prog = Math.min(1, Math.max(ratio, ratio + (1 - ratio) * (filmstrip.scrollLeft / maxScroll)));
+      railBar.style.setProperty('--rail-p', prog.toFixed(3));
+    };
+    filmstrip.addEventListener('scroll', syncFilmRail, { passive: true });
+    let draggingStrip = false, dragStartX = 0, dragStartScroll = 0, movedStrip = false;
+    filmstrip.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || filmstrip.scrollWidth <= filmstrip.clientWidth) return;
+      draggingStrip = true;
+      movedStrip = false;
+      dragStartX = e.clientX;
+      dragStartScroll = filmstrip.scrollLeft;
+      filmstrip.classList.add('is-grabbing');
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!draggingStrip) return;
+      const dx = e.clientX - dragStartX;
+      if (Math.abs(dx) > 4) movedStrip = true;
+      filmstrip.scrollLeft = dragStartScroll - dx;
+    }, { passive: true });
+    window.addEventListener('pointerup', () => {
+      if (!draggingStrip) return;
+      draggingStrip = false;
+      filmstrip.classList.remove('is-grabbing');
+      if (movedStrip) {
+        const stopClick = (ev) => ev.stopPropagation();
+        filmstrip.addEventListener('click', stopClick, { capture: true, once: true });
+        setTimeout(() => filmstrip.removeEventListener('click', stopClick, { capture: true }), 80);
+      }
+    });
+    syncFilmRail();
+  }
+
+  window.addEventListener('resize', () => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); glideToneSwitch(); }), { passive: true });
+  document.fonts?.ready?.then(() => requestAnimationFrame(() => { glideHeroDeck(); glideWbTabs(); glideToneSwitch(); }));
   window.addEventListener('load', () => {
     SHOTS.forEach((s, i) => setTimeout(() => { const img = new Image(); img.src = assetUrl(s.file); }, i * 80));
   });
@@ -625,7 +914,7 @@
   // Boot
   highlightVisitorOs();
   applyLocale(currentLang);
-  setupScrollReveals();
+  setupBandRules();
   updateScrollState();
   hydrateLatestRelease();
 })();

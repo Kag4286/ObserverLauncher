@@ -33,6 +33,11 @@
       </nav>
 
       <div class="header-actions">
+        <div class="tone-switch tone-switch-desktop" role="radiogroup" aria-label="Reading style">
+          <span class="tone-thumb" aria-hidden="true"></span>
+          <button type="button" class="tone-btn active" data-tone="simple" role="radio" aria-checked="true" data-i18n="tone.simple">Player</button>
+          <button type="button" class="tone-btn" data-tone="tech" role="radio" aria-checked="false" data-i18n="tone.tech">Technical</button>
+        </div>
         <label class="sr-only" for="langSelect">Language</label>
         <select id="langSelect" class="lang-select" aria-label="Interface language">
           <option value="en">English</option>
@@ -49,6 +54,11 @@
 
     <nav class="mobile-subnav" aria-label="Quick section navigation">
       <div class="wrap mobile-subnav-inner">
+        <div class="tone-switch tone-switch-mobile" role="radiogroup" aria-label="Reading style">
+          <span class="tone-thumb" aria-hidden="true"></span>
+          <button type="button" class="tone-btn active" data-tone="simple" role="radio" aria-checked="true" data-i18n="tone.simple">Player</button>
+          <button type="button" class="tone-btn" data-tone="tech" role="radio" aria-checked="false" data-i18n="tone.tech">Technical</button>
+        </div>
         <a href="#workbench" data-i18n="nav.workbench">Workflow</a>
         <a href="#spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
         <a href="#ecosystem" data-i18n="nav.engines">Engines</a>
@@ -63,11 +73,11 @@
     <section class="hero-band">
       <div class="wrap hero-split">
         <div class="hero-copy">
-          <p class="hero-kicker mono hero-stagger" style="--hi:0" data-i18n="hero.kicker">Windows 10/11 &amp; Linux x86_64 · Apache-2.0 · No telemetry</p>
-          <h1 class="hero-stagger" style="--hi:1" data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
-          <p class="lead hero-stagger" style="--hi:2" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
+          <p class="hero-kicker mono hero-shutter" style="--si:0" data-i18n="hero.kicker">Windows 10/11 &amp; Linux x86_64 · Apache-2.0 · No telemetry</p>
+          <h1 class="hero-shutter" style="--si:1" data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
+          <p class="lead hero-shutter" style="--si:2" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
 
-          <div class="hero-actions hero-stagger" id="heroActions" style="--hi:3">
+          <div class="hero-actions hero-shutter" id="heroActions" style="--si:3">
             <a id="dlWin" class="btn primary" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
               <span data-i18n="hero.dlWin">Download Windows (.exe)</span>
               <span class="btn-sub" id="dlWinMeta">v9.0.0</span>
@@ -103,7 +113,7 @@
           </dl>
         </div>
 
-        <div class="hero-deck hero-stagger" style="--hi:4">
+        <div class="hero-deck" id="heroDeck">
           <div class="deck-toolbar">
             <div class="deck-tabs" role="tablist" aria-label="Core application screens" id="heroDeckTabs">
               <span class="deck-glide" id="deckGlide" aria-hidden="true"></span>
@@ -119,6 +129,11 @@
             <button type="button" class="shot-trigger" id="heroShotTrigger" aria-label="Inspect screenshot fullscreen">
               <img id="heroDeckImg" data-asset="docs/screenshot-overview.png" src="docs/screenshot-overview.png" width="1360" height="860" fetchpriority="high" decoding="sync" alt="ObserverLauncher Overview Control Deck">
             </button>
+            <div class="stage-hud" id="heroStageHud" aria-hidden="true">
+              <span class="hud-line hud-x" id="hudLineX"></span>
+              <span class="hud-line hud-y" id="hudLineY"></span>
+              <span class="hud-coords mono" id="hudCoords">PX: 680, 430 · 1360x860</span>
+            </div>
           </div>
 
           <div class="deck-caption">
@@ -132,10 +147,10 @@
       </div>
     </section>
 
-    <!-- Band 2: Contrast Mineral Stone Workbench (Manual Host vs ObserverLauncher Diff) -->
-    <section id="workbench" class="band-stone">
+    <!-- Band 2: Contrast Obsidian-Slate Workbench (Manual Host vs ObserverLauncher Convergence) -->
+    <section id="workbench" class="band-stone rule-band">
       <div class="wrap workbench-layout">
-        <div class="workbench-intro reveal-item" style="--ri:0">
+        <div class="workbench-intro">
           <span class="band-code mono">01 / WORKBENCH</span>
           <h2 data-i18n="wb.title">What you normally wire up by hand versus one desktop workspace.</h2>
           <p data-i18n="wb.sub">Pick how your group plays below to compare the fragmented manual setup against what ObserverLauncher automates locally.</p>
@@ -149,7 +164,7 @@
           </div>
         </div>
 
-        <div class="workbench-diff reveal-item" id="wbDiffPanel" style="--ri:1">
+        <div class="workbench-diff" id="wbDiffPanel">
           <div class="diff-col diff-manual">
             <div class="diff-col-head">
               <span class="mono" data-i18n="wb.manualTag">TYPICAL MANUAL STEPS</span>
@@ -158,20 +173,31 @@
             <ul class="diff-list" id="wbManualList"></ul>
           </div>
 
+          <div class="wb-bus-col" aria-hidden="true">
+            <svg class="wb-bus" id="wbBusSvg" viewBox="0 0 44 260" preserveAspectRatio="none">
+              <path class="bus-track" d="M0,34 C22,34 18,130 44,130 M0,82 C22,82 20,130 44,130 M0,130 L44,130 M0,178 C22,178 20,130 44,130 M0,226 C22,226 18,130 44,130"/>
+              <path class="bus-pulse" pathLength="100" d="M0,34 C22,34 18,130 44,130 M0,82 C22,82 20,130 44,130 M0,130 L44,130 M0,178 C22,178 20,130 44,130 M0,226 C22,226 18,130 44,130"/>
+            </svg>
+          </div>
+
           <div class="diff-col diff-observer">
             <div class="diff-col-head">
               <span class="mono" data-i18n="wb.obsTag">IN OBSERVERLAUNCHER</span>
               <span class="mono" id="wbObsOutcome">Handled inside app</span>
             </div>
             <div class="diff-summary" id="wbObsSummary"></div>
-            <p class="diff-module mono" id="wbObsModules"></p>
+            <div class="tech-receipt" id="wbReceiptWrap">
+              <div class="tech-receipt-inner">
+                <p class="diff-module mono" id="wbObsModules"></p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Band 3: Asymmetric Flagship Spotlight (Cartography + Interactive 1:8 Calculator & 3D Player Data) -->
-    <section id="spotlight" class="band-dark">
+    <!-- Band 3: Asymmetric Flagship Spotlight (Cartography + Interactive 1:8 Portal Radar & 3D Player Data) -->
+    <section id="spotlight" class="band-dark rule-band">
       <div class="wrap">
         <div class="section-head-split">
           <div>
@@ -181,8 +207,8 @@
           <p data-i18n="spot.sub">Built-in JavaScript parsers handle Anvil .mca chunk decompression in an idle-reclaimed worker thread, plus NBT equipment across 1.12 through 26.3 saves.</p>
         </div>
 
-        <!-- Spotlight Row A: World Map + Live 1:8 Nether Calculator -->
-        <div class="spot-row-a reveal-item" style="--ri:0">
+        <!-- Spotlight Row A: World Map + Interactive 1:8 Portal Radar Calculator -->
+        <div class="spot-row-a">
           <div class="spot-media">
             <button type="button" class="shot-trigger" data-lightbox-idx="8" aria-label="Open World Map screenshot fullscreen">
               <img data-asset="docs/screenshot-worldmap.png" src="docs/screenshot-worldmap.png" width="1360" height="860" loading="lazy" alt="ObserverLauncher offline .mca World Map">
@@ -219,6 +245,41 @@
               </div>
             </div>
 
+            <div class="portal-radar" id="portalRadar">
+              <div class="radar-head mono">
+                <span id="radarChunkTag">Chunk [50, -100] · r.1.-4.mca</span>
+                <span class="radar-hint" data-i18n="radar.dragHint">Drag pad or edit X/Z</span>
+              </div>
+              <svg class="radar-svg" id="radarSvg" viewBox="0 0 320 96" role="img" aria-label="Interactive Overworld to Nether 1:8 portal radar">
+                <g class="radar-pad" id="radarSourcePad">
+                  <rect x="6" y="6" width="130" height="84" rx="4" class="pad-bg"/>
+                  <path d="M38.5 6V90 M71 6V90 M103.5 6V90 M6 27H136 M6 48H136 M6 69H136" class="pad-grid"/>
+                  <line x1="71" y1="6" x2="71" y2="90" class="pad-axis"/>
+                  <line x1="6" y1="48" x2="136" y2="48" class="pad-axis"/>
+                  <text x="12" y="18" class="pad-lbl" data-i18n="radar.ow">OVERWORLD</text>
+                  <g id="radarOwDot" transform="translate(88 32)">
+                    <circle r="10" class="reticle-ring"/>
+                    <circle r="3" class="reticle-core"/>
+                  </g>
+                </g>
+                <g class="radar-bridge">
+                  <path id="radarBridgeLine" d="M142 48 L178 48" class="bridge-line" pathLength="100"/>
+                  <text x="160" y="39" text-anchor="middle" class="bridge-ratio" id="radarRatioLbl">1:8</text>
+                </g>
+                <g class="radar-pad">
+                  <rect x="184" y="6" width="130" height="84" rx="4" class="pad-bg pad-nether"/>
+                  <path d="M216.5 6V90 M249 6V90 M281.5 6V90 M184 27H314 M184 48H314 M184 69H314" class="pad-grid"/>
+                  <line x1="249" y1="6" x2="249" y2="90" class="pad-axis"/>
+                  <line x1="184" y1="48" x2="314" y2="48" class="pad-axis"/>
+                  <text x="190" y="18" class="pad-lbl" data-i18n="radar.nether">NETHER</text>
+                  <g id="radarNeDot" transform="translate(251 46)">
+                    <rect x="-6" y="-6" width="12" height="12" rx="2" class="reticle-box"/>
+                    <circle r="2.5" class="reticle-core"/>
+                  </g>
+                </g>
+              </svg>
+            </div>
+
             <div class="calc-output" id="calcOutput" aria-live="polite">
               <span class="mono calc-out-label" id="calcOutDim">NETHER TARGET COORDS</span>
               <strong class="mono calc-out-coords" id="calcOutCoords">X: 100 · Z: -200</strong>
@@ -232,7 +293,7 @@
         </div>
 
         <!-- Spotlight Row B: 3D Player Inspector & Inventory -->
-        <div class="spot-row-b reveal-item" style="--ri:1">
+        <div class="spot-row-b">
           <div class="spot-player-copy">
             <h3 data-i18n="ply.spotTitle">3D Player Inspector &amp; 9x4 Inventory</h3>
             <p data-i18n="ply.spotDesc">Inspect Mojang or SkinsRestorer skins, equipped armor, XP, and Ender Chests offline or live (including native Rust players before .dat files exist).</p>
@@ -245,11 +306,11 @@
             <dl class="nbt-ledger">
               <div>
                 <dt data-i18n="nbt.d1k">Save paths checked</dt>
-                <dd class="mono">&lt;world&gt;/playerdata/ + players/data/ (26.1+)</dd>
+                <dd class="mono" data-i18n="nbt.d1v">&lt;world&gt;/playerdata/ + players/data/ (26.1+)</dd>
               </div>
               <div>
                 <dt data-i18n="nbt.d2k">Armor formats</dt>
-                <dd class="mono">Inventory slots &amp; top-level equipment NBT</dd>
+                <dd class="mono" data-i18n="nbt.d2v">Inventory slots &amp; top-level equipment NBT</dd>
               </div>
               <div>
                 <dt data-i18n="nbt.d3k">Custom modded 3D armor</dt>
@@ -268,7 +329,7 @@
     </section>
 
     <!-- Band 4: Ecosystem Filmstrip & Interactive Runtime Ledger -->
-    <section id="ecosystem" class="band-dark">
+    <section id="ecosystem" class="band-dark rule-band">
       <div class="wrap">
         <div class="section-head-split">
           <div>
@@ -279,7 +340,7 @@
         </div>
 
         <div class="filmstrip" id="filmstrip" aria-label="Additional interface screens">
-          <article class="film-card reveal-item" style="--ri:0">
+          <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="4" aria-label="Inspect Content pagination screenshot">
               <img data-asset="docs/screenshot-content.png" src="docs/screenshot-content.png" width="1360" height="860" loading="lazy" alt="Paginated Content Manager">
             </button>
@@ -290,7 +351,7 @@
             </div>
           </article>
 
-          <article class="film-card reveal-item" style="--ri:1">
+          <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="5" aria-label="Inspect Marketplace screenshot">
               <img data-asset="docs/screenshot-marketplace.png" src="docs/screenshot-marketplace.png" width="1360" height="860" loading="lazy" alt="Modrinth and CurseForge Marketplace">
             </button>
@@ -301,7 +362,7 @@
             </div>
           </article>
 
-          <article class="film-card reveal-item" style="--ri:2">
+          <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="9" aria-label="Inspect 80-tool MCP settings screenshot">
               <img data-asset="docs/screenshot-MCP.png" src="docs/screenshot-MCP.png" width="1360" height="860" loading="lazy" alt="Local MCP Server Settings">
             </button>
@@ -312,7 +373,7 @@
             </div>
           </article>
 
-          <article class="film-card reveal-item" style="--ri:3">
+          <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="10" aria-label="Inspect Remote Web Dashboard screenshot">
               <img data-asset="docs/screenshot-remote-ui.png" src="docs/screenshot-remote-ui.png" width="1360" height="860" loading="lazy" alt="Remote Web Dashboard">
             </button>
@@ -323,9 +384,10 @@
             </div>
           </article>
         </div>
+        <div class="film-rail" aria-hidden="true"><span class="film-rail-bar" id="filmRailBar"></span></div>
 
         <!-- Runtime Profile Switcher & Engine Grid -->
-        <div class="engines-block reveal-item" style="--ri:0">
+        <div class="engines-block">
           <div class="engines-head">
             <h3 data-i18n="eng.title">Supported engines by runtime mode</h3>
             <div class="mode-bar" role="tablist" aria-label="Runtime profiles" id="modeBar">
@@ -338,8 +400,16 @@
           </div>
 
           <div class="mode-specs" id="modeSpecs">
-            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.bootLbl">BOOT / RUNTIME</span><strong class="mono" id="specBoot">Java 8 to 25 &amp; Rust</strong></div>
-            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.ramLbl">TYPICAL IDLE RAM</span><strong class="mono" id="specRam">~120 MB to 4 GB</strong></div>
+            <div class="mode-spec">
+              <span class="mode-spec-lbl" data-i18n="spec.bootLbl">BOOT / RUNTIME</span>
+              <strong class="mono" id="specBoot">Java 8 to 25 &amp; Rust</strong>
+              <span class="spec-meter" aria-hidden="true"><span class="spec-meter-fill" id="meterBoot"></span></span>
+            </div>
+            <div class="mode-spec">
+              <span class="mode-spec-lbl" data-i18n="spec.ramLbl">TYPICAL IDLE RAM</span>
+              <strong class="mono" id="specRam">~120 MB to 4 GB</strong>
+              <span class="spec-meter" aria-hidden="true"><span class="spec-meter-fill" id="meterRam"></span></span>
+            </div>
             <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.setupLbl">JAVA PROVISIONING</span><strong class="mono" id="specJava" data-i18n="spec.javaAll">Auto OpenJDK / None on Rust</strong></div>
             <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.netLbl">SHARING &amp; CONTROL</span><strong class="mono" id="specNet">Playit, Pinggy, SSE, MCP</strong></div>
           </div>
@@ -361,9 +431,9 @@
     </section>
 
     <!-- Band 5: Pre-flight Technical Sheet (SmartScreen & Honest Scope) -->
-    <section id="preflight" class="band-dark">
+    <section id="preflight" class="band-dark rule-band">
       <div class="wrap preflight-grid">
-        <div class="preflight-col reveal-item" style="--ri:0">
+        <div class="preflight-col">
           <span class="band-code mono">04 / BEFORE YOU RUN</span>
           <h2 data-i18n="faq.title">Windows SmartScreen &amp; Linux setup</h2>
           <div class="faq-list">
@@ -388,7 +458,7 @@
           </div>
         </div>
 
-        <div class="preflight-col reveal-item" style="--ri:1">
+        <div class="preflight-col">
           <span class="band-code mono">05 / HONEST SCOPE</span>
           <h2 data-i18n="scope.title">Where it fits, and where it does not</h2>
           <div class="scope-ledger">
