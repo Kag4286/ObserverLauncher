@@ -616,7 +616,14 @@ function handle(request) {
   if (kind === 'armormod' || kind === 'armormodlegs') {
     const layer = kind === 'armormodlegs' ? 2 : 1;
     const armorInfo = readModArmorInfo(file, layer);
-    if (armorInfo.buffer) return respondWithCachedPng(armorInfo.buffer, version, kind, file);
+    const warnStatus = armorInfo.isCustomGeo ? 'custom-geo' : (armorInfo.nonStandardUv ? 'nonstandard-uv' : '');
+    if (armorInfo.buffer) {
+      const dest = path.join(cacheRoot(), version, kind, file);
+      try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, armorInfo.buffer); } catch {}
+      const headers = { ...PNG_HEADERS, 'cache-control': 'no-store' };
+      if (warnStatus) headers['x-observer-armor-status'] = warnStatus;
+      return new Response(armorInfo.buffer, { headers });
+    }
     return new Response(PLACEHOLDER_PNG, {
       headers: {
         ...PNG_HEADERS,

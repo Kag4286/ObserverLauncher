@@ -17,8 +17,27 @@ const { areMcVersionsCompatible } = require('../main/mc-compat.js');
 // (marketplace.js market:install) and the MCP install tools already use, so nothing drifts.
 function folderForKind(kind, levelName) {
   if (kind === 'datapack') return path.join(levelName || 'world', 'datapacks');
-  if (kind === 'mod' || kind === 'forge' || kind === 'fabric' || kind === 'neoforge') return 'mods';
+  if (kind === 'mod' || kind === 'forge' || kind === 'fabric' || kind === 'neoforge' || kind === 'quilt') return 'mods';
   return 'plugins';
+}
+
+// Classify client/server install side requirement from Modrinth env metadata ({ client, server })
+// or normalized env string. Lets AI clearly separate vanilla-compatible server-only mods from mods
+// every joining player must also install locally.
+function classifySideRequirement(env) {
+  if (!env) return 'unknown';
+  if (typeof env === 'string') {
+    if (env === 'client-only') return 'client-only';
+    if (env === 'server-only') return 'server-only';
+    if (env === 'both') return 'both-required';
+    return 'unknown';
+  }
+  const c = String(env.client || '').toLowerCase();
+  const s = String(env.server || '').toLowerCase();
+  if (s === 'unsupported') return 'client-only';
+  if (c === 'required' && (s === 'required' || s === 'optional' || !s)) return 'both-required';
+  if ((s === 'required' || s === 'optional') && (c === 'optional' || c === 'unsupported' || !c)) return 'server-only';
+  return 'unknown';
 }
 
 // Compatibility of one resolved item against the detected server.
@@ -114,7 +133,7 @@ function planWarnings(items, server, opts) {
   const o = opts || {};
   const srv = server || {};
   const warnings = [];
-  const isModLike = it => ['mod', 'forge', 'fabric', 'neoforge'].includes(it.kind);
+  const isModLike = it => ['mod', 'forge', 'fabric', 'neoforge', 'quilt'].includes(it.kind);
   // (a) Fabric/Quilt server with mods but no Fabric API in the plan -> many mods silently no-op.
   if (['fabric', 'quilt'].includes(srv.loader)) {
     const mods = list.filter(isModLike);
@@ -162,7 +181,7 @@ function missingDependencies(declared, present) {
   const have = present instanceof Set ? present : new Set((present || []).map(String));
   const platform = new Set(['minecraft', 'neoforge', 'forge', 'fabricloader', 'quilt_loader', 'java', 'fabric-api']);
   const missing = [];
-  const seen = new Set();
+  const byKey = new Map();
   for (const d of declared || []) {
     // v2.3.1: skip optional AND incompatible deps. `incompatible` means the mod must NOT be
     // present, so it is never a MISSING dependency (it is handled by conflictingDependencies).
@@ -172,9 +191,20 @@ function missingDependencies(declared, present) {
     if (platform.has(id.toLowerCase())) continue;
     if (have.has(id) || have.has(id.toLowerCase())) continue;
     const key = id.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    missing.push({ modId: id, versionRange: d.versionRange || '*', neededBy: d.from || null });
+    const reqFile = d.fileName || d.from || null;
+    const existing = byKey.get(key);
+    if (existing) {
+      if (reqFile && !existing.neededByAll.includes(reqFile)) existing.neededByAll.push(reqFile);
+      continue;
+    }
+    const entry = {
+      modId: id,
+      versionRange: d.versionRange || '*',
+      neededBy: reqFile,
+      neededByAll: reqFile ? [reqFile] : [],
+    };
+    byKey.set(key, entry);
+    missing.push(entry);
   }
   return missing;
 }
@@ -199,4 +229,4 @@ function conflictingDependencies(declared, present) {
   return conflicts;
 }
 
-module.exports = { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY };
+module.exports = { folderForKind, itemCompat, classifySideRequirement, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY };

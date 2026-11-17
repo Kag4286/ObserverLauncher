@@ -1,7 +1,7 @@
 // A3 (v2.1.0): planConflicts is the item-vs-ITEM check that itemCompat (item-vs-server) does not do.
 // Pure module - no electron, no network.
 const assert = require('assert');
-const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, LOADER_FAMILY } = require('../src/mcp/modpack-plan.js');
+const { folderForKind, itemCompat, classifySideRequirement, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, LOADER_FAMILY } = require('../src/mcp/modpack-plan.js');
 
 let passed = 0;
 function ok(name, cond) { assert(cond, `FAIL: ${name}`); console.log(`PASS ${name}`); passed++; }
@@ -9,8 +9,15 @@ function ok(name, cond) { assert(cond, `FAIL: ${name}`); console.log(`PASS ${nam
 // --- folderForKind ---
 ok('datapack -> world/datapacks', folderForKind('datapack', 'world') === require('path').join('world', 'datapacks'));
 ok('mod -> mods', folderForKind('mod', 'world') === 'mods');
-ok('forge/fabric/neoforge -> mods', folderForKind('forge', 'w') === 'mods' && folderForKind('fabric', 'w') === 'mods' && folderForKind('neoforge', 'w') === 'mods');
+ok('forge/fabric/neoforge/quilt -> mods', folderForKind('forge', 'w') === 'mods' && folderForKind('fabric', 'w') === 'mods' && folderForKind('neoforge', 'w') === 'mods' && folderForKind('quilt', 'w') === 'mods');
 ok('plugin -> plugins', folderForKind('plugin', 'world') === 'plugins');
+
+// --- classifySideRequirement ---
+ok('classifySideRequirement server-only', classifySideRequirement({ client: 'optional', server: 'required' }) === 'server-only');
+ok('classifySideRequirement server unsupported client', classifySideRequirement({ client: 'unsupported', server: 'required' }) === 'server-only');
+ok('classifySideRequirement both-required', classifySideRequirement({ client: 'required', server: 'required' }) === 'both-required');
+ok('classifySideRequirement client-only', classifySideRequirement({ client: 'required', server: 'unsupported' }) === 'client-only');
+ok('classifySideRequirement unknown', classifySideRequirement(null) === 'unknown');
 
 // --- itemCompat (existing behaviour still holds) ---
 const srv = { mc: '1.20.1', loader: 'fabric' };

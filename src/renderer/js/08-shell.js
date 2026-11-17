@@ -696,7 +696,7 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!isNatSave && !r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
-  state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};markSettingsSaved();refreshUI();
+  state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};refreshUI();markSettingsSaved();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(isNatSave?t('toast.settingsSaved'):r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });
@@ -1119,7 +1119,8 @@ $('#javaAutoInstall').onclick=async()=>{
   const r=await window.observer.javaAutoInstall();
   btn.disabled=false;btn.textContent=original; $('#javaProgress').hidden=true;
   if(!r.ok)return toast(r.error,'error');
-  state.java=r.java;state.settings={...state.settings,javaPath:r.java.path};markSettingsSaved();refreshUI();
+  if(typeof _javaRuntimes!=='undefined')_javaRuntimes=null;
+  state.java=r.java;state.settings={...state.settings,javaPath:r.java.path};refreshUI();markSettingsSaved();
   toast(t('toast.javaInstalled',{v:r.java.version}),'success');
 };
 
@@ -1258,7 +1259,7 @@ if(initial.settings?.remoteEnabled&&!initial.remote?.running||initial.settings?.
 // cover the server-path text in the command bar. Detect the Window Controls Overlay and flag it so
 // CSS can reserve its width (.wco-app rules in style.css).
 try{const wco=navigator.windowControlsOverlay;if(wco){const sync=()=>document.documentElement.classList.toggle('wco-app',!!wco.visible);sync();wco.addEventListener('geometrychange',sync);}}catch{}
-bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window.observer.marketVersions();if(v.ok)$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
+bootStep(85,'boot.market');const v=window.observer.isE2E?{ok:false}:await window.observer.marketVersions();if(v.ok){$('#marketVersion').innerHTML='<option value="">All versions</option>'+v.versions.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(typeof syncMarketControls==='function')syncMarketControls(false);}requestAnimationFrame(positionChannelIndicator);window.addEventListener('resize',()=>{metricChart($('#perfTickChart'),true,'tick');metricChart($('#perfResourceChart'),true,'resource');positionChannelIndicator();bootFinish()})})();
 
 // ===== DOCKER EXPORT =====
 $('#exportDockerBtn')?.addEventListener('click', () => withBusy($('#exportDockerBtn'), async () => {

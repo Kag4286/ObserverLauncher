@@ -3,16 +3,42 @@
 // incompatible mod pairs, and client-only mods.
 const fs = require('fs');
 const path = require('path');
-const { openJar } = require('./jar-read.js');
-const { classifyJar } = require('./mod-metadata.js');
+const { openJar, openJarFromBuffer } = require('./jar-read.js');
+const { classifyJar, selectLoaderProfile } = require('./mod-metadata.js');
 const { serverFiles } = require('./server-files.js');
 const { detectServerTarget, LOADER_FAMILY } = require('./server-compat.js');
 const { readJsonList } = require('./fs-utils.js');
 const { missingDependencies, conflictingDependencies } = require('../mcp/modpack-plan.js');
 const { checkMcCompat } = require('./mc-compat.js');
 
+function extractEmbeddedIds(jar, cls) {
+  const embeddedIds = new Set();
+  if (!jar || typeof jar.readBuffer !== 'function') return [];
+  const candidates = new Set((cls && cls.embeddedJarPaths) || []);
+  if (typeof jar.list === 'function') {
+    for (const entryName of jar.list()) {
+      if (/^META-INF\/(?:jars|jarjar)\/[^/]+\.jar$/i.test(entryName)) candidates.add(entryName);
+    }
+  }
+  let count = 0;
+  for (const rel of candidates) {
+    if (count >= 128) break;
+    count++;
+    const subRes = jar.readBuffer(rel);
+    if (!subRes || !subRes.ok || !subRes.data) continue;
+    try {
+      const subJar = openJarFromBuffer(subRes.data);
+      if (subJar.error) continue;
+      const subCls = classifyJar(subJar.read, path.basename(rel));
+      if (subCls.modId) embeddedIds.add(String(subCls.modId).toLowerCase());
+      for (const p of subCls.provides || []) embeddedIds.add(String(p).toLowerCase());
+    } catch {}
+  }
+  return Array.from(embeddedIds);
+}
+
 const _classifyCache = new Map();
-function safeClassify(folder, fileName) {
+function safeClassify(folder, fileName, serverLoader) {
   try {
     const filePath = path.join(folder, fileName);
     let mtime = null;
@@ -24,18 +50,26 @@ function safeClassify(folder, fileName) {
         size = st.size;
       }
     } catch {}
+    let cls = null;
     if (mtime !== null && size !== null) {
       const cached = _classifyCache.get(filePath);
       if (cached && cached.mtime === mtime && cached.size === size) {
-        return cached.cls;
+        cls = cached.cls;
       }
     }
-    const jar = openJar(filePath);
-    const cls = classifyJar(jar.read, fileName);
-    if (mtime !== null && size !== null) {
-      _classifyCache.set(filePath, { mtime, size, cls });
+    if (!cls) {
+      const jar = openJar(filePath);
+      if (jar && jar.error) {
+        cls = { _jarError: jar.error, name: null, version: null, loader: null, modId: null };
+      } else {
+        cls = classifyJar(jar.read, fileName);
+        cls.embeddedIds = extractEmbeddedIds(jar, cls);
+      }
+      if (mtime !== null && size !== null) _classifyCache.set(filePath, { mtime, size, cls });
     }
-    return cls;
+    if (cls._jarError) return cls;
+    const out = serverLoader ? selectLoaderProfile({ ...cls }, serverLoader) : { ...cls };
+    return out;
   } catch {
     return null;
   }
@@ -55,6 +89,53 @@ function normalizeDep(sourceName, fileName, kind, dep) {
   };
 }
 
+function collectFolderEntries(folder, fileList, kind, disabledScanned, issues, serverLoader) {
+  const active = [];
+  for (const name of fileList) {
+    const isDisabled = /\.disabled$/i.test(name);
+    const cls = safeClassify(folder, name, kind === 'mod' ? serverLoader : null);
+    if (!cls) continue;
+    if (isDisabled) {
+      if (!cls._jarError) disabledScanned.push({ name, cls });
+      continue;
+    }
+    if (cls._jarError) {
+      issues.push({
+        fileName: name,
+        kind,
+        type: 'corrupt-jar',
+        detail: cls._jarError === 'not-a-zip'
+          ? 'File is not a valid JAR/ZIP archive (corrupt or incomplete download).'
+          : `Could not read JAR file (${cls._jarError}).`
+      });
+      continue;
+    }
+    active.push({ name, cls });
+  }
+  return active;
+}
+
+function recordModPresence(cls, name, state) {
+  const mid = cls.modId ? String(cls.modId).toLowerCase() : null;
+  if (mid) {
+    state.present.add(mid);
+    if (mid === 'fabric-api' || mid === 'fabric' || mid === 'quilted_fabric_api') {
+      state.hasFabricApi = true;
+      state.present.add('fabric-api');
+      state.present.add('fabric');
+    }
+    if (!state.idToFiles.has(mid)) state.idToFiles.set(mid, []);
+    state.idToFiles.get(mid).push({ fileName: name, kind: 'mod', title: cls.name || cls.modId });
+  }
+  for (const p of cls.provides || []) {
+    const pid = String(p).toLowerCase();
+    state.present.add(pid);
+    if (pid === 'fabric-api' || pid === 'fabric') state.hasFabricApi = true;
+  }
+  for (const eid of cls.embeddedIds || []) state.present.add(String(eid).toLowerCase());
+  if (cls.requiresFabricApi) state.fabricApiRequirers.push({ from: cls.modId || name, fileName: name });
+}
+
 async function scanContentConflicts(root, options = {}) {
   const f = options.files || serverFiles(root);
   const server = options.server || detectServerTarget(root, f);
@@ -67,29 +148,20 @@ async function scanContentConflicts(root, options = {}) {
     }
   } catch {}
 
-  const modFiles = (f.mods || []).filter(name => !/\.disabled$/i.test(name));
-  const pluginFiles = (f.plugins || []).filter(name => !/\.disabled$/i.test(name));
-
   const scanned = [];
+  const disabledScanned = [];
   const idToFiles = new Map();
   const present = new Set();
   const declared = [];
   const issues = [];
+  const modState = { present, idToFiles, hasFabricApi: false, fabricApiRequirers: [] };
 
-  // 1. Scan mods
-  const modsFolder = path.join(root, 'mods');
-  for (const name of modFiles) {
-    const cls = safeClassify(modsFolder, name);
-    if (!cls) continue;
+  // 1. Scan active mods (and capture disabled mod display metadata without flagging conflicts)
+  const activeMods = collectFolderEntries(path.join(root, 'mods'), f.mods || [], 'mod', disabledScanned, issues, server.loader);
+  for (const { name, cls } of activeMods) {
     if (!cls.env) cls.env = manifestEnv[String(name).toLowerCase()] || cls.envHint || null;
     scanned.push({ name, kind: 'mod', cls });
-
-    const mid = cls.modId ? String(cls.modId).toLowerCase() : null;
-    if (mid) {
-      present.add(mid);
-      if (!idToFiles.has(mid)) idToFiles.set(mid, []);
-      idToFiles.get(mid).push({ fileName: name, kind: 'mod', title: cls.name || cls.modId });
-    }
+    recordModPresence(cls, name, modState);
 
     if (cls.loader && !cls.loaderGuessed && families.length && !families.includes(cls.loader)) {
       issues.push({
@@ -134,11 +206,9 @@ async function scanContentConflicts(root, options = {}) {
     }
   }
 
-  // 2. Scan plugins
-  const pluginsFolder = path.join(root, 'plugins');
-  for (const name of pluginFiles) {
-    const cls = safeClassify(pluginsFolder, name);
-    if (!cls) continue;
+  // 2. Scan plugins (and capture disabled plugin metadata)
+  const activePlugins = collectFolderEntries(path.join(root, 'plugins'), f.plugins || [], 'plugin', disabledScanned, issues);
+  for (const { name, cls } of activePlugins) {
     scanned.push({ name, kind: 'plugin', cls });
     const pid = (cls.name || cls.modId) ? String(cls.name || cls.modId).toLowerCase() : null;
     if (pid) {
@@ -186,13 +256,27 @@ async function scanContentConflicts(root, options = {}) {
 
   // 4. Missing dependencies & Incompatibilities
   const missing = missingDependencies(declared, present);
+  if (['fabric', 'quilt'].includes(server.loader) && !modState.hasFabricApi && modState.fabricApiRequirers.length) {
+    const firstReq = modState.fabricApiRequirers[0];
+    const extraCount = modState.fabricApiRequirers.length - 1;
+    missing.push({
+      modId: 'fabric-api',
+      versionRange: '*',
+      neededBy: firstReq.fileName,
+      neededByAll: [...new Set(modState.fabricApiRequirers.map(r => r.fileName).filter(Boolean))],
+      detailSuffix: extraCount > 0 ? ` (needed by ${modState.fabricApiRequirers.length} mods)` : ''
+    });
+  }
   for (const m of missing) {
+    const affectedFiles = Array.isArray(m.neededByAll) && m.neededByAll.length ? m.neededByAll : (m.neededBy ? [m.neededBy] : []);
+    const multiSuffix = !m.detailSuffix && affectedFiles.length > 1 ? ` (needed by ${affectedFiles.length} mods)` : (m.detailSuffix || '');
     issues.push({
       fileName: m.neededBy,
+      affectedFiles,
       type: 'missing-dep',
       requiredModId: m.modId,
       versionRange: m.versionRange,
-      detail: `Missing required dependency: ${m.modId}${m.versionRange && m.versionRange !== '*' ? ` (${m.versionRange})` : ''}.`
+      detail: `Missing required dependency: ${m.modId}${m.versionRange && m.versionRange !== '*' ? ` (${m.versionRange})` : ''}${multiSuffix}.`
     });
   }
 
@@ -208,13 +292,16 @@ async function scanContentConflicts(root, options = {}) {
   }
 
   const metadata = {};
-  for (const item of scanned) {
-    if (item.cls) {
+  for (const item of [...scanned, ...disabledScanned]) {
+    if (item.cls && !item.cls._jarError) {
       metadata[item.name] = {
         name: item.cls.name || null,
         version: item.cls.version || null,
         loader: item.cls.loader || null,
-        modId: item.cls.modId || null
+        loaders: Array.isArray(item.cls.loaders) ? item.cls.loaders : (item.cls.loader ? [item.cls.loader] : []),
+        modId: item.cls.modId || null,
+        provides: Array.isArray(item.cls.provides) ? item.cls.provides : [],
+        embeddedIds: Array.isArray(item.cls.embeddedIds) ? item.cls.embeddedIds : [],
       };
     }
   }
@@ -231,4 +318,4 @@ async function scanContentConflicts(root, options = {}) {
   };
 }
 
-module.exports = { scanContentConflicts, safeClassify };
+module.exports = { scanContentConflicts, safeClassify, recordModPresence };

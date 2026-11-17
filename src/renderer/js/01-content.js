@@ -30,12 +30,35 @@ async function loadContentUpdates(btn){
   loadContentConflicts();
   refreshUI();
 }
+function issueBadgeInfo(type){
+  switch(type){
+    case 'duplicate':return{cls:'bad',text:t('cnt.issue_duplicate')};
+    case 'loader-mismatch':return{cls:'bad',text:t('cnt.issue_loader_mismatch')};
+    case 'mc-incompatible':return{cls:'bad',text:t('cnt.issue_mc_incompatible')};
+    case 'corrupt-jar':return{cls:'bad',text:t('cnt.issue_corrupt_jar')};
+    case 'missing-dep':return{cls:'warn',text:t('cnt.issue_missing_dep')};
+    case 'conflict':return{cls:'bad',text:t('cnt.issue_conflict')};
+    case 'client-only':return{cls:'warn',text:t('cnt.issue_client_only')};
+    default:return{cls:'',text:t('cnt.conflictBadge')};
+  }
+}
+let _conflictsLoading=false;
 async function loadContentConflicts(){
-  if(!window.observer.contentConflicts)return;
+  if(!window.observer.contentConflicts||_conflictsLoading)return;
+  _conflictsLoading=true;
+  const rescanBtn=$('#ccbRescan');
+  if(rescanBtn)rescanBtn.disabled=true;
   try{
     const r=await window.observer.contentConflicts();
     state.contentConflicts=r||null;
+    if(r&&r.ok===false&&r.error&&!(r.issues&&r.issues.length)){
+      toast(t('cnt.scanFailed',{m:r.error}),'error');
+    }
   }catch{state.contentConflicts=null}
+  finally{
+    _conflictsLoading=false;
+    if(rescanBtn)rescanBtn.disabled=false;
+  }
   renderContentConflicts();
   updateContentToolbarState();
   if(state.files){
@@ -45,9 +68,33 @@ async function loadContentConflicts(){
     renderFiles('#datapacksList',f.datapacks||[],'datapack');
   }
 }
+function depSearchQuery(modId) {
+  const raw = String(modId || '').trim();
+  const low = raw.toLowerCase();
+  if (!raw) return '';
+  if (low === 'fabric-api' || low === 'fabric' || /^fabric-(?:api-base|[\w-]+-v\d+)$/i.test(low)) return 'fabric-api';
+  const map = {
+    yet_another_config_lib_v3: 'yet another config lib',
+    yacl: 'yet another config lib',
+    kotlinforforge: 'kotlin for forge',
+    kffmod: 'kotlin for forge',
+    fzzy_config: 'fzzy config',
+    puzzleslib: 'puzzles lib',
+    owo: 'owo lib',
+  };
+  if (map[low]) return map[low];
+  return raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function issueAppliesToFile(iss, fileName) {
+  const target = String(fileName || '').toLowerCase();
+  if (!target || !iss) return false;
+  if (String(iss.fileName || iss.neededBy || '').toLowerCase() === target) return true;
+  return Array.isArray(iss.affectedFiles) && iss.affectedFiles.some(f => String(f || '').toLowerCase() === target);
+}
 function renderContentConflicts(){
-  const box=$('#contentConflictsBanner'),title=$('#ccbTitle'),list=$('#ccbList'),toggle=$('#ccbToggle');
+  const box=$('#contentConflictsBanner'),title=$('#ccbTitle'),list=$('#ccbList'),toggle=$('#ccbToggle'),rescan=$('#ccbRescan');
   if(!box)return;
+  if(rescan)rescan.onclick=()=>loadContentConflicts();
   const data=state.contentConflicts;
   const issues=(data&&data.issues)||[];
   if(!issues.length){
@@ -68,18 +115,16 @@ function renderContentConflicts(){
   }
   if(list){
     list.innerHTML=issues.map(iss=>{
-      const isDup=iss.type==='duplicate';
-      const isMismatch=iss.type==='loader-mismatch';
-      const isMissing=iss.type==='missing-dep';
-      const badgeClass=isDup?'bad':isMismatch?'bad':isMissing?'warn':'';
-      let badgeText=t('cnt.conflictBadge');
-      if(iss.type==='duplicate')badgeText=t('cnt.issue_duplicate');
-      else if(iss.type==='loader-mismatch')badgeText=t('cnt.issue_loader_mismatch');
-      else if(iss.type==='missing-dep')badgeText=t('cnt.issue_missing_dep');
-      else if(iss.type==='conflict')badgeText=t('cnt.issue_conflict');
-      else if(iss.type==='client-only')badgeText=t('cnt.issue_client_only');
-      return `<li class="ccb-item"><span class="ccb-badge ${badgeClass}">${esc(badgeText)}</span><span class="ccb-file mono">${esc(iss.fileName||iss.neededBy||'')}</span><span class="ccb-detail">${esc(iss.detail)}</span></li>`;
+      const info=issueBadgeInfo(iss.type);
+      const findBtn=(iss.type==='missing-dep'&&iss.requiredModId)
+        ?`<button type="button" class="btn xs secondary" data-find-dep="${esc(iss.requiredModId)}">${esc(t('cnt.findDep'))} ↗</button>`:'';
+      const filesList=(Array.isArray(iss.affectedFiles)&&iss.affectedFiles.length?iss.affectedFiles:[iss.fileName||iss.neededBy||'']).filter(Boolean).join('|');
+      return `<li class="ccb-item" data-issue-files="${esc(filesList)}"><span class="ccb-badge ${info.cls}">${esc(info.text)}</span><span class="ccb-file mono" title="${esc(iss.fileName||iss.neededBy||'')}">${esc(iss.fileName||iss.neededBy||'')}</span><span class="ccb-detail">${esc(iss.detail)}</span>${findBtn}</li>`;
     }).join('');
+    list.querySelectorAll('[data-find-dep]').forEach(b=>b.onclick=()=>{
+      const q=depSearchQuery(b.dataset.findDep||'');
+      jumpToMarket(contentKind==='plugin'?'plugin':'mod',q);
+    });
   }
 }
 async function renderContentUpdatesPill(){
@@ -116,11 +161,16 @@ async function rollbackLastContentUpdate(sessionId){
   refreshUI();
   toast(t('toast.rollbackSuccess',{n:r.rolledBackCount||1}),'success');
 }
-function jumpToMarket(kind){
+function jumpToMarket(kind,initialQuery){
   switchTab('marketplace');
-  const map={plugin:'plugin',datapack:'datapack',mod:/forge|neoforge/i.test(state.files?.jar||'')?'forge':/fabric|quilt/i.test(state.files?.jar||'')?'fabric':'plugin'};
-  if(map[kind])$('#marketKind').value=map[kind];
-  $('#marketQuery').value='';
+  const tLdr=state.files?.target?.loader;
+  const modLoader=(tLdr&&['fabric','quilt','neoforge','forge'].includes(tLdr))
+    ?tLdr
+    :(/neoforge/i.test(state.files?.jar||'')?'neoforge':/forge/i.test(state.files?.jar||'')?'forge':/quilt/i.test(state.files?.jar||'')?'quilt':/fabric/i.test(state.files?.jar||'')?'fabric':'mod');
+  const map={plugin:'plugin',datapack:'datapack',mod:modLoader,modpack:'modpack'};
+  if(map[kind]&&$('#marketKind'))$('#marketKind').value=map[kind];
+  if(typeof syncMarketUiFromKind==='function')syncMarketUiFromKind();
+  $('#marketQuery').value=initialQuery||'';
   runMarketSearch(1);
   setTimeout(()=>$('#marketQuery')?.focus(),200);
 }
@@ -544,16 +594,14 @@ function renderFiles(id, files, kind) {
     const hasUpdate = info && info.status === 'update' && !off;
     const upBtn = hasUpdate ? `<button type="button" class="cr-badge update" data-update-content="${esc(kind)}" data-update-file="${esc(x)}" title="${esc(t('cnt.confirmUpdate', { n: x }))}">↳ ${esc(info.latestNumber || '')} ⚡</button>` : '';
 
-    const fileConflict = conflictList.find(iss => String(iss.fileName || iss.neededBy).toLowerCase() === String(x).toLowerCase());
+    const fileIssues = off ? [] : conflictList.filter(iss => issueAppliesToFile(iss, x));
     let conflictBadge = '';
-    if (fileConflict) {
-      let badgeText = t('cnt.conflictBadge');
-      if (fileConflict.type === 'duplicate') badgeText = t('cnt.issue_duplicate');
-      else if (fileConflict.type === 'loader-mismatch') badgeText = t('cnt.issue_loader_mismatch');
-      else if (fileConflict.type === 'missing-dep') badgeText = t('cnt.issue_missing_dep');
-      else if (fileConflict.type === 'conflict') badgeText = t('cnt.issue_conflict');
-      else if (fileConflict.type === 'client-only') badgeText = t('cnt.issue_client_only');
-      conflictBadge = `<span class="cr-badge issue" title="${esc(fileConflict.detail)}">⚠ ${esc(badgeText)}</span>`;
+    if (fileIssues.length) {
+      const primary = fileIssues.find(i => ['corrupt-jar', 'loader-mismatch', 'mc-incompatible', 'duplicate', 'conflict'].includes(i.type)) || fileIssues[0];
+      const info = issueBadgeInfo(primary.type);
+      const extra = fileIssues.length > 1 ? ` +${fileIssues.length - 1}` : '';
+      const tip = fileIssues.map(i => i.detail).filter(Boolean).join('\n');
+      conflictBadge = `<button type="button" class="cr-badge issue" data-jump-issue="${esc(x)}" title="${esc(tip)}">! ${esc(info.text + extra)}</button>`;
     }
 
     let dpBtns = '';
@@ -562,7 +610,7 @@ function renderFiles(id, files, kind) {
       if (/\.zip$/i.test(x)) dpBtns += '<button class="text-btn sm" data-extract-dp="' + esc(x) + '">' + esc(t('cnt.extract')) + '</button>';
     }
 
-    return `<li data-name="${esc(x)}" data-title="${esc(cleanTitle)}" data-off="${off ? '1' : '0'}" data-has-update="${hasUpdate ? '1' : '0'}" data-has-issue="${fileConflict ? '1' : '0'}" class="content-row ${off ? 'is-disabled' : ''}" title="${esc(x)}">
+    return `<li data-name="${esc(x)}" data-title="${esc(cleanTitle)}" data-off="${off ? '1' : '0'}" data-has-update="${hasUpdate ? '1' : '0'}" data-has-issue="${fileIssues.length ? '1' : '0'}" class="content-row ${off ? 'is-disabled' : ''}" title="${esc(x)}">
       <div class="cr-left">
         <div class="cr-glyph" style="background:${glyph.bg};border:1px solid ${glyph.border};color:${glyph.color};" aria-hidden="true">${glyph.text}</div>
         <div class="cr-info">
@@ -817,6 +865,25 @@ $$(CONTENT_LIST_SEL).forEach(list => {
   });
 
   list.addEventListener('click', async e => {
+    const issueBtn = e.target.closest('[data-jump-issue]');
+    if (issueBtn) {
+      const targetFile = String(issueBtn.dataset.jumpIssue || '').toLowerCase();
+      const box = $('#contentConflictsBanner'), toggle = $('#ccbToggle');
+      if (box) {
+        box.hidden = false;
+        box.classList.add('is-open');
+        if (toggle) toggle.textContent = t('cnt.hideDetails');
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        $$('#ccbList .ccb-item').forEach(li => {
+          const files = String(li.dataset.issueFiles || '').toLowerCase().split('|');
+          const match = targetFile && files.includes(targetFile);
+          li.classList.toggle('is-flash', match);
+          if (match) setTimeout(() => li.classList.remove('is-flash'), 1600);
+        });
+      }
+      return;
+    }
+
     const cfgBtn = e.target.closest('[data-config-file]');
     if (cfgBtn) {
       jumpToModConfig(cfgBtn.dataset.configFile, kind);

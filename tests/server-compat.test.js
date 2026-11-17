@@ -32,7 +32,19 @@ check('spigot -> paper/1.20.4', JSON.stringify(detectServerTarget(spig, serverFi
 const cb = makeServer({ jar: 'craftbukkit-1.16.5.jar' });
 check('craftbukkit -> paper/1.16.5', JSON.stringify(detectServerTarget(cb, serverFiles(cb))) === JSON.stringify({ mc: '1.16.5', loader: 'paper' }));
 const fab = makeServer({ jar: 'fabric-server-mc.1.20.1.jar' });
-check('fabric -> fabric/1.20.1', detectServerTarget(fab, serverFiles(fab)).loader === 'fabric');
+check('fabric -> fabric/1.20.1', (() => { const d = detectServerTarget(fab, serverFiles(fab)); return d.loader === 'fabric' && d.mc === '1.20.1'; })());
+check('mcFromName fabric-server-mc.1.20.1-loader.0.16.10.jar', mcFromName('fabric-server-mc.1.20.1-loader.0.16.10.jar') === '1.20.1');
+const fabLaunch = makeServer({ jar: 'fabric-server-launch.jar' });
+fs.writeFileSync(path.join(fabLaunch, 'server.jar'), 'vanilla');
+fs.mkdirSync(path.join(fabLaunch, 'libraries', 'net', 'fabricmc', 'intermediary', '1.20.1'), { recursive: true });
+const flFiles = serverFiles(fabLaunch);
+const flTarget = detectServerTarget(fabLaunch, flFiles);
+check('serverFiles prefers fabric-server-launch.jar over server.jar', flFiles.jar === 'fabric-server-launch.jar');
+check('opaque fabric-server-launch.jar detects fabric + 1.20.1', flTarget.loader === 'fabric' && flTarget.mc === '1.20.1');
+const fabRemap = makeServer({ jar: 'server.jar' });
+fs.mkdirSync(path.join(fabRemap, '.fabric', 'remappedJars', 'minecraft-1.20.1-0.16.10'), { recursive: true });
+const frTarget = detectServerTarget(fabRemap, serverFiles(fabRemap));
+check('renamed server.jar + .fabric/remappedJars detects fabric + 1.20.1', frTarget.loader === 'fabric' && frTarget.mc === '1.20.1');
 const vel = makeServer({ jar: 'velocity-3.3.0.jar' });
 check('velocity -> proxy', detectServerTarget(vel, serverFiles(vel)).loader === 'proxy');
 
@@ -55,6 +67,6 @@ check('unknown MC not rejected', versionMatchesServer({ loaders: ['neoforge'] },
 check('neoforge also valid on forge server', versionMatchesServer({ gameVersions: ['1.16.5'], loaders: ['forge'] }, ot).ok === true);
 
 // cleanup
-for (const r of [paper, spig, cb, fab, vel, neo, of]) { try { fs.rmSync(r, { recursive: true, force: true }); } catch {} }
+for (const r of [paper, spig, cb, fab, fabLaunch, fabRemap, vel, neo, of]) { try { fs.rmSync(r, { recursive: true, force: true }); } catch {} }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

@@ -503,6 +503,18 @@ function hasBedrockGeoModel(entryNames, ns, mat) {
   return false;
 }
 
+// Detect whether a decoded PNG buffer matches standard humanoid armor atlas geometry (2:1 like 64x32/128x64
+// or extended 64x64). Larger square atlases (128x128+) are typically Bedrock/GeckoLib custom meshes.
+function isStandardHumanoidArmorPng(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 24) return true;
+  if (buf.readUInt32BE(0) !== 0x89504e47) return true;
+  const w = buf.readUInt32BE(16);
+  const h = buf.readUInt32BE(20);
+  if (!w || !h) return true;
+  if (w === h * 2) return true;
+  return w === 64 && h === 64;
+}
+
 // PURE: candidate paths for armor worn textures inside mod jars.
 // Layer 1 is helmet, chestplate, boots; Layer 2 is leggings.
 function candidateArmorEntries(namespace, material, layer) {
@@ -515,10 +527,13 @@ function candidateArmorEntries(namespace, material, layer) {
     `assets/${ns}/textures/model/armor/`,
     `assets/${ns}/textures/entity/armor/`,
     `assets/${ns}/textures/armor/`,
+    `assets/${ns}/textures/entity/armour/`,
+    `assets/${ns}/textures/armour/`,
+    `assets/${ns}/textures/item/armor/`,
   ];
   const fileNames = l === 2
-    ? [`${mat}_layer_2.png`, `${mat}_legs.png`, `${mat}_leggings.png`, `${mat}_layer2.png`, `${mat}_2.png`, `${mat}_armor_layer_2.png`, `armor_${mat}_layer_2.png`]
-    : [`${mat}_layer_1.png`, `${mat}.png`, `${mat}_layer1.png`, `${mat}_1.png`, `${mat}_armor_layer_1.png`, `armor_${mat}_layer_1.png`];
+    ? [`${mat}_layer_2.png`, `${mat}_legs.png`, `${mat}_leggings.png`, `${mat}_layer2.png`, `${mat}_2.png`, `${mat}_armor_layer_2.png`, `armor_${mat}_layer_2.png`, `${mat}/layer_2.png`, `${mat}/${mat}_layer_2.png`]
+    : [`${mat}_layer_1.png`, `${mat}.png`, `${mat}_layer1.png`, `${mat}_1.png`, `${mat}_armor_layer_1.png`, `armor_${mat}_layer_1.png`, `${mat}/layer_1.png`, `${mat}/${mat}_layer_1.png`];
   const out = [];
   for (const d of dirs) {
     for (const f of fileNames) out.push(d + f);
@@ -791,50 +806,63 @@ class ModsIndex {
   // Extract worn armor texture + custom geometry metadata from the first jar that has it.
   readArmorTextureInfo(namespace, material, layer) {
     const ctx = this._prepLookup(namespace, material);
-    if (!ctx) return { buffer: null, isCustomGeo: false };
+    if (!ctx) return { buffer: null, isCustomGeo: false, nonStandardUv: false };
     const { ns, nm: mat } = ctx;
     const l = Number(layer) === 2 ? 2 : 1;
     const cacheKey = `armor:${ns}:${mat}:${l}`;
     const isCustomGeo = this.hasArmorCustomGeo(ns, mat);
+    const wrapHit = buf => ({
+      buffer: buf || null,
+      isCustomGeo,
+      nonStandardUv: buf ? !isStandardHumanoidArmorPng(buf) : false,
+    });
     if (this.extractCache.has(cacheKey)) {
-      return { buffer: this.extractCache.get(cacheKey), isCustomGeo };
+      return wrapHit(this.extractCache.get(cacheKey));
     }
 
-    // 1. 1.21.4–26.3 Equipment asset JSON (assets/<ns>/equipment/<mat>.json)
-    const eqBuf = this._readTexEntry(ns, `assets/${ns}/equipment/${mat}.json`);
+    // 1. 1.21.2-26.3 Equipment asset JSON (assets/<ns>/equipment/ & 1.21.2-1.21.3 models/equipment/)
+    const eqBuf = this._readTexEntry(ns, `assets/${ns}/equipment/${mat}.json`)
+      || this._readTexEntry(ns, `assets/${ns}/models/equipment/${mat}.json`);
     if (eqBuf) {
       const eq = parseEquipmentAssetJson(eqBuf.toString('utf8'), ns);
       const eqList = eq ? (l === 2 ? eq.humanoid_leggings : eq.humanoid) : [];
       for (const ep of eqList) {
         const hit = this._readTexEntry(ns, ep);
-        if (hit) { this.extractCache.set(cacheKey, hit); return { buffer: hit, isCustomGeo }; }
+        if (hit) { this.extractCache.set(cacheKey, hit); return wrapHit(hit); }
         const epMatch = ep.match(/^assets\/([a-z0-9_.-]+)\//i);
         const epNs = epMatch ? epMatch[1].toLowerCase() : ns;
         if (epNs !== ns) {
           const cross = this._readTexEntry(epNs, ep);
-          if (cross) { this.extractCache.set(cacheKey, cross); return { buffer: cross, isCustomGeo }; }
+          if (cross) { this.extractCache.set(cacheKey, cross); return wrapHit(cross); }
         }
       }
     }
 
-    // 2. Direct & token-normalized search across armor/equipment subdirectories
-    const wanted = candidateArmorEntries(namespace, material, l);
-    const stripped = mat.replace(/^armor_/, '').replace(/_armor$/, '').replace(/_(?:set|heavy|light)$/, '');
+    // 2. Direct & token-normalized search across armor/equipment subdirectories (supports nested mat folders)
+    const stripped = mat.replace(/^armor_/, '').replace(/_armor$/, '').replace(/_(?:set|heavy|light|metal|plate)$/, '');
+    const wanted = [...candidateArmorEntries(namespace, material, l)];
+    if (stripped && stripped !== mat) {
+      for (const w of candidateArmorEntries(namespace, stripped, l)) {
+        if (!wanted.includes(w)) wanted.push(w);
+      }
+    }
     const tokens = stripped.split('_').filter(t => t.length >= 2);
+    const texPrefix = `assets/${ns}/textures/`;
     const buffer = this._findInJars(ns, wanted, cacheKey, e => {
       const lower = e.toLowerCase();
-      if (!lower.startsWith(`assets/${ns}/textures/`) || !lower.endsWith('.png')) return false;
-      if (!lower.includes('/armor') && !lower.includes('/equipment/')) return false;
+      if (!lower.startsWith(texPrefix) || !lower.endsWith('.png')) return false;
+      if (!lower.includes('/armor') && !lower.includes('/armour') && !lower.includes('/equipment/')) return false;
+      const relTex = lower.slice(texPrefix.length, -4);
       const base = path.basename(lower, '.png');
-      const matchesName = base.includes(mat)
-        || (stripped && base.includes(stripped))
-        || (tokens.length >= 2 && tokens.every(tok => base.includes(tok)));
+      const matchesName = base.includes(mat) || relTex.includes(`/${mat}/`)
+        || (stripped && (base.includes(stripped) || relTex.includes(`/${stripped}/`)))
+        || (tokens.length >= 2 && tokens.every(tok => relTex.includes(tok)));
       if (!matchesName) return false;
       const isLegsFile = lower.includes('layer_2') || lower.includes('_legs') || lower.includes('layer2') || lower.includes('leggings') || lower.includes('_2.png') || lower.includes('humanoid_leggings');
       if (l === 2) return isLegsFile;
       return !isLegsFile;
     });
-    return { buffer: buffer || null, isCustomGeo };
+    return wrapHit(buffer);
   }
 
   // Extract worn armor texture from the first jar that has it.

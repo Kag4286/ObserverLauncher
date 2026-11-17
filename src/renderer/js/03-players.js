@@ -1165,17 +1165,19 @@ async function renderPlayer3D(canvas,status,uuid,name,armor){
       toggleBtn.hidden=!equipment;
       toggleBtn.classList.add('active');
     }
-    const armorIssues=new Set();
-    const hasModArmor=Boolean(equipment&&typeof getArmorMaterial==='function'&&['helmet','chest','legs','boots'].some(k=>{
-      const m=equipment[k]?getArmorMaterial(equipment[k]):null;
-      return m&&typeof m==='object'&&m.isMod;
-    }));
+    const armorIssues=new Map();
+    const slotLabels={helmet:'Helm',chest:'Chest',legs:'Legs',boots:'Boots'};
     const onArmorStatus=(slotKey,st)=>{
-      if(!noticeEl||!hasModArmor)return;
-      if(st==='missing'||st==='custom-geo') armorIssues.add(slotKey);
+      if(!noticeEl)return;
+      if(st==='missing'||st==='custom-geo'||st==='nonstandard-uv'||st==='unsupported') armorIssues.set(slotKey,st);
       else armorIssues.delete(slotKey);
       if(armorIssues.size>0){
-        const msg=t('pd.armorCustomModel');
+        const slots=[...armorIssues.keys()].map(k=>slotLabels[k]||k).join(', ');
+        const reasons=new Set(armorIssues.values());
+        let msg='';
+        if(reasons.has('custom-geo')||reasons.has('nonstandard-uv')) msg=t('pd.armorCustomModelSlots',{slots});
+        else if(reasons.has('missing')) msg=t('pd.armorMissingSlots',{slots});
+        else msg=t('pd.armorUnsupportedSlots',{slots});
         noticeEl.textContent=msg;
         noticeEl.title=msg;
         noticeEl.hidden=false;

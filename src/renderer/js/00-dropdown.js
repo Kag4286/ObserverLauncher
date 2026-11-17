@@ -47,7 +47,7 @@
     // select starts EMPTY and is filled when the window opens, so before that it was an empty
     // box on screen, and clicking it portalled an empty panel to <body> where it outlived the
     // modal it belonged to.
-    const syncVisible = () => { wrap.hidden = sel.options.length === 0; };
+    const syncVisible = () => { wrap.hidden = sel.dataset.hideDd === '1' || sel.options.length === 0; };
     const sync = () => { syncLabel(); syncVisible(); };
     sync();
     // The panel is portalled to <body>, so hiding the wrapper must close it too, or it stays on

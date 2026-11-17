@@ -304,6 +304,7 @@
                       </div>
                     </div>
                   </div>
+                  <p class="pd-3d-scope" id="pd3dScope" data-i18n="pd.previewScope">Preview renders vanilla and standard humanoid mod armor; custom 3D models (GeckoLib/Curios), Elytra, and armor trims are simplified or omitted.</p>
                   <div class="pd-facts">
                     <!-- Card 1: Vitals & Progression Deck -->
                     <div class="pd-vitals-card" id="pdVitalsCard">
@@ -577,9 +578,10 @@
         </div>
         <div class="content-conflicts-banner" id="contentConflictsBanner" hidden>
           <div class="ccb-head">
-            <div class="ccb-icon-badge" aria-hidden="true">⚠</div>
+            <div class="ccb-icon-badge" aria-hidden="true">!</div>
             <span class="ccb-title" id="ccbTitle"></span>
-            <button type="button" class="btn xs secondary ccb-toggle" id="ccbToggle" aria-label="Toggle filter">Filter</button>
+            <button type="button" class="btn xs secondary" id="ccbRescan" data-i18n="cnt.rescanIssues">Rescan</button>
+            <button type="button" class="btn xs secondary ccb-toggle" id="ccbToggle" aria-label="Toggle issue details" data-i18n="cnt.showDetails">Show details</button>
           </div>
           <div class="ccb-drawer" id="ccbDrawer">
             <div class="ccb-drawer-inner">
@@ -658,22 +660,41 @@
     <section id="marketplace" class="tab">
       <header class="tab-head">
         <p class="sub" data-i18n="mkt.sub">Official Modrinth, Hangar and Spigot — install directly to your server folder</p>
-        <div class="tab-head-actions"><span class="stat-pill" id="marketplaceCount">—</span></div>
+        <div class="tab-head-actions">
+          <button type="button" class="btn sm secondary" id="marketImportModpackBtn" hidden data-i18n="mkt.importModpack">Import .mrpack</button>
+          <span class="stat-pill" id="marketplaceCount">—</span>
+        </div>
       </header>
       <div class="market-server-banner" id="marketServerBanner">
         <div class="msb-info">
-          <span class="msb-dot"></span>
+          <span class="msb-dot" id="marketServerDot" aria-hidden="true"></span>
           <div class="msb-text">
             <span class="msb-label" data-i18n="mkt.activeServer">Active Server</span>
             <b class="msb-target" id="marketServerTarget">—</b>
           </div>
-          <span class="msb-pill" id="marketServerBadge">Auto-locked to server</span>
+          <span class="msb-pill" id="marketServerBadge">—</span>
         </div>
-        <button type="button" class="btn sm secondary msb-toggle" id="marketStrictToggle" data-i18n="mkt.strictFilter">Strict Filter</button>
+        <div class="msb-actions">
+          <button type="button" class="btn sm secondary msb-toggle" id="marketStrictToggle" data-i18n="mkt.matchServer">Match server</button>
+        </div>
       </div>
       <div class="market-hero">
-        <div class="market-search-bar"><span class="search-icon">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. ViaVersion, Spark, LuckPerms, WorldEdit" aria-label="Search marketplace plugins and mods"><button class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
-        <div class="market-quick"><span class="market-quick-label" data-i18n="mkt.popular">Popular</span><button class="quick-chip" data-quick="EssentialsX">EssentialsX</button><button class="quick-chip" data-quick="LuckPerms">LuckPerms</button><button class="quick-chip" data-quick="ViaVersion">ViaVersion</button><button class="quick-chip" data-quick="Spark">Spark</button><button class="quick-chip" data-quick="WorldEdit">WorldEdit</button><button class="quick-chip" data-quick="Vault">Vault</button></div>
+        <div class="market-search-bar"><span class="search-icon" aria-hidden="true">⌕</span><input id="marketQuery" data-i18n-placeholder="mkt.searchPh" placeholder="Search — e.g. Fabric API, Sodium, LuckPerms" aria-label="Search marketplace plugins and mods"><button type="button" class="btn primary" id="marketSearch" data-i18n="mkt.searchBtn">Search</button></div>
+        <div class="market-quick" id="marketQuickRow"><span class="market-quick-label" data-i18n="mkt.popular">Popular</span><div class="market-quick-chips" id="marketQuickChips"></div></div>
+      </div>
+      <div class="market-toolbar">
+        <div class="market-field"><span data-i18n="mkt.type">Type</span><div class="market-seg" id="marketKindSeg" role="tablist" aria-label="Content type">
+          <button type="button" class="seg" data-mkind="mod" role="tab" aria-selected="false" data-i18n="mkt.modsTab">Mods</button>
+          <button type="button" class="seg active" data-mkind="plugin" role="tab" aria-selected="true" data-i18n="mkt.pluginsTab">Plugins</button>
+          <button type="button" class="seg" data-mkind="datapack" role="tab" aria-selected="false" data-i18n="mkt.datapacksTab">Datapacks</button>
+          <button type="button" class="seg" data-mkind="modpack" role="tab" aria-selected="false" data-i18n="mkt.modpacksTab">Modpacks</button>
+        </div></div>
+        <select id="marketKind" hidden aria-hidden="true" aria-label="Content type"><option value="plugin">Plugin</option><option value="fabric">Fabric</option><option value="neoforge">NeoForge</option><option value="forge">Forge</option><option value="quilt">Quilt</option><option value="mod">All mods</option><option value="datapack">Datapack</option><option value="modpack">Modpack</option></select>
+        <label class="market-field" id="marketLoaderWrap" hidden><span data-i18n="mkt.loaderLabel">Loader</span><select id="marketLoader" class="ol-select" aria-label="Mod loader"><option value="" data-i18n="mkt.allLoaders">All loaders</option><option value="fabric">Fabric</option><option value="neoforge">NeoForge</option><option value="forge">Forge</option><option value="quilt">Quilt</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select" aria-label="Minecraft version"><option value="">All versions</option></select></label>
+        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort" class="ol-select" aria-label="Sort by"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
+        <div class="market-seg market-src-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth" role="tab" aria-selected="true">Modrinth</button><button type="button" class="seg" data-source="hangar" role="tab" aria-selected="false">Hangar</button><button type="button" class="seg" data-source="spigot" role="tab" aria-selected="false">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" role="tab" aria-selected="false" hidden>CurseForge</button></div>
+        <input type="hidden" id="marketSource" value="modrinth">
       </div>
       <div class="market-type-bar">
         <div class="market-type-chips" id="marketTypeChips">
@@ -687,16 +708,9 @@
           <button type="button" class="type-chip" data-type="library" data-i18n="mkt.typeLibrary">Library / API</button>
         </div>
       </div>
-      <div class="market-toolbar">
-        <div class="market-seg" id="marketSourceSeg" role="tablist" aria-label="Source"><button type="button" class="seg active" data-source="modrinth" role="tab" aria-selected="true">Modrinth</button><button type="button" class="seg" data-source="hangar" role="tab" aria-selected="false">Hangar</button><button type="button" class="seg" data-source="spigot" role="tab" aria-selected="false">Spigot</button><button type="button" class="seg" data-source="curseforge" id="marketCfSeg" role="tab" aria-selected="false" hidden>CurseForge</button></div>
-        <input type="hidden" id="marketSource" value="modrinth">
-        <label class="market-field"><span data-i18n="mkt.type">Type</span><select id="marketKind" class="ol-select" aria-label="Content type"><option value="plugin" data-i18n="mkt.pluginType">Plugin (Paper/Purpur)</option><option value="neoforge" data-i18n="mkt.neoforgeType">NeoForge mod</option><option value="forge" data-i18n="mkt.forgeType">Forge mod</option><option value="fabric" data-i18n="mkt.fabricType">Fabric mod</option><option value="datapack" data-i18n="mkt.datapackType">Datapack</option><option value="modpack" data-i18n="mkt.modpackType">Modpack (full pack)</option></select></label>
-        <label class="market-field"><span data-i18n="mkt.version">Version</span><select id="marketVersion" class="ol-select" aria-label="Minecraft version"><option value="">All versions</option></select></label>
-        <label class="market-field"><span data-i18n="mkt.sortBy">Sort</span><select id="marketSort" class="ol-select" aria-label="Sort by"><option value="downloads" data-i18n="mkt.sortDl">Most downloaded</option><option value="latest" data-i18n="mkt.sortLatest">Latest</option><option value="all" data-i18n="mkt.sortRel">Relevance</option></select></label>
-      </div>
       <div id="marketStatus" class="market-status" hidden></div>
       <div id="marketResults" class="market-results"></div>
-      <div id="marketPager" class="market-pager" hidden><button class="btn secondary" id="marketPrev" data-i18n="mkt.prev">← Previous</button><span id="marketPageLabel">Page 1</span><button class="btn secondary" id="marketNext" data-i18n="mkt.next">Next →</button></div>
+      <div id="marketPager" class="market-pager" hidden><button type="button" class="btn secondary" id="marketPrev" data-i18n="mkt.prev">← Previous</button><span id="marketPageLabel">Page 1</span><button type="button" class="btn secondary" id="marketNext" data-i18n="mkt.next">Next →</button></div>
     </section>
     <section id="worlds" class="tab">
       <div id="worldsProxyNotice" class="proxy-notice" hidden data-i18n-html="wld.proxyNotice">This server is a <b>proxy (Velocity)</b> — it doesn't have worlds or backups of its own. Manage worlds on the backend servers it connects to instead.</div>
@@ -1788,7 +1802,15 @@
         <div class="im-compat" id="imCompat"></div>
       </div>
       <div class="im-section" id="imVersionSection">
-        <div class="im-sec-head"><p class="eyebrow" data-i18n="im.version">VERSION</p><div class="im-sec-right"><span class="im-pick-title" id="imVersionPickTitle" data-i18n="im.versionPickTitle">Pick a build compatible with your server</span><button type="button" class="text-btn im-filter-toggle" id="imToggleLoaderFilter" hidden aria-label="Toggle loader filter">Show all</button></div></div>
+        <div class="im-sec-head"><p class="eyebrow" data-i18n="im.version">VERSION</p><div class="im-sec-right"><span class="im-pick-title" id="imVersionPickTitle" data-i18n="im.versionPickTitle">Build / Version</span><button type="button" class="text-btn im-filter-toggle" id="imToggleLoaderFilter" hidden aria-label="Toggle loader filter">Show all</button></div></div>
+        <div class="im-build-controls" id="imBuildControls" hidden>
+          <div class="im-build-pills" id="imBuildFilterSeg" role="group" aria-label="Build compatibility filter">
+            <button type="button" class="filter-chip active" data-bmode="compat" id="imModeCompatBtn">—</button>
+            <button type="button" class="filter-chip" data-bmode="all" id="imModeAllBtn">—</button>
+          </div>
+          <button type="button" class="filter-chip" id="imStableToggle" data-i18n="im.stableOnly">Release only</button>
+          <input type="search" id="imBuildSearch" class="im-build-search" hidden data-i18n-placeholder="im.searchBuildPh" placeholder="Filter builds or MC (e.g. 1.20.1)…" aria-label="Filter builds">
+        </div>
         <div class="im-version-cards" id="imVersionCards"></div>
         <select id="imVersion" class="launcher-select ol-select" aria-label="Version"></select>
         <ul class="im-versions" id="imVersionList" hidden></ul>

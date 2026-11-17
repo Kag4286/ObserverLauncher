@@ -52,6 +52,7 @@ const both = mrpackCompat({ minecraft: '1.20.1', forge: '47' }, { mc: '1.21.4', 
 check('both mismatched -> 2 warnings', both.warnings.includes('mc') && both.warnings.includes('loader'));
 check('mc object has want/have', both.mc.want === '1.20.1' && both.mc.have === '1.21.4');
 check('loader object has want/have', both.loader.want === 'forge' && both.loader.have === 'fabric');
+check('cross-patch 1.20 pack on 1.20.1 fabric server -> ok', mrpackCompat({ minecraft: '1.20', 'fabric-loader': '0.15' }, { mc: '1.20.1', loader: 'fabric' }).warnings.length === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

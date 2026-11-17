@@ -18,11 +18,12 @@ const editor = require('../main/editor.js');
 const { json } = require('../main/http.js');
 const { importMrpackFromPath, importModpackFromPath, detectServerCompat } = require('../main/modpacks.js');
 const { searchMarket, resolveMarketDownload, listMarketVersions, findMarketProject, isZipFile } = require('../main/marketplace.js');
-const { folderForKind, itemCompat, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY } = require('./modpack-plan.js');
+const { folderForKind, itemCompat, classifySideRequirement, dedupeById, capPlan, planConflicts, planWarnings, filterPlan, missingDependencies, conflictingDependencies, LOADER_FAMILY } = require('./modpack-plan.js');
 const { detectServerTarget, versionMatchesServer } = require('../main/server-compat.js');
+const { scanContentConflicts, safeClassify, recordModPresence } = require('../main/content-conflicts.js');
 const { compareVersions, isComparableVersion } = require('../main/version-compare.js');
 const { openJar } = require('../main/jar-read.js');
-const { classifyJar } = require('../main/mod-metadata.js');
+const { classifyJar, selectLoaderProfile } = require('../main/mod-metadata.js');
 const { checkMcCompat } = require('../main/mc-compat.js');
 const repair = require('./repair.js');
 
@@ -98,9 +99,14 @@ async function tReadFile(ctx, a) {
   if (p === 'server/status' || p === 'crash-reports/latest' || p.startsWith('observer://')) {
     const uri = p.startsWith('observer://') ? p : ('observer://' + p);
     try {
-      const { resolveResource } = require('./resources.js');
+      const { resolveResource, resolveStaticDataResource } = require('./resources.js');
+      const staticData = resolveStaticDataResource(uri);
+      if (staticData) {
+        const out = { path: p, content: staticData.text, size: Buffer.byteLength(staticData.text, 'utf8'), readOnly: true };
+        return { ok: true, rel: p, ...out, result: out };
+      }
       const target = resolveResource(uri);
-      if (target) {
+      if (target && target.tool) {
         const tool = getTool(target.tool);
         if (tool) {
           const res = await tool.handler(ctx, target.args || {});
@@ -175,7 +181,7 @@ async function tListContent(ctx) {
     const row = { name };
     try {
       const jar = openJar(path.join(root, folder, name));
-      const cls = classifyJar(jar.read, name);
+      const cls = selectLoaderProfile(classifyJar(jar.read, name), server.loader);
       if (cls.modId) row.modId = cls.modId;
       if (cls.loader) row.loader = cls.loader;
       // CB3 (v3.3.0): surface the declared name + version so the AI/user sees real versions.
@@ -218,13 +224,20 @@ async function tCheckModCompat(ctx) {
   try { for (const e of readJsonList(root, 'observerlauncher-manifest.json')) { if (e && e.fileName && e.env) manifestEnv[String(e.fileName).toLowerCase()] = e.env; } } catch {}
   // First pass: collect every mod id present (so deps can resolve against each other).
   const metas = [];
+  const modState = { present, idToFiles: new Map(), hasFabricApi: false, fabricApiRequirers: [] };
+  const modsFolder = path.join(root, 'mods');
   for (const name of f.mods || []) {
-    const cls = classifyJar(openJar(path.join(root, 'mods', name)).read, name);
+    if (/\.disabled$/i.test(name)) continue;
+    const cls = safeClassify(modsFolder, name, server.loader);
+    if (!cls || cls._jarError) {
+      jarIssues.push({ name, problem: 'corrupt-jar', detail: cls && cls._jarError ? `Could not read JAR (${cls._jarError})` : 'Could not read JAR file.' });
+      continue;
+    }
     if (!cls.env) cls.env = manifestEnv[String(name).toLowerCase()] || cls.envHint || null;
     metas.push({ name, cls });
+    recordModPresence(cls, name, modState);
     if (cls.modId) {
       const mid = String(cls.modId).toLowerCase();
-      present.add(mid);
       if (!idToFiles.has(mid)) idToFiles.set(mid, []);
       idToFiles.get(mid).push(name);
     }
@@ -270,6 +283,10 @@ async function tCheckModCompat(ctx) {
     });
   }
   const missing = missingDependencies(declared, present);
+  if (['fabric', 'quilt'].includes(server.loader) && !modState.hasFabricApi && modState.fabricApiRequirers.length) {
+    const reqFiles = modState.fabricApiRequirers.map(r => r.fileName).filter(Boolean);
+    missing.push({ modId: 'fabric-api', versionRange: '*', neededBy: reqFiles[0] || null, neededByAll: reqFiles });
+  }
   // v2.3.1: a declared `type="incompatible"` dep that IS present is a CONFLICT, not a missing dep.
   const conflicts = conflictingDependencies(declared, present);
   const mcSummary = {
@@ -363,18 +380,94 @@ async function tGetNetworkInfo(ctx) {
   } };
 }
 async function tGetJavaInfo(ctx) { return { ok: true, result: ctx.javaInfo || null }; }
+function inferKindForLoader(loader) {
+  if (['fabric', 'quilt', 'forge', 'neoforge'].includes(loader)) return 'mod';
+  return 'plugin';
+}
+function getMcpServerContext(ctx) {
+  const root = ctx && ctx.currentServerPath ? ctx.currentServerPath : null;
+  if (!root) return { root: null, files: null, server: { mc: null, loader: null }, defaultKind: 'plugin' };
+  let files = {};
+  let server = { mc: null, loader: null };
+  try { files = serverFiles(root) || {}; } catch {}
+  try { server = detectServerTarget(root, files) || { mc: null, loader: null }; } catch {}
+  return { root, files, server, defaultKind: inferKindForLoader(server.loader) };
+}
+function readInstalledCatalog(root, files) {
+  const projectIds = new Set();
+  const modIds = new Set();
+  const fileNames = new Set();
+  if (!root) return { projectIds, modIds, fileNames };
+  const manifest = readJsonList(root, 'observerlauncher-manifest.json') || [];
+  for (const e of manifest) {
+    if (!e) continue;
+    if (e.projectId) projectIds.add(String(e.projectId).toLowerCase());
+    if (e.slug) projectIds.add(String(e.slug).toLowerCase());
+    if (e.fileName) fileNames.add(String(e.fileName).toLowerCase());
+  }
+  const modsDir = path.join(root, 'mods');
+  for (const name of (files && files.mods) || []) {
+    if (!name || /\.disabled$/i.test(name)) continue;
+    fileNames.add(String(name).toLowerCase());
+    const cls = safeClassify(modsDir, name);
+    if (!cls || cls._jarError) continue;
+    if (cls.modId) modIds.add(String(cls.modId).toLowerCase());
+    for (const p of cls.provides || []) modIds.add(String(p).toLowerCase());
+    for (const emb of cls.embeddedIds || []) modIds.add(String(emb).toLowerCase());
+  }
+  return { projectIds, modIds, fileNames };
+}
+async function fetchModrinthProjectsMeta(ids) {
+  const unique = [...new Set((ids || []).filter(Boolean).map(String))];
+  const map = new Map();
+  if (!unique.length) return map;
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    try {
+      const projects = await json(`https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(JSON.stringify(chunk))}`);
+      for (const p of Array.isArray(projects) ? projects : []) {
+        if (!p || !p.id) continue;
+        map.set(String(p.id), p);
+        if (p.slug) map.set(String(p.slug), p);
+      }
+    } catch { /* best-effort metadata enrichment */ }
+  }
+  return map;
+}
 async function tSearchMarketplace(ctx, a) {
   // Delegates to the SAME search the GUI marketplace uses (src/main/marketplace.js), so Modrinth,
   // Hangar and Spigot are all supported and the facet/loader logic never drifts between the two.
+  a = a || {};
+  const mctx = getMcpServerContext(ctx);
   const source = a.source || 'modrinth';
-  const kind = a.kind || 'plugin';
+  const kind = a.kind || mctx.defaultKind || 'plugin';
   const query = String(a.query || '').trim();
-  const version = a.version || '';
+  const version = a.version !== undefined ? String(a.version || '') : String(mctx.server.mc || '');
   const sort = a.sort || 'downloads';
   const offset = Number(a.offset) || 0;
-  const loader = String(a.loader || '');
+  const category = String(a.category || '');
+  const excludeClientOnly = a.excludeClientOnly === true;
+  const limit = Math.min(25, Math.max(1, Number(a.limit) || 12));
+  const autoLoader = (kind === 'datapack') ? ''
+    : (kind === 'modpack') ? (['fabric', 'quilt', 'forge', 'neoforge'].includes(mctx.server.loader) ? mctx.server.loader : '')
+    : String(mctx.server.loader || '');
+  const fallbackLoader = a.loader !== undefined ? '' : autoLoader;
+  const loader = String(a.loader || fallbackLoader);
   try {
-    return { ok: true, result: await searchMarket({ source, kind, query, version, sort, offset, loader }) };
+    const res = await searchMarket({ source, kind, query, version, sort, offset, loader, category, limit, excludeClientOnly });
+    if (res && Array.isArray(res.items) && mctx.root) {
+      const cat = readInstalledCatalog(mctx.root, mctx.files);
+      res.items = res.items.map(it => {
+        const hitInstalled = (it.id && cat.projectIds.has(String(it.id).toLowerCase()))
+          || (it.slug && cat.projectIds.has(String(it.slug).toLowerCase()))
+          || (it.slug && cat.modIds.has(String(it.slug).toLowerCase()));
+        return hitInstalled ? { ...it, alreadyInstalled: true } : it;
+      });
+    }
+    if (res && typeof res === 'object') {
+      res.serverContext = { mc: mctx.server.mc || null, loader: mctx.server.loader || null, defaultKind: mctx.defaultKind };
+    }
+    return { ok: true, result: res };
   } catch (e) { return { ok: false, error: e?.message || 'Search failed.' }; }
 }
 async function tListMarketVersions(ctx, a) {
@@ -391,10 +484,21 @@ async function tListMarketVersions(ctx, a) {
 // A1 (v2.1.0): search Modrinth for installable MODPACKS. Thin wrapper over the shared search so the
 // facet logic never drifts; then install one with install_from_market { kind:'modpack' }.
 async function tSearchModpacks(ctx, a) {
-  const query = String(a.query || '').trim();
-  const offset = Number(a.offset) || 0;
-  const version = a.version || '';
-  try { return { ok: true, result: await searchMarket({ source: 'modrinth', kind: 'modpack', query, version, sort: a.sort || 'downloads', offset }) }; }
+  const args = a || {};
+  const mctx = getMcpServerContext(ctx);
+  const query = String(args.query || '').trim();
+  const offset = Number(args.offset) || 0;
+  const version = args.version !== undefined ? String(args.version || '') : String(mctx.server.mc || '');
+  const autoLoader = ['fabric', 'quilt', 'forge', 'neoforge'].includes(mctx.server.loader) ? mctx.server.loader : '';
+  const loader = args.loader !== undefined ? String(args.loader || '') : autoLoader;
+  const limit = Math.min(25, Math.max(1, Number(args.limit) || 12));
+  try {
+    const res = await searchMarket({ source: 'modrinth', kind: 'modpack', query, version, loader, sort: args.sort || 'downloads', offset, limit });
+    if (res && typeof res === 'object') {
+      res.serverContext = { mc: mctx.server.mc || null, loader: mctx.server.loader || null };
+    }
+    return { ok: true, result: res };
+  }
   catch (e) { return { ok: false, error: e?.message || 'Search failed.' }; }
 }
 
@@ -691,10 +795,22 @@ async function tExportModpack(ctx, a) {
 // dependencies into a plan the AI shows the user; assemble_modpack (write) installs the approved
 // plan in ONE confirmed batch. The AI supplies ids/source/version only - URLs and hashes are always
 // resolved here from the registry, never taken from the model.
-function normalizePlanItem(it) {
+function normalizePlanItem(it, defaults) {
+  const d = defaults || {};
   const source = ['modrinth', 'hangar', 'spigot', 'curseforge'].includes(it && it.source) ? it.source : 'modrinth';
-  const kind = ['forge', 'fabric', 'datapack', 'mod', 'neoforge', 'plugin'].includes(it && it.kind) ? it.kind : 'plugin';
-  return { source, kind, id: String((it && it.id) || ''), version: (it && it.version) || '', versionId: (it && it.versionId) || '', title: (it && it.title) || null, env: (it && it.env) || null };
+  const kind = ['forge', 'fabric', 'quilt', 'datapack', 'mod', 'neoforge', 'plugin'].includes(it && it.kind) ? it.kind : (d.defaultKind || 'plugin');
+  const isDatapack = kind === 'datapack';
+  return {
+    source,
+    kind,
+    id: String((it && it.id) || ''),
+    version: (it && it.version) || d.mc || '',
+    loader: (it && it.loader) || (isDatapack ? 'datapack' : (d.loader || '')),
+    versionId: (it && it.versionId) || '',
+    title: (it && it.title) || null,
+    env: (it && it.env) || null,
+    requiredBy: Array.isArray(it && it.requiredBy) ? [...it.requiredBy] : [],
+  };
 }
 async function tPlanModpack(ctx, a) {
   const root = needPath(ctx);
@@ -702,18 +818,21 @@ async function tPlanModpack(ctx, a) {
   if (!input.length) return { ok: false, error: 'items is required: [{ id, source?, kind?, version?, versionId? }]. Find ids with search_marketplace first.' };
   const max = Math.max(1, Math.min(100, Number(a.max) || 50));
   const resolveDeps = a.resolveDeps !== false;
-  const props = serverFiles(root).properties || {};
+  const files = serverFiles(root);
+  const props = files.properties || {};
   // A8 (v2.3.0): detect the target from libraries/ too, so a jar-less NeoForge/Forge server is not
   // misread as vanilla (which made the loader filter below a no-op).
-  const server = detectServerTarget(root, serverFiles(root));
-  const seed = dedupeById(input.map(normalizePlanItem).filter(it => it.id));
+  const server = detectServerTarget(root, files);
+  const defaults = { mc: server.mc || '', loader: server.loader || '', defaultKind: inferKindForLoader(server.loader) };
+  const seed = dedupeById(input.map(x => normalizePlanItem(x, defaults)).filter(it => it.id));
   const { items: capped } = capPlan(seed, max);
-  const seen = new Set(capped.map(it => it.source + ':' + it.id));
+  const seen = new Set(capped.map(it => it.source + ':' + String(it.id).toLowerCase()));
   const queue = [...capped];
   const plan = [];
   const rejected = [];
   const problems = [];
-  const dlByKey = new Map(); // source:id -> resolved download (for the A9 jar inspection below)
+  const dlByKey = new Map(); // source:id -> resolved download
+  const metaLookup = new Map(); // normalized key -> resolved entry / queued item
   let depth = 0;
   while (queue.length && plan.length < max) {
     const batch = queue.splice(0, queue.length);
@@ -723,75 +842,142 @@ async function tPlanModpack(ctx, a) {
       let dl;
       try { dl = await resolveMarketDownload(it); }
       catch (e) { problems.push({ id: it.id, source: it.source, error: e?.message || 'Could not resolve a downloadable version.' }); continue; }
-      const compat = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server);
-      // A8 (v2.3.0): HARD reject a version whose loader/MC does not match the server, instead of
-      // only warning - a Forge mod on NeoForge (or a wrong-MC build) must never reach the plan.
       const vmatch = versionMatchesServer({ gameVersions: dl.gameVersions, loaders: dl.loaders }, server);
       if (!vmatch.ok) { rejected.push({ id: it.id, source: it.source, kind: it.kind, reason: vmatch.reason, version: dl.versionNumber || it.version || null }); continue; }
+      const compat = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server);
       dlByKey.set(it.source + ':' + it.id, dl);
-      // CurseForge dependencies are listed (informational) but NOT auto-queued: CF publishes no
-      // official relationType table, so we cannot reliably tell required from optional. Incompatible
-      // ones become a warning. Modrinth deps (clear types) are followed below.
+      if (dl.canonicalProjectId) {
+        seen.add(it.source + ':' + String(dl.canonicalProjectId).toLowerCase());
+      }
       const deps = Array.isArray(dl.dependencies) ? dl.dependencies : [];
       const cfDeps = deps.filter(d => d && (d.uncertain || !d.versionId) && d.projectId && it.source === 'curseforge');
       const incompat = deps.filter(d => d && d.type === 'incompatible' && d.projectId);
       if (incompat.length) compat.warnings.push('incompatible');
-      const entry = { id: it.id, source: it.source, kind: it.kind, title: it.title, version: dl.versionNumber || it.version || null, filename: dl.filename, folder: folderForKind(it.kind, props['level-name'] || 'world').replace(/\\/g, '/'), warnings: compat.warnings };
+      const entry = {
+        id: it.id,
+        canonicalId: dl.canonicalProjectId || null,
+        source: it.source,
+        kind: it.kind,
+        title: it.title,
+        version: dl.versionNumber || it.version || null,
+        filename: dl.filename,
+        folder: folderForKind(it.kind, props['level-name'] || 'world').replace(/\\/g, '/'),
+        warnings: compat.warnings,
+        gameVersions: dl.gameVersions || [],
+        loaders: dl.loaders || [],
+        incompatibleIds: incompat.map(d => String(d.projectId)),
+        requiredBy: it.requiredBy.length ? it.requiredBy : undefined,
+      };
       if (it.source === 'curseforge' && cfDeps.length) entry.dependencies = cfDeps.map(d => ({ projectId: d.projectId, type: d.type, uncertain: !!d.uncertain }));
       plan.push(entry);
-      // A6 (v2.1.0): follow required Modrinth deps to depth 3 (was 2); the `seen` set already guards
-      // cycles and capPlan caps the total, so a deeper walk cannot run away.
-      if (resolveDeps && depth <= 3 && Array.isArray(dl.dependencies)) {
+      metaLookup.set(it.source + ':' + String(it.id).toLowerCase(), entry);
+      if (dl.canonicalProjectId) metaLookup.set(it.source + ':' + String(dl.canonicalProjectId).toLowerCase(), entry);
+      // Follow Modrinth required dependencies up to depth 3 even when versionId is null (the common case).
+      if (resolveDeps && depth <= 3 && it.source === 'modrinth' && Array.isArray(dl.dependencies)) {
         for (const d of dl.dependencies) {
           if (!d || d.type !== 'required' || !d.projectId) continue;
-          // Only Modrinth deps carry a versionId; CF deps are surfaced in `entry.dependencies` above.
-          if (!d.versionId) continue;
-          const key = 'modrinth:' + d.projectId;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          queue.push({ source: 'modrinth', kind: it.kind === 'datapack' ? 'datapack' : it.kind, id: String(d.projectId), version: it.version, versionId: d.versionId || '', title: null, env: null });
+          const depKey = 'modrinth:' + String(d.projectId).toLowerCase();
+          if (seen.has(depKey)) {
+            const existing = metaLookup.get(depKey);
+            if (existing) {
+              if (!existing.requiredBy) existing.requiredBy = [];
+              if (!existing.requiredBy.includes(it.id)) existing.requiredBy.push(it.id);
+            }
+            continue;
+          }
+          seen.add(depKey);
+          const nextItem = {
+            source: 'modrinth',
+            kind: it.kind === 'datapack' ? 'datapack' : (defaults.defaultKind || it.kind),
+            id: String(d.projectId),
+            version: it.version || server.mc || '',
+            loader: it.loader || (it.kind === 'datapack' ? 'datapack' : (server.loader || '')),
+            versionId: d.versionId || '',
+            title: null,
+            env: null,
+            requiredBy: [it.id],
+          };
+          metaLookup.set(depKey, nextItem);
+          queue.push(nextItem);
         }
       }
     }
   }
-  // A4: flag items whose exact target file is already present (case-insensitive) so the AI can skip
-  // re-installing - a hint, not an error. Same folder mapping the installer uses.
+  // Batch fetch Modrinth project metadata for authoritative client/server env + title/slug.
+  const mrIds = [];
   for (const p of plan) {
+    if (p.source === 'modrinth') mrIds.push(p.canonicalId || p.id);
+  }
+  const projMeta = await fetchModrinthProjectsMeta(mrIds);
+  const installedCatalog = readInstalledCatalog(root, files);
+  for (const p of plan) {
+    const meta = p.source === 'modrinth' ? (projMeta.get(String(p.canonicalId || '')) || projMeta.get(String(p.id))) : null;
+    if (meta) {
+      if (!p.title && meta.title) p.title = meta.title;
+      if (meta.slug) p.slug = meta.slug;
+      p.env = { client: meta.client_side || null, server: meta.server_side || null };
+      const hadIncompat = p.warnings.includes('incompatible');
+      const recomputed = itemCompat({ kind: p.kind, gameVersions: p.gameVersions, loaders: p.loaders, env: p.env }, server).warnings;
+      p.warnings = hadIncompat && !recomputed.includes('incompatible') ? [...recomputed, 'incompatible'] : recomputed;
+    }
+    p.sideRequirement = classifySideRequirement(p.env);
+    delete p.gameVersions;
+    delete p.loaders;
+    // Flag alreadyInstalled by exact file OR installed manifest projectId/slug/modId.
     try {
       const target = safeTarget(root, path.join(p.folder, p.filename));
+      let present = false;
       if (target) {
         const dir = path.dirname(target);
         const base = path.basename(target).toLowerCase();
-        const present = fs.existsSync(dir) && fs.readdirSync(dir).some(f => f.toLowerCase() === base);
-        if (present) p.alreadyInstalled = true;
+        present = fs.existsSync(dir) && fs.readdirSync(dir).some(f => f.toLowerCase() === base);
       }
+      if (!present) {
+        const idsToCheck = [p.id, p.canonicalId, p.slug].filter(Boolean).map(x => String(x).toLowerCase());
+        present = idsToCheck.some(k => installedCatalog.projectIds.has(k) || installedCatalog.modIds.has(k));
+      }
+      if (present) p.alreadyInstalled = true;
     } catch { /* existence check is best-effort */ }
   }
   const warnCount = plan.filter(p => p.warnings.length).length;
   const installedCount = plan.filter(p => p.alreadyInstalled).length;
-  // A3: item-vs-item conflicts (the plan is otherwise only checked item-vs-server).
   const { conflicts } = planConflicts(plan);
-  // A5: plan-level warnings (Fabric API missing, proxy, Java requirement).
+  // Also surface incompatible pairs against already-installed server mods/plugins.
+  for (const p of plan) {
+    for (const inc of p.incompatibleIds || []) {
+      const key = String(inc).toLowerCase();
+      if (installedCatalog.projectIds.has(key) || installedCatalog.modIds.has(key)) {
+        conflicts.push({ code: 'incompatible-installed', a: p.id, b: inc, detail: `${p.source}:${p.id} declares incompatibility with already-installed "${inc}"` });
+      }
+    }
+    delete p.incompatibleIds;
+  }
   let hasProxy = false;
   try { hasProxy = fs.existsSync(path.join(root, 'velocity.toml')); } catch {}
   const serverJava = (() => { try { return javaMajor(ctx.javaInfo?.version); } catch { return null; } })();
   const { warnings: planWarn } = planWarnings(plan, server, { hasProxy, serverJava });
-  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, planned: plan.length, withWarnings: warnCount, alreadyInstalled: installedCount, conflicts, planWarnings: planWarn, rejected, plan, problems, note: 'Show this plan to the user, then call assemble_modpack with the same items to install them in one confirmed batch.' } };
+  const summary = {
+    serverOnly: plan.filter(p => p.sideRequirement === 'server-only').length,
+    bothRequired: plan.filter(p => p.sideRequirement === 'both-required').length,
+    clientOnly: plan.filter(p => p.sideRequirement === 'client-only').length,
+    unknownSide: plan.filter(p => p.sideRequirement === 'unknown').length,
+    alreadyInstalled: installedCount,
+    newToInstall: plan.length - installedCount,
+  };
+  return { ok: true, result: { server: { mc: server.mc, loader: server.loader }, planned: plan.length, withWarnings: warnCount, alreadyInstalled: installedCount, summary, conflicts, planWarnings: planWarn, rejected, plan, problems, note: 'Show this plan to the user (separating server-only vs both-required mods and highlighting warnings), then call assemble_modpack with the planned items to install in one confirmed batch.' } };
 }
 async function tAssembleModpack(ctx, a) {
   const root = needPath(ctx);
   const input = Array.isArray(a.items) ? a.items : [];
   if (!input.length) return { ok: false, error: 'items is required.' };
-  const items = dedupeById(input.map(normalizePlanItem).filter(it => it.id)).slice(0, 100);
-  const levelName = (serverFiles(root).properties || {})['level-name'] || 'world';
+  const filesBefore = serverFiles(root);
+  const server = detectServerTarget(root, filesBefore);
+  const defaults = { mc: server.mc || '', loader: server.loader || '', defaultKind: inferKindForLoader(server.loader) };
+  const items = dedupeById(input.map(x => normalizePlanItem(x, defaults)).filter(it => it.id)).slice(0, 100);
+  const levelName = (filesBefore.properties || {})['level-name'] || 'world';
   const { isSafeDownloadUrl } = require('../main/validate.js');
   const { download } = require('../main/http.js');
   const { recordManifestEntry, verifyFileHash } = require('../main/fs-utils.js');
-  // Recompute compatibility per item so the REPORT itself carries warnings — assemble must not
-  // rely on the caller having run plan_modpack first (the "show plan, then assemble" flow is
-  // prompt-driven, not enforced). A failed compat check does not block the install; it is reported.
-  // A8 (v2.3.0): detect the target from libraries/ too (jar-less NeoForge/Forge run.bat).
-  const server = detectServerTarget(root, serverFiles(root));
   const force = a.force === true;
   // A7 (v2.1.0) preflight: resolve each item first, sum the sizes the registry reports, and warn on
   // a big batch BEFORE any download so the AI can confirm with the user. Resolve failures are kept
@@ -835,7 +1021,22 @@ async function tAssembleModpack(ctx, a) {
         failed++;
         continue;
       }
-      try { recordManifestEntry(root, { kind: it.kind, fileName: path.basename(dl.filename), sourceUrl: dl.url, source: it.source, title: it.title || undefined, env: it.env || undefined, projectId: dl.projectId || it.id, versionId: dl.versionId || undefined, gameVersion: dl.gameVersion || undefined, version: dl.versionNumber || undefined, installedAt: new Date().toISOString() }); } catch {}
+      try {
+        recordManifestEntry(root, {
+          kind: it.kind,
+          fileName: path.basename(dl.filename),
+          sourceUrl: dl.url,
+          source: it.source,
+          title: it.title || undefined,
+          env: it.env || undefined,
+          projectId: dl.canonicalProjectId || dl.projectId || it.id,
+          slug: dl.canonicalProjectId && dl.projectId && dl.canonicalProjectId !== dl.projectId ? dl.projectId : undefined,
+          versionId: dl.versionId || undefined,
+          gameVersion: dl.gameVersion || undefined,
+          version: dl.versionNumber || undefined,
+          installedAt: new Date().toISOString(),
+        });
+      } catch {}
       createdFiles.push(path.relative(root, dest).replace(/\\/g, '/'));
       const warnings = itemCompat({ kind: it.kind, gameVersions: dl.gameVersions, loaders: dl.loaders, env: it.env }, server).warnings;
       const row = { id: it.id, ok: true, name: dl.filename };
@@ -852,11 +1053,25 @@ async function tAssembleModpack(ctx, a) {
   const serverJava = (() => { try { return javaMajor(ctx.javaInfo?.version); } catch { return null; } })();
   const installPlan = items.map(it => ({ id: it.id, source: it.source, kind: it.kind, filename: (results.find(r => r.id === it.id && r.ok) || {}).name || null, folder: folderForKind(it.kind, levelName).replace(/\\/g, '/'), javaRequired: it.javaRequired }));
   const { warnings: planWarn } = planWarnings(installPlan, server, { hasProxy, serverJava });
+  let postInstallCompat = null;
+  if (installed > 0) {
+    try {
+      const scan = await scanContentConflicts(root);
+      postInstallCompat = {
+        ok: !!scan.ok,
+        scannedCount: scan.scannedCount,
+        issueCount: Array.isArray(scan.issues) ? scan.issues.length : 0,
+        issues: scan.issues || [],
+        missingDependencies: scan.missingDependencies || [],
+        conflicts: scan.conflicts || [],
+      };
+    } catch {}
+  }
   const note = failed && createdFiles.length
     ? 'Some items installed before a failure. To undo, call delete_content for each file in createdFiles (needs user approval).'
     : undefined;
   const blockedNote = blocked.length ? `${blocked.length} item(s) were skipped as incompatible with this ${server.loader} ${server.mc || ''} server (pass force:true to override).` : undefined;
-  return { ok: true, result: { requested: items.length, installed, failed, blocked, withWarnings: warned, planWarnings: planWarn, preflight, createdFiles, note: blockedNote || note, results, files: serverFiles(root) } };
+  return { ok: true, result: { requested: items.length, installed, failed, blocked, withWarnings: warned, planWarnings: planWarn, postInstallCompat, preflight, createdFiles, note: blockedNote || note, results, files: serverFiles(root) } };
 }
 async function tSavePlayerData(ctx, a) { return ok(await savePlayer(ctx, { uuid: a.uuid, changes: a.changes || {}, clearInventory: !!a.clearInventory })); }
 const { readPlayer, whitelistToggle, banToggle, opToggle, savePlayer } = require('../main/players.js');
@@ -1536,7 +1751,7 @@ const TOOLS = [
   { name: 'list_backups', risk: 'read', description: 'Backup files with size + date.', inputSchema: S(), handler: tListBackups },
   { name: 'get_network_info', risk: 'read', description: 'LAN IPs and server port.', inputSchema: S(), handler: tGetNetworkInfo },
   { name: 'get_java_info', risk: 'read', description: 'Detected Java version/path/arch.', inputSchema: S(), handler: tGetJavaInfo },
-  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar, Spigot or CurseForge for plugins/mods/datapacks/modpacks. Pass loader (neoforge|forge|fabric|quilt) to pin the search to a loader instead of the loose kind group. CurseForge requires the user to have set an API key in Settings.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), loader: STR('neoforge|forge|fabric|quilt (pin to one loader)'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
+  { name: 'search_marketplace', risk: 'read', description: 'Search Modrinth, Hangar, Spigot or CurseForge for plugins/mods/datapacks/modpacks. Automatically inherits active server MC version, loader and default kind (mod vs plugin) when omitted. Pass category (optimization|library|qol|worldgen|admin|security|economy) and excludeClientOnly:true to filter out client-only mods when curating for a server.', inputSchema: S({ query: STR('search text'), kind: STR('plugin|mod|datapack|modpack (auto-detected from active server if omitted)'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version (default = active server version)'), loader: STR('neoforge|forge|fabric|quilt (default = active server loader)'), category: STR('optimization|library|qol|worldgen|admin|security|economy (optional)'), excludeClientOnly: { type: 'boolean', description: 'exclude client-only (server_side=unsupported) mods on Modrinth (default false)' }, limit: { type: 'number', description: 'items per page (default 12, max 25)' }, sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchMarketplace },
   { name: 'list_market_versions', risk: 'read', description: 'Versions of a project (Modrinth, Hangar or CurseForge). Pick a versionId then install_from_market.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), source: STR('modrinth|hangar|curseforge (default modrinth)'), version: STR('MC version (optional filter)'), loader: STR('neoforge|forge|fabric|quilt (optional filter)'), limit: { type: 'number', description: 'max versions (default 25, max 100)' } }, ['id']), handler: tListMarketVersions },
   { name: 'diagnose_server', risk: 'read', description: 'Full server health check: folder, jar, Java version/arch, EULA, port, world, backups, recent crash. Returns per-check level (ok/warn/error) + fixes.', inputSchema: S(), handler: tDiagnoseServer },
   { name: 'analyze_console', risk: 'read', description: 'Scan the console buffer for errors/warnings (OOM, port-busy, exceptions, lag), grouped and ranked.', inputSchema: S({ lines: { type: 'number', description: 'lines to scan (default 500, max 2000)' } }), handler: tAnalyzeConsole },
@@ -1566,13 +1781,13 @@ const TOOLS = [
   { name: 'set_setting', risk: 'write', description: 'Change one launcher setting (memoryMin/Max, autoRestart, autoEula, autoBackupMinutes, locale, jvmArgs). serverPath is NOT settable.', inputSchema: S({ key: STR('setting name'), value: { description: 'new value' } }, ['key', 'value']), handler: tSetSetting },
   { name: 'set_schedule', risk: 'write', description: 'Set the server schedule. Any of enabled (bool), startTime/stopTime (HH:MM 24h or ""), days (array of mon..sun, empty = every day).', inputSchema: S({ enabled: { type: 'boolean', description: 'true = scheduler on' }, startTime: STR('HH:MM (24h) or empty to disable'), stopTime: STR('HH:MM (24h) or empty to disable'), days: { type: 'array', items: { type: 'string' }, description: 'weekdays mon..sun (empty = every day)' } }), handler: tSetSchedule },
   { name: 'kick_player', risk: 'write', description: 'Kick an online player from the running server.', inputSchema: S({ name: STR('player name'), reason: STR('kick reason (optional)') }, ['name']), handler: tKickPlayer },
-  { name: 'search_modpacks', risk: 'read', description: 'Search Modrinth for installable modpacks. Install one with install_from_market { kind: "modpack", id }.', inputSchema: S({ query: STR('search text'), version: STR('MC version'), sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchModpacks },
+  { name: 'search_modpacks', risk: 'read', description: 'Search Modrinth for installable modpacks. Auto-inherits active server MC version and mod loader when omitted. Install one with install_from_market { kind: "modpack", id }.', inputSchema: S({ query: STR('search text'), version: STR('MC version (default = active server version)'), loader: STR('neoforge|forge|fabric|quilt (default = active server loader if modded)'), limit: { type: 'number', description: 'items per page (default 12, max 25)' }, sort: STR('downloads|latest|relevance'), offset: { type: 'number', description: 'pagination offset (default 0)' } }), handler: tSearchModpacks },
   { name: 'install_from_market', risk: 'write', description: 'Install a plugin/mod/datapack/MODPACK from Modrinth, Hangar, Spigot or CurseForge (same resolver as the GUI). Refuses a build whose loader/MC does not match the server, or one OLDER than the installed version (pass force:true / allowDowngrade:true to override). kind:"modpack" downloads the .mrpack and imports it. CurseForge needs the user to have set an API key in Settings, and refuses projects whose author blocks third-party downloads.', inputSchema: S({ id: STR('project id/slug (Hangar: owner/slug)'), kind: STR('plugin|mod|datapack|modpack'), source: STR('modrinth|hangar|spigot|curseforge (default modrinth)'), version: STR('MC version'), versionId: STR('exact Modrinth version id'), title: STR('title (Spigot, optional)'), loader: STR('neoforge|forge|fabric|quilt (optional, filter download by loader)'), env: STR('client|server|both (optional, recorded in the manifest)'), force: { type: 'boolean', description: 'install even on a loader/MC mismatch (default false)' }, allowDowngrade: { type: 'boolean', description: 'allow installing an older version over a newer one (default false)' }, verbose: { type: 'boolean', description: 'return the full server file snapshot (default false, lean result)' } }, ['id']), handler: tInstallFromMarket },
   { name: 'install_local_jar', risk: 'write', description: 'Copy a local .jar into plugins/mods.', inputSchema: S({ path: STR('absolute source path'), kind: STR('plugin|mod|datapack') }, ['path']), handler: tInstallLocalJar },
   { name: 'import_modpack_path', risk: 'write', description: 'Import a .mrpack from a local path.', inputSchema: S({ path: STR('absolute .mrpack path') }, ['path']), handler: tImportModpackPath },
   { name: 'export_modpack', risk: 'write', description: 'Export current setup to a .mrpack at a path.', inputSchema: S({ path: STR('absolute destination .mrpack') }, ['path']), handler: tExportModpack },
-  { name: 'plan_modpack', risk: 'read', description: 'Resolve candidate projects into an install plan: exact versions, per-item compatibility warnings against this server, and required Modrinth dependencies (depth 1-2, auto-followed). CurseForge items also list their declared dependencies (informational only - CF has no reliable required/optional table, so they are shown, never auto-installed). Read-only. Find ids with search_marketplace first, show the plan to the user, then assemble_modpack.', inputSchema: S({ items: { type: 'array', description: 'candidates: [{ id, source?, kind?, version?, versionId? }]', items: { type: 'object' } }, resolveDeps: { type: 'boolean', description: 'include required Modrinth dependencies (default true)' }, max: { type: 'number', description: 'max items in the plan (default 50)' } }, ['items']), handler: tPlanModpack },
-  { name: 'assemble_modpack', risk: 'write', description: 'Install a whole list of projects in one confirmed batch (from plan_modpack). Returns a per-item report (installed/failed). One confirmation for the entire batch.', inputSchema: S({ items: { type: 'array', description: 'items: [{ id, source?, kind?, version?, versionId?, title? }]', items: { type: 'object' } } }, ['items']), handler: tAssembleModpack },
+  { name: 'plan_modpack', risk: 'read', description: 'Resolve candidate projects into an install plan: auto-inherits active server MC/loader/kind when omitted, follows required Modrinth dependencies up to depth 3 (including unpinned deps), enriches client/server sideRequirement (server-only vs both-required vs client-only), and checks conflicts against already-installed mods. Read-only. Show the plan to the user, then call assemble_modpack.', inputSchema: S({ items: { type: 'array', description: 'candidates: [{ id, source?, kind?, version?, loader?, versionId?, env? }]', items: { type: 'object' } }, resolveDeps: { type: 'boolean', description: 'include required Modrinth dependencies (default true)' }, max: { type: 'number', description: 'max items in the plan (default 50)' } }, ['items']), handler: tPlanModpack },
+  { name: 'assemble_modpack', risk: 'write', description: 'Install a whole list of projects in one confirmed batch (from plan_modpack), auto-inheriting active server MC/loader/kind and running a post-install JAR compatibility scan (postInstallCompat). One confirmation for the entire batch.', inputSchema: S({ items: { type: 'array', description: 'items: [{ id, source?, kind?, version?, loader?, versionId?, title?, env? }]', items: { type: 'object' } }, force: { type: 'boolean', description: 'install even on a loader/MC mismatch (default false)' } }, ['items']), handler: tAssembleModpack },
   { name: 'prepare_and_start', risk: 'write', description: 'Diagnose first (refuse on hard errors) -> create a safety backup -> start the server.', inputSchema: S(), handler: tPrepareAndStart },
   { name: 'safe_restart', risk: 'destroy', description: 'Back up, gracefully stop (waits up to 30s), then start again. Stops a running server - always requires confirmation (same class as stop_server).', inputSchema: S(), handler: tSafeRestart },
   { name: 'save_player_data', risk: 'write', description: 'Apply edits to a player .dat (health/food/xp/gamemode). Server must be stopped; a backup is written first.', inputSchema: S({ uuid: STR('player UUID'), changes: { type: 'object', description: 'health, food, saturation, xpLevel, xpTotal, gameType' }, clearInventory: { type: 'boolean', description: 'also clear inventory + equipment' } }, ['uuid']), handler: tSavePlayerData },

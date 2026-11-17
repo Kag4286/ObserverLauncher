@@ -11,27 +11,26 @@ const { readJsonList, fileHashes, safeTarget } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
 const platform = require('./platform');
 const cf = require('./curseforge.js');
+const { detectServerTarget, mcFromName, LOADER_FAMILY } = require('./server-compat.js');
+const { areMcVersionsCompatible } = require('./mc-compat.js');
 // ============ MODPACK COMPATIBILITY (0.8.0) ============
 // A .mrpack declares its target in modrinth.index.json's `dependencies`:
 //   { "minecraft": "1.20.1", "forge": "47.2.0" }  (or neoforge / fabric-loader / quilt-loader)
 // Import used to ignore this entirely, so a Fabric 1.20.1 pack could be dropped into a Paper
-// 1.21 server and silently break. These helpers are pure (no I/O) so the mapping is unit-tested.
+// 1.21 server and silently break. Unified with detectServerTarget() so disk fallbacks (.fabric,
+// libraries/) stay in sync with the rest of the launcher.
 const LOADER_KEYS = ['neoforge', 'forge', 'fabric-loader', 'quilt-loader'];
-// Finer loader detection than server-files.detectSoftware (which folds forge+neoforge into 'forge'):
-// compatibility needs to tell Forge from NeoForge and Fabric from Quilt.
-function detectServerCompat(info) {
-  const name = String((info && (info.jar || info.launchScript)) || '').toLowerCase();
-  if (/velocity|bungee|waterfall/.test(name)) return { mc: null, loader: 'proxy' };
-  if (/neoforge/.test(name)) return { mc: mcFromJar(name), loader: 'neoforge' };
-  if (/forge/.test(name)) return { mc: mcFromJar(name), loader: 'forge' };
-  if (/quilt/.test(name)) return { mc: mcFromJar(name), loader: 'quilt' };
-  if (/fabric/.test(name)) return { mc: mcFromJar(name), loader: 'fabric' };
-  if (/paper|purpur|leaf|folia/.test(name) || (info && info.hasSpigotConfig)) return { mc: mcFromJar(name), loader: 'paper' };
-  return { mc: mcFromJar(name), loader: 'vanilla' };
+function detectServerCompat(info, root) {
+  if (info && info.target && info.target.loader && info.target.loader !== 'unknown') {
+    return {
+      mc: info.target.mc || mcFromName(info.jar || info.launchScript),
+      loader: info.target.loader,
+    };
+  }
+  return detectServerTarget(root || '', info);
 }
 function mcFromJar(name) {
-  const m = String(name || '').match(/\b(1\.\d{1,2}(?:\.\d{1,2})?|26\.\d{1,2})\b/);
-  return m ? m[1] : null;
+  return mcFromName(name);
 }
 // Compare a pack's declared dependencies against the current server.
 //   deps:   index.dependencies (may be missing/empty)
@@ -46,7 +45,8 @@ function mrpackCompat(deps, server) {
   const warnings = [];
   const mc = { want: wantMc, have: server.mc || null, ok: true };
   // Only flag a MISMATCH when both sides are known — unknown version is not a warning.
-  if (wantMc && server.mc && wantMc !== server.mc) { mc.ok = false; warnings.push('mc'); }
+  // Evaluates cross-patch peers (e.g. 1.20 modpack on 1.20.1 server).
+  if (wantMc && server.mc && !areMcVersionsCompatible(server.mc, wantMc)) { mc.ok = false; warnings.push('mc'); }
   const loader = { want: wantLoader, have: server.loader || null, ok: true };
   if (wantLoader) {
     const h = server.loader;
@@ -141,7 +141,7 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local', p
     // COMPAT: compare the pack's declared loader/MC against the current server. For a local
     // import we ask the user before installing a mismatched pack ("Install anyway" allowed);
     // for the Marketplace path the renderer already shows a warning panel, so we only report.
-    const compat = mrpackCompat(index.dependencies, detectServerCompat(serverFiles(ctx.currentServerPath)));
+    const compat = mrpackCompat(index.dependencies, detectServerCompat(serverFiles(ctx.currentServerPath), ctx.currentServerPath));
     if (compat.warnings.length) {
       onInfo?.({ phase: 'compat', warnings: compat.warnings, mc: compat.mc, loader: compat.loader });
       if (source === 'local') {
@@ -301,7 +301,7 @@ async function importCfModpack(ctx, extractDir, index, onInfo) {
   // COMPAT: same check/confirm the .mrpack path uses.
   const loaderKey = { forge: 'forge', neoforge: 'neoforge', fabric: 'fabric-loader', quilt: 'quilt-loader' }[lf.loader];
   const deps = {}; if (index.mc) deps.minecraft = index.mc; if (loaderKey) deps[loaderKey] = lf.version || 'latest';
-  const compat = mrpackCompat(deps, detectServerCompat(serverFiles(ctx.currentServerPath)));
+  const compat = mrpackCompat(deps, detectServerCompat(serverFiles(ctx.currentServerPath), ctx.currentServerPath));
   if (compat.warnings.length) {
     onInfo?.({ phase: 'compat', warnings: compat.warnings, mc: compat.mc, loader: compat.loader });
     const lines = [];
@@ -380,15 +380,20 @@ async function importModpackFromPath(ctx, modpackPath, onInfo, source = 'local')
 
 function registerModpacks(ipcMain, ctx) {
   const { dialog } = require('electron'); // GUI-only: the file-open dialog below
-  ipcMain.handle('modpack:install-from-market', async (_, { id, source = 'modrinth', version, versionId }) => {
+  ipcMain.handle('modpack:install-from-market', async (_, { id, source = 'modrinth', version, versionId, loader }) => {
     if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
     let tempMrpack;
     try {
+      const srv = detectServerCompat(serverFiles(ctx.currentServerPath), ctx.currentServerPath);
+      const wantVersion = version || srv.mc || '';
+      const wantLoader = (loader && !['all', 'auto', 'unknown'].includes(loader))
+        ? loader
+        : (srv.loader && !['unknown', 'vanilla'].includes(srv.loader) ? srv.loader : '');
       if (source === 'curseforge') {
         const { resolveMarketDownload } = require('./marketplace.js');
         const { isSafeDownloadUrl } = require('./validate.js');
         const { verifyFileHash } = require('./fs-utils.js');
-        const dl = await resolveMarketDownload({ id, source: 'curseforge', kind: 'modpack', version, versionId });
+        const dl = await resolveMarketDownload({ id, source: 'curseforge', kind: 'modpack', version: wantVersion, versionId, loader: wantLoader || undefined });
         if (!isSafeDownloadUrl(dl.url)) throw new Error('Refused: download URL is not on an allowlisted public host.');
         tempMrpack = path.join(tempDir(), `observerlauncher-market-modpack-${Date.now()}.zip`);
         await download(dl.url, tempMrpack, (received, total) => ctx.send('market:progress', { phase: 'pack', name: dl.filename || 'modpack.zip', received, total }), null, { maxBytes: 1024 * 1024 * 1024 });
@@ -397,10 +402,23 @@ function registerModpacks(ipcMain, ctx) {
         return await importModpackFromPath(ctx, tempMrpack, info => ctx.send('market:progress', info), 'market');
       }
       const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(id)}/version`);
-      const byVersion = versions.filter(v => !version || (v.game_versions || []).includes(version));
       const hasMrpack = v => (v.files || []).some(f => /\.mrpack$/i.test(f.filename));
+      const mrpackVersions = versions.filter(hasMrpack);
+      const byVersion = wantVersion
+        ? mrpackVersions.filter(v => areMcVersionsCompatible(wantVersion, v.game_versions || []))
+        : mrpackVersions;
+      const wantedFam = wantLoader ? (LOADER_FAMILY[wantLoader] || [wantLoader]) : null;
+      const matchesLoader = v => !wantedFam || !Array.isArray(v.loaders) || !v.loaders.length || v.loaders.some(l => wantedFam.includes(String(l).toLowerCase()));
+      const byVersionAndLoader = byVersion.filter(matchesLoader);
       let target = versionId ? versions.find(v => v.id === versionId && hasMrpack(v)) : null;
-      if (!target) target = (byVersion.length ? byVersion : versions).find(hasMrpack);
+      if (!target) {
+        target = byVersionAndLoader.find(v => v.version_type === 'release')
+          || byVersionAndLoader[0]
+          || byVersion.find(v => v.version_type === 'release')
+          || byVersion[0]
+          || mrpackVersions.find(matchesLoader)
+          || mrpackVersions[0];
+      }
       const file = target?.files?.find(f => /\.mrpack$/i.test(f.filename));
       if (!file) throw new Error('No .mrpack file was found for this modpack.');
       tempMrpack = path.join(tempDir(), `observerlauncher-market-modpack-${Date.now()}.mrpack`);

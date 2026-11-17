@@ -109,32 +109,18 @@ function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=
   }catch(e){console.warn('files render error:',e)}
    const wc=$('#worldsCountPill'), bc=$('#backupsCountPill'), be=$('#backupEmpty'); if(wc) wc.textContent=String((f.worlds||[]).length); if(bc) bc.textContent=String((f.backups||[]).length); if(be) be.hidden=(f.backups||[]).length>0;
    const cpc=$('#contentPluginsCount'), cmc=$('#contentModsCount'), cdc=$('#contentDatapacksCount'); if(cpc) cpc.textContent=String((f.plugins||[]).length); if(cmc) cmc.textContent=String((f.mods||[]).length); if(cdc) cdc.textContent=String((f.datapacks||[]).length);
-   if(typeof syncContentKindAuto==='function')syncContentKindAuto();if(typeof updateContentToolbarState==='function')updateContentToolbarState();
+   if(typeof syncContentKindAuto==='function')syncContentKindAuto();if(typeof updateContentToolbarState==='function')updateContentToolbarState();if(typeof syncMarketControls==='function')syncMarketControls(false);
    const abs=$('#autoBackupStatus');if(abs){const mins=s.autoBackupMinutes||0;abs.innerHTML=mins>0?t('wld.autoOn',{n:mins})+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.configure')+'</button>':t('wld.autoOff')+' · <button class="text-btn" data-tab-jump="settings">'+t('wld.turnOn')+'</button>';abs.querySelectorAll('[data-tab-jump]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump))}
   if(cur === 'players'){ try{ renderPlayers(); }catch(e){console.warn('players render error:',e)} }
-  if(cur === 'performance'){ try{ renderPerfDiagnostics(); }catch(e){console.warn('perf diag render error:',e)} }const j=state.java||{},n=$('#javaNotice');const is32=j.ok&&j.arch==='32-bit';
-// 2.2.0 (C): show the Java the current server's jar NEEDS vs what is detected, and offer the
-// one-click install whenever the detected Java is missing OR the wrong version (not just missing).
-// 2.2.0 (Java gap): prefer the Java requirement resolved in the main process (it also handles a
-// jar-less NeoForge/Forge run.bat server by reading libraries/); fall back to the jar-name helper
-// when the backend has not reported it yet.
+  if(cur === 'performance'){ try{ renderPerfDiagnostics(); }catch(e){console.warn('perf diag render error:',e)} }const j=state.java||{},sPathSet=!!((s.javaPath||'').trim());
 const need=state.javaRequired||requiredJavaOf((state.files&&state.files.jar)||'');
-const have=j.ok?javaMajorOf(j.version):null;
-const mismatch=j.ok&&need&&have!=null&&have<need;
-const tooNew=j.ok&&need&&have!=null&&have>need;
-n.className='java-notice '+(!j.ok?'bad':(is32||mismatch)?'warn':'ok');
-if(!j.ok)n.textContent=t('set.javaBad',{m:j.message||t('set.javaPathHint')});
-else if(mismatch)n.textContent=t('set.javaNeed',{need,have});
-else if(is32)n.textContent=t('set.java32',{v:j.version,p:j.path});
-else if(tooNew)n.textContent=t('set.javaNewer',{have,need});
-else n.textContent=t('set.javaOk',{v:j.version,p:j.path});
+const { mismatch, tooNew } = renderJavaNoticeUI(j, need, null);
 // Show the install button when Java is missing, too OLD, or too NEW (so the user can switch to the
 // exact version the server needs - e.g. downgrade Java 25 -> 21 for a 1.21.1 server).
 // Show Install when Java is missing, mismatched/too-new, OR still coming from PATH (no managed
 // javaPath set) - so a run.bat server with no jar can still pin a specific runtime.
-const javaPathSet=!!((s.javaPath||'').trim());
 const isNatSetting=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
-$('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!tooNew);
+$('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&sPathSet&&!mismatch&&!tooNew);
   if(!isNatSetting) populateJavaPicker(j);
   else { const jpRow=$('#javaPickRow'); if(jpRow) jpRow.hidden=true; }
   const jt=$('#setJavaTopic'); if(jt) jt.hidden=isNatSetting;
@@ -178,7 +164,7 @@ $('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&javaPathSet&&!mismatch&&!too
         $('#javaFixBtn').disabled=true;$('#javaFixBtn').textContent='…';
         const r=await window.observer.javaAutoInstall();
         $('#javaFixBtn').disabled=false;
-        if(r&&r.ok){state.java=r.java;state.settings={...state.settings,javaPath:r.java.path};markSettingsSaved();refreshUI();toast(t('toast.javaInstalled',{v:r.java.version}),'success')}
+        if(r&&r.ok){_javaRuntimes=null;state.java=r.java;state.settings={...state.settings,javaPath:r.java.path};refreshUI();markSettingsSaved();toast(t('toast.javaInstalled',{v:r.java.version}),'success')}
         else toast(r?.error||'Install failed','error');
       };
     }
@@ -450,29 +436,108 @@ $('#prometheusPortInput')?.addEventListener('input',updatePromStatus); $('#world
 $('#promCopyUrl')?.addEventListener('click',()=>{const p=$('#promCopyUrl')?.dataset.port;if(!p)return;const url=`http://127.0.0.1:${p}/metrics`;try{navigator.clipboard.writeText(url);toast(t('prom.copied'));}catch{}});
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
 function markSettingsSaved(){settingsDirty=false;try{_settingsBaseline=JSON.stringify(getSettings())}catch{}updateApplyDirty()}
-// 2.2.0 (Java D): fill the 'Installed runtimes' pick-list from java:list. Hidden with 0-1 runtimes.
+// 2.2.0 (Java D): fill the 'Installed runtimes' pick-list from java:list + handle Edit -> Apply preview.
 let _javaRuntimes=null;
+const normJavaPath=p=>String(p||'').trim().replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
+function renderJavaNoticeUI(j,need,pending){
+  const n=$('#javaNotice');if(!n)return{mismatch:false,tooNew:false};
+  if(pending&&pending.customPath!==undefined){
+    n.className='java-notice warn';
+    n.textContent=pending.customPath?t('set.javaPendingPath',{p:pending.customPath}):t('set.javaPendingAuto');
+    return{mismatch:false,tooNew:false};
+  }
+  const rt=pending&&pending.runtime?pending.runtime:j;
+  const is32=rt.ok&&rt.arch==='32-bit';
+  const have=rt.ok?javaMajorOf(rt.version||String(rt.major||'')):null;
+  const mismatch=rt.ok&&need&&have!=null&&have<need;
+  const tooNew=rt.ok&&need&&have!=null&&have>need;
+  n.className='java-notice '+(!rt.ok?'bad':(is32||mismatch)?'warn':'ok');
+  let txt='';
+  if(!rt.ok)txt=t('set.javaBad',{m:rt.message||t('set.javaPathHint')});
+  else if(mismatch)txt=t('set.javaNeed',{need,have});
+  else if(is32)txt=t('set.java32',{v:rt.version,p:rt.path});
+  else if(tooNew)txt=t('set.javaNewer',{have,need});
+  else txt=t('set.javaOk',{v:rt.version||`Java ${rt.major}`,p:rt.path});
+  if(pending&&pending.runtime)txt+=` (${t('set.unsaved')})`;
+  n.textContent=txt;
+  return{mismatch,tooNew};
+}
+function updateJavaPreviewFromForm(){
+  const ji=$('#javaPathInput');if(!ji)return;
+  const formPath=ji.value.trim();
+  const savedPath=String((state.settings&&state.settings.javaPath)||'').trim();
+  const need=state.javaRequired||requiredJavaOf((state.files&&state.files.jar)||'');
+  if(normJavaPath(formPath)===normJavaPath(savedPath)){
+    renderJavaNoticeUI(state.java||{},need,null);
+  }else if(!formPath){
+    renderJavaNoticeUI(state.java||{},need,{customPath:''});
+  }else{
+    const match=(_javaRuntimes||[]).find(rt=>normJavaPath(rt.path)===normJavaPath(formPath));
+    if(match)renderJavaNoticeUI(state.java||{},need,{runtime:{ok:true,version:match.version||String(match.major),major:match.major,path:match.path,arch:match.arch}});
+    else renderJavaNoticeUI(state.java||{},need,{customPath:formPath});
+  }
+  renderJvmPreview();
+}
 async function populateJavaPicker(j){
   const row=$('#javaPickRow'),sel=$('#javaPickSelect');if(!row||!sel)return;
   if(_javaRuntimes===null){try{const r=await window.observer.javaList();_javaRuntimes=(r&&r.ok&&Array.isArray(r.runtimes))?r.runtimes:[];}catch{_javaRuntimes=[];}}
   const list=_javaRuntimes||[];
-  if(list.length<2){row.hidden=true;return}
+  const cur=String(($('#javaPathInput')?.value??(state.settings&&state.settings.javaPath))||'').trim();
+  const curNorm=normJavaPath(cur);
+  if(list.length<1&&!cur){row.hidden=true;return}
   row.hidden=false;
-  const cur=((state.settings&&state.settings.javaPath)||'').replace(/\\/g,'/');
-  sel.innerHTML=list.map(rt=>'<option value="'+esc(rt.path)+'"'+(rt.path.replace(/\\/g,'/')===cur?' selected':'')+'>Java '+rt.major+(rt.version?' ('+esc(String(rt.version))+')':'')+'</option>').join('');
-  if(!sel._wired){sel._wired=true;sel.onchange=async()=>{const next={...getSettings(),javaPath:sel.value};const r=await window.observer.saveSettings(next);if(r&&r.ok){state.settings=next;state.java=r.java;markSettingsSaved();refreshUI();toast(t('set.javaSwitched',{v:(r.java&&r.java.version)||''}),'success')}}}
+  const autoMajor=j&&j.ok?javaMajorOf(j.version):null;
+  const autoSuffix=(!cur&&j&&j.ok)?` (${autoMajor?`Java ${autoMajor}`:''}${j.version?` · ${j.version}`:''})`.replace(/\(\s*·\s*/,'('):'';
+  const opts=[`<option value="">${esc(t('set.javaAutoOption'))}${esc(autoSuffix)}</option>`];
+  let matchedVal='';
+  for(const rt of list){
+    const isSel=curNorm&&normJavaPath(rt.path)===curNorm;
+    if(isSel)matchedVal=rt.path;
+    opts.push(`<option value="${esc(rt.path)}"${isSel?' selected':''}>Java ${rt.major}${rt.version?' ('+esc(String(rt.version))+')':''}</option>`);
+  }
+  if(cur&&!matchedVal){
+    matchedVal=cur;
+    opts.push(`<option value="${esc(cur)}" selected>${esc(t('set.javaCustomOption',{p:cur}))}</option>`);
+  }
+  sel.innerHTML=opts.join('');
+  sel.value=matchedVal;
+  try{sel.closest('.ol-dd')?._olSync?.()}catch{}
+  if(!sel._wired){
+    sel._wired=true;
+    sel.onchange=()=>{
+      const ji=$('#javaPathInput');
+      if(ji)ji.value=sel.value;
+      updateJavaPreviewFromForm();
+    };
+  }
+  const ji=$('#javaPathInput');
+  if(ji&&!ji._javaPickerWired){
+    ji._javaPickerWired=true;
+    ji.addEventListener('input',()=>{
+      const nVal=normJavaPath(ji.value);
+      const hit=(_javaRuntimes||[]).find(rt=>normJavaPath(rt.path)===nVal);
+      sel.value=hit?hit.path:(!ji.value.trim()?'':sel.value);
+      try{sel.closest('.ol-dd')?._olSync?.()}catch{}
+      updateJavaPreviewFromForm();
+    });
+  }
 }
 function renderJvmPreview(){
   const el=$('#jvmPreview');if(!el)return;
   const s=state.settings||{},f=state.files||{};
   const isNat=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
-  const isPumpkin=(f.target&&f.target.software==='pumpkin')||(f.nativeBinary&&/pumpkin/i.test(f.nativeBinary))||f.hasPumpkinConfig;
   const jar=f.jar||f.launchScript||f.nativeBinary;
   if(isNat||!jar){el.hidden=true;return}
-  const custom=String(s.jvmArgs||'').trim();
-  const args=custom?custom:`-Xms${s.memoryMin||2}G -Xmx${s.memoryMax||6}G`;
+  const ji=$('#javaPathInput');
+  const formJava=(ji&&ji.value.trim())||'';
+  const savedJava=String(s.javaPath||'').trim();
+  const displayJava=formJava?(normJavaPath(formJava)===normJavaPath(savedJava)?((state.java&&state.java.path)||formJava):formJava):((normJavaPath(savedJava)==='')&&state.java&&state.java.path?state.java.path:'java');
+  const custom=String($('#jvmArgsInput')?.value??s.jvmArgs??'').trim();
+  const minMem=Number($('#memoryMinInput')?.value)||s.memoryMin||2;
+  const maxMem=Number($('#memoryMaxInput')?.value)||s.memoryMax||6;
+  const args=custom?custom:`-Xms${minMem}G -Xmx${maxMem}G`;
   el.hidden=false;
-  el.textContent=`${(state.java&&state.java.path)||'java'} ${args} -jar ${jar}${/velocity/i.test(jar)?'':' nogui'}`;
+  el.textContent=`${displayJava} ${args} -jar ${jar}${/velocity/i.test(jar)?'':' nogui'}`;
 }
 // SETTINGS sub-tabs (Basic / Advanced): sliding glider + pane swap. Beginner-first —
 // everyday settings (folder, Java, preferences, reliability) stay on Basic; path/MCP/JVM

@@ -59,12 +59,34 @@ function getMcCompatPeers(version) {
 }
 
 // Test if targetMc satisfies a single constraint condition like ">=1.16.4", "<1.17", "=1.16.5".
+function testWildcardPattern(targetMc, pattern) {
+  const clean = String(pattern || '').trim().replace(/^=+\s*/, '');
+  const m = clean.match(/^([0-9]+(?:\.[0-9]+)*)\.(?:x|\*)$/i);
+  if (!m) return null;
+  const prefix = normalizeMcVersion(m[1]);
+  const tNorm = normalizeMcVersion(targetMc);
+  if (tNorm === prefix || tNorm.startsWith(prefix + '.')) return true;
+  if (String(targetMc).trim().startsWith(m[1] + '.')) return true;
+  return false;
+}
+
+function normalizeWildcardBound(op, bound) {
+  const b = String(bound || '').trim();
+  if (!/\.(x|\*)$/i.test(b)) return b;
+  const base = b.replace(/\.(x|\*)$/i, '');
+  return (op === '<=' || op === '<') ? `${base}.9999` : `${base}.0`;
+}
+
 function testSimpleConstraint(targetMc, op, bound) {
   if (!targetMc || !bound) return false;
+  if ((op === '=' || op === '==') && /\.(x|\*)$/i.test(bound)) {
+    return !!testWildcardPattern(targetMc, bound);
+  }
+  const cleanBound = normalizeWildcardBound(op, bound);
   const tNorm = normalizeMcVersion(targetMc);
-  const bNorm = normalizeMcVersion(bound);
+  const bNorm = normalizeMcVersion(cleanBound);
   if ((op === '=' || op === '==') && tNorm === bNorm) return true;
-  const cmp = compareVersions(targetMc, bound);
+  const cmp = compareVersions(targetMc, cleanBound);
   if (op === '>=') return cmp >= 0 || tNorm === bNorm;
   if (op === '<=') return cmp <= 0 || tNorm === bNorm;
   if (op === '>') return cmp > 0 && tNorm !== bNorm;
@@ -107,11 +129,26 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
   const raw = String(rangeStr).trim();
   if (!raw) return true;
 
+  // Support Fabric/NPM OR expressions ("1.20.x || 1.21.x", ">=1.20 <=1.20.1 || >=1.20.4")
+  if (raw.includes('||')) {
+    return raw.split('||').some(part => testMcVersionAgainstRange(targetMc, part));
+  }
+
   // Multiple comma-separated clauses outside brackets (e.g. "[1.16.5],[1.16.4]" or "[1.16.4, 1.16.5], [1.17]")
   const clauses = splitRangeClauses(raw);
   if (clauses.length > 1) {
     return clauses.some(c => testMcVersionAgainstRange(targetMc, c));
   }
+
+  // Hyphen range: "1.20 - 1.20.1"
+  const hyphenMatch = raw.match(/^([0-9a-zA-Z._-]+)\s+-\s+([0-9a-zA-Z._-]+)$/);
+  if (hyphenMatch) {
+    return testSimpleConstraint(targetMc, '>=', hyphenMatch[1]) && testSimpleConstraint(targetMc, '<=', hyphenMatch[2]);
+  }
+
+  // Wildcard pattern: "1.20.x", "1.20.*", "=1.20.x", "26.1.x"
+  const wildMatch = testWildcardPattern(targetMc, raw);
+  if (wildMatch !== null) return wildMatch;
 
   // 1. Maven / Forge interval bracket syntax: [min, max], [min, max), [min,), (,max]
   const mavenMatch = raw.match(/^([\[\(])\s*([^,\]\)]*)\s*,\s*([^,\]\)]*)\s*([\]\)])$/);
@@ -138,7 +175,7 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
 
   // 2. Semver tilde: "~1.16.4" -> >= 1.16.4 < 1.17.0
   if (raw.startsWith('~')) {
-    const base = raw.slice(1).trim();
+    const base = normalizeWildcardBound('>=', raw.slice(1).trim());
     const parts = base.split('.');
     if (parts.length >= 2) {
       const major = parts[0];
@@ -151,7 +188,7 @@ function testMcVersionAgainstRange(targetMc, rangeStr) {
 
   // 3. Semver caret: "^1.16.4", "^26.1"
   if (raw.startsWith('^')) {
-    const base = raw.slice(1).trim();
+    const base = normalizeWildcardBound('>=', raw.slice(1).trim());
     const parts = base.split('.');
     if (parts[0] === '1' && parts.length >= 2) {
       const nextMinor = `1.${parseInt(parts[1], 10) + 1}`;

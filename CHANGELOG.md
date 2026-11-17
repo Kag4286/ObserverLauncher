@@ -10,6 +10,36 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [9.0.1] - 2026-11-17
+
+**Marketplace & Install Modal Rework, Multi-Loader & Lenient Mod Scanning, Verified Datapack Format Table, Java Picker Fix, 3D Armor Compatibility, and 3-Tier MCP Modpack Curation.**
+
+### Content & Dependency Scanner (`mod-metadata.js`, `content-conflicts.js`, `jar-read.js`, `tools.js`):
+- **Multi-Loader / Universal JAR Support:** Updated `classifyJar()` in `src/main/mod-metadata.js` to collect every descriptor present inside a JAR (`loaderProfiles` & `loaders` across `neoforge.mods.toml`, `mods.toml`, `fabric.mod.json`, `quilt.mod.json`, and `mcmod.info`) instead of early-returning on the first descriptor found. Added `selectLoaderProfile(cls, serverLoader)` used by `safeClassify()`, `scanContentConflicts()`, `tListContent`, and `tCheckModCompat` so universal/multi-loader mods resolve cleanly to the active server's loader family without false `Wrong loader` warnings.
+- **Lenient Manifest Parsing & Inline TOML:** Added `parseLenientJson()` (shared across `mod-metadata.js` and `datapack.js`) to handle unescaped literal control characters inside JSON strings (e.g. `bluelib`), BOMs, `//`/`/* */` comments, and trailing commas without falling back to filename `modId` guesses (`2.4.3-fabric`) that caused false `Missing dependency` errors. Updated `parseTomlModInfo()` to support inline `mods = [{ ... }]` arrays with `\b` word-boundary field matching.
+- **Shared Dependency & Alias UX (`05-marketplace.js`, `01-content.js`):** Propagated `affectedFiles`, `provides`, and `embeddedIds` across shared missing dependencies, excluded `.disabled` jars from false dependency reports, normalized dep search aliases (`yacl`, `fabric-api` submodules), and surfaced clearer diagnostics for corrupt or incompatible JARs.
+
+### Datapack Validation Accuracy (`src/main/datapack.js`):
+- **Corrected Official Format Mapping:** Re-verified `FORMAT_RANGES` and `MC_TO_FORMAT` against the Minecraft Wiki Data Pack specification (`1.18–1.18.1` = `8`, `1.18.2` = `9`, `1.19–1.19.3` = `10`, `1.19.4` = `12`, `1.20–1.20.1` = `15`, `1.20.2` = `18`, `1.20.3–1.20.4` = `26`, `1.20.5–1.20.6` = `41`, `1.21–1.21.1` = `48` through `26.3` = `121.0`).
+- **Expanded `pack.mcmeta` Schema Support:** Added object `supported_formats` (`{ min_inclusive, max_inclusive }`), lenient JSON parsing, and `[major, minor]` tuple range comparisons (`toFormatTuple`, `cmpTuple`) including bare scalar `max_format` minor wildcards (`1.21.9+`). Updated `tests/datapack.test.js`.
+
+### Marketplace & Install Modal (`server-compat.js`, `marketplace.js`, `curseforge.js`, `mc-compat.js`, `05-marketplace.js`, `11-market.js`):
+- **Accurate Server Lock, Modpack Search & Version Recommendations:** Added on-disk Fabric/Quilt/Paper MC detection (`detectFabricDiskInfo`, `detectQuiltDiskInfo`, `detectPaperDiskMc`), switched Modrinth modpack search to `OR` facets (`categories:<loader>` OR `loaders:<loader>`), added wildcard/OR constraints in `mc-compat.js` (`1.20.x`), and fixed `imRenderVersionPicker()` so `Recommended` (`recId`) only attaches to builds matching the server's MC + loader (never recommending `26.1` builds on `1.21.1` servers).
+- **Redesigned Marketplace Cards & Install Modal (`05-market.css`, `06-modals.css`):** Added build channel/size/compatibility badges, live search and stable-only build filters, CurseForge `CF_LOADER_NAME` / cross-patch resolution, and collapsible conflict-alert UX in Content Bay.
+
+### Java Runtime Settings (`07-overview.js`, `08-shell.js`):
+- **Dropdown Sync & Edit → Apply Flow:** Added `normJavaPath`, `renderJavaNoticeUI()`, `updateJavaPreviewFromForm()`, explicit `Auto-detect from PATH` and unmatched custom-path options in `populateJavaPicker()`, and `_olSync()` wrapper sync after async load. Selecting an installed runtime now updates `#javaPathInput`, `#javaNotice`, and `#jvmPreview` without auto-saving prematurely, and `#saveSettings` / `#javaAutoInstall` run `refreshUI()` before `markSettingsSaved()` (invalidating `_javaRuntimes`).
+
+### Player Inspector 3D Armor Compatibility & Notices (`mods-index.js`, `textures.js`, `03b-player-3d.js`, `03-players.js`, `index.html`, `04-players.css`, `locales/*.js`):
+- Added `/armour/`, `/item/armor/`, nested `<mat>/layer_<1|2>.png`, `1.21.2–1.21.3` `models/equipment/<mat>.json`, extended armor suffixes (`_helm`, `_visor`, `_hauberk`, `_chausses`, `_sabatons`, etc.), and `isStandardHumanoidArmorPng()` UV aspect checks (`x-observer-armor-status: custom-geo | nonstandard-uv`).
+- Added wrapping slot-specific `#pd3dNotice` warnings (`custom-geo`, `nonstandard-uv`, `missing`, `unsupported`) and permanent `#pd3dScope` caption across all 7 locales.
+
+### 3-Tier MCP Modpack & Server Curation (`src/mcp/`):
+- Added curated stack resource `observer://guides/mod-stacks` (`src/mcp/mod-curation-guide.js`), `design_modpack` workflow prompt (`src/mcp/prompts.js`), `excludeClientOnly` / server-context inheritance in `search_marketplace`, `plan_modpack` dependency auto-expansion, `assemble_modpack` `postInstallCompat` verification, and unified tool guidance.
+
+### Testing & Verification (`tests/`):
+- Added `tests/fabric-1201-detection.test.js`, `tests/mcp-modpack-curation.test.js`, `tests/modpack-search-and-dep-ux.test.js`, `tests/java-rec-armor-fixes.test.js`, `tests/multiloader-lenient-dp.test.js`, and `tests/e2e/fabric-marketplace.spec.js` (`190` unit test files and `19` Playwright E2E specs).
+
 ## [9.0.0] - 2026-11-15
 
 **Architectural Identity, Motion 2.0, Native Rust Engines (`Pumpkin 0.2.2` & `Horizon`), Content Pagination & Minecraft `1.21.5–1.21.11` / `26.1–26.3` Parity.**

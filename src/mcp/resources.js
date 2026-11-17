@@ -143,6 +143,8 @@ const UI_RESOURCES = [
   { uri: 'ui://observerlauncher/dashboard', name: 'ObserverLauncher dashboard', description: 'MCP Apps dashboard. Renders line charts for get_metrics_history, a health-check list for diagnose_server / doctor_report, and player chips for list_players.', mimeType: 'text/html;profile=mcp-app' },
 ];
 
+const { MOD_CURATION_GUIDE } = require('./mod-curation-guide.js');
+
 // Static (fixed-URI) resources an AI can read for context without a tool call.
 const STATIC_RESOURCES = [
   { uri: 'observer://server/status', name: 'Server status', description: 'Folder, jar, software, Java, running state.', mimeType: 'application/json' },
@@ -154,6 +156,7 @@ const STATIC_RESOURCES = [
   { uri: 'observer://world/players', name: 'Players', description: 'Online, whitelisted, banned, op and known players.', mimeType: 'application/json' },
   { uri: 'observer://instances', name: 'Instances', description: 'Every server instance (id, name, path, status, active).', mimeType: 'application/json' },
   { uri: 'observer://crash-reports/latest', name: 'Latest crash report', description: 'Summary of the most recent crash report.', mimeType: 'application/json' },
+  { uri: 'observer://guides/mod-stacks', name: 'Mod & modpack curation guide', description: 'Curated loader stacks, server-only vs client+server rules, verified Modrinth slugs, and incompatibility traps.', mimeType: 'application/json' },
 ];
 
 // Resource TEMPLATES (RFC 6570). Each maps a concrete URI to an existing read tool + args.
@@ -212,7 +215,16 @@ function resolveUiResource(uri) {
   return null;
 }
 
+function resolveStaticDataResource(uri) {
+  if (uri === 'observer://guides/mod-stacks') {
+    return { text: JSON.stringify(MOD_CURATION_GUIDE, null, 2), mimeType: 'application/json' };
+  }
+  return null;
+}
+
 function resolveResource(uri) {
+  const staticData = resolveStaticDataResource(uri);
+  if (staticData) return { staticData: true, ...staticData };
   const STATIC_MAP = {
     'observer://server/status': { tool: 'get_status', args: {} },
     'observer://server/properties': { tool: 'get_properties', args: {} },
@@ -229,4 +241,4 @@ function resolveResource(uri) {
   return null;
 }
 
-module.exports = { STATIC_RESOURCES, RESOURCE_TEMPLATES, UI_RESOURCES, resolveResource, resolveUiResource };
+module.exports = { STATIC_RESOURCES, RESOURCE_TEMPLATES, UI_RESOURCES, resolveResource, resolveUiResource, resolveStaticDataResource };

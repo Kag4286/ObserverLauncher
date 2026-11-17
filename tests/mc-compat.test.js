@@ -196,5 +196,28 @@ check('parseManifestMf ignores Specification-Version 2.1.13', parseManifestMf('S
 check('parseManifestMf ignores Specification-Version 1.11.0', parseManifestMf('Specification-Title: alexsmobs\nSpecification-Version: 1.11.0\n').mcVersionRange === null);
 check('parseManifestMf parses Minecraft-Version: 1.16.5', parseManifestMf('Minecraft-Version: 1.16.5\n').mcVersionRange === '1.16.5');
 
+// --- 12. Wildcards (.x / .*), || alternations, hyphen ranges, and Fabric arrays / Quilt ---
+check('1.20.x matches 1.20.1', testMcVersionAgainstRange('1.20.1', '1.20.x'));
+check('1.20.x matches 1.20', testMcVersionAgainstRange('1.20', '1.20.x'));
+check('1.20.x rejects 1.21.1', !testMcVersionAgainstRange('1.21.1', '1.20.x'));
+check('1.20.* matches 1.20.4', testMcVersionAgainstRange('1.20.4', '1.20.*'));
+check('OR expression matches 1.20.1', testMcVersionAgainstRange('1.20.1', '1.19.4 || 1.20.x'));
+check('OR expression rejects 1.21.4', !testMcVersionAgainstRange('1.21.4', '1.19.4 || 1.20.x'));
+check('hyphen range matches 1.20.1', testMcVersionAgainstRange('1.20.1', '1.20 - 1.20.4'));
+const fabArrayClass = classifyJar(n => n === 'fabric.mod.json' ? {
+  ok: true,
+  content: JSON.stringify({ id: 'lithium', name: 'Lithium', version: '0.11.2', provides: ['lithium-api'], depends: { minecraft: ['1.20', '1.20.1'], 'fabric-api': '*' } })
+} : { ok: false }, 'lithium-fabric-mc1.20.1-0.11.2.jar');
+check('fabric array mcVersionRange compatible with 1.20.1', areMcVersionsCompatible('1.20.1', fabArrayClass.mcVersionRange));
+check('fabric provides parsed', fabArrayClass.provides.includes('lithium-api'));
+check('fabric requiresFabricApi flagged', fabArrayClass.requiresFabricApi === true);
+const quiltClass = classifyJar(n => n === 'quilt.mod.json' ? {
+  ok: true,
+  content: JSON.stringify({ quilt_loader: { id: 'qmod', version: '1.2.0', metadata: { name: 'Quilt Example' }, provides: ['qalias'], depends: [{ id: 'minecraft', versions: '1.20.x' }, { id: 'cloth-config', versions: '*' }] } })
+} : { ok: false }, 'qmod-1.2.0.jar');
+check('quilt modId parsed', quiltClass.modId === 'qmod');
+check('quilt mcVersionRange parsed', checkMcCompat('1.20.1', quiltClass.mcVersionRange).compatible === true);
+check('quilt dependency parsed', quiltClass.dependencies.some(d => d.modId === 'cloth-config'));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

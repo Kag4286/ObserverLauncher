@@ -154,6 +154,27 @@ const PROMPTS = [
       '4. If Geyser is already installed, run apply_geyser_fix to verify port and auth settings.',
     ].join('\n')),
   },
+  {
+    name: 'design_modpack',
+    title: 'Design and curate a custom modpack',
+    description: 'Inspect the server, choose server-only vs client+server mods cleanly using verified categories, plan dependencies, and install safely.',
+    arguments: [
+      { name: 'goal', description: 'gameplay or performance goal (e.g. "vanilla+ optimization", "co-op adventure")', required: false },
+      { name: 'side', description: 'server-only (vanilla clients can join) or client-and-server', required: false },
+      { name: 'instance', description: 'target instance id (optional; default = active)', required: false },
+    ],
+    build: (a) => userMsg([
+      `Help me design and install a compatible mod/plugin stack${a && a.goal ? ` for: ${a.goal}` : ''}.`,
+      a && a.instance ? `Target instance: ${a.instance}.` : 'Use the active instance.',
+      a && a.side ? `Side constraint: ${a.side}.` : 'Ask/clarify whether joining players use Vanilla clients (server-only mods) or can install mods on their clients too (client+server).',
+      'Follow this exact workflow:',
+      '1. Inspect first: call get_status (exact MC version & loader), get_settings (check memoryMax), get_java_info, list_content, and read observer://guides/mod-stacks.',
+      '2. Search intentionally: use search_marketplace with category (optimization, library, qol, worldgen) and excludeClientOnly:true (it auto-inherits the active server MC version and loader). Never install client-only mods (Sodium, Iris, Mod Menu, Oculus, Embeddium) on a dedicated server.',
+      '3. Plan before installing: pass candidate items to plan_modpack (it resolves MC/loader builds, required dependencies including unpinned Modrinth deps, sideRequirement, and existing server conflicts).',
+      '4. Present the plan grouped cleanly into Server-only, Both Client+Server required, and Auto-included Dependencies, plus any planWarnings (Java, RAM, Fabric API). Wait for my explicit confirmation.',
+      '5. After confirmation, run create_backup (if a world exists) then assemble_modpack, and verify postInstallCompat / check_mod_compat reports ok:true before starting the server.',
+    ].join('\n')),
+  },
 ];
 
 function getPrompt(name) { return PROMPTS.find(p => p.name === name) || null; }

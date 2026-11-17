@@ -8,12 +8,13 @@
 const fs = require('fs');
 const path = require('path');
 const { detectForgeMcVersion } = require('./server-java.js');
+const { compareVersions } = require('./version-compare.js');
 
 // mcFromName: pull a Minecraft version out of a jar/script filename (same shape modpacks.js used).
 function mcFromName(name) {
   const str = String(name || '');
-  // Explicit mc prefix first (e.g. "mod-mc1.16.4-1.0.jar" or "foo_mc1.21.1.jar")
-  const mcPrefixed = str.match(/(?:^|[^0-9a-z])mc[-_]?([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:[^0-9]|$)/i);
+  // Explicit mc prefix first (e.g. "mod-mc1.16.4-1.0.jar", "foo_mc1.21.1.jar", "fabric-server-mc.1.20.1.jar")
+  const mcPrefixed = str.match(/(?:^|[^0-9a-z])mc[-_.]?([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:[^0-9]|$)/i);
   if (mcPrefixed) return mcPrefixed[1];
   // Standard delimiter-bounded MC versions for modding are 1.7 through 1.29 (or 26.x NeoForge).
   // Sub-1.7 versions (e.g. 1.0, 1.2, 1.5) in modern filenames are mod build numbers (e.g. "cloth-config-1.0.jar").
@@ -21,10 +22,105 @@ function mcFromName(name) {
   return m ? m[1] : null;
 }
 
-// Read the newest version dir of a mods/ subfolder name if any, to guess the loader from CONTENT
-// when the filename is inconclusive (a run.bat server with mods/ full of .jar files).
+function listDirEntries(dir) {
+  try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
+}
+
 function anyFile(folder, re) {
-  try { return fs.readdirSync(folder).some(f => re.test(f)); } catch { return false; }
+  return listDirEntries(folder).some(d => re.test(d.name));
+}
+
+function pickNewestMcVersion(list) {
+  const clean = list.filter(Boolean).sort(compareVersions);
+  return clean.length ? clean[clean.length - 1] : null;
+}
+
+// Inspect on-disk Fabric artifacts when the server jar is opaque (e.g. fabric-server-launch.jar or renamed server.jar).
+function detectFabricDiskInfo(root) {
+  if (!root) return { found: false, mc: null };
+  const mcCandidates = [];
+  let found = false;
+
+  const remapped = listDirEntries(path.join(root, '.fabric', 'remappedJars'));
+  if (remapped.length) found = true;
+  for (const d of remapped) {
+    const m = d.name.match(/minecraft[-_]([0-9]+\.[0-9]+(?:\.[0-9]+)?)/i);
+    if (m) mcCandidates.push(m[1]);
+  }
+
+  const interDirs = listDirEntries(path.join(root, 'libraries', 'net', 'fabricmc', 'intermediary'))
+    .filter(d => d.isDirectory())
+    .map(d => d.name);
+  if (interDirs.length) found = true;
+  for (const name of interDirs) {
+    const mc = mcFromName(name);
+    if (mc) mcCandidates.push(mc);
+  }
+
+  const launchProps = path.join(root, 'fabric-server-launch.properties');
+  if (fs.existsSync(launchProps)) {
+    found = true;
+    try {
+      const txt = fs.readFileSync(launchProps, 'utf8');
+      const m = txt.match(/serverJar\s*=\s*(.+)/i);
+      if (m) {
+        const mc = mcFromName(m[1].trim());
+        if (mc) mcCandidates.push(mc);
+      }
+    } catch {}
+  }
+
+  if (fs.existsSync(path.join(root, '.fabric')) || anyFile(path.join(root, 'libraries', 'net', 'fabricmc', 'fabric-loader'), /.+/)) {
+    found = true;
+  }
+
+  return { found, mc: pickNewestMcVersion(mcCandidates) };
+}
+
+function detectQuiltDiskInfo(root) {
+  if (!root) return { found: false, mc: null };
+  const hashed = listDirEntries(path.join(root, 'libraries', 'org', 'quiltmc', 'hashed'))
+    .filter(d => d.isDirectory())
+    .map(d => mcFromName(d.name))
+    .filter(Boolean);
+  const found = hashed.length > 0
+    || fs.existsSync(path.join(root, '.quilt'))
+    || anyFile(path.join(root, 'libraries', 'org', 'quiltmc', 'quilt-loader'), /.+/);
+  return { found, mc: pickNewestMcVersion(hashed) };
+}
+
+function detectPaperDiskMc(root) {
+  if (!root) return null;
+  const candidates = [];
+  for (const d of listDirEntries(path.join(root, 'cache'))) {
+    const m = d.name.match(/^mojang[-_]([0-9]+\.[0-9]+(?:\.[0-9]+)?)\.jar$/i);
+    if (m) candidates.push(m[1]);
+  }
+  for (const d of listDirEntries(path.join(root, 'versions'))) {
+    const mc = mcFromName(d.name);
+    if (mc) candidates.push(mc);
+  }
+  return pickNewestMcVersion(candidates);
+}
+
+function detectLaunchScriptInfo(root, scriptName) {
+  if (!root || !scriptName) return { loader: null, mc: null };
+  try {
+    const p = path.join(root, scriptName);
+    const st = fs.statSync(p);
+    if (st.size > 64 * 1024) return { loader: null, mc: null };
+    const txt = fs.readFileSync(p, 'utf8');
+    let loader = null;
+    if (/neoforge/i.test(txt)) loader = 'neoforge';
+    else if (/minecraftforge|forge/i.test(txt)) loader = 'forge';
+    else if (/quilt/i.test(txt)) loader = 'quilt';
+    else if (/fabric/i.test(txt)) loader = 'fabric';
+    else if (/paper|purpur|leaf|folia|spigot/i.test(txt)) loader = 'paper';
+    const mc = mcFromName(txt);
+    return { loader, mc };
+  } catch {
+    return { loader: null, mc: null };
+  }
 }
 
 // Detect { mc, loader } for a server root. `files` is optional serverFiles(root) (passed in to avoid
@@ -37,22 +133,37 @@ function detectServerTarget(root, files) {
   if (/horizon/.test(name) || (f.nativeBinary && !/pumpkin/.test(f.nativeBinary)) || (f.hasHorizonConfig && !f.jar && !f.launchScript)) return { mc: '26.3', loader: 'horizon', engineType: 'native' };
   // Proxy first (a Velocity server has no worlds/mods of its own).
   if (/velocity|bungee|waterfall/.test(name)) return { mc: mcFromName(name), loader: 'proxy' };
-  // Explicit loader in the filename wins.
+  // Explicit loader in the filename wins, falling back to on-disk metadata when filename omits MC.
   if (/neoforge/.test(name)) return { mc: mcFromName(name) || detectForgeMcVersion(root), loader: 'neoforge' };
   if (/forge/.test(name)) return { mc: mcFromName(name) || detectForgeMcVersion(root), loader: 'forge' };
-  if (/quilt/.test(name)) return { mc: mcFromName(name), loader: 'quilt' };
-  if (/fabric/.test(name)) return { mc: mcFromName(name), loader: 'fabric' };
-  if (/paper|purpur|leaf|folia|spigot|bukkit|craftbukkit/i.test(name) || f.hasSpigotConfig) return { mc: mcFromName(name), loader: 'paper' };
-  // jar-less Forge/NeoForge (run.bat): read libraries/ for the MC version + loader.
+  if (/quilt/.test(name)) {
+    const q = detectQuiltDiskInfo(root);
+    return { mc: mcFromName(name) || q.mc || detectFabricDiskInfo(root).mc, loader: 'quilt' };
+  }
+  if (/fabric/.test(name)) {
+    return { mc: mcFromName(name) || detectFabricDiskInfo(root).mc, loader: 'fabric' };
+  }
+  if (/paper|purpur|leaf|folia|spigot|bukkit|craftbukkit/i.test(name)) {
+    return { mc: mcFromName(name) || detectPaperDiskMc(root), loader: 'paper' };
+  }
+  // Ambiguous filename (e.g. server.jar) or jar-less script (run.bat): inspect libraries/ and launch artifacts.
   if (f.launchScript || root) {
     const libRoot = path.join(String(root || ''), 'libraries', 'net');
-    const neo = anyFile(path.join(libRoot, 'neoforged'), /neoforge/i);
-    const forge = anyFile(path.join(libRoot, 'minecraftforge'), /forge/i);
-    if (neo) return { mc: detectForgeMcVersion(root), loader: 'neoforge' };
-    if (forge) return { mc: detectForgeMcVersion(root), loader: 'forge' };
+    if (anyFile(path.join(libRoot, 'neoforged'), /neoforge/i)) return { mc: detectForgeMcVersion(root), loader: 'neoforge' };
+    if (anyFile(path.join(libRoot, 'minecraftforge'), /forge/i)) return { mc: detectForgeMcVersion(root), loader: 'forge' };
+    const q = detectQuiltDiskInfo(root);
+    if (q.found) return { mc: mcFromName(name) || q.mc || detectFabricDiskInfo(root).mc, loader: 'quilt' };
+    const fab = detectFabricDiskInfo(root);
+    if (fab.found) return { mc: mcFromName(name) || fab.mc, loader: 'fabric' };
+    const scriptInfo = detectLaunchScriptInfo(root, f.launchScript);
+    if (scriptInfo.loader) {
+      const mc = scriptInfo.mc || mcFromName(name) || (scriptInfo.loader === 'forge' || scriptInfo.loader === 'neoforge' ? detectForgeMcVersion(root) : null);
+      return { mc, loader: scriptInfo.loader };
+    }
   }
-  // Filename was a plain server jar with an MC version -> treat as the right family by name.
-  const mc = mcFromName(name);
+  if (f.hasSpigotConfig) return { mc: mcFromName(name) || detectPaperDiskMc(root), loader: 'paper' };
+  // Filename was a plain server jar with an MC version -> treat as vanilla.
+  const mc = mcFromName(name) || detectPaperDiskMc(root);
   if (mc && /server/.test(name)) return { mc, loader: 'vanilla' };
   return { mc: mc || null, loader: 'vanilla' };
 }

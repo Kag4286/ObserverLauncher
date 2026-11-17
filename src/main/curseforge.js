@@ -27,11 +27,12 @@ async function resolveCfFileIds(fileIds, headers) {
 
 // CurseForge classId per content kind. Values verified against the CF v1 API docs; unknown kinds
 // fall back to Mods. (5=Bukkit Plugins, 6=Mods, 4471=Modpacks, 6945=Data Packs.)
-const CLASS_ID = { plugin: 5, mod: 6, forge: 6, neoforge: 6, fabric: 6, modpack: 4471, datapack: 6945 };
+const CLASS_ID = { plugin: 5, mod: 6, forge: 6, neoforge: 6, fabric: 6, quilt: 6, modpack: 4471, datapack: 6945 };
 function classIdForKind(kind) { return CLASS_ID[kind] || CLASS_ID.mod; }
 
 // CurseForge modLoader type ids. 0=Any, 1=Forge, 4=Fabric, 5=Quilt, 6=NeoForge.
 const LOADER_ID = { any: 0, forge: 1, fabric: 4, quilt: 5, neoforge: 6 };
+const CF_LOADER_NAME = { 1: 'forge', 4: 'fabric', 5: 'quilt', 6: 'neoforge' };
 function loaderIdFor(loader) { return LOADER_ID[String(loader || '').toLowerCase()] ?? 0; }
 
 // A CF file is installable by a third party ONLY when the API returned a downloadUrl. When an
@@ -49,8 +50,13 @@ function cfFileInstallable(file) {
 // so the renderer never needs to know which registry a row came from.
 function mapCfItem(hit) {
   const latest = (hit && hit.latestFiles) || [];
+  const indexes = (hit && hit.latestFilesIndexes) || [];
   const primary = latest[0] || null;
   const authors = (hit && hit.authors) || [];
+  const loaders = [...new Set([
+    ...indexes.map(x => CF_LOADER_NAME[Number(x && x.modLoader)]).filter(Boolean),
+    ...latest.flatMap(f => mapCfFileToVersion(f)?.loaders || []),
+  ])];
   return {
     source: 'curseforge',
     id: String(hit.id),
@@ -61,7 +67,7 @@ function mapCfItem(hit) {
     downloads: hit.downloadCount || 0,
     version: '',
     env: null,
-    loaders: [],
+    loaders,
     date: hit.dateModified || hit.dateCreated || null,
     // Whether the newest file can be auto-installed (drives the Install vs Open-page button).
     blocked: primary ? !cfFileInstallable(primary).ok : false,
@@ -72,18 +78,24 @@ function mapCfItem(hit) {
 // Pick the newest file that matches the wanted game version and loader, from a CF /files list.
 // Order in the CF response is newest-first, but we sort defensively. Pure.
 function pickCfFile(files, gameVersion, loaderId) {
+  const { areMcVersionsCompatible } = require('./mc-compat.js');
   const list = (files || []).slice();
   list.sort((a, b) => new Date(b.fileDate || 0) - new Date(a.fileDate || 0));
-  const matches = f => {
-    const gv = f.gameVersions || [];
-    if (gameVersion && !gv.includes(gameVersion)) return false;
-    if (loaderId) {
-      const hasLoader = f.modLoader != null ? Number(f.modLoader) === Number(loaderId) : true;
-      if (!hasLoader) return false;
+  const loaderName = loaderId ? CF_LOADER_NAME[Number(loaderId)] : null;
+  const matchesLoader = f => {
+    if (!loaderId) return true;
+    if (f.modLoader != null) return Number(f.modLoader) === Number(loaderId);
+    if (loaderName && Array.isArray(f.gameVersions)) {
+      const lower = f.gameVersions.map(x => String(x).toLowerCase());
+      if (lower.some(x => /^(neoforge|forge|fabric|quilt)$/.test(x))) return lower.includes(loaderName);
     }
     return true;
   };
-  return list.find(matches) || list[0] || null;
+  return list.find(f => (!gameVersion || (f.gameVersions || []).includes(gameVersion)) && matchesLoader(f))
+    || list.find(f => (!gameVersion || areMcVersionsCompatible(gameVersion, f.gameVersions || [])) && matchesLoader(f))
+    || list.find(matchesLoader)
+    || list[0]
+    || null;
 }
 
 // ---- CurseForge MODPACK manifest (manifest.json inside a CF .zip) ----
@@ -211,6 +223,8 @@ function mapCfFileToVersion(file) {
   const ml = modLoaderMap[Number(file.modLoader)];
   const loaders = [...new Set([...(ml ? [ml] : []), ...gvLoaders])];
   const realGameVersions = gv.filter(x => !gvLoaders.includes(x.toLowerCase()) && !/client|server/i.test(x));
+  const rt = Number(file.releaseType);
+  const versionType = rt === 2 ? 'beta' : rt === 3 ? 'alpha' : 'release';
   return {
     id: String(file.id),
     number: file.displayName || file.fileName || String(file.id),
@@ -218,6 +232,7 @@ function mapCfFileToVersion(file) {
     date: file.fileDate || null,
     gameVersions: realGameVersions.length ? realGameVersions : gv,
     loaders,
+    versionType,
     size: file.fileLength || 0,
     sha1,
     blocked: !cfFileInstallable(file).ok,

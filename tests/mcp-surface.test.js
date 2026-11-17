@@ -41,20 +41,21 @@ check('at least 15 outputSchemas', schemaNames.length >= 15);
 check('non-schema read tools have no outputSchema', getTool('list_files').outputSchema === undefined);
 
 // --- Gói B: prompts ---
-check('9 prompts', PROMPTS.length === 9);
+check('10 prompts', PROMPTS.length === 10);
 check('every prompt has name/title/description/arguments/build', PROMPTS.every(p => p.name && p.title && p.description && Array.isArray(p.arguments) && typeof p.build === 'function'));
 check('prompt names unique', new Set(PROMPTS.map(p => p.name)).size === PROMPTS.length);
 const names = PROMPTS.map(p => p.name);
-['diagnose_server','optimize_for_ram','explain_last_crash','set_up_paper_for_players','audit_mods','safe_modpack_install','recover_corrupted_world','update_minecraft_version','setup_geyser_bedrock'].forEach(n => check('prompt exists: ' + n, names.includes(n)));
+['diagnose_server','optimize_for_ram','explain_last_crash','set_up_paper_for_players','audit_mods','safe_modpack_install','recover_corrupted_world','update_minecraft_version','setup_geyser_bedrock','design_modpack'].forEach(n => check('prompt exists: ' + n, names.includes(n)));
 // build returns a non-empty message list with text content
 check('build returns messages', PROMPTS.every(p => { const m = p.build({}); return Array.isArray(m) && m.length > 0 && m[0].role === 'user' && m[0].content.type === 'text' && m[0].content.text.length > 0; }));
 check('safe_modpack_install interpolates query', getPrompt('safe_modpack_install').build({ query: 'better mc' })[0].content.text.includes('better mc'));
+check('design_modpack interpolates goal & side', (() => { const t = getPrompt('design_modpack').build({ goal: 'vanilla+ perf', side: 'server-only' })[0].content.text; return t.includes('vanilla+ perf') && t.includes('server-only'); })());
 check('getPrompt unknown -> null', getPrompt('nope') === null);
 check('promptList strips build', promptList().every(p => p.build === undefined && p.name && p.title));
 check('promptList length matches', promptList().length === PROMPTS.length);
 
 // --- Gói C: resources ---
-check('9 static resources', STATIC_RESOURCES.length === 9);
+check('10 static resources', STATIC_RESOURCES.length === 10);
 check('6 resource templates', RESOURCE_TEMPLATES.length === 6);
 check('every template has uriTemplate/name/match', RESOURCE_TEMPLATES.every(t => t.uriTemplate && t.name && typeof t.match === 'function'));
 check('resolve static status', JSON.stringify(resolveResource('observer://server/status')) === JSON.stringify({ tool: 'get_status', args: {} }));

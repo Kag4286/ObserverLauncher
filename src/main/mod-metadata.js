@@ -22,11 +22,14 @@ function parseTomlDependencies(toml) {
   const flush = () => {
     if (cur && cur.modId) {
       const t = String(cur.type || '').toLowerCase();
+      const side = String(cur.side || '').toUpperCase();
       // v2.3.1: four NeoForge/Forge relation types. `optional`/`discouraged` are not required;
       // `incompatible` means the mod must NOT be present (a CONFLICT, not a missing dep).
-      cur.optional = t === 'optional' || t === 'discouraged';
+      // Also ignore side="CLIENT" requirements on dedicated servers (e.g. client HUD/shader integrations).
+      cur.optional = t === 'optional' || t === 'discouraged' || side === 'CLIENT';
       cur.incompatible = t === 'incompatible';
-      if (cur.mandatory === undefined) cur.mandatory = !cur.optional && !cur.incompatible;
+      if (side === 'CLIENT') cur.mandatory = false;
+      else if (cur.mandatory === undefined) cur.mandatory = !cur.optional && !cur.incompatible;
       deps.push(cur);
     }
     cur = null;
@@ -46,6 +49,7 @@ function parseTomlDependencies(toml) {
     else if (key === 'mandatory') { if (!cur) cur = {}; cur.mandatory = /true/i.test(val); }
     else if (key === 'versionrange') { if (!cur) cur = {}; cur.versionRange = val; }
     else if (key === 'type') { if (!cur) cur = {}; cur.type = val; }
+    else if (key === 'side') { if (!cur) cur = {}; cur.side = val; }
     else if (key === 'reason') { if (!cur) cur = {}; cur.reason = val; }
   }
   flush();
@@ -53,21 +57,120 @@ function parseTomlDependencies(toml) {
 }
 
 // --- fabric.mod.json ---
+function stringifyFabricConstraint(v) {
+  if (Array.isArray(v)) return v.map(x => String(x || '').trim()).filter(Boolean).join(' || ') || '*';
+  return typeof v === 'string' && v.trim() ? v.trim() : '*';
+}
+
 function parseFabricDependencies(json) {
   const deps = [];
   const obj = json && typeof json === 'object' ? json : {};
   for (const [k, v] of Object.entries(obj.depends || {})) {
-    // 'minecraft', 'fabricloader', 'java' are platform deps, not mods to install.
-    if (['minecraft', 'fabricloader', 'java', 'fabric-api'].includes(k)) continue;
-    deps.push({ modId: k, mandatory: true, versionRange: typeof v === 'string' ? v : '*', type: 'fabric' });
+    // 'minecraft', 'fabricloader', 'java', and 'fabric-api'/'fabric' platform aliases are checked
+    // separately (missing Fabric API is flagged only if neither fabric-api nor fabric sub-modules exist).
+    const low = String(k || '').toLowerCase();
+    if (['minecraft', 'fabricloader', 'java', 'fabric-api', 'fabric'].includes(low)) continue;
+    deps.push({ modId: k, mandatory: true, versionRange: stringifyFabricConstraint(v), type: 'fabric' });
   }
-  for (const [k, v] of Object.entries(obj.breaks || {})) deps.push({ modId: k, mandatory: false, incompatible: true, versionRange: typeof v === 'string' ? v : '*', type: 'fabric' });
+  for (const [k, v] of Object.entries(obj.breaks || {})) {
+    deps.push({ modId: k, mandatory: false, incompatible: true, versionRange: stringifyFabricConstraint(v), type: 'fabric' });
+  }
+  for (const [k, v] of Object.entries(obj.conflicts || {})) {
+    deps.push({ modId: k, mandatory: false, incompatible: true, versionRange: stringifyFabricConstraint(v), type: 'fabric' });
+  }
   return deps;
+}
+
+// --- quilt.mod.json ---
+function parseQuiltModJson(content) {
+  const out = { modId: null, name: null, version: null, env: null, mcVersionRange: null, provides: [], dependencies: [], requiresFabricApi: false };
+  try {
+    const j = typeof content === 'object' ? content : parseLenientJson(content);
+    const ql = (j && j.quilt_loader) || {};
+    out.modId = ql.id || null;
+    out.version = ql.version || null;
+    out.name = (ql.metadata && ql.metadata.name) || out.modId || null;
+    if (Array.isArray(ql.provides)) {
+      out.provides = ql.provides.map(p => typeof p === 'string' ? p : (p && p.id)).filter(Boolean);
+    }
+    const deps = Array.isArray(ql.depends) ? ql.depends : [];
+    for (const d of deps) {
+      const id = typeof d === 'string' ? d : (d && d.id);
+      if (!id) continue;
+      const low = String(id).toLowerCase();
+      const ver = typeof d === 'object' ? stringifyFabricConstraint(d.versions || d.version) : '*';
+      if (low === 'minecraft') { out.mcVersionRange = ver; continue; }
+      if (['quilt_loader', 'quilted_fabric_loader', 'fabricloader', 'java'].includes(low)) continue;
+      if (low === 'fabric-api' || low === 'fabric' || low === 'quilted_fabric_api' || low === 'qsl') {
+        out.requiresFabricApi = true;
+        continue;
+      }
+      const optional = !!(typeof d === 'object' && d.optional);
+      out.dependencies.push({ modId: id, mandatory: !optional, optional, versionRange: ver, type: 'quilt' });
+    }
+    const breaks = Array.isArray(ql.breaks) ? ql.breaks : [];
+    for (const b of breaks) {
+      const id = typeof b === 'string' ? b : (b && b.id);
+      if (!id) continue;
+      out.dependencies.push({ modId: id, mandatory: false, incompatible: true, versionRange: typeof b === 'object' ? stringifyFabricConstraint(b.versions || b.version) : '*', type: 'quilt' });
+    }
+    const mcSide = j && j.minecraft && j.minecraft.environment;
+    if (mcSide === 'client' || mcSide === 'client_only') out.env = 'client-only';
+    else if (mcSide === 'dedicated_server' || mcSide === 'server') out.env = 'server-only';
+    else if (mcSide === '*') out.env = 'both';
+  } catch {}
+  return out;
+}
+
+// Lenient JSON parser for real-world mod/pack manifests (BOM, comments, trailing commas, unescaped newlines in strings).
+function parseLenientJson(text) {
+  const raw = String(text || '').replace(/^\uFEFF/, '');
+  try { return JSON.parse(raw); } catch {}
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === '\\') { out += ch; esc = true; continue; }
+      if (ch === '"') { out += ch; inStr = false; continue; }
+      const code = ch.charCodeAt(0);
+      if (code < 0x20) {
+        if (ch === '\n') out += '\\n';
+        else if (ch === '\r') out += '\\r';
+        else if (ch === '\t') out += '\\t';
+        else out += '\\u' + code.toString(16).padStart(4, '0');
+        continue;
+      }
+      out += ch;
+      continue;
+    }
+    if (ch === '"') { out += ch; inStr = true; continue; }
+    if (ch === '/' && raw[i + 1] === '/') {
+      while (i < raw.length && raw[i] !== '\n') i++;
+      out += '\n';
+      continue;
+    }
+    if (ch === '/' && raw[i + 1] === '*') {
+      i += 2;
+      while (i < raw.length && !(raw[i] === '*' && raw[i + 1] === '/')) i++;
+      i++;
+      continue;
+    }
+    if (ch === ',') {
+      let j = i + 1;
+      while (j < raw.length && /\s/.test(raw[j])) j++;
+      if (raw[j] === '}' || raw[j] === ']') continue;
+    }
+    out += ch;
+  }
+  return JSON.parse(out);
 }
 
 // CB3 (v3.3.0): the display name + version a mod/plugin jar DECLARES, so list_content can show a
 // real version instead of a bare filename (the prerequisite for update checks). Pure parsers.
-// FIRST [mods] / [[mods]] block of a (neo)forge mods.toml.
+// FIRST [mods] / [[mods]] block (or inline mods = [{...}] table) of a (neo)forge mods.toml.
 function parseTomlModInfo(toml) {
   const out = { modId: null, name: null, version: null };
   let inMods = false; const body = [];
@@ -76,13 +179,17 @@ function parseTomlModInfo(toml) {
     if (/^\s*\[/.test(raw)) { if (inMods) break; continue; }
     if (inMods) body.push(raw);
   }
-  const text = body.join('\n');
+  let text = body.join('\n');
+  if (!text) {
+    const inlineMatch = String(toml || '').match(/\bmods\s*=\s*\[([\s\S]*?)\]/i);
+    text = inlineMatch ? inlineMatch[1] : String(toml || '');
+  }
   const pick = re => { const m = text.match(re); return m ? m[1].replace(/^["']|["']$/g, '').trim() : null; };
-  out.modId = pick(/modId\s*=\s*["']([^"']+)["']/i);
-  out.version = pick(/version\s*=\s*["']([^"']+)["']/i);
+  out.modId = pick(/\bmodId\s*=\s*["']([^"']+)["']/i);
+  out.version = pick(/\bversion\s*=\s*["']([^"']+)["']/i);
   // v6.1.6: ignore unexpanded Gradle tokens like "${file.jarVersion}" so version resolves from manifest/filename.
   if (out.version && /^\$\{.*\}$/.test(out.version)) out.version = null;
-  out.name = pick(/(?:displayName|name)\s*=\s*["']([^"']+)["']/i);
+  out.name = pick(/\b(?:displayName|name)\s*=\s*["']([^"']+)["']/i);
   return out;
 }
 // CB3: name + version from a bukkit/spigot plugin.yml (simple `key: value` lines).
@@ -121,7 +228,7 @@ function parseMcModInfo(content) {
   const out = { modId: null, name: null, version: null, mcVersionRange: null, dependencies: [] };
   if (!content) return out;
   try {
-    const data = typeof content === 'object' ? content : JSON.parse(content);
+    const data = typeof content === 'object' ? content : parseLenientJson(content);
     const list = Array.isArray(data) ? data : (Array.isArray(data.modList) ? data.modList : [data]);
     const first = list[0] || {};
     out.modId = first.modid || first.modId || null;
@@ -205,103 +312,168 @@ function loaderFromFilename(name) {
   return null;
 }
 
-// Classify a jar by reading the entries it MIGHT have. `read` is a function (name) -> { ok, content }.
-// `fileName` (optional) is used only to derive a modId when the descriptor is unreadable/missing.
-// Returns { loader, env, modId, name, version, mcVersionRange, mcHint, mcSource, dependencies:[{modId, mandatory, versionRange}] }.
-function classifyJar(read, fileName) {
-  const out = { loader: null, env: null, envHint: null, modId: null, name: null, version: null, mcVersionRange: null, mcHint: null, mcSource: null, dependencies: [] };
-  const finish = () => {
-    if (!out.modId) out.modId = modIdFromFilename(fileName);
-    // loader from the FILE NAME is a guess (a jar may be multi-loader or misnamed), so flag it —
-    // callers must NOT treat a guessed loader as an authoritative mismatch.
-    if (!out.loader) { out.loader = loaderFromFilename(fileName); if (out.loader) out.loaderGuessed = true; }
-    // CB3 (v3.3.0): a plugin with no mods.toml/fabric.mod.json still declares name + version in
-    // plugin.yml (bukkit/spigot/paper) or the jar manifest. Fill them in as a fallback.
-    if (!out.version || !out.name) {
-      const yml = read('plugin.yml');
-      if (yml && yml.ok) { const p = parsePluginYml(yml.content); out.name = out.name || p.name; out.version = out.version || p.version; }
-    }
-    if (!out.version || !out.name || !out.mcVersionRange) {
-      const mf = read('META-INF/MANIFEST.MF');
-      if (mf && mf.ok) {
-        const p = parseManifestMf(mf.content);
-        out.name = out.name || p.name;
-        out.version = out.version || p.version;
-        if (!out.mcVersionRange && p.mcVersionRange) out.mcVersionRange = p.mcVersionRange;
-      }
-    }
-    // Filename hint as secondary fallback when jar metadata carries no explicit Minecraft version
-    const { mcFromName } = require('./server-compat.js');
-    const hint = mcFromName(fileName);
-    if (hint) out.mcHint = hint;
-    out.mcSource = out.mcVersionRange ? 'metadata' : (out.mcHint ? 'filename' : null);
-    return out;
-  };
-  const neo = read('META-INF/neoforge.mods.toml');
-  if (neo && neo.ok) {
-    out.loader = 'neoforge';
-    const mid = String(neo.content).match(/modId\s*=\s*["']([^"']+)["']/i);
-    if (mid) out.modId = mid[1];
-    const ni = parseTomlModInfo(neo.content);
-    if (ni.modId) out.modId = ni.modId;
-    out.name = ni.name || null; out.version = ni.version || null;
-    out.dependencies = parseTomlDependencies(neo.content);
-    const mcDep = out.dependencies.find(d => String(d.modId || '').toLowerCase() === 'minecraft');
-    if (mcDep && mcDep.versionRange) out.mcVersionRange = mcDep.versionRange;
-    // displayTest is a WEAK side hint (it primarily controls the version-mismatch warning):
-    //   IGNORE_SERVER_VERSION / IGNORE_ALL_VERSION -> the mod does not need to be on the server.
-    // Stored as `envHint` (NOT authoritative `env`) so a real Modrinth/Fabric value always wins.
-    const dt = String(neo.content).match(/displayTest\s*=\s*["']([^"']+)["']/i);
-    if (dt && /IGNORE_(SERVER|ALL)/i.test(dt[1])) out.envHint = 'client-only';
-    return finish();
-  }
-  const forge = read('META-INF/mods.toml');
-  if (forge && forge.ok) {
-    out.loader = 'forge';
-    const mid = String(forge.content).match(/modId\s*=\s*["']([^"']+)["']/i);
-    if (mid) out.modId = mid[1];
-    const fi = parseTomlModInfo(forge.content);
-    if (fi.modId) out.modId = fi.modId;
-    out.name = fi.name || null; out.version = fi.version || null;
-    out.dependencies = parseTomlDependencies(forge.content);
-    const mcDep = out.dependencies.find(d => String(d.modId || '').toLowerCase() === 'minecraft');
-    if (mcDep && mcDep.versionRange) out.mcVersionRange = mcDep.versionRange;
-    return finish();
-  }
-  const fab = read('fabric.mod.json');
-  if (fab && fab.ok) {
-    out.loader = 'fabric';
+function readJarJarPaths(read) {
+  const out = [];
+  const jj = read('META-INF/jarjar/metadata.json');
+  if (jj && jj.ok) {
     try {
-      const j = JSON.parse(fab.content);
-      out.modId = j.id || null;
-      out.name = j.name || null; out.version = j.version || null;
-      out.env = normalizeEnv(null, fabricEnv(j));
-      out.dependencies = parseFabricDependencies(j);
-      if (j.depends && j.depends.minecraft) {
-        const mc = j.depends.minecraft;
-        out.mcVersionRange = Array.isArray(mc) ? mc.join(', ') : String(mc);
+      const data = parseLenientJson(jj.content);
+      for (const j of (data && data.jars) || []) {
+        if (j && j.path) out.push(String(j.path));
       }
-    } catch { /* malformed json -> keep empty deps */ }
-    return finish();
+    } catch {}
   }
-  // Quilt uses quilt.mod.json and is Fabric-compatible.
-  const quilt = read('quilt.mod.json');
-  if (quilt && quilt.ok) { out.loader = 'quilt'; return finish(); }
-
-  // v6.1.6: Forge 1.7.10 - 1.12.2 legacy mod descriptor (mcmod.info)
-  const mcinfo = read('mcmod.info');
-  if (mcinfo && mcinfo.ok) {
-    out.loader = 'forge';
-    const parsed = parseMcModInfo(mcinfo.content);
-    if (parsed.modId) out.modId = parsed.modId;
-    if (parsed.name) out.name = parsed.name;
-    if (parsed.version) out.version = parsed.version;
-    if (parsed.mcVersionRange) out.mcVersionRange = parsed.mcVersionRange;
-    if (parsed.dependencies.length) out.dependencies = parsed.dependencies;
-    return finish();
-  }
-
-  return finish();
+  return out;
 }
 
-module.exports = { parseTomlDependencies, parseFabricDependencies, classifyJar, fabricEnv, normalizeEnv, modIdFromFilename, loaderFromFilename, parseTomlModInfo, parsePluginYml, parseManifestMf, parseMcModInfo };
+function emptyLoaderProfile(loader) {
+  return {
+    loader, env: null, envHint: null, modId: null, name: null, version: null,
+    mcVersionRange: null, provides: [], embeddedJarPaths: [], requiresFabricApi: false,
+    dependencies: []
+  };
+}
+
+function parseTomlProfile(content, loaderName) {
+  const p = emptyLoaderProfile(loaderName);
+  const mid = String(content).match(/modId\s*=\s*["']([^"']+)["']/i);
+  if (mid) p.modId = mid[1];
+  const info = parseTomlModInfo(content);
+  if (info.modId) p.modId = info.modId;
+  p.name = info.name || null;
+  p.version = info.version || null;
+  p.dependencies = parseTomlDependencies(content);
+  const mcDep = p.dependencies.find(d => String(d.modId || '').toLowerCase() === 'minecraft');
+  if (mcDep && mcDep.versionRange) p.mcVersionRange = mcDep.versionRange;
+  if (loaderName === 'neoforge') {
+    const dt = String(content).match(/displayTest\s*=\s*["']([^"']+)["']/i);
+    if (dt && /IGNORE_(SERVER|ALL)/i.test(dt[1])) p.envHint = 'client-only';
+  }
+  return p;
+}
+
+function parseFabricProfile(content) {
+  const p = emptyLoaderProfile('fabric');
+  try {
+    const j = parseLenientJson(content);
+    p.modId = j.id || null;
+    p.name = j.name || null;
+    p.version = j.version || null;
+    p.env = normalizeEnv(null, fabricEnv(j));
+    if (Array.isArray(j.provides)) p.provides = j.provides.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim());
+    if (Array.isArray(j.jars)) p.embeddedJarPaths = j.jars.map(x => x && x.file).filter(Boolean);
+    const depKeys = Object.keys(j.depends || {}).map(k => k.toLowerCase());
+    if (depKeys.some(k => k === 'fabric-api' || k === 'fabric')) p.requiresFabricApi = true;
+    p.dependencies = parseFabricDependencies(j);
+    if (j.depends && j.depends.minecraft) {
+      p.mcVersionRange = stringifyFabricConstraint(j.depends.minecraft);
+    }
+  } catch { /* malformed json -> keep empty deps */ }
+  return p;
+}
+
+function applyFallbackFields(target, fallback) {
+  if (!target.modId && fallback.modId) target.modId = fallback.modId;
+  if (!target.name && fallback.name) target.name = fallback.name;
+  if (!target.version && fallback.version) target.version = fallback.version;
+  if (!target.mcVersionRange && fallback.mcVersionRange) target.mcVersionRange = fallback.mcVersionRange;
+  target.mcSource = target.mcVersionRange ? 'metadata' : (target.mcHint ? 'filename' : null);
+  return target;
+}
+
+// Pick the descriptor matching `serverLoader` (or its compatible LOADER_FAMILY) when a universal/multi-loader
+// jar ships multiple descriptors (e.g. neoforge.mods.toml + fabric.mod.json).
+function selectLoaderProfile(cls, serverLoader) {
+  if (!cls || !serverLoader || !cls.loaderProfiles) return cls;
+  const { LOADER_FAMILY } = require('./server-compat.js');
+  const fam = LOADER_FAMILY[serverLoader];
+  if (!fam || !fam.length) return cls;
+  const order = [serverLoader, ...fam.filter(l => l !== serverLoader)];
+  const chosen = order.find(l => cls.loaderProfiles[l]);
+  if (!chosen || chosen === cls.loader) return cls;
+  const profile = cls.loaderProfiles[chosen];
+  const merged = {
+    ...cls,
+    ...profile,
+    loaders: cls.loaders,
+    loaderProfiles: cls.loaderProfiles,
+    embeddedIds: cls.embeddedIds,
+    embeddedJarPaths: cls.embeddedJarPaths,
+    mcHint: cls.mcHint,
+    loaderGuessed: false
+  };
+  return applyFallbackFields(merged, cls._fallback || { modId: modIdFromFilename(cls._fileName) });
+}
+
+// Classify a jar by reading ALL metadata descriptors it contains (so multi-loader/universal jars
+// expose all supported loaders via `loaders` / `loaderProfiles` and can be matched to the active server).
+function classifyJar(read, fileName) {
+  const out = {
+    ...emptyLoaderProfile(null),
+    loaders: [],
+    loaderProfiles: {},
+    mcHint: null,
+    mcSource: null,
+    _fileName: fileName || null
+  };
+
+  const neo = read('META-INF/neoforge.mods.toml');
+  if (neo && neo.ok) out.loaderProfiles.neoforge = parseTomlProfile(neo.content, 'neoforge');
+
+  const forge = read('META-INF/mods.toml');
+  if (forge && forge.ok) out.loaderProfiles.forge = parseTomlProfile(forge.content, 'forge');
+
+  const fab = read('fabric.mod.json');
+  if (fab && fab.ok) out.loaderProfiles.fabric = parseFabricProfile(fab.content);
+
+  const quilt = read('quilt.mod.json');
+  if (quilt && quilt.ok) {
+    const pq = parseQuiltModJson(quilt.content);
+    out.loaderProfiles.quilt = { ...emptyLoaderProfile('quilt'), ...pq };
+  }
+
+  // v6.1.6: Forge 1.7.10 - 1.12.2 legacy mod descriptor (mcmod.info)
+  if (!out.loaderProfiles.forge && !out.loaderProfiles.neoforge) {
+    const mcinfo = read('mcmod.info');
+    if (mcinfo && mcinfo.ok) {
+      const parsed = parseMcModInfo(mcinfo.content);
+      out.loaderProfiles.forge = { ...emptyLoaderProfile('forge'), ...parsed };
+    }
+  }
+
+  out.loaders = Object.keys(out.loaderProfiles);
+  if (out.loaders.length) {
+    Object.assign(out, out.loaderProfiles[out.loaders[0]]);
+  }
+
+  const fallback = { modId: modIdFromFilename(fileName), name: null, version: null, mcVersionRange: null };
+  const yml = read('plugin.yml');
+  if (yml && yml.ok) { const p = parsePluginYml(yml.content); fallback.name = p.name || null; fallback.version = p.version || null; }
+  const mf = read('META-INF/MANIFEST.MF');
+  if (mf && mf.ok) {
+    const p = parseManifestMf(mf.content);
+    fallback.name = fallback.name || p.name || null;
+    fallback.version = fallback.version || p.version || null;
+    if (p.mcVersionRange) fallback.mcVersionRange = p.mcVersionRange;
+  }
+  out._fallback = fallback;
+
+  if (!out.loader) {
+    out.loader = loaderFromFilename(fileName);
+    if (out.loader) out.loaderGuessed = true;
+  }
+
+  const allEmbedded = new Set(readJarJarPaths(read));
+  for (const p of Object.values(out.loaderProfiles)) {
+    for (const ep of p.embeddedJarPaths || []) allEmbedded.add(ep);
+  }
+  out.embeddedJarPaths = [...allEmbedded];
+
+  const { mcFromName } = require('./server-compat.js');
+  const hint = mcFromName(fileName);
+  if (hint) out.mcHint = hint;
+
+  return applyFallbackFields(out, fallback);
+}
+
+module.exports = { parseLenientJson, parseTomlDependencies, parseFabricDependencies, parseQuiltModJson, classifyJar, selectLoaderProfile, fabricEnv, normalizeEnv, modIdFromFilename, loaderFromFilename, parseTomlModInfo, parsePluginYml, parseManifestMf, parseMcModInfo };

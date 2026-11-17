@@ -46,20 +46,27 @@ function listEntries(buf) {
 // unsupported. Safety: refuses an entry whose declared uncompressed size is absurd (>8 MB) so a
 // crafted jar cannot make us allocate gigabytes.
 const MAX_ENTRY_BYTES = 8 * 1024 * 1024;
-function readEntry(buf, entry) {
+function readEntryBuffer(buf, entry) {
   if (!entry) return null;
   if (entry.uncompSize > MAX_ENTRY_BYTES) return null;
   const lo = entry.localOffset;
+  if (lo < 0 || lo + 30 > buf.length) return null;
   if (buf.readUInt32LE(lo) !== 0x04034b50) return null; // local file header sig
   const nameLen = buf.readUInt16LE(lo + 26);
   const extraLen = buf.readUInt16LE(lo + 28);
   const dataStart = lo + 30 + nameLen + extraLen;
+  if (dataStart + entry.compSize > buf.length) return null;
   const data = buf.subarray(dataStart, dataStart + entry.compSize);
   try {
-    if (entry.method === 0) return data.toString('utf8');        // stored
-    if (entry.method === 8) return zlib.inflateRawSync(data).toString('utf8'); // deflate
+    if (entry.method === 0) return Buffer.from(data);          // stored
+    if (entry.method === 8) return zlib.inflateRawSync(data);  // deflate
   } catch { return null; }
   return null;
+}
+
+function readEntry(buf, entry) {
+  const raw = readEntryBuffer(buf, entry);
+  return raw == null ? null : raw.toString('utf8');
 }
 
 // Public: read a named text entry from a jar on disk. Returns { ok, content } or { ok:false, error }.
@@ -81,24 +88,44 @@ function readJarEntry(jarPath, entryName) {
   return content == null ? { ok: false, error: 'entry-unreadable' } : { ok: true, content };
 }
 
-// Open a jar ONCE and return a read(name) function that reuses the in-memory buffer for every
-// entry lookup. classifyJar() probes up to 4 entry names per jar; without this, each probe would
-// re-read the whole file (a 20 MB jar x 4 x 50 mods = gigabytes of reads). Returns { read, error }.
-function openJar(jarPath) {
-  let buf;
-  try { buf = fs.readFileSync(jarPath); } catch (e) { return { read: () => ({ ok: false, error: e?.code || 'read-failed' }), error: e?.code || 'read-failed' }; }
-  const entries = listEntries(buf);
+function openJarFromBuffer(buf) {
+  const entries = Buffer.isBuffer(buf) ? listEntries(buf) : null;
   const byName = new Map();
   for (const e of (entries || [])) byName.set(e.name.toLowerCase(), e);
   return {
     error: entries ? null : 'not-a-zip',
+    list() {
+      return (entries || []).map(e => e.name);
+    },
     read(name) {
       const entry = byName.get(String(name).toLowerCase());
       if (!entry) return { ok: false, error: 'entry-not-found' };
       const content = readEntry(buf, entry);
       return content == null ? { ok: false, error: 'entry-unreadable' } : { ok: true, content };
     },
+    readBuffer(name) {
+      const entry = byName.get(String(name).toLowerCase());
+      if (!entry) return { ok: false, error: 'entry-not-found' };
+      const data = readEntryBuffer(buf, entry);
+      return data == null ? { ok: false, error: 'entry-unreadable' } : { ok: true, data };
+    },
   };
 }
 
-module.exports = { readJarEntry, openJar, listEntries, findEocd, MAX_ENTRY_BYTES };
+// Open a jar ONCE and return read / readBuffer / list helpers reusing the in-memory buffer.
+function openJar(jarPath) {
+  let buf;
+  try { buf = fs.readFileSync(jarPath); }
+  catch (e) {
+    const err = e?.code || 'read-failed';
+    return {
+      read: () => ({ ok: false, error: err }),
+      readBuffer: () => ({ ok: false, error: err }),
+      list: () => [],
+      error: err,
+    };
+  }
+  return openJarFromBuffer(buf);
+}
+
+module.exports = { readJarEntry, openJar, openJarFromBuffer, listEntries, findEocd, MAX_ENTRY_BYTES };

@@ -95,7 +95,10 @@ function serverFiles(root) {
   const list = p => fs.existsSync(p) ? fs.readdirSync(p, { withFileTypes: true }) : [];
   const names = list(root).filter(x => x.isFile() && /\.jar$/i.test(x.name)).map(x => x.name);
   const runnable = names.filter(x => !/(installer|universal|shim|buildtools)/i.test(x)); const launchScript = list(root).find(x => x.isFile() && /^run\.(bat|sh)$/i.test(x.name))?.name || null;
-  const jar = runnable.find(x => /spigot/i.test(x)) || runnable.find(x => /(purpur|paper|leaf|folia|velocity|craftbukkit|forge|fabric|server)/i.test(x)) || runnable[0] || null;
+  const jar = runnable.find(x => /spigot/i.test(x))
+    || runnable.find(x => /(purpur|paper|leaf|folia|velocity|craftbukkit|neoforge|forge|fabric|quilt)/i.test(x))
+    || runnable.find(x => /server/i.test(x))
+    || runnable[0] || null;
   const nativeBinary = list(root).find(x => x.isFile() && /^(horizon-server|pumpkin)(\.exe)?$/i.test(x.name))?.name || null;
   const hasHorizonConfig = fs.existsSync(path.join(root, 'server.toml'));
   const hasPumpkinConfig = fs.existsSync(path.join(root, 'Pumpkin.toml')) || fs.existsSync(path.join(root, 'pumpkin.toml'));
@@ -190,7 +193,7 @@ function serverFiles(root) {
     else if (/leaf/.test(name)) soft = 'leaf';
     else if (/folia/.test(name)) soft = 'folia';
     else if (/paper/.test(name)) soft = 'paper';
-    else if (/spigot/.test(name) || hasSpigotConfig) soft = 'spigot';
+    else if (/spigot/.test(name) || (hasSpigotConfig && (dt.loader === 'paper' || dt.loader === 'vanilla'))) soft = 'spigot';
     else if (/velocity|bungee|waterfall/.test(name)) soft = 'velocity';
     target = { mc: dt.mc || (soft === 'horizon' ? '26.3' : soft === 'pumpkin' ? 'latest' : null), loader: dt.loader || (soft === 'horizon' ? 'horizon' : soft === 'pumpkin' ? 'pumpkin' : 'unknown'), software: soft || dt.loader || 'unknown', engineType: (soft === 'horizon' || soft === 'pumpkin' || nativeBinary) ? 'native' : (dt.engineType || 'java') };
   } catch {}

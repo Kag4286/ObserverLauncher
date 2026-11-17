@@ -8,6 +8,7 @@ const { safeTarget, recordManifestEntry } = require('./fs-utils.js');
 const { json, download, marketplaceError } = require('./http.js');
 const cf = require('./curseforge.js');
 const { normalizeEnv } = require('./mod-metadata.js');
+const { areMcVersionsCompatible } = require('./mc-compat.js');
 
 // Is this file a ZIP (and therefore a jar)? A jar starts with the local-file-header signature
 // "PK\x03\x04". Reading four bytes is enough and never loads the whole file into memory.
@@ -33,8 +34,9 @@ function cfHeaders() {
 // Pure marketplace search shared by the IPC handler (GUI) and the MCP search_marketplace tool, so
 // both support the same three sources and never drift. Caller is responsible for try/catch.
 async function searchMarket(opts) {
-  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0, loader = '', category = '' } = opts || {};
+  const { source = 'modrinth', kind = 'plugin', query = '', version = '', sort = 'downloads', offset = 0, loader = '', category = '', limit = 20, excludeClientOnly = false } = opts || {};
   const skip = Math.max(0, Number(offset) || 0);
+  const pageSize = Math.min(25, Math.max(1, Number(limit) || 20));
   if (source === 'modrinth') {
     const loaderGroups = {
       plugin: ['loaders:paper', 'loaders:spigot', 'loaders:purpur', 'loaders:folia', 'loaders:bukkit'],
@@ -59,17 +61,19 @@ async function searchMarket(opts) {
       library: ['categories:library'],
     };
     const catFacets = catMap[category] || (category ? [`categories:${category}`] : null);
+    const sideFacet = (excludeClientOnly && kind !== 'datapack') ? ['server_side:required', 'server_side:optional'] : null;
     const index = sort === 'latest' ? 'newest' : sort === 'downloads' ? 'downloads' : 'relevance';
     let lastTotal = null;
     const runSearch = async filters => {
       const facets = encodeURIComponent(JSON.stringify(filters));
-      const data = await json(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&index=${index}&facets=${facets}`);
+      const data = await json(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query || '')}&limit=${pageSize}&offset=${skip}&index=${index}&facets=${facets}`);
       lastTotal = data.total_hits ?? null;
       return data.hits || [];
     };
     let hits, relaxed = null;
     const runWithRelax = async (typeFacet, loaderGroup) => {
       const base = loaderGroup ? [[typeFacet], loaderGroup] : [[typeFacet]];
+      if (sideFacet) base.push(sideFacet);
       const filters = [...base];
       if (version) filters.push([`versions:${version}`]);
       if (catFacets) filters.push(catFacets);
@@ -85,18 +89,27 @@ async function searchMarket(opts) {
         if (res.length) relaxed = 'version';
       }
       if (!res.length && skip === 0 && loaderGroup) {
-        res = await runSearch([[typeFacet]]);
+        const bare = sideFacet ? [[typeFacet], sideFacet] : [[typeFacet]];
+        res = await runSearch(bare);
         if (res.length) relaxed = 'loader';
       }
       return res;
     };
     if (kind === 'modpack') {
-      const mpLoader = explicit || loaderGroups[loader] || null;
+      // Modrinth indexes modpack loaders primarily under `categories:<loader>` (unlike mods, which
+      // populate `loaders:<loader>`). Querying BOTH with OR guarantees full catalog coverage.
+      const mpLoaderMap = {
+        fabric: ['categories:fabric', 'categories:quilt', 'loaders:fabric', 'loaders:quilt'],
+        quilt: ['categories:quilt', 'categories:fabric', 'loaders:quilt', 'loaders:fabric'],
+        forge: ['categories:forge', 'loaders:forge'],
+        neoforge: ['categories:neoforge', 'loaders:neoforge'],
+      };
+      const mpLoader = mpLoaderMap[loader] || explicit || loaderGroups[loader] || null;
       hits = await runWithRelax('project_type:modpack', mpLoader);
     } else if (kind === 'datapack') {
-      hits = await runSearch([['project_type:datapack']]);
-      if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['loaders:datapack']]); if (hits.length) relaxed = 'loader'; }
-      if (!hits.length && skip === 0) { hits = await runSearch([['project_type:mod'], ['categories:datapack']]); if (hits.length) relaxed = 'loader'; }
+      hits = await runWithRelax('project_type:datapack', null);
+      if (!hits.length && skip === 0) { hits = await runWithRelax('project_type:mod', ['loaders:datapack']); if (hits.length && !relaxed) relaxed = 'loader'; }
+      if (!hits.length && skip === 0) { hits = await runWithRelax('project_type:mod', ['categories:datapack']); if (hits.length && !relaxed) relaxed = 'loader'; }
     } else {
       const loaderGroup = explicit || loaderGroups[loader] || loaderGroups[kind] || loaderGroups.plugin;
       hits = await runWithRelax('project_type:mod', loaderGroup);
@@ -105,9 +118,13 @@ async function searchMarket(opts) {
     const mapHit = x => {
       const hitLoaders = (x.loaders && x.loaders.length) ? x.loaders : (x.categories || []).map(c => String(c).toLowerCase()).filter(c => KNOWN_LOADERS.includes(c));
       const hitEnv = { client: x.client_side || null, server: x.server_side || null, normalized: normalizeEnv({ client: x.client_side, server: x.server_side }) };
-      return { source, id: x.project_id, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, kind: kind === 'modpack' || kind === 'datapack' ? kind : undefined, env: hitEnv, loaders: hitLoaders, date: x.date_created || null };
+      return { source, id: x.project_id, slug: x.slug || null, title: x.title, author: x.author, description: x.description, icon: x.icon_url, downloads: x.downloads, version, gameVersions: Array.isArray(x.versions) ? x.versions : [], kind: kind === 'modpack' || kind === 'datapack' ? kind : undefined, env: hitEnv, loaders: hitLoaders, date: x.date_created || null };
     };
-    return { ok: true, relaxed, total: lastTotal, items: hits.map(mapHit) };
+    let mapped = hits.map(mapHit);
+    if (excludeClientOnly && kind !== 'datapack') {
+      mapped = mapped.filter(it => it.env?.server !== 'unsupported');
+    }
+    return { ok: true, relaxed, total: lastTotal, items: mapped };
   }
   if (source === 'hangar') {
     // BUGFIX (6.0.1): the sort field was "updatedAt", which Hangar does not accept. Its search
@@ -115,16 +132,16 @@ async function searchMarket(opts) {
     // An unknown field is answered with a 400, so sorting by "latest" always failed. The field
     // is "updated" (the one Hangar's own UI calls "Recently Updated").
     const order = sort === 'downloads' ? '-downloads' : sort === 'latest' ? '-updated' : '-stars';
-    const data = await json(`https://hangar.papermc.io/api/v1/projects?query=${encodeURIComponent(query || '')}&limit=20&offset=${skip}&sort=${encodeURIComponent(order)}`);
+    const data = await json(`https://hangar.papermc.io/api/v1/projects?query=${encodeURIComponent(query || '')}&limit=${pageSize}&offset=${skip}&sort=${encodeURIComponent(order)}`);
     const rows = data.result || data.projects || [];
     // BUGFIX (v4.0.0): Hangar hits carry an avatarUrl (often root-relative) — without mapping it to
     // `icon`, the renderer fell back to the generic placeholder, so Hangar rows had no real icon.
     const hangarIcon = u => !u ? null : (String(u).startsWith('http') ? String(u) : 'https://hangar.papermc.io' + String(u));
-    return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, icon: hangarIcon(x.avatarUrl || x.iconUrl || x.icon), version })) };
+    return { ok: true, total: data.pagination?.count ?? null, items: rows.map(x => ({ source, id: `${x.namespace?.owner || x.namespace}/${x.name || x.slug}`, title: x.name || x.slug, author: x.namespace?.owner || x.owner || 'Hangar', description: x.description || '', downloads: x.stats?.downloads || 0, loaders: ['paper'], icon: hangarIcon(x.avatarUrl || x.iconUrl || x.icon), version })) };
   }
   if (source === 'spigot') {
-    const page = Math.floor(skip / 20) + 1;
-    const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=20&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
+    const page = Math.floor(skip / pageSize) + 1;
+    const data = await json(`https://api.spiget.org/v2/search/resources/${encodeURIComponent(query || 'plugin')}?size=${pageSize}&page=${page}&sort=${sort === 'latest' ? '-releaseDate' : '-downloads'}`);
 
     // CONFIRMED via a real Spiget response (scripts/spigot-probe.js): `icon.url` IS present but is a
     // ROOT-RELATIVE path with NO leading slash, e.g. "data/resource_icons/62/62325.jpg?1564519207".
@@ -152,9 +169,9 @@ async function searchMarket(opts) {
     const headers = cfHeaders();
     if (!headers) { const e = new Error('CurseForge API key not set. Add your own key in Settings to search CurseForge.'); e.code = 'noKey'; throw e; }
     const classId = cf.classIdForKind(kind);
-    const targetLoader = loader || (kind === 'fabric' ? 'fabric' : kind === 'neoforge' ? 'neoforge' : kind === 'forge' ? 'forge' : 'any');
+    const targetLoader = loader || (['fabric', 'quilt', 'neoforge', 'forge'].includes(kind) ? kind : 'any');
     const loaderId = cf.loaderIdFor(targetLoader);
-    const params = new URLSearchParams({ gameId: String(cf.CF_GAME_ID), classId: String(classId), searchFilter: query || '', sortField: sort === 'latest' ? '3' : '2', sortOrder: 'desc', index: String(skip), pageSize: '20' });
+    const params = new URLSearchParams({ gameId: String(cf.CF_GAME_ID), classId: String(classId), searchFilter: query || '', sortField: sort === 'latest' ? '3' : '2', sortOrder: 'desc', index: String(skip), pageSize: String(pageSize) });
     if (version) params.set('gameVersion', version);
     if (loaderId) params.set('modLoaderType', String(loaderId));
     const data = await json(`${cf.CF_BASE}/mods/search?${params.toString()}`, headers);
@@ -167,7 +184,7 @@ async function searchMarket(opts) {
 // BOTH support Modrinth + Hangar + Spigot and the version/loader picking never drifts. Throws on
 // failure. Returns { url, filename, source }.
 async function resolveMarketDownload(item) {
-  const kind = ['forge', 'fabric', 'datapack', 'mod', 'modpack'].includes(item.kind) ? item.kind : 'plugin';
+  const kind = ['forge', 'neoforge', 'fabric', 'quilt', 'datapack', 'mod', 'modpack'].includes(item.kind) ? item.kind : 'plugin';
   if (item.source === 'modrinth' || !item.source) {
     const versions = await json(`https://api.modrinth.com/v2/project/${encodeURIComponent(item.id)}/version`);
     const isVel = item && (item.software === 'velocity' || item.loader === 'velocity' || item.loader === 'proxy');
@@ -179,9 +196,11 @@ async function resolveMarketDownload(item) {
     else if (item && item.loader === 'paper') wantedLoaders = ['paper', 'spigot', 'purpur', 'folia', 'bukkit'];
     else if (isVel) wantedLoaders = ['velocity', 'waterfall', 'bungeecord'];
     else {
-      wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], neoforge: ['neoforge'], forge: ['forge'], mod: ['neoforge', 'forge', 'fabric', 'quilt'], fabric: ['fabric', 'quilt'], datapack: ['datapack', 'minecraft'], modpack: ['neoforge', 'forge', 'fabric', 'quilt'] }[kind] || ['paper', 'spigot', 'purpur', 'folia', 'bukkit'];
+      wantedLoaders = { plugin: ['paper', 'spigot', 'purpur', 'folia', 'bukkit'], neoforge: ['neoforge'], forge: ['forge'], mod: ['neoforge', 'forge', 'fabric', 'quilt'], fabric: ['fabric', 'quilt'], quilt: ['quilt', 'fabric'], datapack: ['datapack', 'minecraft'], modpack: ['neoforge', 'forge', 'fabric', 'quilt'] }[kind] || ['paper', 'spigot', 'purpur', 'folia', 'bukkit'];
     }
-    const byVersion = versions.filter(v => !item.version || (v.game_versions || []).includes(item.version));
+    const exactVersion = item.version ? versions.filter(v => (v.game_versions || []).includes(item.version)) : versions;
+    const byVersion = item.version ? versions.filter(v => areMcVersionsCompatible(item.version, v.game_versions || [])) : versions;
+    const loaderMatch = v => (v.loaders || []).some(l => wantedLoaders.includes(l));
     let target = item.versionId ? versions.find(v => v.id === item.versionId) : null;
     if (target && item.loader && !item.allowIncompatible && Array.isArray(target.loaders) && target.loaders.length) {
       if (kind === 'datapack' || target.loaders.includes('datapack')) {
@@ -193,21 +212,22 @@ async function resolveMarketDownload(item) {
         }
       }
     }
-    if (!target) target = byVersion.find(v => (v.loaders || []).some(l => wantedLoaders.includes(l))) || null;
-    // BUGFIX (v3.3.1): the old fallback `|| byVersion[0] || versions[0]` silently installed a
-    // MISMATCHED jar (e.g. a Floodgate NeoForge build onto a Paper/Purpur server) that then crashed
-    // the server on start. When the registry told us the loaders (so we KNOW a build exists) and NONE
-    // matches this server's loader family, refuse instead of guessing. Datapack/modpack keep the old
-    // fallback because their `loaders` field is not a server-loader contract (datapack packs list
-    // 'datapack'/'minecraft'; modpacks bundle their own loader).
     if (!target) {
-      const loaderSensitive = kind === 'plugin' || kind === 'mod' || kind === 'forge' || kind === 'fabric';
+      target = exactVersion.find(v => loaderMatch(v) && (v.version_type || 'release') === 'release')
+        || exactVersion.find(loaderMatch)
+        || byVersion.find(v => loaderMatch(v) && (v.version_type || 'release') === 'release')
+        || byVersion.find(loaderMatch)
+        || null;
+    }
+    if (!target) {
+      const loaderSensitive = ['plugin', 'mod', 'forge', 'neoforge', 'fabric', 'quilt'].includes(kind);
       const someWithLoaders = byVersion.some(v => Array.isArray(v.loaders) && v.loaders.length);
       if (loaderSensitive && someWithLoaders) {
         const found = [...new Set(byVersion.flatMap(v => v.loaders || []))].filter(Boolean).join(', ');
         throw new Error(`No ${kind} build matches this server's loader (available: ${found || 'none'}). Refusing to install a mismatched jar — pass the exact versionId or install manually.`);
       }
-      target = byVersion[0] || versions[0];
+      target = exactVersion[0];
+      if (!target) target = byVersion[0] || versions[0];
     }
     if (!target?.files?.[0]) throw new Error('No downloadable version was found.');
     const f = target.files.find(x => x.primary) || target.files[0];
@@ -219,6 +239,7 @@ async function resolveMarketDownload(item) {
       hashes: f.hashes || null,
       // CB2 (v3.3.0): identity for the manifest so a later check_updates can re-query the registry.
       projectId: item.id,
+      canonicalProjectId: target.project_id || null,
       versionId: target.id || null,
       gameVersion: item.version || (target.game_versions && target.game_versions[0]) || null,
       versionNumber: target.version_number || null,
@@ -238,7 +259,10 @@ async function resolveMarketDownload(item) {
       target = list.find(v => v.name === item.versionId || String(v.id) === String(item.versionId)) || null;
     }
     if (!target && item.version) {
-      target = list.find(v => (v.platformDependencies?.PAPER || v.platformDependencies?.VELOCITY || []).includes(item.version)) || null;
+      const gvsOf = v => v.platformDependencies?.PAPER || v.platformDependencies?.VELOCITY || [];
+      target = list.find(v => gvsOf(v).includes(item.version))
+        || list.find(v => areMcVersionsCompatible(item.version, gvsOf(v)))
+        || null;
     }
     if (!target) target = list[0] || null;
     const file = target ? pickFile(target) : null;
@@ -429,6 +453,7 @@ function registerMarketplace(ipcMain, ctx) {
                 number: v.name,
                 gameVersions: gv,
                 loaders: ld.length ? ld : ['paper'],
+                versionType: String(v.channel?.name || 'release').toLowerCase(),
                 date: v.createdAt || null,
                 size: (dl?.fileInfo && dl.fileInfo.sizeBytes) || 0,
                 dependencies: [],
@@ -526,12 +551,9 @@ function registerMarketplace(ipcMain, ctx) {
   ipcMain.handle('market:install', async (_, item) => {
     try {
       if (!ctx.currentServerPath) return { ok: false, error: 'Choose and apply a server folder first.' };
-      const kind = ['forge', 'fabric', 'neoforge', 'mod', 'datapack'].includes(item.kind) ? item.kind : 'plugin';
+      const kind = ['forge', 'fabric', 'neoforge', 'quilt', 'mod', 'datapack'].includes(item.kind) ? item.kind : 'plugin';
       const levelName = serverFiles(ctx.currentServerPath).properties['level-name'] || 'world';
-      // BUGFIX (v3.0.0): a 'mod' (or neoforge) item was NOT in the kind list, so it fell through to
-      // 'plugin' and a mod jar landed in plugins/ where the mod loader never sees it. Map every mod
-      // loader to mods/ (mirrors the MCP install_from_market path).
-      const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', neoforge: 'mods', mod: 'mods', datapack: path.join(levelName, 'datapacks') };
+      const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', neoforge: 'mods', quilt: 'mods', mod: 'mods', datapack: path.join(levelName, 'datapacks') };
       const destDir = safeTarget(ctx.currentServerPath, destFolders[kind]);
       fs.mkdirSync(destDir, { recursive: true });
       const { url, filename, hashes, projectId, versionId, gameVersion, versionNumber } = await resolveMarketDownload(item);
@@ -603,7 +625,7 @@ async function listMarketVersions(opts) {
   if (source === 'modrinth') {
     const r = await json('https://api.modrinth.com/v2/project/' + encodeURIComponent(id) + '/version');
     let mapped = (r || []).map(v => ({ id: v.id, number: v.version_number, gameVersions: v.game_versions || [], loaders: v.loaders || [], date: v.date_published, size: (v.files || []).find(f => f.primary)?.size || (v.files || [])[0]?.size || 0 }));
-    if (filterVer) mapped = mapped.filter(v => (v.gameVersions || []).includes(filterVer));
+    if (filterVer) mapped = mapped.filter(v => areMcVersionsCompatible(filterVer, v.gameVersions || []));
     if (filterLoader) mapped = mapped.filter(v => (v.loaders || []).includes(filterLoader));
     return mapped.slice(0, limit);
   }
@@ -615,7 +637,7 @@ async function listMarketVersions(opts) {
       const gv = (v.platformDependencies && (v.platformDependencies.PAPER || v.platformDependencies.VELOCITY || v.platformDependencies.WATERFALL)) || [];
       return { id: v.name, number: v.name, gameVersions: Array.isArray(gv) ? gv : (gv ? [gv] : []), loaders: ['paper'], date: v.createdAt || null };
     });
-    if (filterVer) mapped = mapped.filter(v => (v.gameVersions || []).includes(filterVer));
+    if (filterVer) mapped = mapped.filter(v => areMcVersionsCompatible(filterVer, v.gameVersions || []));
     return mapped.slice(0, limit);
   }
   // curseforge
@@ -624,7 +646,7 @@ async function listMarketVersions(opts) {
   const files = await json(`${cf.CF_BASE}/mods/${encodeURIComponent(id)}/files?pageSize=${Math.min(limit, 50)}`, headers);
   let versions = (files.data || []).map(cf.mapCfFileToVersion).filter(Boolean);
   versions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  if (filterVer) versions = versions.filter(v => (v.gameVersions || []).includes(filterVer));
+  if (filterVer) versions = versions.filter(v => areMcVersionsCompatible(filterVer, v.gameVersions || []));
   if (filterLoader) versions = versions.filter(v => (v.loaders || []).includes(filterLoader));
   return versions.slice(0, limit);
 }

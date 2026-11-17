@@ -60,7 +60,7 @@ function getArmorMaterial(idOrItem) {
   if (!s) return null;
   if (s.includes(':') && !s.startsWith('minecraft:')) {
     const [ns, name] = s.split(':');
-    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots|greaves|cuirass|pauldrons|sabatons|cap|tunic|pants|shoes|hat|hood|mask|crown|tiara|shroud|cloak|robe|vest|plates)$/, '');
+    const mat = name.replace(/_(?:helmet|chestplate|leggings|boots|greaves|cuirass|pauldrons|sabatons|cap|tunic|pants|shoes|hat|hood|mask|crown|tiara|shroud|cloak|robe|vest|plates|helm|headpiece|headgear|visor|goggles|beret|bandana|wreath|circlet|chest|torso|jacket|coat|mantle|brigandine|hauberk|breastplate|plate|legs|legplates|trousers|chausses|kilt|skirt|feet|foot|slippers|sandals|sneakers|treads|striders)$/, '');
     if (mat && ns) return { isMod: true, ns, mat };
   }
   if (s.includes('turtle')) return 'turtle';
@@ -286,15 +286,20 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment, opts = {}) {
       if (cached.texture) cb(cached);
       return;
     }
-    loadArmor(effectiveKind, matStr, dyeRgb, (t, texH) => {
-      const res = { texture: t, texH, status: 'ok' };
+    loadArmor(effectiveKind, matStr, dyeRgb, (t, texH, hdrStatus) => {
+      const st = hdrStatus || 'ok';
+      const res = { texture: t, texH, status: st };
       armorTexCache.set(key, res);
       allCreatedTextures.push(t);
-      notifyArmorStatus(slotKey, 'ok');
+      notifyArmorStatus(slotKey, st);
       cb(res);
     }, (missStatus) => {
       armorTexCache.set(key, { texture: null, texH: 32, status: missStatus });
       notifyArmorStatus(slotKey, missStatus);
+    }, (lateStatus) => {
+      const cached = armorTexCache.get(key);
+      if (cached) cached.status = lateStatus;
+      notifyArmorStatus(slotKey, lateStatus);
     });
   };
 
@@ -362,7 +367,7 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment, opts = {}) {
     return { src, texH };
   };
 
-  const loadArmor = (kind, material, dyeRgb, onReady, onMiss) => {
+  const loadArmor = (kind, material, dyeRgb, onReady, onMiss, onLateStatus) => {
     const texture = gl.createTexture();
     const image = new Image();
     image.crossOrigin = 'anonymous';
@@ -381,7 +386,16 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment, opts = {}) {
       }
       const { src, texH } = prepareArmorSource(image, dyeRgb);
       if (upload(texture, src)) {
-        onReady(texture, texH);
+        const isModArmor = String(kind || '').startsWith('armormod');
+        const nw = image.naturalWidth || 0, nh = image.naturalHeight || 0;
+        const badAspect = isModArmor && nw > 0 && nh > 0 && !(nw === nh * 2 || (nw === 64 && nh === 64));
+        onReady(texture, texH, badAspect ? 'nonstandard-uv' : 'ok');
+        if (isModArmor && typeof fetch === 'function' && typeof onLateStatus === 'function') {
+          fetch(url).then(r => {
+            const st = r.headers.get('x-observer-armor-status');
+            if (st) onLateStatus(st);
+          }).catch(() => {});
+        }
       }
     };
     image.onerror = () => { if (typeof onMiss === 'function') onMiss('missing'); };
@@ -419,9 +433,13 @@ function createPlayerRenderer(canvas, skinUrl, isSlim, equipment, opts = {}) {
     }
 
     if (helmetMat) fetchArmor('helmet', 'armor', helmetMat, equipment?.helmet?.dyedColor, r => { texHelmet = r.texture; texHelmetH = r.texH; draw(); });
+    else if (equipment && equipment.helmet) notifyArmorStatus('helmet', 'unsupported');
     if (chestMat) fetchArmor('chest', 'armor', chestMat, equipment?.chest?.dyedColor, r => { texChest = r.texture; texChestH = r.texH; draw(); });
+    else if (equipment && equipment.chest) notifyArmorStatus('chest', 'unsupported');
     if (bootsMat) fetchArmor('boots', 'armor', bootsMat, equipment?.boots?.dyedColor, r => { texBoots = r.texture; texBootsH = r.texH; draw(); });
+    else if (equipment && equipment.boots) notifyArmorStatus('boots', 'unsupported');
     if (legsMat) fetchArmor('legs', 'armorlegs', legsMat, equipment?.legs?.dyedColor, r => { texLegs = r.texture; texLegsH = r.texH; draw(); });
+    else if (equipment && equipment.legs) notifyArmorStatus('legs', 'unsupported');
     draw();
   };
 

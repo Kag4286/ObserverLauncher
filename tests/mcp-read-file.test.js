@@ -44,7 +44,7 @@ const check = (name, cond) => cond ? (pass++, console.log('PASS', name)) : (fail
   // Test 3: list_prompts and get_prompt tools
   const lp = getTool('list_prompts');
   const lpRes = await lp.handler(ctx, {});
-  check('list_prompts returns prompts', lpRes && lpRes.ok && Array.isArray(lpRes.result?.prompts) && lpRes.result.prompts.length === 9);
+  check('list_prompts returns prompts', lpRes && lpRes.ok && Array.isArray(lpRes.result?.prompts) && lpRes.result.prompts.length === 10);
 
   const gp = getTool('get_prompt');
   const gpRes = await gp.handler(ctx, { name: 'diagnose_server' });

@@ -13,7 +13,7 @@ Create Java or Rust servers on your own PC, invite friends without touching rout
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square&logo=apache)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows_%7C_Linux-2ea44f?style=flat-square&logo=windows&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
-[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.0.0.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
+[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.0.1.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
 
 <br>
 
@@ -183,7 +183,7 @@ cd ObserverLauncher
 
 npm install
 npm start          # Launch Electron app in development mode
-npm test           # Run unit and integration suite (185 test files)
+npm test           # Run unit and integration suite (190 test files)
 npm run test:e2e   # Run Playwright Electron E2E tests
 
 npm run build:win   # Windows installer (.exe)
