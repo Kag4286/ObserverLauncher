@@ -1,6 +1,7 @@
 // website/i18n.js - Complete 7-locale dictionary: tech, simple (End-User), Workbench, and Automation/Self-Host (0 em dashes per R-02)
 window.WEB_LOCALES = {
   en: {
+    'a11y.skip': 'Skip to content',
     'nav.workbench': 'Workflow',
     'nav.spotlight': 'Map & 3D',
     'nav.engines': 'Engines & CLI',
@@ -151,6 +152,7 @@ window.WEB_LOCALES = {
     'sc.10.tab': 'Remote Web UI', 'sc.10.title': 'Remote Web Dashboard (SSE)', 'sc.10.desc': 'Monitor status, live console logs, players, and backups from phone or browser behind constant-time Bearer auth.',
   },
   vi: {
+    'a11y.skip': 'Chuyển tới nội dung',
     'nav.workbench': 'So sánh quy trình',
     'nav.spotlight': 'Bản đồ & 3D',
     'nav.engines': 'Engine & CLI',
@@ -301,6 +303,7 @@ window.WEB_LOCALES = {
     'sc.10.tab': 'Remote Web UI', 'sc.10.title': 'Bảng điều khiển Web qua SSE', 'sc.10.desc': 'Theo dõi trạng thái, console trực tiếp, người chơi và backup từ điện thoại/trình duyệt qua Bearer auth.',
   },
   es: {
+    'a11y.skip': 'Ir al contenido',
     'nav.workbench': 'Flujo',
     'nav.spotlight': 'Mapa y 3D',
     'nav.engines': 'Motores y CLI',
@@ -451,6 +454,7 @@ window.WEB_LOCALES = {
     'sc.10.tab': 'Web Remota', 'sc.10.title': 'Panel Web Remoto (SSE)', 'sc.10.desc': 'Controla estado, consola en vivo, jugadores y copias de seguridad desde el navegador tras auth Bearer.',
   },
   'pt-BR': {
+    'a11y.skip': 'Ir para o conteúdo',
     'nav.workbench': 'Fluxo',
     'nav.spotlight': 'Mapa e 3D',
     'nav.engines': 'Motores e CLI',
@@ -601,6 +605,7 @@ window.WEB_LOCALES = {
     'sc.10.tab': 'Web Remota', 'sc.10.title': 'Painel Web Remoto (SSE)', 'sc.10.desc': 'Acompanhe status, console ao vivo, jogadores e backups pelo navegador com autenticação Bearer.',
   },
   de: {
+    'a11y.skip': 'Zum Inhalt springen',
     'nav.workbench': 'Workflow',
     'nav.spotlight': 'Karte & 3D',
     'nav.engines': 'Engines & CLI',
@@ -751,6 +756,7 @@ window.WEB_LOCALES = {
     'sc.10.tab': 'Remote Web', 'sc.10.title': 'Remote Web-Dashboard (SSE)', 'sc.10.desc': 'Status, Live-Konsole, Spieler und Backups direkt im Browser hinter Bearer-Auth steuern.',
   },
   ru: {
+    'a11y.skip': 'Перейти к содержимому',
     'nav.workbench': 'Процесс',
     'nav.spotlight': 'Карта и 3D',
     'nav.engines': 'Ядра и CLI',
@@ -901,6 +907,7 @@ window.WEB_LOCALES = {
     'sc.10.tab': 'Веб-панель', 'sc.10.title': 'Удалённая веб-панель (SSE)', 'sc.10.desc': 'Контроль статуса, консоли, игроков и бэкапов из браузера с постоянной проверкой Bearer-токена.',
   },
   'zh-CN': {
+    'a11y.skip': '跳到主要内容',
     'nav.workbench': '流程对比',
     'nav.spotlight': '地图与 3D',
     'nav.engines': '核心与 CLI',

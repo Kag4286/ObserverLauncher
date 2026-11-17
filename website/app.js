@@ -688,9 +688,31 @@
   window.addEventListener('keydown', (e) => {
     const lb = document.getElementById('shotLightbox');
     if (!lb || lb.hidden) return;
-    if (e.key === 'Escape') closeLightbox();
-    else if (e.key === 'ArrowLeft') stepLightbox(-1);
-    else if (e.key === 'ArrowRight') stepLightbox(1);
+    if (e.key === 'Escape') { closeLightbox(); return; }
+    if (e.key === 'ArrowLeft') { stepLightbox(-1); return; }
+    if (e.key === 'ArrowRight') { stepLightbox(1); return; }
+    if (e.key === 'Tab') {
+      const focusables = [...lb.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+
+  // Keyboard Arrow Navigation for ARIA Tablists (a11y)
+  document.querySelectorAll('[role="tablist"]').forEach((list) => {
+    list.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      const tabs = [...list.querySelectorAll('[role="tab"]')];
+      const idx = tabs.indexOf(document.activeElement);
+      if (idx === -1) return;
+      e.preventDefault();
+      const delta = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+      const next = tabs[(idx + delta + tabs.length) % tabs.length];
+      if (next) { next.focus(); next.click(); }
+    });
   });
 
   document.querySelectorAll('#modeBar .mode-pill').forEach((btn) => {
@@ -798,6 +820,22 @@
     };
     radarPad.addEventListener('pointerup', endRadarDrag);
     radarPad.addEventListener('pointercancel', endRadarDrag);
+    radarPad.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 128 : 16;
+      const cxEl = document.getElementById('coordX');
+      const czEl = document.getElementById('coordZ');
+      if (!cxEl || !czEl) return;
+      let dx = 0, dz = 0;
+      if (e.key === 'ArrowLeft') dx = -step;
+      else if (e.key === 'ArrowRight') dx = step;
+      else if (e.key === 'ArrowUp') dz = -step;
+      else if (e.key === 'ArrowDown') dz = step;
+      else return;
+      e.preventDefault();
+      cxEl.value = String((Number(cxEl.value) || 0) + dx);
+      czEl.value = String((Number(czEl.value) || 0) + dz);
+      updateCalculator(true);
+    });
   }
 
   // Horizontal Filmstrip Scrub Rail + Desktop Pointer Drag
