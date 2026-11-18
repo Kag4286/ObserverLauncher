@@ -19,7 +19,7 @@ function parseMetricValue(raw) {
 // (same pattern as scheduler.js's exported schedulerTick). `st` carries the counters between ticks.
 async function metricsTick(ctx, st) {
   if (!ctx.serverProcess?.pid) {
-    ctx.monitoredPid = null; st.consecutiveMisses = 0; st.javaRetryCount = 0;
+    ctx.monitoredPid = null; st.consecutiveMisses = 0; st.javaRetryCount = 0; st.lowTpsStreak = 0;
     // Idle (server stopped): throttle the idle push to ~1 per 5 ticks (and skip memoryUsage() on skipped ticks).
     if ((st.idleTicks++ % 5) !== 0) return;
     const used = process.memoryUsage().rss / 1024 / 1024;
@@ -111,6 +111,16 @@ async function metricsTick(ctx, st) {
   if (Number.isFinite(cpu)) st.lastMetrics.cpu = Math.round(cpu);
   const curMem = memory > 0 ? memory : st.lastMetrics.serverMemory;
   pushHistory(ctx, { t: now, tps: ctx.live?.tps ?? null, mspt: ctx.live?.mspt ?? null, cpu: Number.isFinite(cpu) ? Math.round(cpu) : null, ram: curMem ? Math.round(curMem) : null, players: (ctx.live?.players || []).length });
+  // v9.0.2: fire low-TPS webhook after 3 consecutive ticks below 15.0 TPS (subject to 10m cooldown).
+  const curTps = ctx.live?.tps;
+  if (curTps != null && Number.isFinite(Number(curTps)) && Number(curTps) > 0 && Number(curTps) < 15.0) {
+    st.lowTpsStreak = (st.lowTpsStreak || 0) + 1;
+    if (st.lowTpsStreak >= 3) {
+      try { require('./webhook.js').fireForContext(ctx, { type: 'tps_low', tps: Number(curTps), mspt: ctx.live?.mspt ?? null }); } catch {}
+    }
+  } else {
+    st.lowTpsStreak = 0;
+  }
   ctx.send('server:metrics', { appMemory: Math.round(used), serverMemory: curMem, cpu: Math.round(cpu), running: true, timestamp: now, ...ctx.live });
   if (typeof ctx.emitRemote === 'function' && (now - (st.lastRemoteMetrics || 0)) >= 2000) {
     st.lastRemoteMetrics = now;

@@ -10,6 +10,26 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [9.0.2] - 2026-11-18
+
+**Discord Webhook 2.0 (Rich Embeds & Encrypted URL Storage), Local Discord Rich Presence IPC Client, and Dedicated Discord Settings Tab.**
+
+### Discord Webhook 2.0 (`src/main/webhook.js`, `src/main/secrets.js`, `src/main/backups.js`, `src/main/server-metrics.js`, `src/main/tunnel.js`, `src/main/pinggy-tunnel.js`, `src/main/server-lifecycle.js`):
+- **Rich Embeds & Formats:** Added `EVENT_META`, `buildEmbed()`, `buildPayload()`, and `resolveCrashMention()` supporting `discord` (color-coded embeds with Environment/Players/Uptime/Diagnosis fields, optional `mc-heads.net` player skin thumbnails via `webhookPlayerAvatars`, custom `webhookUsername`, and crash-only mentions via `webhookCrashMention`), `discord_compact`, and `generic` JSON.
+- **Expanded Lifecycle & Health Events:** Wired `player_leave` (`server-lifecycle.js`), `backup` (`backups.js`), `tps_low` with 3-tick streak and 10-minute per-instance cooldown (`server-metrics.js`), and `tunnel` (`tunnel.js` + `pinggy-tunnel.js`) via shared `fireForContext(ctx, ev)`.
+- **Reliability & Security:** Added serial dispatch pacing, single `429 Retry-After` retry, non-2xx HTTP error propagation for `webhook:test`, and added `'webhookUrl'` to `GLOBAL_SECRET_KEYS` in `src/main/secrets.js` for `safeStorage` encryption at rest.
+
+### Local Discord Rich Presence (`src/main/discord-rpc.js`, `src/main.js`, `src/main/context.js`, `src/main/app-lifecycle.js`, `src/main/settings.js`):
+- **Pure-Node IPC Client:** Implemented `encodeFrame()`, `decodeFrames()`, `candidateIpcPaths()`, `buildPresenceActivity()`, `collectPresenceSnapshot()`, and `createDiscordRpcController()` over local Discord named pipes (`\\.\pipe\discord-ipc-0..9`) and POSIX sockets (`XDG_RUNTIME_DIR`, Flatpak, Snap) with zero npm dependencies.
+- **Resilience, Diagnostics & Privacy:** Defaulted `discordRpcShowIdle` to `true`, added `handshakeTimeoutMs` (`3000ms`), surfaced fatal Discord IPC error frames (`4000`, `4002`, `4003`, `4009`) as `state: 'error'` with `lastError` instead of silent infinite retries, used direct HTTPS artwork (`https://raw.githubusercontent.com/Kag4286/ObserverLauncher/main/build/icon.png`), omitted `party` when 0 players are online, and pushed live `discord-rpc:status` IPC events via `onStatusChange`.
+
+### Dedicated Discord Settings Tab & Beginner Mode (`src/renderer/index.html`, `src/renderer/css/02-shell.css`, `src/renderer/css/06-modals.css`, `src/renderer/js/07-overview.js`, `src/renderer/js/08-shell.js`, `src/main/settings-handlers.js`, `src/preload.js`, `src/renderer/locales/*.js`):
+- Moved Discord Rich Presence and Webhook Notifications from `Advanced` into a dedicated `data-set-view="discord"` / `data-set-pane="discord"` settings category, hid it under `body.beginner-mode` (`02-shell.css` + `applyBeginnerMode()` redirect in `08-shell.js`), and fixed `#webhookEvents` label crushing with `.set-item-row.col`.
+- Added live `#discordRpcPreview` card, `#discordRpcPill`, `#discordRpcSetupNote`, `discord-rpc:reconnect`, and `discord-rpc:open-portal` (lazily requiring `electron.shell`), plus full 7-locale parity (`1525` keys × `7` locales).
+
+### Testing (`tests/`):
+- Added `tests/discord-rpc.test.js` (`15 passed`), expanded `tests/webhook.test.js` (`31 passed`), updated `tests/beginner-mode.test.js` (`34 passed`) and `tests/e2e/interaction.spec.js` (`19/19` E2E passed; `191/191` unit test files passed).
+
 ## [9.0.1] - 2026-11-17
 
 **Marketplace & Install Modal Rework, Multi-Loader & Lenient Mod Scanning, Verified Datapack Format Table, Java Picker Fix, 3D Armor Compatibility, and 3-Tier MCP Modpack Curation.**

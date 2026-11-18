@@ -27,8 +27,12 @@ contextBridge.exposeInMainWorld('observer', {
   // v6.0.0 A2.3: per-instance Pinggy tunnel (Bedrock UDP).
   pinggyStart: proto => ipcRenderer.invoke('pinggy:start', proto), pinggyStop: () => ipcRenderer.invoke('pinggy:stop'), pinggyGet: () => ipcRenderer.invoke('pinggy:get'), onPinggyStatus: cb => ipcRenderer.on('pinggy:status', (_, d) => cb(d)),
   metricsLong: range => ipcRenderer.invoke('metrics:long', range),
-  // v6.0.0 F1: webhook notifications.
+  // v6.0.0 F1 / v9.0.2: webhook notifications & local Discord Rich Presence.
   webhookTest: () => ipcRenderer.invoke('webhook:test'),
+  discordRpcStatus: () => ipcRenderer.invoke('discord-rpc:status'),
+  discordRpcReconnect: () => ipcRenderer.invoke('discord-rpc:reconnect'),
+  discordRpcOpenPortal: () => ipcRenderer.invoke('discord-rpc:open-portal'),
+  onDiscordRpcStatus: cb => ipcRenderer.on('discord-rpc:status', (_, d) => cb(d)),
   playerSkin: input => ipcRenderer.invoke('player:skin', { input }),
   playerAnalytics: () => ipcRenderer.invoke('player:analytics'),
   proxyServerGet: () => ipcRenderer.invoke('proxy:servers:get'),

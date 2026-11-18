@@ -165,6 +165,8 @@ function setupQuitHandler(ctx) {
     try { require('./platform/ps-host.js').dispose(); } catch {}
     // v8.1.1: terminate the World Map worker thread if running so it exits cleanly on quit.
     try { require('./worldmap-worker.js').terminate().catch(() => {}); } catch {}
+    // v9.0.2: clear Discord Rich Presence activity before quit.
+    try { if (ctx.discordRpc) ctx.discordRpc.stop(); } catch {}
     if (quitHandled) return;
     const targets = gatherRunningInstances();
     if (!targets.length) return;

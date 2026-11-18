@@ -37,7 +37,10 @@ const css = fs.readFileSync(path.join(root, 'src', 'renderer', 'css', '02-shell.
 check('CSS does NOT hide properties tab', !/body\.beginner-mode \.nav-item\[data-tab="properties"\]/.test(css));
 check('CSS hides ov-adv', /body\.beginner-mode \.ov-adv\{display:none\}/.test(css));
 check('CSS hides content group', /body\.beginner-mode \.nav-group\[data-grp="content"\]/.test(css));
-check('CSS hides AI and advanced settings in beginner mode', /body\.beginner-mode \.settings-nav \.seg-switch-btn\[data-set-view="ai"\]/.test(css));
+check('CSS hides AI, Discord, and advanced settings in beginner mode',
+  /body\.beginner-mode \.settings-nav \.seg-switch-btn\[data-set-view="discord"\]/.test(css) &&
+  /body\.beginner-mode \.settings-nav \.seg-switch-btn\[data-set-view="ai"\]/.test(css));
+check('applyBeginnerMode redirects away from hidden discord pane', /curPane\.dataset\.setPane==='discord'/.test(sh));
 
 // HTML wiring
 const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
@@ -47,6 +50,10 @@ check('HTML has railShowBeginner', /id="railShowBeginner"/.test(html));
 check('HTML has beginnerShare', /id="beginnerShare"/.test(html));
 check('HTML has beginnerShareAddr', /id="beginnerShareAddr"/.test(html));
 check('HTML has beginnerShareTabs', /id="beginnerShareTabs"/.test(html));
+check('HTML has dedicated Discord settings nav and pane with stacked webhook events',
+  /data-set-view="discord"/.test(html) &&
+  /data-set-pane="discord"/.test(html) &&
+  /<div class="set-item-row col">\s*<div class="sir-info">\s*<div class="sir-title" data-i18n="wh\.events">/.test(html));
 check('content group has data-grp', /data-grp="content"/.test(html));
 
 // Mode toggle buttons hidden on rail (mode controlled in Launcher Settings and Onboarding)

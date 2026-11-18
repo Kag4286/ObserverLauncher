@@ -252,6 +252,7 @@ test('Beginner mode hides advanced rail tabs after Apply and restores them when 
   await expect(win.locator('body')).toHaveClass(/beginner-mode/);
   await expect(win.locator('.nav-item[data-tab="performance"]')).toBeHidden();
   await expect(win.locator('.nav-item[data-tab="worldmap"]')).toBeHidden();
+  await expect(win.locator('#settingsSeg .seg-switch-btn[data-set-view="discord"]')).toBeHidden();
 
   await toggle.click();
   await win.locator('#saveSettings').click();
@@ -259,6 +260,11 @@ test('Beginner mode hides advanced rail tabs after Apply and restores them when 
   await expect(win.locator('body')).not.toHaveClass(/beginner-mode/);
   await expect(win.locator('.nav-item[data-tab="performance"]')).toBeVisible();
   await expect(win.locator('.nav-item[data-tab="worldmap"]')).toBeVisible();
+  await expect(win.locator('#settingsSeg .seg-switch-btn[data-set-view="discord"]')).toBeVisible();
+
+  await win.locator('#settingsSeg .seg-switch-btn[data-set-view="discord"]').click();
+  await expect(win.locator('#settings .set-pane[data-set-pane="discord"]')).toBeVisible();
+  await expect(win.locator('#discordRpcPreview')).toBeVisible();
 
   await win.locator('#settingsSeg .seg-switch-btn[data-set-view="setup"]').click();
 });

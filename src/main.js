@@ -133,12 +133,21 @@ app.whenReady().then(async () => {
   ctx.startPrometheus = async () => { try { await prom.startPrometheus(ctx); } catch (e) { try { ctx.appendLog('Prometheus start failed: ' + (e?.message || e), 'error'); } catch {} } };
   ctx.stopPrometheus = () => { try { prom.stopPrometheus(ctx); } catch {} };
   try { const pOn = !!require('./main/settings.js').loadSettings().prometheusEnabled; ctx.currentPrometheusEnabled = pOn; if (pOn) ctx.startPrometheus(); } catch {}
+  // v9.0.2: local Discord Rich Presence IPC client (fail-silent when Discord Desktop is absent).
+  try {
+    const { createDiscordRpcController } = require('./main/discord-rpc.js');
+    ctx.discordRpc = createDiscordRpcController({
+      onStatusChange: st => { try { ctx.send('discord-rpc:status', st); } catch {} },
+    });
+    ctx.discordRpc.configure(require('./main/settings.js').loadSettings());
+    ctx.discordRpc.updateFromContext(ctx);
+  } catch {}
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 // Stop the MCP server and remove its bridge config on the way out, so a stale token/port file
 // never lingers to confuse the next launch.
-app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { stopAllPinggy(ctx); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} try { require('./main/metrics-store.js').flushAll(); } catch {} });
+app.on('before-quit', () => { try { stopTunnel(ctx); } catch {} try { stopAllPinggy(ctx); } catch {} try { ctx.discordRpc && ctx.discordRpc.stop(); } catch {} try { ctx.stopMcpServer && ctx.stopMcpServer(); } catch {} try { ctx.stopRemoteServer && ctx.stopRemoteServer(); } catch {} try { require('./main/metrics-store.js').flushAll(); } catch {} });
 setupQuitHandler(ctx);
 
 // Exported for smoke tests (require without launching Electron windows).

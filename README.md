@@ -13,7 +13,7 @@ Create Java or Rust servers on your own PC, invite friends without touching rout
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square&logo=apache)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows_%7C_Linux-2ea44f?style=flat-square&logo=windows&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
-[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.0.1.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
+[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.0.2.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
 
 <br>
 
@@ -82,7 +82,7 @@ Personal settings also include 7 UI languages (`en`, `vi`, `es`, `pt-BR`, `de`, 
 - Create manual world ZIP backups or turn on **Auto-backup** (`15m`, `30m`, `1h`, or a custom interval) with automatic cleanup of old auto-backups.
 - Rename worlds, inspect or set seeds, adjust gamerules, and reorder datapacks.
 - Enable **Auto-restart on crash** (with retry limits and delay) and set daily/weekly **Start & Stop schedules**.
-- Send **Discord** (or generic JSON) webhook alerts when the server starts, stops, crashes, or when players join and leave.
+- Send **Discord Rich Embeds** (or compact/generic JSON) when the server starts, stops, crashes, backs up, drops TPS, opens a tunnel, or when players join and leave, and display a live **"Playing" status (Discord Rich Presence)** in a dedicated **Discord** settings tab (hidden in Beginner mode).
 
 <p align="center">
   <img src="docs/screenshot-player-inspector.png" width="48%" alt="Player Inspector 3D Preview">
@@ -183,7 +183,7 @@ cd ObserverLauncher
 
 npm install
 npm start          # Launch Electron app in development mode
-npm test           # Run unit and integration suite (190 test files)
+npm test           # Run unit and integration suite (191 test files)
 npm run test:e2e   # Run Playwright Electron E2E tests
 
 npm run build:win   # Windows installer (.exe)

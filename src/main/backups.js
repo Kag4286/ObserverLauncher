@@ -43,7 +43,13 @@ async function createBackupInternal(ctx, opts = {}) {
     const prefix = opts.auto ? 'world-backup-auto-' : 'world-backup-';
     const out = path.join(dir, `${prefix}${stamp}.zip`);
     const r = await platform.createBackup({ serverPath: root, worlds: info.worlds, destZip: out });
-    return r.ok ? { ok: true, files: serverFiles(root), name: path.basename(out) } : { ok: false, error: r.error };
+    if (r.ok) {
+      let sizeBytes = 0;
+      try { sizeBytes = fs.statSync(out).size; } catch {}
+      try { require('./webhook.js').fireForContext(ctx, { type: 'backup', detail: path.basename(out), auto: !!opts.auto, sizeBytes }); } catch {}
+      return { ok: true, files: serverFiles(root), name: path.basename(out) };
+    }
+    return { ok: false, error: r.error };
   } finally {
     try { if (ctx.serverProcess && ctx.serverProcess.stdin.writable) ctx.serverProcess.stdin.write('save-on\r\n'); } catch {}
     ctx.backupInProgress = false;

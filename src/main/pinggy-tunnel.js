@@ -177,6 +177,7 @@ async function startPinggy(ctx, proto, opts = {}) {
     // persisted, because the ssh child dies on app quit so a stored address would be stale.
     try { ctx.appendLog(`Pinggy ${kind.toUpperCase()} tunnel ready: ${ctx.pinggyAddress} (expires in about 60 minutes).`, 'system'); } catch {}
     emit(ctx);
+    try { require('./webhook.js').fireForContext(ctx, { type: 'tunnel', detail: ctx.pinggyAddress }); } catch {}
     // 55-minute auto-restart, in ownId so it restarts the RIGHT instance.
     clearRestart(ctx);
     ctx.pinggyRestartTimer = setTimeout(() => {

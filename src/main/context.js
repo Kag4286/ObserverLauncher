@@ -43,6 +43,8 @@ function createContext() {
     mcpToken: null,
     mcpPort: null,
     onMcpConfirm: null, // set by the renderer bridge when a write/destroy tool needs approval
+    // v9.0.2: local Discord Rich Presence controller (global across instances).
+    discordRpc: null,
     // v2.0.0 multi-instance: per-instance state map + the active id. AsyncLocalStorage
     // carries the CURRENT instance across awaits (ctx.inst()) so a handler can never
     // race another by mutating a global. See docs/v2.0.0-plan.md "ctx access model".
@@ -187,6 +189,7 @@ function createContext() {
     const statePayload = { status, running: status !== 'stopped', instanceId: ctx.inst(), startedAt: ctx.startedAt || 0 };
     send('server:state', statePayload);
     emitRemote('state', statePayload);
+    try { if (ctx.discordRpc && typeof ctx.discordRpc.updateFromContext === 'function') ctx.discordRpc.updateFromContext(ctx); } catch {}
   }
 
   function pushFiles() {

@@ -17,16 +17,9 @@ const platform = require('./platform');
 const { killTree } = require('./kill.js');
 const webhook = require('./webhook.js');
 
-// v6.0.0 F1: fire a user-configured webhook for a server event. Fire-and-forget + fail-silent: never
-// blocks a lifecycle action, never logs (a wrong URL must not spam). Settings are read per event so a
-// URL change takes effect immediately. `detail` is optional text (e.g. a crash category).
+// v6.0.0 F1 / v9.0.2: fire a user-configured webhook for a server event via shared enrichment helper.
 function fireWebhook(ctx, ev) {
-  try {
-    const s = require('./settings.js').loadSettings();
-    if (!s || !s.webhookUrl) return;
-    const instance = (() => { try { return require('./settings.js').listInstances().instances.find(i => i.id === ctx.inst())?.name || ''; } catch { return ''; } })();
-    webhook.fire(s, { ...ev, instance }).catch(() => {});
-  } catch {}
+  webhook.fireForContext(ctx, ev);
 }
 // Metrics sampling and auto-poll were split into their own modules (behaviour unchanged).
 // Re-exported below so existing callers (app-lifecycle.js, tests) keep working.
@@ -532,10 +525,24 @@ async function startServerInternal(ctx, settings) {
       const isAutoPollStatus = duringPoll
         && /(spark-worker-pool|players online|TPS from last|Tick durations|CPU usage from last|The game is running|Target tick rate:|Average time per tick:|Percentiles:|Mean tick time|Mean TPS|Dim \d+\s*:|Overall:|\bTPS:\s*[\d.]+\s*MSPT:|\(system\)|\(process\)|Unknown or incomplete command|see below for error|<--\[HERE\]|^forge tps$|^tps$|^tick query$|^spark tps$|^list$)/i.test(x);
       if (!isAutoPollStatus) ctx.appendLog(x);
-      // v6.0.0 F1: fire the player_join webhook when a join line appears (before parseServerLine
-      // mutates the list, so we can compare). Fail-silent.
-      try { const j = String(x).replace(/§./g, '').match(/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+joined the game/i); if (j && !ctx.live.players.includes(j[1])) fireWebhook(ctx, { type: 'player_join', player: j[1] }); } catch {}
+      // v6.0.0 F1 / v9.0.2: fire player_join & player_leave webhooks (and refresh Discord RPC) on live player changes.
+      const cleanLine = String(x).replace(/§./g, '').replace(/\u001b\[[0-9;]*m/g, '');
+      try {
+        const j = cleanLine.match(/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+joined the game/i);
+        if (j && !ctx.live.players.includes(j[1])) {
+          fireWebhook(ctx, { type: 'player_join', player: j[1], playersOnline: ctx.live.players.length + 1 });
+        }
+        const l = cleanLine.match(/(?:^|[:\]\s])\s*([\w.-]{1,16})\s+left the game/i);
+        if (l && ctx.live.players.includes(l[1])) {
+          fireWebhook(ctx, { type: 'player_leave', player: l[1], playersOnline: Math.max(0, ctx.live.players.length - 1) });
+        }
+      } catch {}
+      const prevPlayersLen = Array.isArray(ctx.live.players) ? ctx.live.players.length : 0;
+      const prevTps = ctx.live.tps;
       parseServerLine(x, ctx.live, ctx.send);
+      if (ctx.discordRpc && (prevPlayersLen !== (ctx.live.players || []).length || prevTps !== ctx.live.tps)) {
+        try { ctx.discordRpc.updateFromContext(ctx); } catch {}
+      }
     });
   }));
   ctx.serverProcess.stderr.on('data', inInst(d => {
@@ -587,6 +594,7 @@ async function startServerInternal(ctx, settings) {
     // F1: also fire the crash (or manual stop) webhook here.
     if (!wasManual) {
       let crashCat = null;
+      let crashHint = null;
       try {
         const doctor = require('./mcp/doctor.js');
         const latest = doctor.latestCrashReport(ctx.currentServerPath);
@@ -595,13 +603,14 @@ async function startServerInternal(ctx, settings) {
           const cls = doctor.classifyCrash(text);
           crashCat = cls.category;
           const sum = doctor.summarizeCrashText(text);
+          crashHint = sum.cause || sum.description || (Array.isArray(cls.hints) && cls.hints[0]) || null;
           ctx.send('crash:analysis', { name: latest.name, category: cls.category, confidence: cls.confidence, hints: cls.hints, description: sum.description, version: sum.version, cause: sum.cause });
           ctx.appendLog(`Crash report analysed: ${cls.category} (${cls.confidence}). Open the crash panel for details.`, 'error');
         }
       } catch {}
-      fireWebhook(ctx, { type: 'crash', detail: crashCat || `exit code ${code ?? 'none'}` });
+      fireWebhook(ctx, { type: 'crash', detail: crashCat || `exit code ${code ?? 'none'}`, hint: crashHint, uptimeMs: ctx.startedAt ? Date.now() - ctx.startedAt : 0 });
     } else {
-      fireWebhook(ctx, { type: 'stop' });
+      fireWebhook(ctx, { type: 'stop', uptimeMs: ctx.startedAt ? Date.now() - ctx.startedAt : 0 });
     }
     // A user-requested restart: relaunch with the settings captured at request time. teardown()
     // (just below) clears the flag, so read it first.

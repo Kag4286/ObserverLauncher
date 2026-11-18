@@ -13,7 +13,8 @@
 // decryptString}) so they are pure and unit-testable without Electron.
 // 3.3.0: remoteToken is a LONG-LIVED token (unlike MCP's per-launch token) so a remote client can
 // be configured once. Stored encrypted at rest like every other secret.
-const GLOBAL_SECRET_KEYS = ['curseforgeApiKey', 'remoteToken'];
+// 9.0.2: webhookUrl contains the Discord webhook secret token, so encrypt it at rest too.
+const GLOBAL_SECRET_KEYS = ['curseforgeApiKey', 'remoteToken', 'webhookUrl'];
 const INSTANCE_SECRET_KEYS = ['rconPassword'];
 
 function isWrapped(v) { return typeof v === 'string' && (v.startsWith('safe:') || v.startsWith('plain:')); }

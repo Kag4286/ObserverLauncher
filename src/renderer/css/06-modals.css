@@ -314,6 +314,35 @@
 .mcp-tier+.mcp-tier{border-top:1px solid var(--border)}
 .mcp-tier-info b{display:block;font:600 12.5px var(--font-ui);color:var(--text)}
 .mcp-tier-info small{display:block;margin-top:2px;font:400 11.5px var(--font-ui);color:var(--text-3)}
+.mcp-pill.warn{border-color:rgba(255,200,87,.35);background:var(--warning-weak);color:var(--warning)}
+.mcp-pill.bad{border-color:rgba(255,102,125,.35);background:var(--danger-weak);color:var(--danger)}
+
+.rpc-preview-card{
+  display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);
+  border:1px solid var(--border);border-left:2px solid var(--border-strong);border-radius:var(--r-sm);
+  background:var(--field);transition:border-color var(--dur-micro) var(--ease-snap),opacity var(--dur-micro) var(--ease-snap);
+}
+.rpc-preview-card.active{border-left-color:var(--brand)}
+.rpc-preview-card.dim{opacity:.68}
+.rpc-preview-icon{
+  width:48px;height:48px;border-radius:var(--r-sm);object-fit:cover;flex-shrink:0;
+  border:1px solid var(--border);background:var(--surface);
+}
+.rpc-preview-body{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.rpc-preview-eyebrow{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-4)}
+.rpc-preview-mode{font:600 10px var(--font-mono);color:var(--text-3)}
+.rpc-preview-app{font:700 13px var(--font-ui);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rpc-preview-line{font:500 12px var(--font-ui);color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rpc-preview-line.muted{color:var(--text-3)}
+.rpc-preview-timer{font:500 11px var(--font-mono);color:var(--brand);margin-top:1px}
+.rpc-setup-note{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;
+  padding:var(--space-2) var(--space-3);border:1px solid var(--border);border-left:2px solid var(--info);
+  border-radius:var(--r-sm);background:var(--surface);font:400 12px/1.45 var(--font-ui);color:var(--text-3);
+}
+.rpc-setup-note p{margin:0;flex:1 1 260px}
+.rpc-status-line.ok{color:var(--success)}
+.rpc-status-line.bad{color:var(--danger)}
 
 /* Remote Access UI section in Settings (migrated cleanly from 07-polish.css) */
 .remote-section{border-left:2px solid var(--brand);padding-left:var(--space-3)}

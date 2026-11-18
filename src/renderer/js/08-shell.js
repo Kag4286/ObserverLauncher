@@ -696,7 +696,7 @@ $('#saveSettings').onclick=()=>withBusy($('#saveSettings'),async()=>{
   const r=await window.observer.saveSettings(next);
   if(!r.ok) return toast(friendlyError(r.error),'error');
   if(!isNatSave && !r.java?.ok && next.javaPath){ if(javaInput){ javaInput.style.borderColor='var(--danger)'; javaInput.focus(); } return toast(`Java not found at "${next.javaPath}" — ${r.java?.message||'check the path or use auto-install.'}`,'error'); }
-  state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};refreshUI();markSettingsSaved();
+  state={...state,settings:r.settings||next,java:r.java,files:r.files,eulaAccepted:r.eulaAccepted,javaRequired:r.javaRequired??state.javaRequired,mcp:r.mcp??state.mcp,remote:r.remote??state.remote,prometheus:r.prometheus??state.prometheus,discordRpc:r.discordRpc??state.discordRpc};propsDirty=false;try{if(typeof updatePropsDirty==='function')updatePropsDirty()}catch{};refreshUI();markSettingsSaved();
   if(r.mcp&&r.mcp.running)toast(t('mcp.running',{p:r.mcp.port}),'success');
   toast(isNatSave?t('toast.settingsSaved'):r.java?.ok?t('toast.settingsSavedJava',{v:r.java.version}):t('toast.settingsSavedNoJava'),'success');
 });
@@ -1196,7 +1196,7 @@ function applyBeginnerMode(on){
   if(on_){
     const cur=document.querySelector('.tab.active');if(cur&&!BEGINNER_TABS.has(cur.id))switchTab('overview');
     const curPane=document.querySelector('.set-pane:not([hidden])');
-    if(curPane&&(curPane.dataset.setPane==='ai'||curPane.dataset.setPane==='advanced')){
+    if(curPane&&(curPane.dataset.setPane==='discord'||curPane.dataset.setPane==='ai'||curPane.dataset.setPane==='advanced')){
       const setupBtn=document.querySelector('.settings-nav .seg-switch-btn[data-set-view="setup"]');
       if(setupBtn)setupBtn.click();
     }

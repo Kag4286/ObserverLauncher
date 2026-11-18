@@ -103,9 +103,13 @@ function isSafeTunnelAddress(raw) {
 function setTunnelAddress(ctx, addr) {
   const { loadSettings, saveSettings } = require('./settings.js');
   const s = loadSettings();
+  const prev = String(s.tunnelAddress || '').trim();
   s.tunnelAddress = String(addr == null ? '' : addr).trim();
   saveSettings(s);
   ctx.tunnelAddress = s.tunnelAddress;
+  if (s.tunnelAddress && s.tunnelAddress !== prev && ctx.serverStatus === 'running') {
+    try { require('./webhook.js').fireForContext(ctx, { type: 'tunnel', detail: s.tunnelAddress }); } catch {}
+  }
   return s.tunnelAddress;
 }
 

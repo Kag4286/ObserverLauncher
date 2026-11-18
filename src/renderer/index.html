@@ -899,6 +899,7 @@
             <button type="button" class="seg-switch-btn" data-set-view="personal" role="tab" aria-selected="false" data-i18n="set.catPersonal">Personal</button>
             <button type="button" class="seg-switch-btn" data-set-view="automation" role="tab" aria-selected="false" data-i18n="set.catAutomation">Automation</button>
             <button type="button" class="seg-switch-btn" data-set-view="integrations" role="tab" aria-selected="false" data-i18n="set.catIntegrations">Integrations</button>
+            <button type="button" class="seg-switch-btn" data-set-view="discord" role="tab" aria-selected="false" data-i18n="set.catDiscord">Discord</button>
             <button type="button" class="seg-switch-btn" data-set-view="ai" role="tab" aria-selected="false" data-i18n="set.catAi">AI</button>
             <button type="button" class="seg-switch-btn" data-set-view="advanced" role="tab" aria-selected="false" data-i18n="set.catAdvanced">Advanced</button>
           </nav>
@@ -1415,13 +1416,84 @@
             </div>
           </div>
 
-          <!-- Pane 6: Advanced -->
-          <div class="set-pane" data-set-pane="advanced" hidden>
+          <!-- Pane 5b: Discord (Hidden in Beginner Mode) -->
+          <div class="set-pane" data-set-pane="discord" hidden>
             <div class="set-group-card">
-              <!-- Topic 1: Notifications -->
-              <div class="set-topic">
+              <!-- Topic 1: Discord Rich Presence -->
+              <div class="set-topic" id="discordRpcTopic">
                 <div class="set-topic-head">
-                  <div class="sth-icon"><img src="./assets/icons/ui/bolt.svg" alt=""></div>
+                  <div class="sth-icon"><img src="./assets/icons/ui/person.svg" alt=""></div>
+                  <div class="sth-text">
+                    <h3 data-i18n="rpc.title">Discord Rich Presence</h3>
+                    <small data-i18n="rpc.sub">Show a live "Playing" status on your Discord profile while hosting.</small>
+                  </div>
+                  <div class="sth-spacer">
+                    <span class="mcp-pill" id="discordRpcPill" data-i18n="rpc.pillOff">Off</span>
+                  </div>
+                </div>
+                <div class="rpc-preview-card dim" id="discordRpcPreview">
+                  <img src="./assets/icons/observer.png" alt="ObserverLauncher icon" class="rpc-preview-icon">
+                  <div class="rpc-preview-body">
+                    <div class="rpc-preview-eyebrow">
+                      <span data-i18n="rpc.previewPlaying">Playing</span>
+                      <span class="rpc-preview-mode" id="discordRpcPreviewTag">Preview</span>
+                    </div>
+                    <div class="rpc-preview-app">ObserverLauncher</div>
+                    <div class="rpc-preview-line" id="discordRpcPreviewDetails">ObserverLauncher</div>
+                    <div class="rpc-preview-line muted" id="discordRpcPreviewState">Ready to host</div>
+                    <div class="rpc-preview-timer" id="discordRpcPreviewTimer" hidden>00:04 elapsed</div>
+                  </div>
+                </div>
+                <div class="rpc-setup-note" id="discordRpcSetupNote">
+                  <p data-i18n="rpc.setupGuide">Discord only auto-detects registered commercial games; adding the .exe manually shows a [?] box without server stats. Create a free Discord app (name it ObserverLauncher) and paste its Application ID below for full Rich Presence.</p>
+                  <button type="button" class="btn secondary sm" id="discordRpcPortalBtn" data-i18n="rpc.openPortal">Developer Portal ↗</button>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="rpc.enable">Enable "Playing" status</div>
+                    <div class="sir-desc" data-i18n="rpc.enableSub">Connects locally to Discord Desktop on this PC. Zero external network telemetry.</div>
+                  </div>
+                  <div class="sir-control"><label class="switch"><input type="checkbox" id="discordRpcEnabledInput" aria-label="Enable Discord Rich Presence"><span class="slider"></span></label></div>
+                </div>
+                <div class="set-item-row col">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="rpc.clientId">Discord Application ID</div>
+                    <div class="sir-desc" data-i18n="rpc.clientIdSub">17–21 digit ID from the Discord Developer Portal (its app name shows after "Playing").</div>
+                  </div>
+                  <div class="set-input-box">
+                    <input id="discordRpcClientIdInput" placeholder="1234567890123456789" spellcheck="false" autocomplete="off" aria-label="Discord Application ID">
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="rpc.showName">Show active server name</div>
+                    <div class="sir-desc" data-i18n="rpc.showNameSub">Turn off to display generic "Hosting Minecraft Server" instead of your folder name.</div>
+                  </div>
+                  <div class="sir-control"><label class="switch"><input type="checkbox" id="discordRpcShowServerNameInput" aria-label="Show active server name on Discord"><span class="slider"></span></label></div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="rpc.showPlayers">Show player count &amp; TPS</div>
+                    <div class="sir-desc" data-i18n="rpc.showPlayersSub">Display online slots and server TPS on your Discord status.</div>
+                  </div>
+                  <div class="sir-control"><label class="switch"><input type="checkbox" id="discordRpcShowPlayersInput" aria-label="Show player count and TPS on Discord"><span class="slider"></span></label></div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="rpc.showIdle">Show status while idle</div>
+                    <div class="sir-desc" data-i18n="rpc.showIdleSub">Keep showing "Managing N servers · Idle" when no server is running.</div>
+                  </div>
+                  <div class="sir-control"><label class="switch"><input type="checkbox" id="discordRpcShowIdleInput" aria-label="Show Discord status while idle"><span class="slider"></span></label></div>
+                </div>
+                <div class="input-row" style="align-items:center;gap:10px">
+                  <span class="hint rpc-status-line" id="discordRpcStatusLine" hidden></span>
+                  <button type="button" class="btn secondary sm" id="discordRpcRefreshBtn" style="margin-left:auto" data-i18n="rpc.reconnect" hidden>Reconnect</button>
+                </div>
+              </div>
+              <!-- Topic 2: Discord Webhook Notifications -->
+              <div class="set-topic" id="discordWebhookTopic">
+                <div class="set-topic-head">
+                  <div class="sth-icon"><img src="./assets/icons/ui/hook.svg" alt=""></div>
                   <div class="sth-text">
                     <h3 data-i18n="wh.title">Notifications</h3>
                     <small data-i18n="wh.sub">Post a message to a Discord webhook when something happens.</small>
@@ -1436,7 +1508,7 @@
                     <input id="webhookUrlInput" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off" aria-label="Discord webhook URL">
                   </div>
                 </div>
-                <div class="set-item-row">
+                <div class="set-item-row col">
                   <div class="sir-info">
                     <div class="sir-title" data-i18n="wh.events">Events</div>
                     <div class="sir-desc" data-i18n="wh.eventsSub">Which events send a message.</div>
@@ -1448,24 +1520,59 @@
                       <label class="filter-chip"><input type="checkbox" data-wh-event="crash"> <span data-i18n="wh.ev.crash">Crash</span></label>
                       <label class="filter-chip"><input type="checkbox" data-wh-event="player_join"> <span data-i18n="wh.ev.join">Player joins</span></label>
                       <label class="filter-chip"><input type="checkbox" data-wh-event="player_leave"> <span data-i18n="wh.ev.leave">Player leaves</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="backup"> <span data-i18n="wh.ev.backup">Backups</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="tps_low"> <span data-i18n="wh.ev.tpsLow">Low TPS</span></label>
+                      <label class="filter-chip"><input type="checkbox" data-wh-event="tunnel"> <span data-i18n="wh.ev.tunnel">Tunnel address</span></label>
                     </div>
                   </div>
                 </div>
                 <div class="set-item-row">
                   <div class="sir-info">
                     <div class="sir-title" data-i18n="wh.format">Payload format</div>
-                    <div class="sir-desc" data-i18n="wh.formatSub">How the webhook body is shaped. Discord posts a content field. Generic sends a flat JSON body.</div>
+                    <div class="sir-desc" data-i18n="wh.formatSub">Rich Embed sends structured cards with stats. Compact sends one-line text. Generic sends flat JSON.</div>
                   </div>
                   <div class="sir-control">
                     <select class="ol-select" id="webhookFormatSelect" style="max-width:220px" aria-label="Webhook payload format">
-                      <option value="discord" data-i18n="wh.formatDiscord">Discord</option>
+                      <option value="discord" data-i18n="wh.formatDiscord">Discord (Rich Embed)</option>
+                      <option value="discord_compact" data-i18n="wh.formatCompact">Discord (Compact text)</option>
                       <option value="generic" data-i18n="wh.formatGeneric">Generic JSON</option>
                     </select>
                   </div>
                 </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="wh.botName">Bot display name</div>
+                    <div class="sir-desc" data-i18n="wh.botNameSub">Optional custom webhook sender name in Discord.</div>
+                  </div>
+                  <div class="sir-control">
+                    <div class="set-input-box" style="max-width:220px"><input id="webhookUsernameInput" placeholder="ObserverLauncher" spellcheck="false" autocomplete="off" aria-label="Webhook bot display name"></div>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="wh.crashMention">Crash alert mention</div>
+                    <div class="sir-desc" data-i18n="wh.crashMentionSub">Role ID, "here", or "everyone" to ping only on server crash. Leave empty for silent.</div>
+                  </div>
+                  <div class="sir-control">
+                    <div class="set-input-box" style="max-width:220px"><input id="webhookCrashMentionInput" placeholder="Role ID or here" spellcheck="false" autocomplete="off" aria-label="Crash alert mention"></div>
+                  </div>
+                </div>
+                <div class="set-item-row">
+                  <div class="sir-info">
+                    <div class="sir-title" data-i18n="wh.playerAvatars">Player head thumbnails</div>
+                    <div class="sir-desc" data-i18n="wh.playerAvatarsSub">Include player skin head icon URL in join/leave Discord embeds.</div>
+                  </div>
+                  <div class="sir-control"><label class="switch"><input type="checkbox" id="webhookPlayerAvatarsInput" aria-label="Show player head thumbnails in Discord embeds"><span class="slider"></span></label></div>
+                </div>
                 <div class="input-row"><span class="hint" data-i18n="wh.hint">Sent only on your machine; a bad URL is ignored silently.</span><button type="button" class="btn secondary sm" id="webhookTestBtn" style="margin-left:auto" data-i18n="wh.test">Send test</button></div>
               </div>
-              <!-- Topic 2: Docker Export -->
+            </div>
+          </div>
+
+          <!-- Pane 6: Advanced -->
+          <div class="set-pane" data-set-pane="advanced" hidden>
+            <div class="set-group-card">
+              <!-- Topic 1: Docker Export -->
               <div class="set-topic">
                 <div class="set-topic-head">
                   <div class="sth-icon"><img src="./assets/icons/ui/cube.svg" alt=""></div>

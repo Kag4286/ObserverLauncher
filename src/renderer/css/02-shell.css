@@ -65,6 +65,7 @@ body.beginner-mode .nav-item[data-tab="worlds"],
 body.beginner-mode .nav-item[data-tab="worldmap"]{display:none}
 body.beginner-mode .nav-group[data-grp="content"]{display:none}
 body.beginner-mode .ov-adv{display:none}
+body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="discord"],
 body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="ai"],
 body.beginner-mode .settings-nav .seg-switch-btn[data-set-view="advanced"]{display:none}
 .rail-showall,.rail-showbeginner{display:none !important}

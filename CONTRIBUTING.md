@@ -14,7 +14,7 @@ Thanks for taking a look. This project is small, so the process is intentionally
 ```bash
 npm install
 npm start        # launch the app in development mode
-npm test         # unit/regression suite (node tests/run.js — 190 test files)
+npm test         # unit/regression suite (node tests/run.js — 191 test files)
 npm run test:e2e # Playwright smoke tests against the real Electron app
 ```
 
@@ -53,7 +53,7 @@ plus a window-less entry point that reuses the exact same backend:
     `properties-history.js` (snapshot/diff/restore), `template-store.js` (user templates),
     `gamerules.js` (level.dat game rules), `geyser.js` (Geyser config inspect + line-level repair),
     `proxy-config.js` (velocity.toml line-level edit), `pinggy.js` (the Pinggy ssh adapter),
-    `webhook.js` (Discord/generic webhook alerts with SSRF filtering), `http-guard.js` (shared Origin/Host/loopback guards),
+    `webhook.js` (Discord Rich Embeds / generic webhook alerts with `429` retry & SSRF filtering), `discord-rpc.js` (pure-Node local Discord IPC Rich Presence client), `http-guard.js` (shared Origin/Host/loopback guards),
     `player-analytics.js` (playtime leaderboard), `skins.js` + `skinsrestorer.js` + `client-skins.js`
     + `jar-reader.js` (the player skin chain), and `mods-index.js` (item icons read from mod jars).
   - `remote-ui/` — the Remote-access WEB dashboard (`index.html` / `style.css` / `app.js`), served by
@@ -136,7 +136,7 @@ globals, so read this before touching backend state.
 
 - **Scheduler** (`scheduler.js`). A pure `shouldFire()` decides whether a scheduled start or stop is due for a given instance, time and status. A stop is skipped while a backup is in progress. Times are the PC's local clock; a scheduled action that lands while the computer is asleep is skipped, not replayed hours later.
 - **SSRF Defense-in-Depth** (`validate.js`). `isSafeDownloadUrl()` enforces strict URL validation before any download or webhook is triggered. It rejects private IPv4 ranges, IPv4-mapped IPv6 (`::ffff:...`), loopback (`::1`, `127.0.0.1`), link-local (`fe80::/10`, `169.254.x`), unique local LAN (`fc00::/7`), and multicast (`ff00::/8`, `224.0.0.0/4`).
-- **Webhook** (`webhook.js`). `fire()` is fire-and-forget. Uses `isSafeDownloadUrl` so a webhook cannot be pointed at internal or metadata services. Messages support Discord and generic JSON formats.
+- **Webhook** (`webhook.js`). `fire()` is fire-and-forget (with single `429` retry). Uses `isSafeDownloadUrl` so a webhook cannot be pointed at internal or metadata services, and `webhookUrl` is wrapped via `safeStorage` at rest. Supports `discord` (Rich Embed), `discord_compact`, and `generic` JSON formats.
 - **Crash Doctor** (`mcp/doctor.js`). Pure `classifyCrash` and `summarizeCrashText` helpers classify crash logs, identify missing dependencies or mod conflicts, and translate bytecode class versions (`69.0` -> Java 25, `65.0` -> Java 21) into plain-language explanations.
 - **Orphan adoption** (`orphan.js`, `orphan-prompt.js`). If a server process is still running when the app starts, a tier-2 orphan prompt asks the user to reconnect or stop. Resolves to `reconnect` after 60 s, preventing accidental termination of live servers.
 - **Prometheus & Remote Security** (`http-guard.js`). Prometheus (`prometheus.js`) and the Remote dashboard (`remote.js`) share the loopback guards in `http-guard.js` (Origin check, Host validation, and loopback IP enforcement).
@@ -174,7 +174,7 @@ Textures do not go through the normal IPC path. A custom `tex://` scheme serves 
 - **Keep IPC channel names stable.** `preload.js` and the renderer depend on the exact channel strings used in `ipcMain.handle(...)`.
 - **Validate untrusted input.** Anything arriving from the renderer (or a remote API / MCP) is treated as untrusted. Use `src/main/validate.js` and `safeTarget` in `src/main/fs-utils.js`. When checking file basenames for path traversal, always check for both `/` and `\` explicitly (`name.includes('/') || name.includes('\\')`) because POSIX `path.basename` does not treat backslash as a directory separator.
 - **Follow the motion contract.** New animation uses tokens (`var(--dur-*)`, `var(--ease-*)`) from `01-tokens.css`, never literal `.2s`/`150ms`, and guards Lite mode and `prefers-reduced-motion`.
-- **Run the tests** before opening a PR: `npm test` (190 test files, including `design-system-v9`, `no-dup`, `motion-tokens`, `security-csp-v9`, and `i18n`) and `npm run test:e2e`.
+- **Run the tests** before opening a PR: `npm test` (191 test files, including `design-system-v9`, `no-dup`, `motion-tokens`, `security-csp-v9`, and `i18n`) and `npm run test:e2e`.
 - **Test on Windows** if you can — Windows and Linux are supported platforms, and several paths (`powershell.exe`, `cmd.exe`, `run.bat`) are Windows-specific.
 
 ## Adding a language

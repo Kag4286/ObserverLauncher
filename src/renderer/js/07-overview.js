@@ -79,6 +79,14 @@ function renderPerfDiagnostics(){
 function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=s.locale||'en';$('#languageSelect').value=currentLocale;applyLocale();$('#serverFolderInput').value=s.serverPath||'';$('#javaPathInput').value=s.javaPath||'';$('#playitPathInput').value=s.playitPath||'';$('#pinggyPathInput').value=s.pinggyPath||'';const tm=$('#tunnelManual');if(tm&&document.activeElement!==tm)tm.value=s.tunnelAddress||'';const cfk=$('#cfKeyInput');if(cfk)cfk.value=s.curseforgeApiKey||'';if($('#autoTunnelInput'))$('#autoTunnelInput').checked=!!s.autoTunnel;const ml=$('#motionLevelSelect');if(ml)ml.value=s.motionLevel||'full';applyMotionLevel(s.motionLevel||'full');if($('#beginnerModeInput'))$('#beginnerModeInput').checked=!!s.beginnerMode;if(typeof applyBeginnerMode==='function')applyBeginnerMode(s.beginnerMode);if($('#worldmapCheatModeInput'))$('#worldmapCheatModeInput').checked=!!s.worldmapCheatMode;if(typeof wmSyncCheatMode==='function')wmSyncCheatMode();if($('#updatePolicySelect'))$('#updatePolicySelect').value=(s.updatePolicy||(s.autoCheckUpdates===false?'off':'ask'));
   if($('#webhookUrlInput'))$('#webhookUrlInput').value=s.webhookUrl||'';
   if($('#webhookFormatSelect'))$('#webhookFormatSelect').value=s.webhookFormat||'discord';
+  if($('#webhookUsernameInput'))$('#webhookUsernameInput').value=s.webhookUsername||'';
+  if($('#webhookCrashMentionInput'))$('#webhookCrashMentionInput').value=s.webhookCrashMention||'';
+  if($('#webhookPlayerAvatarsInput'))$('#webhookPlayerAvatarsInput').checked=s.webhookPlayerAvatars!==false;
+  if($('#discordRpcEnabledInput'))$('#discordRpcEnabledInput').checked=!!s.discordRpcEnabled;
+  if($('#discordRpcClientIdInput'))$('#discordRpcClientIdInput').value=s.discordRpcClientId||'';
+  if($('#discordRpcShowServerNameInput'))$('#discordRpcShowServerNameInput').checked=s.discordRpcShowServerName!==false;
+  if($('#discordRpcShowPlayersInput'))$('#discordRpcShowPlayersInput').checked=s.discordRpcShowPlayers!==false;
+  if($('#discordRpcShowIdleInput'))$('#discordRpcShowIdleInput').checked=s.discordRpcShowIdle!==false;
   // v6.0.0 F4: Prometheus toggle + port + live status line.
   if($('#prometheusEnabledInput'))$('#prometheusEnabledInput').checked=!!s.prometheusEnabled;
   if($('#prometheusPortInput'))$('#prometheusPortInput').value=s.prometheusPort||0;
@@ -86,7 +94,7 @@ function refreshUI(){const s=state.settings||{},f=state.files||{};currentLocale=
   // state once it has one. Reading the toggle (not just state.prometheus) means the line shows the
   // moment the user enables it, without waiting for an Apply, and it cannot vanish when a later
   // refreshUI drops state.prometheus.
-  updatePromStatus();refreshResourcePackUI();
+  updatePromStatus();updateDiscordRpcStatus();refreshResourcePackUI();
   {const evs=Array.isArray(s.webhookEvents)?s.webhookEvents:['start','stop','crash'];$$('#webhookEvents input[data-wh-event]').forEach(x=>{x.checked=evs.includes(x.dataset.whEvent)})}if($('#autoTunnelQuick'))$('#autoTunnelQuick').checked=!!s.autoTunnel;$('#memoryMinInput').value=s.memoryMin??2;$('#memoryMaxInput').value=s.memoryMax??6;$('#jvmArgsInput').value=s.jvmArgs||'';$('#autoEulaInput').checked=!!s.autoEula;$('#autoRestartInput').checked=!!s.autoRestart;$('#autoBackupMinutesInput').value=s.autoBackupMinutes??0;if($('#backupRetentionInput'))$('#backupRetentionInput').value=s.backupRetention??10;$('#autoRestartMaxAttemptsInput').value=s.autoRestartMaxAttempts??3;$('#autoRestartDelaySecondsInput').value=s.autoRestartDelaySeconds??5;syncAutoRestartFields();syncBackupChips(s.autoBackupMinutes??0);syncScheduleFields(s);syncMcpFields(s);syncRemoteFields(s);if(state.systemMemoryGB)$('#systemRamHint').textContent=t('ov.systemRam',{n:state.systemMemoryGB});
   // v6.0.0 G1: disable a RAM preset that exceeds the machine's RAM, and reflect the current max.
   {const sys=state.systemMemoryGB||0;$$('#ramPresets .ram-preset').forEach(b=>{const gb=Number(b.dataset.ram)||0;b.disabled=sys>0&&gb>sys;b.classList.toggle('active',Number($('#memoryMaxInput')?.value)===gb&&Number($('#memoryMinInput')?.value)===gb)})}$('#serverPath').textContent=s.serverPath||t('top.noServer');$('#serverName').textContent=s.serverPath?s.serverPath.split(/[\\/]/).filter(Boolean).pop():t('ov.defaultName');$('#serverHint').textContent=s.serverPath?(state.status==='starting'?t('ov.hintStarting',{n:f.jar||f.launchScript||f.nativeBinary||'server'}):state.status==='stopping'?t('top.stopping'):state.running?t('ov.hintRunning',{n:f.jar||f.launchScript||f.nativeBinary||'server'}):(f.jar?t('ov.hintReady',{n:f.jar}):(f.launchScript?t('ov.hintReady',{n:f.launchScript}):(f.nativeBinary?t('ov.hintReady',{n:f.nativeBinary}):t('ov.hintNone'))))):t('ov.hintSelect');const statusLabel={starting:t('top.starting'),running:t('top.running'),stopping:t('top.stopping'),stopped:t('top.offline')}[state.status||(state.running?'running':'stopped')]||t('top.offline');$('#metricStatus').textContent=statusLabel;$('#statusText').textContent=statusLabel;const sd=$('#statusDot');sd.className='status-dot st-'+(state.status||'stopped');const heroDot=$('#heroDot');if(heroDot)heroDot.className='metric-hero-dot status-dot lg st-'+(state.status||'stopped');if(state.running&&!uptimeStart)uptimeStart=Date.now();if(!state.running)uptimeStart=null;updateUptime();$('#startBtn').disabled=state.status!=='stopped';$('#stopBtn').disabled=!(state.status==='running'||state.status==='starting');
@@ -399,7 +407,7 @@ $$('.backup-chip-row .filter-chip').forEach(chip=>chip.onclick=()=>{
   $('#autoBackupMinutesInput').value=v;syncBackupChips(Number(v));
 });
 $('#autoBackupCustomInput')?.addEventListener('input',()=>{$('#autoBackupMinutesInput').value=Number($('#autoBackupCustomInput').value)||0});
-function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),pinggyPath:$('#pinggyPathInput').value.trim(),curseforgeApiKey:($('#cfKeyInput')?.value||'').trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,remoteEnabled:$('#remoteEnabledInput')?.checked||false,remoteReadOnly:$('#remoteReadOnlyInput')?.checked||false,remoteAllow:($('#remoteAllowInput')?.value||'').trim(),remotePort:Number($('#remotePortInput')?.value)||0,remoteBind:($('#remoteBindInput')?.value||'').trim(),remoteAllowedHosts:($('#remoteAllowedHostsInput')?.value||'').trim(),motionLevel:$('#motionLevelSelect')?.value||'full',updatePolicy:$('#updatePolicySelect')?.value||'ask',webhookUrl:($('#webhookUrlInput')?.value||'').trim(),webhookEvents:$$('#webhookEvents input[data-wh-event]:checked').map(x=>x.dataset.whEvent),webhookFormat:($('#webhookFormatSelect')?.value||'discord'),prometheusEnabled:$('#prometheusEnabledInput')?.checked||false,prometheusPort:Number(($('#prometheusPortInput')?.value||'').replace(/[^0-9]/g,''))||0,beginnerMode:$('#beginnerModeInput')?.checked||false,worldmapCheatMode:$('#worldmapCheatModeInput')?.checked||false,locale:$('#languageSelect').value}}
+function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),pinggyPath:$('#pinggyPathInput').value.trim(),curseforgeApiKey:($('#cfKeyInput')?.value||'').trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,remoteEnabled:$('#remoteEnabledInput')?.checked||false,remoteReadOnly:$('#remoteReadOnlyInput')?.checked||false,remoteAllow:($('#remoteAllowInput')?.value||'').trim(),remotePort:Number($('#remotePortInput')?.value)||0,remoteBind:($('#remoteBindInput')?.value||'').trim(),remoteAllowedHosts:($('#remoteAllowedHostsInput')?.value||'').trim(),motionLevel:$('#motionLevelSelect')?.value||'full',updatePolicy:$('#updatePolicySelect')?.value||'ask',webhookUrl:($('#webhookUrlInput')?.value||'').trim(),webhookEvents:$$('#webhookEvents input[data-wh-event]:checked').map(x=>x.dataset.whEvent),webhookFormat:($('#webhookFormatSelect')?.value||'discord'),webhookUsername:($('#webhookUsernameInput')?.value||'').trim(),webhookCrashMention:($('#webhookCrashMentionInput')?.value||'').trim(),webhookPlayerAvatars:$('#webhookPlayerAvatarsInput')?$('#webhookPlayerAvatarsInput').checked:true,discordRpcEnabled:$('#discordRpcEnabledInput')?.checked||false,discordRpcClientId:($('#discordRpcClientIdInput')?.value||'').trim(),discordRpcShowIdle:$('#discordRpcShowIdleInput')?.checked||false,discordRpcShowServerName:$('#discordRpcShowServerNameInput')?$('#discordRpcShowServerNameInput').checked:true,discordRpcShowPlayers:$('#discordRpcShowPlayersInput')?$('#discordRpcShowPlayersInput').checked:true,prometheusEnabled:$('#prometheusEnabledInput')?.checked||false,prometheusPort:Number(($('#prometheusPortInput')?.value||'').replace(/[^0-9]/g,''))||0,beginnerMode:$('#beginnerModeInput')?.checked||false,worldmapCheatMode:$('#worldmapCheatModeInput')?.checked||false,locale:$('#languageSelect').value}}
 // Launcher settings polish: an "unsaved changes" dot on Apply, a folder health line and a live
 // preview of the exact command line the launcher will run for this server.
 let settingsDirty=false;
@@ -433,6 +441,121 @@ function updatePromStatus(){
 }
 $('#prometheusEnabledInput')?.addEventListener('change',updatePromStatus);
 $('#prometheusPortInput')?.addEventListener('input',updatePromStatus); $('#worldmapCheatModeInput')?.addEventListener('change',async()=>{const on=!!$('#worldmapCheatModeInput').checked;if(!state.settings)state.settings={};state.settings.worldmapCheatMode=on;if(typeof wmSyncCheatMode==='function')wmSyncCheatMode();try{const next={...getSettings(),worldmapCheatMode:on};const r=await window.observer.saveSettings(next);if(r&&r.ok){state={...state,settings:r.settings||next};markSettingsSaved();}}catch{}});
+function renderDiscordRpcPreview(){
+  const card=$('#discordRpcPreview');if(!card)return;
+  const on=!!$('#discordRpcEnabledInput')?.checked;
+  const showName=$('#discordRpcShowServerNameInput')?$('#discordRpcShowServerNameInput').checked:true;
+  const showPlayers=$('#discordRpcShowPlayersInput')?$('#discordRpcShowPlayersInput').checked:true;
+  const showIdle=$('#discordRpcShowIdleInput')?$('#discordRpcShowIdleInput').checked:true;
+  const f=state.files||{},s=state.settings||{};
+  const srvName=(f.target?.name||s.serverPath?.split(/[\\/]/).filter(Boolean).pop()||'Survival SMP');
+  const sw=[f.target?.loader?(f.target.loader[0].toUpperCase()+f.target.loader.slice(1)):'',f.target?.mc&&f.target.mc!=='latest'?f.target.mc:''].filter(Boolean).join(' ');
+  const st=state.status||(state.running?'running':'stopped');
+  const detEl=$('#discordRpcPreviewDetails'),stEl=$('#discordRpcPreviewState'),tmEl=$('#discordRpcPreviewTimer'),tagEl=$('#discordRpcPreviewTag');
+  const live=state.discordRpc||{};
+  card.classList.toggle('dim',!on);
+  card.classList.toggle('active',on&&live.state==='connected');
+  if(tagEl)tagEl.textContent=on&&live.state==='connected'?(live.user?.username?`@${live.user.username}`:t('rpc.pillConnected')):t('rpc.previewTag');
+  let details='ObserverLauncher',line='',showTimer=true;
+  if(st==='running'){
+    details=showName?`Hosting ${srvName}`:'Hosting Minecraft Server';
+    const parts=[];if(sw)parts.push(sw);
+    if(showPlayers){
+      const pl=Array.isArray(state.live?.players)?state.live.players.length:0;
+      const maxP=Number(f.properties?.['max-players'])||20;
+      parts.push(`${pl}/${maxP} players`);
+    }
+    if(state.live?.tps!=null&&Number.isFinite(Number(state.live.tps)))parts.push(`${Number(state.live.tps).toFixed(1)} TPS`);
+    line=parts.join(' · ')||'Online';
+  }else if(st==='starting'){
+    details=showName?`Starting ${srvName}…`:'Starting Minecraft Server…';
+    line=sw||'Preparing world…';showTimer=false;
+  }else if(showIdle){
+    const n=Math.max(1,(Array.isArray(state.instances)?state.instances.length:0)||(s.serverPath?1:0));
+    details='ObserverLauncher';
+    line=n>0?`Managing ${n} server${n===1?'':'s'} · Idle`:'Ready to host';
+  }else{
+    details='ObserverLauncher';line=t('rpc.previewHiddenIdle');showTimer=false;
+  }
+  if(detEl)detEl.textContent=details;
+  if(stEl)stEl.textContent=line;
+  if(tmEl)tmEl.hidden=!showTimer;
+}
+function updateDiscordRpcStatus(){
+  const sl=$('#discordRpcStatusLine'),rb=$('#discordRpcRefreshBtn'),pill=$('#discordRpcPill'),note=$('#discordRpcSetupNote');
+  renderDiscordRpcPreview();
+  const toggle=$('#discordRpcEnabledInput');
+  const on=!!(toggle&&toggle.checked);
+  const formCid=($('#discordRpcClientIdInput')?.value||'').trim();
+  const validCid=/^\d{17,21}$/.test(formCid);
+  if(note)note.hidden=on&&validCid&&(state.discordRpc?.state==='connected');
+  const setPill=(cls,text)=>{if(!pill)return;pill.className='mcp-pill'+(cls?` ${cls}`:'');pill.textContent=text;};
+  if(!sl)return;
+  if(!on){
+    sl.hidden=true;sl.className='hint rpc-status-line';
+    if(rb)rb.hidden=true;
+    setPill('',t('rpc.pillOff'));
+    return;
+  }
+  sl.hidden=false;
+  const savedCfg=state.settings||{};
+  if(on!==!!savedCfg.discordRpcEnabled||formCid!==String(savedCfg.discordRpcClientId||'')){
+    sl.className='hint rpc-status-line';
+    sl.textContent=validCid?t('rpc.pendingSave'):t('rpc.needClientId');
+    setPill(validCid?'warn':'bad',validCid?t('rpc.pillPending'):t('rpc.pillNeedsId'));
+    if(rb)rb.hidden=true;
+    return;
+  }
+  const live=state.discordRpc||{};
+  if(rb)rb.hidden=false;
+  if(live.state==='connected'){
+    const handle=live.user?.username?` (@${live.user.username})`:'';
+    sl.className='hint rpc-status-line ok';
+    sl.textContent=t('rpc.connected',{u:handle});
+    setPill('on',t('rpc.pillConnected'));
+  }else if(live.state==='error'){
+    sl.className='hint rpc-status-line bad';
+    sl.textContent=t('rpc.errorMsg',{m:live.lastError||'Invalid Client ID'});
+    setPill('bad',t('rpc.pillError'));
+  }else if(live.state==='no_client_id'){
+    sl.className='hint rpc-status-line bad';
+    sl.textContent=t('rpc.needClientId');
+    setPill('bad',t('rpc.pillNeedsId'));
+  }else if(live.state==='connecting'){
+    sl.className='hint rpc-status-line';
+    sl.textContent=t('rpc.connecting');
+    setPill('warn',t('rpc.pillWaiting'));
+  }else{
+    sl.className='hint rpc-status-line';
+    sl.textContent=t('rpc.waiting');
+    setPill('warn',t('rpc.pillWaiting'));
+  }
+}
+$('#discordRpcEnabledInput')?.addEventListener('change',updateDiscordRpcStatus);
+$('#discordRpcClientIdInput')?.addEventListener('input',updateDiscordRpcStatus);
+$('#discordRpcShowServerNameInput')?.addEventListener('change',updateDiscordRpcStatus);
+$('#discordRpcShowPlayersInput')?.addEventListener('change',updateDiscordRpcStatus);
+$('#discordRpcShowIdleInput')?.addEventListener('change',updateDiscordRpcStatus);
+$('#discordRpcPortalBtn')?.addEventListener('click',async()=>{
+  try{
+    const r=await window.observer.discordRpcOpenPortal?.();
+    if(r&&r.ok===false)toast(r.error||'Could not open Discord Developer Portal.','error');
+  }catch(e){toast(e?.message||'Could not open Discord Developer Portal.','error');}
+});
+$('#discordRpcRefreshBtn')?.addEventListener('click',()=>withBusy($('#discordRpcRefreshBtn'),async()=>{
+  try{
+    const r=await (window.observer.discordRpcReconnect?.()||window.observer.discordRpcStatus?.());
+    if(r&&r.ok&&r.status){state.discordRpc=r.status;updateDiscordRpcStatus();}
+    else if(r&&r.error)toast(r.error,'error');
+  }catch{}
+}));
+try{
+  window.observer.onDiscordRpcStatus?.(st=>{
+    if(!st)return;
+    state.discordRpc=st;
+    updateDiscordRpcStatus();
+  });
+}catch{}
 $('#promCopyUrl')?.addEventListener('click',()=>{const p=$('#promCopyUrl')?.dataset.port;if(!p)return;const url=`http://127.0.0.1:${p}/metrics`;try{navigator.clipboard.writeText(url);toast(t('prom.copied'));}catch{}});
 function updateApplyDirty(){const b=$('#saveSettings');if(b)b.classList.toggle('dirty',settingsDirty);const h=$('#applyDirtyHint');if(h)h.hidden=!settingsDirty}
 function markSettingsSaved(){settingsDirty=false;try{_settingsBaseline=JSON.stringify(getSettings())}catch{}updateApplyDirty()}

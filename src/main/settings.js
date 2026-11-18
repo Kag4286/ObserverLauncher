@@ -63,9 +63,12 @@ function defaultGlobal() {
     // default (empty allow = any). remoteToken is a secret (see secrets.js GLOBAL_SECRET_KEYS).
     remoteEnabled: false, remoteReadOnly: true, remoteAllow: '', remoteAllowedHosts: '', remotePort: 0, remoteBind: '',
     playitPath: '', pinggyPath: '', motionLevel: 'full', curseforgeApiKey: '',
-    // v6.0.0 F1: webhook notifications (Discord-compatible). Empty URL = off. webhookEvents is the
-    // subscribed list; webhookFormat is 'discord' (default) or 'generic'.
+    // v6.0.0 F1 / v9.0.2: webhook notifications + rich embeds. Empty URL = off.
     webhookUrl: '', webhookEvents: ['start', 'stop', 'crash'], webhookFormat: 'discord',
+    webhookUsername: '', webhookCrashMention: '', webhookPlayerAvatars: true,
+    // v9.0.2: local Discord Rich Presence ("Playing ObserverLauncher" via local IPC pipe/socket).
+    discordRpcEnabled: false, discordRpcClientId: '',
+    discordRpcShowIdle: true, discordRpcShowServerName: true, discordRpcShowPlayers: true,
     // v6.0.0 F4: Prometheus /metrics endpoint. Off by default; binds 127.0.0.1 only when on.
     prometheusEnabled: false, prometheusPort: 0,
     // 4.0.0: auto-check for app updates on startup (global). v6.0.0 H4: replaced the boolean with a

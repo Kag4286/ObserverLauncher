@@ -130,7 +130,8 @@ function registerSettings(ipcMain, ctx) {
         const { remoteSnapshot, remoteAddresses } = require('./remote.js');
         const snap = remoteSnapshot(settings);
         return { ...snap, running: !!ctx.remotePort, port: ctx.remotePort || snap.port || null, addresses: remoteAddresses(ctx.remotePort || snap.port || 0) };
-      })()
+      })(),
+      discordRpc: ctx.discordRpc ? ctx.discordRpc.getStatus() : undefined,
     };
   });
 
@@ -200,6 +201,29 @@ function registerSettings(ipcMain, ctx) {
       }
       merged.remoteAllowedHosts = parseAllowedHosts(rawHosts).join(', ');
     }
+    // v9.0.2: validate Webhook extras + Discord Rich Presence fields.
+    if (merged.webhookUsername !== undefined) {
+      merged.webhookUsername = String(merged.webhookUsername || '').trim().slice(0, 80);
+    }
+    if (merged.webhookCrashMention !== undefined) {
+      const wm = String(merged.webhookCrashMention || '').trim().slice(0, 32);
+      if (wm && !/^(@?here|@?everyone|(<@&)?\d{17,21}>?)$/i.test(wm)) {
+        return { ok: false, error: 'Crash mention must be a 17-21 digit Role ID, "here", "everyone", or blank.' };
+      }
+      merged.webhookCrashMention = wm;
+    }
+    if (merged.webhookPlayerAvatars !== undefined) merged.webhookPlayerAvatars = !!merged.webhookPlayerAvatars;
+    if (merged.discordRpcClientId !== undefined) {
+      const cid = String(merged.discordRpcClientId || '').trim().slice(0, 32);
+      if (cid && !/^\d{17,21}$/.test(cid)) {
+        return { ok: false, error: 'Discord Application ID must be a 17-21 digit numeric ID (or blank).' };
+      }
+      merged.discordRpcClientId = cid;
+    }
+    if (merged.discordRpcEnabled !== undefined) merged.discordRpcEnabled = !!merged.discordRpcEnabled;
+    if (merged.discordRpcShowIdle !== undefined) merged.discordRpcShowIdle = !!merged.discordRpcShowIdle;
+    if (merged.discordRpcShowServerName !== undefined) merged.discordRpcShowServerName = !!merged.discordRpcShowServerName;
+    if (merged.discordRpcShowPlayers !== undefined) merged.discordRpcShowPlayers = !!merged.discordRpcShowPlayers;
     // Normalize scheduleDays to NUMBERS (0=Sun..6=Sat) — the shape scheduler.shouldFire() compares
     // against now.getDay(). Accepts names too, so a name-based value can never silently never-fire.
     if (merged.scheduleDays !== undefined) {
@@ -270,6 +294,9 @@ function registerSettings(ipcMain, ctx) {
     ctx.currentServerPath = merged.serverPath;
     ctx.watchServerFolder();
     ctx.javaInfo = await detectJava(merged.javaPath || 'java');
+    if (ctx.discordRpc) {
+      try { ctx.discordRpc.configure(merged); ctx.discordRpc.updateFromContext(ctx); } catch {}
+    }
     const mcpStatus = { enabled: !!ctx.mcpServer, running: !!ctx.mcpPort, port: ctx.mcpPort || null, autoAllowWrite: !!merged.mcpAutoAllowWrite };
     const instList = listInstances();
     return {
@@ -289,6 +316,7 @@ function registerSettings(ipcMain, ctx) {
       remote: (() => { try { const { remoteSnapshot, remoteAddresses } = require('./remote.js'); return { ...remoteSnapshot(merged), running: !!ctx.remotePort, port: ctx.remotePort || null, addresses: remoteAddresses(ctx.remotePort || 0) }; } catch { return undefined; } })(),
       // v6.0.0 F4: mirror the live Prometheus status so the UI refreshes after Save.
       prometheus: { enabled: !!merged.prometheusEnabled, running: !!ctx.prometheusPort, port: ctx.prometheusPort || null },
+      discordRpc: ctx.discordRpc ? ctx.discordRpc.getStatus() : undefined,
     };
   });
 
@@ -621,16 +649,46 @@ function registerSettings(ipcMain, ctx) {
     } catch (e) { return { ok: false, error: e?.message || 'Could not repair the Geyser config.' }; }
   });
 
-  // v6.0.0 F1: send a test message to the configured webhook so the user can confirm the URL works.
+  // v6.0.0 F1 / v9.0.2: send a test message to the configured webhook so the user can confirm the URL works.
   ipcMain.handle('webhook:test', async () => {
     try {
       const s = loadSettings();
       if (!s.webhookUrl) return { ok: false, error: 'Set a webhook URL first.' };
-      if (!require('./webhook.js').isSafeWebhookUrl(s.webhookUrl)) return { ok: false, error: 'That URL is not a public http(s) address.' };
-      const r = await require('./webhook.js').fire({ ...s, webhookEvents: require('./webhook.js').EVENTS }, { type: 'start', instance: 'ObserverLauncher test' });
+      const wh = require('./webhook.js');
+      if (!wh.isSafeWebhookUrl(s.webhookUrl)) return { ok: false, error: 'That URL is not a public http(s) address.' };
+      const r = await wh.fire(
+        { ...s, webhookEvents: wh.EVENTS },
+        { type: 'start', instance: 'ObserverLauncher test', software: 'Fabric', mc: '1.21.1', playersOnline: 2, maxPlayers: 20 },
+        { spacingMs: 0 }
+      );
       if (!r.sent) return { ok: false, error: r.reason || 'The webhook did not accept the message.' };
       return { ok: true, status: r.status };
     } catch (e) { return { ok: false, error: e?.message || 'Could not send the test.' }; }
+  });
+
+  // v9.0.2: query current local Discord Rich Presence connection & signed-in Discord handle.
+  ipcMain.handle('discord-rpc:status', async () => {
+    try {
+      if (!ctx.discordRpc) return { ok: true, status: { enabled: false, state: 'disabled', user: null, hasClientId: false, lastError: null } };
+      return { ok: true, status: ctx.discordRpc.getStatus() };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not read Discord Rich Presence status.' }; }
+  });
+
+  ipcMain.handle('discord-rpc:reconnect', async () => {
+    try {
+      if (!ctx.discordRpc) return { ok: false, error: 'Discord Rich Presence controller is unavailable.' };
+      const status = ctx.discordRpc.reconnect();
+      ctx.discordRpc.updateFromContext(ctx);
+      return { ok: true, status };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not reconnect Discord Rich Presence.' }; }
+  });
+
+  ipcMain.handle('discord-rpc:open-portal', async () => {
+    try {
+      const { shell } = require('electron');
+      await shell.openExternal('https://discord.com/developers/applications');
+      return { ok: true };
+    } catch (e) { return { ok: false, error: e?.message || 'Could not open Discord Developer Portal.' }; }
   });
 
   ipcMain.handle('onboarding:complete', async () => {
