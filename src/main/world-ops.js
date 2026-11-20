@@ -202,7 +202,8 @@ async function cloneWorld(sourceRoot, worldName, targetRoot, targetWorldName, op
     let allowed = false;
     try {
       const { listInstances } = require('./settings.js');
-      const list = listInstances() || [];
+      const rawList = listInstances();
+      const list = Array.isArray(rawList) ? rawList : (rawList && Array.isArray(rawList.instances) ? rawList.instances : []);
       allowed = list.some(i => i && i.serverPath && path.resolve(i.serverPath) === resolvedDestRoot);
     } catch { allowed = false; }
     if (!allowed) return { ok: false, error: 'Target server folder must be the current server or a registered launcher instance.' };

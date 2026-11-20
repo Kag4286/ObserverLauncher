@@ -66,6 +66,41 @@ function mrpackCompat(deps, server) {
   return { mc, loader, warnings };
 }
 
+// SECURITY (v9.0.3): block OS executables and shell launch scripts from untrusted modpack archives
+// (.mrpack / CurseForge .zip). Because ObserverLauncher auto-runs run.bat/run.sh and native binaries
+// on Start, allowing a pack to drop executables creates an import-to-RCE vector. Mod scripts inside
+// nested folders (e.g. kubejs/*.js) are allowed; root-level .js/.mjs/.cjs and OS binaries are blocked.
+const BLOCKED_MODPACK_EXT_RE = /\.(bat|cmd|sh|bash|zsh|ps1|psm1|psd1|vbs|vbe|wsf|wsh|msc|scr|com|exe|msi|msp|dll|so|dylib|lnk|pif|reg|hta|cpl|jar\.exe)$/i;
+const ROOT_SCRIPT_EXT_RE = /\.(js|mjs|cjs)$/i;
+const EXPORT_SENSITIVE_PROP_KEYS = new Set(['rcon.password', 'rcon.port', 'enable-rcon', 'server-ip']);
+
+function isBlockedModpackFile(relPath) {
+  const norm = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!norm) return true;
+  if (BLOCKED_MODPACK_EXT_RE.test(norm)) return true;
+  if (!norm.includes('/') && ROOT_SCRIPT_EXT_RE.test(norm)) return true;
+  return false;
+}
+
+// Strip host-local secrets (e.g. auto-generated rcon.password) before copying server.properties into
+// a shareable .mrpack archive. Pure helper shared by GUI modpack:export and MCP export_modpack.
+function sanitizePropertiesForExport(rawText) {
+  const text = String(rawText == null ? '' : rawText);
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const SECRET_RE = /pass(word)?|secret|token|api[_-]?key/i;
+  const out = [];
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) { out.push(line); continue; }
+    const eq = line.indexOf('=');
+    if (eq <= 0) { out.push(line); continue; }
+    const key = line.slice(0, eq).trim().toLowerCase();
+    if (EXPORT_SENSITIVE_PROP_KEYS.has(key) || SECRET_RE.test(key)) continue;
+    out.push(line);
+  }
+  return out.join(eol);
+}
+
 // Shared with the MCP export_modpack tool so the two exports can't drift. Pure-ish (reads the
 // server folder) but no Electron dialog — the caller does the user-facing warnings.
 function buildMrpackEntries(root, manifest, destFolders) {
@@ -169,6 +204,7 @@ async function importMrpackFromPath(ctx, mrpackPath, onInfo, source = 'local', p
       if (!url) { skipped++; continue; }
       const { isSafeDownloadUrl } = require('./validate.js');
       if (!isSafeDownloadUrl(url)) { skipped++; continue; }
+      if (isBlockedModpackFile(file.path)) throw new Error(`This modpack contains a blocked executable or script file ("${file.path}") — import stopped for safety.`);
       const dest = safeTarget(ctx.currentServerPath, file.path);
       if (!dest) throw new Error(`This modpack's file list contains an unsafe path ("${file.path}") — import stopped for safety.`);
       installable.push({ url, dest, name: path.basename(dest), size: file.fileSize || 0, hashes: file.hashes || null });
@@ -255,6 +291,10 @@ async function copyOverridesWithConfirm(ctx, overridesDir, tx) {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) { walkRel(r); continue; }
       if (!e.isFile()) continue;
+      if (isBlockedModpackFile(r)) {
+        try { ctx.appendLog?.(`Modpack import skipped blocked executable/script override: ${r}`, 'system'); } catch {}
+        continue;
+      }
       const dest = safeTarget(ctx.currentServerPath, r);
       if (!dest) continue; // unsafe path: the copy must not write outside the server folder
       if (tx) tx.touch(dest);
@@ -487,7 +527,10 @@ function registerModpacks(ipcMain, ctx) {
       stagingDir = path.join(tempDir(), `observerlauncher-export-${Date.now()}`);
       fs.mkdirSync(path.join(stagingDir, 'overrides'), { recursive: true });
       fs.writeFileSync(path.join(stagingDir, 'modrinth.index.json'), JSON.stringify(index, null, 2));
-      try { fs.copyFileSync(path.join(ctx.currentServerPath, 'server.properties'), path.join(stagingDir, 'overrides', 'server.properties')); } catch {}
+      try {
+        const rawProps = fs.readFileSync(path.join(ctx.currentServerPath, 'server.properties'), 'utf8');
+        fs.writeFileSync(path.join(stagingDir, 'overrides', 'server.properties'), sanitizePropertiesForExport(rawProps));
+      } catch {}
       const r = await platform.createArchive(stagingDir, saveDialog.filePath);
       if (!r.ok) throw new Error(r.error || 'Could not create the .mrpack archive.');
       return { ok: true, count: files.length, path: saveDialog.filePath };
@@ -496,4 +539,4 @@ function registerModpacks(ipcMain, ctx) {
   });
 }
 
-module.exports = { importMrpackFromPath, importCfModpack, importModpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor };
+module.exports = { importMrpackFromPath, importCfModpack, importModpackFromPath, registerModpacks, mrpackCompat, detectServerCompat, mcFromJar, buildMrpackEntries, dependenciesFor, isBlockedModpackFile, sanitizePropertiesForExport };

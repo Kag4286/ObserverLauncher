@@ -72,6 +72,39 @@ function isValidPngBuffer(buf) {
     buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a;
 }
 
+// SECURITY (v9.0.3): shared SSRF-safe, size-capped, PNG-verified skin image downloader used by
+// both skins.js and skinsrestorer.js. Rejects private/loopback/metadata URLs (including redirects
+// and DNS rebinding), caps body size at 512 KB, and enforces valid PNG magic bytes.
+const MAX_SKIN_BYTES = 512 * 1024;
+async function fetchSafePngBuffer(url, opts = {}) {
+  const { isSafeDownloadUrl, assertPublicHost } = require('./validate.js');
+  const doFetch = opts.fetchFn || (typeof fetch === 'function' ? fetch : null);
+  if (!doFetch) return null;
+  let curUrl = String(url || '').trim();
+  for (let hop = 0; hop <= 3; hop++) {
+    if (!isSafeDownloadUrl(curUrl)) return null;
+    if (!opts.fetchFn || typeof opts.lookupFn === 'function') {
+      const dnsOk = await assertPublicHost(curUrl, { lookupFn: opts.lookupFn });
+      if (!dnsOk.ok) return null;
+    }
+    const res = await doFetch(curUrl, { redirect: 'manual' });
+    if (res && res.status >= 300 && res.status < 400) {
+      try { if (res.body && typeof res.body.cancel === 'function') res.body.cancel(); } catch {}
+      const loc = res.headers && (typeof res.headers.get === 'function' ? res.headers.get('location') : res.headers.location);
+      if (!loc || hop === 3) return null;
+      try { curUrl = new URL(loc, curUrl).href; } catch { return null; }
+      continue;
+    }
+    if (!res || !res.ok) return null;
+    const cl = res.headers && (typeof res.headers.get === 'function' ? res.headers.get('content-length') : res.headers['content-length']);
+    if (cl != null && Number.isFinite(Number(cl)) && Number(cl) > MAX_SKIN_BYTES) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_SKIN_BYTES || !isValidPngBuffer(buf)) return null;
+    return buf;
+  }
+  return null;
+}
+
 // Fetch the default Steve texture from the PrismarineJS mirror, cache it under dataDir, and
 // return a data URI. Returns null on any failure (offline, mirror down) so the caller can fall
 // through to its last resort.
@@ -97,7 +130,8 @@ async function fetchDefaultFromMirror() {
 async function getSkin(input) {
   try {
     const profile = await fetchMojangProfile(input);
-    const uuid = profile.id;
+    const uuid = String(profile.id || '').replace(/-/g, '').toLowerCase();
+    if (!/^[0-9a-f]{32}$/.test(uuid)) throw new Error('Invalid player UUID returned by Mojang.');
     const skinUrl = parseSkinUrl(profile);
     if (!skinUrl) throw new Error('This player has no custom skin (using default).');
 
@@ -116,12 +150,13 @@ async function getSkin(input) {
     let buf;
     if (fs.existsSync(cacheFile)) {
       buf = fs.readFileSync(cacheFile);
-    } else {
-      // Download and cache
+      if (!isValidPngBuffer(buf)) buf = null;
+    }
+    if (!buf) {
+      // Download and cache (SSRF-guarded, size-capped, PNG-verified)
       fs.mkdirSync(cacheDir, { recursive: true });
-      const imgRes = await fetch(skinUrl);
-      if (!imgRes.ok) throw new Error(`Skin download failed: ${imgRes.status}`);
-      buf = Buffer.from(await imgRes.arrayBuffer());
+      buf = await fetchSafePngBuffer(skinUrl);
+      if (!buf) throw new Error('Skin download failed or returned invalid image data.');
       writeFileAtomic(cacheFile, buf);
     }
 
@@ -156,4 +191,4 @@ async function getSkin(input) {
   }
 }
 
-module.exports = { parseSkinUrl, getSkin, isOfflineUuid, isValidPngBuffer };
+module.exports = { parseSkinUrl, getSkin, isOfflineUuid, isValidPngBuffer, fetchSafePngBuffer, MAX_SKIN_BYTES };

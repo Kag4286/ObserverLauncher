@@ -154,14 +154,17 @@ async function tSearchFiles(ctx, a) {
   // total bytes, and yield to the event loop every 25 files.
   const files = (list.files || []).slice(0, 800);
   const MAX_SCAN_BYTES = 40 * 1024 * 1024;
+  const { maskSecrets } = require('./doctor.js');
   const ql = q.toLowerCase();
   const hits = [];
   let scanned = 0, i = 0;
-  for (const rel of files) {
+  for (const entry of files) {
     if (hits.length >= 200 || scanned >= MAX_SCAN_BYTES) break;
+    const rel = typeof entry === 'string' ? entry : (entry && entry.path);
+    if (!rel) continue;
     const t = safeTarget(root, rel); if (!t) continue;
     let txt; try { const st = fs.statSync(t); if (st.size > 2 * 1024 * 1024) continue; scanned += st.size; txt = fs.readFileSync(t, 'utf8'); } catch { continue; }
-    txt.split(/\r?\n/).forEach((line, li) => { if (hits.length < 200 && line.toLowerCase().includes(ql)) hits.push({ path: rel, line: li + 1, text: line.slice(0, 300) }); });
+    txt.split(/\r?\n/).forEach((line, li) => { if (hits.length < 200 && line.toLowerCase().includes(ql)) hits.push({ path: rel, line: li + 1, text: maskSecrets(line).slice(0, 300) }); });
     if (++i % 25 === 0) await new Promise(r => setImmediate(r));
   }
   return { ok: true, result: { query: q, hits, scannedFiles: i, truncated: scanned >= MAX_SCAN_BYTES } };
@@ -565,6 +568,7 @@ function resolveEditableTarget(ctx, aPath) {
   const root = needPath(ctx);
   const target = safeTarget(root, aPath);
   if (!target) return { ok: false, error: 'Path outside the server folder.' };
+  if (editor.isSkippedPath(root, target)) return { ok: false, error: 'Refused: path is in a protected or hidden directory.' };
   assertEditable(aPath);
   return { ok: true, target };
 }
@@ -620,6 +624,15 @@ async function tGetSettings(ctx) {
     locale: s.locale || 'en', autoBackupMinutes: s.autoBackupMinutes || 0
   } };
 }
+// SECURITY (v9.0.3): reject JVM flags that allow arbitrary command execution, native agent
+// loading, debugger attachment, or argfile (@path) expansion via MCP set_setting.
+const DANGEROUS_JVM_ARG_RE = /(?:^|\s)(?:@|-XX:OnError\b|-XX:OnOutOfMemoryError\b|-javaagent\b|-agentlib\b|-agentpath\b|-Xrunjdwp\b|-Xdebug\b|-Djava\.security\.manager\b)/i;
+function isSafeMcpJvmArgs(v) {
+  if (typeof v !== 'string' || v.length > 2000) return false;
+  if (/[\r\n"'<>|]/.test(v)) return false;
+  if (DANGEROUS_JVM_ARG_RE.test(v) || /jdwp/i.test(v)) return false;
+  return true;
+}
 // serverPath is intentionally NOT settable over MCP (root of every file op) — GUI only.
 const SETTABLE = {
   memoryMin: v => Number.isFinite(Number(v)) && Number(v) >= 1 && Number(v) <= 64,
@@ -629,7 +642,7 @@ const SETTABLE = {
   autoBackupMinutes: v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1440,
   backupRetention: v => Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 100,
   locale: v => typeof v === 'string' && v.length <= 10,
-  jvmArgs: v => typeof v === 'string' && v.length <= 2000 && !/["'<>|]/.test(v),
+  jvmArgs: isSafeMcpJvmArgs,
   // SECURITY: playitPath is NOT settable over MCP. tunnel:start spawns whatever binary that path
   // points at, so letting an AI set it (then start the tunnel) would be a one-approval RCE. The
   // user sets it in the GUI only.
@@ -752,6 +765,10 @@ async function tInstallLocalJar(ctx, a) {
 async function tImportModpackPath(ctx, a) {
   const src = String(a.path || '');
   if (!src || !fs.existsSync(src)) return { ok: false, error: 'Modpack file not found.' };
+  let st;
+  try { st = fs.statSync(src); } catch { return { ok: false, error: 'Modpack file not found.' }; }
+  if (!st.isFile()) return { ok: false, error: 'Source is not a regular file.' };
+  if (st.size > 1024 * 1024 * 1024) return { ok: false, error: 'Modpack file too large (max 1 GB).' };
   if (!/\.(mrpack|zip)$/i.test(src)) return { ok: false, error: 'Expected a .mrpack (or .zip) file.' };
   return ok(await importModpackFromPath(ctx, src, undefined, 'mcp'));
 }
@@ -771,7 +788,7 @@ async function tExportModpack(ctx, a) {
   if (!manifest.length) return { ok: false, error: 'Nothing to export (no Marketplace-installed content).' };
   const platform = require('../main/platform');
   // Shared helpers so this never drifts from the IPC modpack:export path.
-  const { buildMrpackEntries, dependenciesFor } = require('../main/modpacks.js');
+  const { buildMrpackEntries, dependenciesFor, sanitizePropertiesForExport } = require('../main/modpacks.js');
   const levelName = serverFiles(root).properties['level-name'] || 'world';
   const destFolders = { plugin: 'plugins', forge: 'mods', fabric: 'mods', datapack: path.join(levelName, 'datapacks'), mod: 'mods' };
   const files = buildMrpackEntries(root, manifest, destFolders);
@@ -781,7 +798,12 @@ async function tExportModpack(ctx, a) {
   fs.mkdirSync(path.join(stagingDir, 'overrides'), { recursive: true });
   const index = { formatVersion: 1, game: 'minecraft', versionId: 'mcp-' + Date.now(), name: path.basename(root), summary: 'Exported via MCP - ' + files.length + ' item(s).', files, dependencies };
   fs.writeFileSync(path.join(stagingDir, 'modrinth.index.json'), JSON.stringify(index, null, 2));
-  try { fs.copyFileSync(path.join(root, 'server.properties'), path.join(stagingDir, 'overrides', 'server.properties')); } catch {}
+  try {
+    const propsSrc = path.join(root, 'server.properties');
+    if (fs.existsSync(propsSrc)) {
+      fs.writeFileSync(path.join(stagingDir, 'overrides', 'server.properties'), sanitizePropertiesForExport(fs.readFileSync(propsSrc, 'utf8')));
+    }
+  } catch {}
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const r = await platform.createArchive(stagingDir, dest);
   try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
@@ -1379,10 +1401,12 @@ async function tReadAuditLog(ctx, a) {
 async function tKickPlayer(ctx, a) {
   const name = String((a && a.name) || '').trim();
   if (!name) return { ok: false, error: 'name is required.' };
-  const { isSafePlayerName } = require('../main/validate.js');
+  const { isSafePlayerName, isSafeReason } = require('../main/validate.js');
   if (!isSafePlayerName(name)) return { ok: false, error: 'Invalid player name - use 3-16 letters, numbers or underscores.' };
+  const rawReason = a && a.reason !== undefined && a.reason !== null ? String(a.reason) : '';
+  if (!isSafeReason(rawReason)) return { ok: false, error: 'Invalid kick reason - single line only, max 200 characters.' };
   if (!ctx.serverProcess) return { ok: false, error: 'Server is not running.' };
-  const reason = String((a && a.reason) || '').trim();
+  const reason = rawReason.trim();
   const cmd = reason ? `kick ${name} ${reason}` : `kick ${name}`;
   // M12: route through sendConsoleCommand (RCON-first) so kick works on an RCON/adopted server too.
   const r = await sendConsoleCommand(ctx, cmd);
@@ -1818,4 +1842,4 @@ const TOOLS = [
 
 function getTool(name) { return TOOLS.find(t => t.name === name) || null; }
 
-module.exports = { TOOLS, getTool, TOOL_ANNOTATIONS, OUTPUT_SCHEMAS };
+module.exports = { TOOLS, getTool, TOOL_ANNOTATIONS, OUTPUT_SCHEMAS, isSafeMcpJvmArgs };

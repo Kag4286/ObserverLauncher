@@ -193,49 +193,52 @@ async function createBackup({ serverPath, worlds, destZip }) {
   return runArchiveTool(cmd, args, serverPath);
 }
 
-async function restoreBackup({ destPath, zipPath }) {
-  // SECURITY (zip-slip): `unzip -o` / `tar -xzf` extract absolute paths and
-  // `../` entries OUTSIDE destPath. A crafted .zip dropped into the backups
-  // folder could overwrite files anywhere the user can write. List entries
-  // first and refuse the whole archive on the first unsafe path.
+// SECURITY (zip-slip + polyglot defense): list entries AND record which tool parsed the archive,
+// then extract ONLY with that exact format tool — never fall back from unzip to tar on a polyglot.
+async function extractVerifiedArchive(archivePath, destDir, label) {
   const { isSafeArchiveEntry } = require('../validate.js');
-  let entries = null;
-  try { entries = await listArchiveEntries(zipPath); } catch { entries = null; }
-  // SECURITY (v3.0.0): if the archive format cannot be LISTED, we cannot run the zip-slip check, so
-  // we REFUSE rather than extract blind. Previously a null listing fell through and extracted
-  // whatever the tool decided — the one path where the guard could be bypassed with a crafted file.
-  if (!entries) return { ok: false, error: 'Could not read the backup archive to verify it is safe (unsupported or corrupt format) — restore stopped.' };
-  const bad = entries.find(e => !isSafeArchiveEntry(e));
-  if (bad) return { ok: false, error: `Backup contains an unsafe path ("${bad}") — restore stopped for safety.` };
-  // try unzip first (handles both zip and tar.gz if bsdtar)
-  const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);
-  if (hasUnzip) {
-    const r = await exec('unzip', ['-o', zipPath, '-d', destPath], 300000);
-    if (r.ok) return { ok: true };
-    // fallback to tar
+  let listed = null;
+  try { listed = await listArchiveEntriesWithFormat(archivePath); } catch { listed = null; }
+  if (!listed || !listed.entries) return { ok: false, error: `Could not read the ${label} to verify it is safe (unsupported or corrupt format) — stopped.` };
+  const bad = listed.entries.find(e => !isSafeArchiveEntry(e));
+  if (bad) return { ok: false, error: `${label} contains an unsafe path ("${bad}") — stopped for safety.` };
+  if (listed.format === 'zip') {
+    const r = await exec('unzip', ['-o', '--', archivePath, '-d', destDir], 300000);
+    return r.ok ? { ok: true } : { ok: false, error: r.error || `Could not extract zip ${label} (unzip failed).` };
   }
-  const r = await exec('tar', ['--no-same-owner', '-xzf', zipPath, '-C', destPath], 300000);
-  return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract backup (needs unzip or tar)' };
+  const r = await exec('tar', ['--no-same-owner', '-xzf', archivePath, '-C', destDir], 300000);
+  return r.ok ? { ok: true } : { ok: false, error: r.error || `Could not extract tar ${label}.` };
 }
 
-// Best-effort archive listing for the zip-slip pre-check above.
-// Returns an array of entry names, or null when the format can't be listed
-// (caller then falls through to normal extraction).
-async function listArchiveEntries(zipPath) {
+async function restoreBackup({ destPath, zipPath }) {
+  return extractVerifiedArchive(zipPath, destPath, 'backup archive');
+}
+
+async function listArchiveEntriesWithFormat(zipPath) {
   const zipList = await exec('unzip', ['-Z1', zipPath], 30000);
   if (zipList.ok && zipList.stdout.trim()) {
     // Reject archives containing symlinks (zipinfo -Z -l starts symlink mode lines with 'l')
     const zipModes = await exec('unzip', ['-Z', '-l', zipPath], 30000);
-    if (zipModes.ok && (zipModes.stdout || '').split(/\r?\n/).some(line => /^l[rwx-]{9}/i.test(line.trim()))) return ['../symlink-rejected'];
-    return zipList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (zipModes.ok && (zipModes.stdout || '').split(/\r?\n/).some(line => /^l[rwx-]{9}/i.test(line.trim()))) {
+      return { format: 'zip', entries: ['../symlink-rejected'] };
+    }
+    return { format: 'zip', entries: zipList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean) };
   }
   const tarList = await exec('tar', ['-tzf', zipPath], 30000);
   if (tarList.ok && tarList.stdout.trim()) {
     const tarModes = await exec('tar', ['-tvzf', zipPath], 30000);
-    if (tarModes.ok && (tarModes.stdout || '').split(/\r?\n/).some(line => /^[lh][rwx-]{9}/i.test(line.trim()))) return ['../symlink-rejected'];
-    return tarList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (tarModes.ok && (tarModes.stdout || '').split(/\r?\n/).some(line => /^[lh][rwx-]{9}/i.test(line.trim()))) {
+      return { format: 'tar', entries: ['../symlink-rejected'] };
+    }
+    return { format: 'tar', entries: tarList.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean) };
   }
   return null;
+}
+
+// Backward-compatible wrapper returning entry array or null.
+async function listArchiveEntries(zipPath) {
+  const listed = await listArchiveEntriesWithFormat(zipPath);
+  return listed ? listed.entries : null;
 }
 
 async function allowFirewall(port) {
@@ -252,27 +255,7 @@ module.exports = { findJavaDescendant, findServerDescendant, getProcessInfo, get
 
 // Cross-platform archive helpers (Linux side). .zip -> unzip, .tar.gz/.tgz -> tar.
 async function extractArchive(archivePath, destDir) {
-  // SECURITY (zip-slip): a .mrpack / JRE archive is untrusted input. `unzip -o` and `tar -xzf`
-  // happily write absolute paths and `../` entries OUTSIDE destDir. List entries first and
-  // refuse the whole archive on the first unsafe path — the same guard restoreBackup already uses.
-  const { isSafeArchiveEntry } = require('../validate.js');
-  let entries = null;
-  try { entries = await listArchiveEntries(archivePath); } catch { entries = null; }
-  // SECURITY (v3.0.0): same rule as restoreBackup — an unlistable archive is REFUSED, never
-  // extracted blind (that was the one way the zip-slip guard could be sidestepped).
-  if (!entries) return { ok: false, error: 'Could not read the archive to verify it is safe (unsupported or corrupt format) — extraction stopped.' };
-  const bad = entries.find(e => !isSafeArchiveEntry(e));
-  if (bad) return { ok: false, error: `Archive contains an unsafe path ("${bad}") — extraction stopped for safety.` };
-  const isZip = /\.zip$/i.test(archivePath);
-  if (isZip) {
-    const hasUnzip = await exec('which', ['unzip']).then(r => r.ok);
-    const r = hasUnzip
-      ? await exec('unzip', ['-o', archivePath, '-d', destDir], 300000)
-      : await exec('tar', ['--no-same-owner', '-xf', archivePath, '-C', destDir], 300000);
-    return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive (needs unzip or tar).' };
-  }
-  const r = await exec('tar', ['--no-same-owner', '-xzf', archivePath, '-C', destDir], 300000);
-  return r.ok ? { ok: true } : { ok: false, error: r.error || 'Could not extract the archive (needs tar).' };
+  return extractVerifiedArchive(archivePath, destDir, 'archive');
 }
 async function createArchive(srcPath, destArchive) {
   // srcPath is the staging folder; archive its CONTENTS into destArchive.

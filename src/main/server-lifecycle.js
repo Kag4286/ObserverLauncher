@@ -39,15 +39,19 @@ function buildLaunchArgs(settings, isProxy, jar) {
 // Spawn the server process (java -jar … or cmd/bash run.bat/run.sh) and store it on ctx.
 function spawnServerProcess(ctx, serverPath, info, customArgs, args) {
   if (info.launchScript) {
+    // SECURITY (v9.0.3): defense in depth — only ever invoke exact run.bat / run.sh basenames.
+    const scriptName = String(info.launchScript);
+    if (!/^run\.(bat|sh)$/i.test(scriptName)) {
+      throw new Error(`Refused to spawn unexpected launch script: "${scriptName}".`);
+    }
     const env = { ...process.env };
     if (customArgs.length) env.JAVA_TOOL_OPTIONS = customArgs.join(' ');
-    if (info.launchScript.toLowerCase().endsWith('.sh')) {
-      ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
+    if (scriptName.toLowerCase().endsWith('.sh')) {
+      ctx.serverProcess = spawn('bash', [scriptName, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
     } else if (process.platform === 'win32') {
-      const scriptCmd = info.launchScript.includes(' ') ? `"${info.launchScript}"` : info.launchScript;
-      ctx.serverProcess = spawn('cmd.exe', ['/d', '/c', scriptCmd, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false, env });
+      ctx.serverProcess = spawn('cmd.exe', ['/d', '/c', scriptName, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false, env });
     } else {
-      ctx.serverProcess = spawn('bash', [info.launchScript, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
+      ctx.serverProcess = spawn('bash', [scriptName, 'nogui'], { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], env });
     }
   } else {
     ctx.serverProcess = spawn(ctx.javaInfo.path, args, { cwd: serverPath, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: false });
@@ -229,6 +233,11 @@ function closeRcon(ctx) {
 // M6: route a console command. Prefer RCON when connected; fall back to stdin (early boot, or when
 // RCON failed). Always echoes the command to the console like the old path did.
 async function sendConsoleCommand(ctx, command) {
+  // SECURITY (v9.0.3): defense-in-depth newline guard so no internal/MCP/IPC caller can ever
+  // smuggle a second console command via stdin.
+  if (typeof command !== 'string' || /[\r\n]/.test(command)) {
+    return { ok: false, error: 'Command must be a single line.' };
+  }
   ctx.lastManualCommandAt = Date.now();
   ctx.appendLog(`> ${command}`, 'command');
   const client = ctx.rcon;

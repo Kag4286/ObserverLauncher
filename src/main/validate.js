@@ -6,6 +6,7 @@
 // so a forgotten check at one call site can't become an injection.
 const path = require('path');
 const crypto = require('crypto');
+const dns = require('dns');
 
 function isValidPort(port) {
   const p = Number(port);
@@ -67,6 +68,41 @@ function isSafeWorldName(name) {
     && !name.startsWith('-') && path.basename(name) === name;
 }
 
+// True when `rawIp` is an IPv4 or IPv6 loopback, private, link-local, CGNAT, multicast,
+// NAT64, discard, or reserved non-public address.
+function isPrivateIp(rawIp) {
+  const host = String(rawIp || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host) return true;
+  if (host === '::1' || host === '::') return true;
+  if (host.includes(':')) {
+    // Strip IPv6 zone identifier if present (e.g. fe80::1%eth0)
+    const ip6 = host.split('%')[0];
+    if (ip6 === '::1' || ip6 === '::') return true;
+    // IPv4-mapped IPv6 (::ffff:a.b.c.d or ::ffff:xxxx:xxxx) and NAT64 (64:ff9b:: / 64:ff9b:1::)
+    if (ip6.startsWith('::ffff:') || ip6.startsWith('64:ff9b:')) return true;
+    // Link-local (fe80::/10) & deprecated site-local (fec0::/10)
+    if (/^fe[89abcf][0-9a-f]?:/i.test(ip6)) return true;
+    // Unique-local (fc00::/7)
+    if (/^f[cd][0-9a-f]{0,2}:/i.test(ip6)) return true;
+    // Multicast (ff00::/8) — require ':' so public hostnames starting with 'ff' are not matched
+    if (/^ff[0-9a-f]{0,2}:/i.test(ip6)) return true;
+    // Discard-Only (100::/64) and expanded unspecified/loopback (0:0:...:0 / 0:0:...:1)
+    if (/^0*100::/i.test(ip6)) return true;
+    if (/^(?:0+:)+0*1?$/.test(ip6)) return true;
+    return false;
+  }
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
 // SECURITY: download URLs inside a .mrpack come from an untrusted file the user
 // opens, and were fetched verbatim — a crafted pack could point at file:// (local
 // read) or a private/loopback host (SSRF to the user's router/cloud metadata).
@@ -77,29 +113,41 @@ function isSafeDownloadUrl(url) {
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false;
-  // IPv6 loopback / unspecified
-  if (host === '::1' || host === '::') return false;
-  // IPv6 link-local (fe80::/10), unique-local (fc00::/7), multicast (ff00::/8)
-  if (/^fe[89ab][0-9a-f]?::?/i.test(host)) return false;
-  if (/^f[cd][0-9a-f]{2}:/i.test(host)) return false;
-  if (host.startsWith('ff')) return false;
-  // IPv4-mapped IPv6 (::ffff:...) and NAT64 (64:ff9b::)
-  if (host.startsWith('::ffff:') || host.startsWith('64:ff9b::')) return false;
   // CurseForge CDN (used for the download URLs its API returns) is a legitimate public host.
-  // (The API itself is api.curseforge.com; files live on forgecdn.net.)
   if (host === 'forgecdn.net' || host.endsWith('.forgecdn.net')) return true;
-  // IPv4 private / loopback / link-local / CGNAT
-  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    if (a === 10 || a === 127 || a === 0) return false;
-    if (a === 169 && b === 254) return false;
-    if (a === 172 && b >= 16 && b <= 31) return false;
-    if (a === 192 && b === 168) return false;
-    if (a === 100 && b >= 64 && b <= 127) return false;
-    if (a >= 224) return false;
-  }
+  if (isPrivateIp(host)) return false;
   return true;
+}
+
+// SECURITY (v9.0.3 DNS-rebinding SSRF defense): resolve hostname via DNS and verify EVERY
+// returned A/AAAA record is a public IP. Blocks domains like 127.0.0.1.nip.io or attacker DNS
+// pointing at 169.254.169.254 / LAN / loopback. Injectable `lookupFn` for offline unit tests.
+async function assertPublicHost(url, opts = {}) {
+  if (!isSafeDownloadUrl(url)) return { ok: false, error: 'Refused: URL is not a safe public http(s) host.' };
+  let host;
+  try { host = new URL(String(url)).hostname.toLowerCase().replace(/^\[|\]$/g, ''); }
+  catch { return { ok: false, error: 'Invalid URL.' }; }
+  if (isPrivateIp(host)) return { ok: false, error: 'Refused: target IP is private or loopback.' };
+  // Literal public IP needs no DNS lookup.
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(':')) return { ok: true };
+  const lookup = typeof opts.lookupFn === 'function'
+    ? opts.lookupFn
+    : (h => dns.promises.lookup(h, { all: true, verbatim: true }));
+  let records;
+  try {
+    records = await lookup(host);
+  } catch (e) {
+    if (opts.strict) return { ok: false, error: `Could not resolve host "${host}".` };
+    return { ok: true, lookupSkipped: true };
+  }
+  const list = Array.isArray(records) ? records : (records ? [records] : []);
+  for (const rec of list) {
+    const addr = typeof rec === 'string' ? rec : (rec && rec.address);
+    if (addr && isPrivateIp(addr)) {
+      return { ok: false, error: `Refused: host "${host}" resolved to non-public address (${addr}).` };
+    }
+  }
+  return { ok: true };
 }
 
 // SECURITY: player UUIDs from the renderer are joined into a file path
@@ -165,6 +213,8 @@ module.exports = {
   isSafeBackupName,
   isSafeArchiveEntry,
   isSafeWorldName,
+  isPrivateIp,
   isSafeDownloadUrl,
+  assertPublicHost,
   isSafeUuid,
 };

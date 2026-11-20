@@ -19,7 +19,8 @@
 const fs = require('fs');
 const path = require('path');
 const { dataDir } = require('./data-dir.js');
-const { writeFileAtomic } = require('./fs-utils.js');
+const { writeFileAtomic, safeTarget } = require('./fs-utils.js');
+const { isValidPngBuffer, fetchSafePngBuffer } = require('./skins.js');
 
 function srDirOf(serverRoot) {
   if (!serverRoot) return null;
@@ -48,55 +49,51 @@ function skinUuidFor(srDir, playerUuid) {
 // Decode a .playerskin file into { url, model }. Null when the file is missing or malformed.
 function readSkinFile(srDir, skinUuid) {
   if (!srDir || !skinUuid) return null;
+  const rawId = String(skinUuid).trim();
+  if (!rawId || rawId === '.' || rawId === '..' || rawId.includes('/') || rawId.includes('\\') || path.basename(rawId) !== rawId) return null;
+  const skinsDir = path.join(srDir, 'skins');
+  const skinPath = safeTarget(skinsDir, `${rawId}.playerskin`);
+  if (!skinPath || path.dirname(skinPath) !== path.resolve(skinsDir)) return null;
   let j;
-  try { j = JSON.parse(fs.readFileSync(path.join(srDir, 'skins', `${skinUuid}.playerskin`), 'utf8')); } catch { return null; }
+  try { j = JSON.parse(fs.readFileSync(skinPath, 'utf8')); } catch { return null; }
   if (!j || typeof j.value !== 'string') return null;
   let decoded;
   try { decoded = JSON.parse(Buffer.from(j.value, 'base64').toString('utf8')); } catch { return null; }
   const skin = decoded && decoded.textures && decoded.textures.SKIN;
   if (!skin || !skin.url) return null;
   const model = skin.metadata && skin.metadata.model === 'slim' ? 'slim' : 'classic';
-  return { url: skin.url, model, skinUuid };
+  return { url: skin.url, model, skinUuid: rawId };
 }
 
 // Download and cache the texture under dataDir/textures/skins/sr/<player>.png. Returns a data URI
 // or null.
-//
-// BUGFIX (v6.0.0 follow-up): the cache was keyed on the player UUID only and never invalidated, so
-// changing a skin in SkinsRestorer kept showing the old face forever, with no UI to clear it. The
-// cache file name now includes a hash of the texture URL: a new URL (the plugin assigns a new skin
-// uuid when the skin changes) is a new file, so the change is picked up on the next open. The old
-// file is left in place, so switching back and forth does not re-download.
-async function downloadAndCache(url, playerUuid) {
+async function downloadAndCache(url, playerUuid, opts) {
   const safeUuid = String(playerUuid || '').replace(/[^a-zA-Z0-9-]/g, '') || 'unknown';
   const urlHash = require('crypto').createHash('sha1').update(String(url)).digest('hex').slice(0, 12);
   const dir = path.join(dataDir(), 'textures', 'skins', 'sr');
   const file = path.join(dir, `${safeUuid}-${urlHash}.png`);
   if (fs.existsSync(file)) {
     const buf = fs.readFileSync(file);
-    if (buf.length > 100) return 'data:image/png;base64,' + buf.toString('base64');
+    if (isValidPngBuffer(buf)) return 'data:image/png;base64,' + buf.toString('base64');
   }
-  let r;
-  try { r = await fetch(url); } catch { return null; }
-  if (!r.ok) return null;
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length < 100) return null;
+  const buf = await fetchSafePngBuffer(url, opts || {});
+  if (!buf) return null;
   try { fs.mkdirSync(dir, { recursive: true }); writeFileAtomic(file, buf); } catch { /* cache best-effort */ }
   return 'data:image/png;base64,' + buf.toString('base64');
 }
 
 // Main entry: resolve a player's skin through SkinsRestorer.
 // Returns { ok:true, dataUri, model, source:'skinsrestorer' } or { ok:false, error }.
-async function getSkinFromSkinsRestorer(serverRoot, playerUuid) {
+async function getSkinFromSkinsRestorer(serverRoot, playerUuid, opts) {
   const srDir = srDirOf(serverRoot);
   if (!srDir) return { ok: false, error: 'SkinsRestorer is not installed on this server.' };
   const skinUuid = skinUuidFor(srDir, playerUuid);
   if (!skinUuid) return { ok: false, error: 'This player has no SkinsRestorer skin.' };
   const info = readSkinFile(srDir, skinUuid);
   if (!info) return { ok: false, error: 'The SkinsRestorer skin file is missing or malformed.' };
-  const dataUri = await downloadAndCache(info.url, playerUuid);
+  const dataUri = await downloadAndCache(info.url, playerUuid, opts);
   if (!dataUri) return { ok: false, error: 'Could not download the SkinsRestorer texture.' };
   return { ok: true, dataUri, model: info.model, source: 'skinsrestorer' };
 }
 
-module.exports = { srDirOf, skinUuidFor, readSkinFile, getSkinFromSkinsRestorer };
+module.exports = { srDirOf, skinUuidFor, readSkinFile, downloadAndCache, getSkinFromSkinsRestorer };

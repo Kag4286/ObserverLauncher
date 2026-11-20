@@ -595,9 +595,16 @@ function handle(request) {
     : /^[a-z0-9_-]+\.png$/.test(file) && !file.includes('..');
   if (!fileOk) return new Response('', { status: 400 });
 
-  const version = u.hostname === 'auto'
+  const rawHost = String(u.hostname || '').trim();
+  if (rawHost !== 'auto' && !/^[0-9]+(?:\.[0-9]+){1,2}$/.test(rawHost)) {
+    return new Response('', { status: 400 });
+  }
+  const version = rawHost === 'auto'
     ? (detectMcVersion(serverNames()) || DEFAULT_VERSION)
-    : u.hostname;
+    : rawHost;
+  if (!/^[0-9]+(?:\.[0-9]+){1,2}$/.test(version)) {
+    return new Response('', { status: 400 });
+  }
 
   // Mod textures come from the server's mod jars. Query the mod index first so
   // newly discovered model JSON definitions or updated mod jars take immediate effect

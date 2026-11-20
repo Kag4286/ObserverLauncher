@@ -237,7 +237,7 @@ function itemCellInner(iconUrl, label, id) {
   const src = cached || iconUrl;
   const isIso = cached ? ' data-iso="1"' : '';
   const idAttr = id ? ` data-id="${esc(id)}"` : '';
-  return `<img src="${src}" alt="" crossorigin="anonymous" data-fb="${esc(initials)}"${idAttr}${isIso}>`;
+  return `<img src="${esc(src)}" alt="" crossorigin="anonymous" data-fb="${esc(initials)}"${idAttr}${isIso}>`;
 }
 // A load event that resolves to the 1x1 placeholder means the texture is not on the mirror (or not
 // in the mod jar). Mark the parent cell so CSS shows the initials badge, and clear the mark when a

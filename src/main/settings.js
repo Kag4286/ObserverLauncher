@@ -169,7 +169,7 @@ function loadSettingsStore() {
     }
     // BACKUP BEFORE MIGRATING v3 -> v4 (never overwrite an earlier backup).
     if (rawVersion === 3 && !fs.existsSync(backupPathV3())) {
-      try { writeFileAtomic(backupPathV3(), JSON.stringify(raw, null, 2)); } catch {}
+      try { writeFileAtomic(backupPathV3(), JSON.stringify(raw, null, 2), { mode: 0o600 }); } catch {}
     }
     const migrated = migrate(raw);
     const healed = sanitizeStoreInstances(migrated);
@@ -476,7 +476,7 @@ function saveSettings(settings) {
     ? { ...settings, version: latestVersion }
     : nestInstances(settings);
   const encrypted = wrapStore({ ...nested, version: latestVersion }, getSafeStorage());
-  writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
+  writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2), { mode: 0o600 });
 }
 
 // M12 (MCP fix): write the flat per-instance view into a SPECIFIC instance, not the active one.
@@ -497,7 +497,7 @@ function saveSettingsFor(instanceId, flat) {
   out.instances = next;
   out.activeInstanceId = raw.activeInstanceId || next[0].id;
   const encrypted = wrapStore({ ...out, version: latestVersion }, getSafeStorage());
-  writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2));
+  writeFileAtomic(settingsPath(), JSON.stringify(encrypted, null, 2), { mode: 0o600 });
 }
 
 module.exports = { settingsPath, backupPathV3, defaultMemoryGB, defaultGlobal, loadSettings, loadSettingsFor, loadSettingsStore, saveSettings, saveSettingsFor, flattenActive, nestInstances, getActiveInstanceId, resolveInstanceId, listInstances, addInstance, switchInstance, renameInstance, setInstanceStyle, setInstanceGroup, INSTANCE_ACCENTS, removeInstance, relinkInstance, sanitizeInstanceName, sanitizeGroup, INSTANCE_NAME_MAX, INSTANCE_GROUP_MAX, isSamePath, sanitizeStoreInstances };

@@ -16,11 +16,11 @@ function originOk(req) {
   try { return new URL(origin).host === String(req.headers['host'] || ''); } catch { return false; }
 }
 
-// True when the socket's peer address is a real loopback (::1, ::ffff:127.0.0.1, or empty when the
-// socket is not ready). Any other address -> false.
+// True when the socket's peer address is a real loopback (::1 or 127.0.0.1 / ::ffff:127.0.0.1).
+// Fail-closed: missing or non-loopback remoteAddress -> false.
 function ipIsLoopback(req) {
-  const ip = String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
-  return ip === '127.0.0.1' || ip === '::1' || ip === '';
+  const ip = String((req && req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
+  return ip === '127.0.0.1' || ip === '::1';
 }
 
 module.exports = { originOk, ipIsLoopback, hostFromHeader };

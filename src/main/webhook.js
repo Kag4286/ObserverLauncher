@@ -197,13 +197,18 @@ function shouldCooldownEvent(ev, o) {
 
 function clearCooldowns() { _tpsCooldowns.clear(); }
 
-async function postWithRedirects(url, body, doFetch, timeoutMs) {
+async function postWithRedirects(url, body, doFetch, timeoutMs, dnsOpts) {
   const MAX_REDIRECTS = 3;
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const { assertPublicHost } = require('./validate.js');
   try {
     let curUrl = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (dnsOpts && dnsOpts.checkDns) {
+        const dnsRes = await assertPublicHost(curUrl, { lookupFn: dnsOpts.lookupFn });
+        if (!dnsRes.ok) return { sent: false, reason: dnsRes.error || 'unsafe host' };
+      }
       const res = await doFetch(curUrl, {
         method: 'POST',
         redirect: 'manual',
@@ -281,13 +286,14 @@ async function fire(settings, ev, opts) {
   const timeoutMs = Number(o.timeoutMs) || 8000;
   const spacingMs = Number.isFinite(Number(o.spacingMs)) ? Number(o.spacingMs) : 150;
 
+  const dnsOpts = { checkDns: !o.fetchFn || typeof o.lookupFn === 'function', lookupFn: o.lookupFn };
   return enqueueSend(async () => {
     try {
-      let res = await postWithRedirects(url, body, doFetch, timeoutMs);
+      let res = await postWithRedirects(url, body, doFetch, timeoutMs, dnsOpts);
       if (res.status === 429 && res.retryAfterMs && !o.noRetry) {
         const waitMs = Number.isFinite(Number(o.retryWaitMs)) ? Number(o.retryWaitMs) : res.retryAfterMs;
         if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
-        res = await postWithRedirects(url, body, doFetch, timeoutMs);
+        res = await postWithRedirects(url, body, doFetch, timeoutMs, dnsOpts);
       }
       return res;
     } catch (e) {

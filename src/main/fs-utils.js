@@ -14,10 +14,12 @@ const crypto = require('crypto');
 function sleepSync(ms) {
   try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { /* ignore */ }
 }
-function writeFileAtomic(filePath, content) {
+function writeFileAtomic(filePath, content, opts) {
   const dir = path.dirname(filePath);
   const tmp = path.join(dir, `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}`);
-  fs.writeFileSync(tmp, content);
+  const mode = opts && opts.mode;
+  fs.writeFileSync(tmp, content, mode ? { mode } : undefined);
+  if (mode && process.platform !== 'win32') { try { fs.chmodSync(tmp, mode); } catch {} }
   // BUGFIX (5.4.0): on Windows fs.renameSync onto an EXISTING file can throw EPERM/EACCES when
   // another process (antivirus scanning the fresh temp file, an editor, or the running server)
   // holds a transient handle on the destination. Retry a few times — the rename is atomic when it

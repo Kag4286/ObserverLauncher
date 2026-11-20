@@ -1,5 +1,6 @@
 // App window lifecycle + auto-update + graceful quit (extracted from main.js).
 const path = require('path');
+const { pathToFileURL } = require('url');
 const { app, BrowserWindow, protocol } = require('electron');
 const { killTree } = require('./kill.js');
 const { loadSettings } = require('./settings.js');
@@ -24,11 +25,18 @@ async function createWindow(ctx) {
   };
   if (process.platform === 'win32') Object.assign(winOpts, { titleBarStyle: 'hidden', titleBarOverlay: { color: '#08090a', symbolColor: '#e9edf0', height: 42 } });
   ctx.win = new BrowserWindow(winOpts);
-  // SECURITY: the renderer must never navigate away from the local UI, and no
-  // window.open() should ever create a real window. Without this, a stray link
-  // or injected markup could replace the app with a remote page.
+  // SECURITY: the renderer must never navigate away from the bundled local index.html, and no
+  // window.open() should ever create a real window. Blocking arbitrary file:// navigations prevents
+  // dragged-and-dropped local HTML files from inheriting the preload bridge (window.observer).
+  const allowedAppUrl = pathToFileURL(path.join(__dirname, '..', 'renderer', 'index.html')).href;
   ctx.win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  ctx.win.webContents.on('will-navigate', (e, url) => { if (!String(url).startsWith('file://')) e.preventDefault(); });
+  ctx.win.webContents.on('will-navigate', (e, url) => {
+    const clean = String(url || '').split('#')[0].split('?')[0];
+    if (clean !== allowedAppUrl) e.preventDefault();
+  });
+  try {
+    ctx.win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  } catch {}
   // v8.1.1 (low RAM): trim transient Chromium HTTP/image caches & terminate worldmap worker on minimize.
   ctx.win.on('minimize', () => {
     try { ctx.win.webContents.session.clearCache().catch(() => {}); } catch {}

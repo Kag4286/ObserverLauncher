@@ -135,11 +135,19 @@ async function downloadAttempt(url, partPath, onProgress, stallMs, externalSigna
     const headers = { 'User-Agent': 'ObserverLauncher/0.2' };
     if (have > 0) headers['Range'] = `bytes=${have}-`;
     bump();
-    const { isSafeDownloadUrl } = require('./validate.js');
+    const { isSafeDownloadUrl, assertPublicHost } = require('./validate.js');
     const enforcePublicRedirect = isSafeDownloadUrl(url);
     let curUrl = url;
     let r;
     for (let hop = 0; hop < 8; hop++) {
+      if (enforcePublicRedirect) {
+        const dnsOk = await assertPublicHost(curUrl);
+        if (!dnsOk.ok) {
+          const err = new Error(dnsOk.error || 'Refused: download target resolved to a non-public host.');
+          err.status = 403;
+          throw err;
+        }
+      }
       r = await fetch(curUrl, { redirect: enforcePublicRedirect ? 'manual' : 'follow', signal: controller.signal, headers });
       if (enforcePublicRedirect && r.status >= 300 && r.status < 400) {
         const loc = r.headers.get('location');

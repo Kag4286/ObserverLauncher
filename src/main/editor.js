@@ -108,4 +108,4 @@ function listFiles(root) {
   return { ok: true, files: out, capped: out.length >= LIST_CAP };
 }
 
-module.exports = { openFile, saveFile, listFiles, ALLOWED, MAX_VIEW, MAX_EDIT, extAllowed };
+module.exports = { openFile, saveFile, listFiles, ALLOWED, MAX_VIEW, MAX_EDIT, extAllowed, isSkippedPath };

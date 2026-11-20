@@ -47,11 +47,19 @@ function registerContent(ipcMain, ctx) {
     }
   });
 
+  // SECURITY (v9.0.3): only open directories and safe non-executable document/image types directly
+  // via shell.openPath(); for any executable or unknown file (.bat, .exe, .cmd, .sh, .ps1, .jar),
+  // reveal it in the OS file manager so IPC can never trigger arbitrary OS execution.
+  const SAFE_OPEN_EXTS = new Set(['.txt', '.log', '.json', '.yml', '.yaml', '.toml', '.properties', '.cfg', '.conf', '.md', '.csv', '.png', '.jpg', '.jpeg', '.webp']);
   ipcMain.handle('files:open', async (_, relative) => {
     const target = safeTarget(ctx.currentServerPath, relative);
     if (target && fs.existsSync(target)) {
-      const { shell } = require('electron'); // GUI-only: opens a file in the OS default app
-      await shell.openPath(target);
+      const { shell } = require('electron'); // GUI-only: opens a folder or safe file
+      let isDir = false;
+      try { isDir = fs.statSync(target).isDirectory(); } catch {}
+      const ext = path.extname(target).toLowerCase();
+      if (isDir || SAFE_OPEN_EXTS.has(ext)) await shell.openPath(target);
+      else shell.showItemInFolder(target);
     }
     return true;
   });

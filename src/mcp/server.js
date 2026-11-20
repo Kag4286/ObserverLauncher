@@ -22,6 +22,7 @@ const { dataDir } = require('../main/data-dir.js');
 const { TOOLS, getTool } = require('./tools.js');
 // 4.4.0: constant-time bearer-token compare (shared with the remote server).
 const { tokenEquals, bearerToken } = require('../main/validate.js');
+const { ipIsLoopback } = require('../main/http-guard.js');
 
 // RESOURCES (1.2.0, single-source in 5.0.0): expose server state as read-only MCP resources so an
 // AI client can pull context without spending a tool call. The URI->{tool,args} map lives in
@@ -235,10 +236,14 @@ function startMcpServer(ctx) {
   const limitBucket = require('../main/rate-limit.js').makeRateLimiter(60, 60000);
   const resourceBucket = require('../main/rate-limit.js').makeRateLimiter(180, 60000);
   const metaBucket = require('../main/rate-limit.js').makeRateLimiter(120, 60000);
+  // v9.0.3: brute-force lockout after 15 failed bearer-token attempts within 5 minutes.
+  const authLimiter = require('../main/rate-limit.js').makeRateLimiter(15, 5 * 60 * 1000);
   const rateLimited = (client, name) => limitBucket(client + '::' + name);
   const resourceRateLimited = client => resourceBucket(client + '::resource');
   const metaRateLimited = client => metaBucket(client + '::meta');
   const server = http.createServer((req, res) => {
+    // SECURITY (v9.0.3): verify peer socket is actually loopback (fail-closed defense in depth).
+    if (!ipIsLoopback(req)) { res.writeHead(403); return res.end('forbidden'); }
     // SECURITY (1.1.0, defense in depth): the real client is the Node bridge, which NEVER sends an
     // Origin header and connects by IP. A browser page on any site can still POST to 127.0.0.1
     // (localhost CSRF / DNS-rebinding): the token already blocks it, but rejecting browser-shaped
@@ -266,6 +271,22 @@ function startMcpServer(ctx) {
     // 5.0.0 (fail-closed): an empty/absent configured token rejects everything below (mirrors
     // remote.js). startMcpServer always mints one, so this only guards direct embedding.
     if (!token) { res.writeHead(401); return res.end('unauthorized'); }
+    const peerIp = String(req.socket?.remoteAddress || '127.0.0.1').replace(/^::ffff:/, '');
+    const checkAuth = () => {
+      if (authLimiter.isLimited(peerIp)) {
+        res.writeHead(429, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Too many failed auth attempts — try again later.' }));
+        return false;
+      }
+      if (!tokenEquals(bearerToken(auth), token)) {
+        authLimiter(peerIp);
+        res.writeHead(401);
+        res.end('unauthorized');
+        return false;
+      }
+      authLimiter.reset(peerIp);
+      return true;
+    };
     const client = String(req.headers['x-ob-client'] || 'local').replace(/[^\w.-]/g, '').slice(0, 32) || 'local';
     const rejectMetaRateLimit = () => {
       res.writeHead(429, { 'content-type': 'application/json' });
@@ -274,7 +295,7 @@ function startMcpServer(ctx) {
     // GET /tools returns the real tool list (name/description/inputSchema) so the bridge can
     // advertise exact schemas instead of shipping a stale hardcoded copy. Auth required.
     if (req.method === 'GET' && req.url === '/tools') {
-      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!checkAuth()) return;
       if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       // v5.0.0: advertise annotations + outputSchema too, so the MCP client can auto-approve reads
@@ -295,7 +316,7 @@ function startMcpServer(ctx) {
     // can advertise workflow templates. GET /prompt?name=..&args=<base64 json> returns the BUILT
     // message list for one prompt. Both auth-gated (loopback + token).
     if (req.method === 'GET' && req.url === '/prompts') {
-      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!checkAuth()) return;
       if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       const { promptList } = require('./prompts.js');
@@ -303,7 +324,7 @@ function startMcpServer(ctx) {
       return res.end(JSON.stringify({ prompts: promptList() }));
     }
     if (req.method === 'GET' && req.url.startsWith('/prompt')) {
-      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!checkAuth()) return;
       if (metaRateLimited(client)) return rejectMetaRateLimit();
       let name = '', args = {};
       try {
@@ -326,7 +347,7 @@ function startMcpServer(ctx) {
     // v5.0.0: GET /resources returns the static resource list (single source: resources.js) so the
     // bridge does not carry a duplicate copy. Auth-gated.
     if (req.method === 'GET' && req.url === '/resources') {
-      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!checkAuth()) return;
       if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       const { STATIC_RESOURCES, UI_RESOURCES } = require('./resources.js');
@@ -334,7 +355,7 @@ function startMcpServer(ctx) {
       return res.end(JSON.stringify({ resources: STATIC_RESOURCES.concat(UI_RESOURCES) }));
     }
     if (req.method === 'GET' && req.url === '/resource-templates') {
-      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!checkAuth()) return;
       if (metaRateLimited(client)) return rejectMetaRateLimit();
       announceClient();
       const { RESOURCE_TEMPLATES } = require('./resources.js');
@@ -343,7 +364,7 @@ function startMcpServer(ctx) {
       return res.end(JSON.stringify({ resourceTemplates: tpl }));
     }
     if (req.method === 'GET' && req.url.startsWith('/resource')) {
-      if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+      if (!checkAuth()) return;
       // 5.0.0: /resource previously bypassed the rate limiter AND the per-instance ALS scope
       // (it called the handler directly). Both now apply, so an instance template reads the RIGHT
       // instance and a leaked token cannot spam the expensive diagnosis resource.
@@ -361,7 +382,16 @@ function startMcpServer(ctx) {
       if (staticRes) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, text: staticRes.text, mimeType: staticRes.mimeType })); }
       const { resolveResource } = require('./resources.js');
       const hit = resolveResource(uri);
-      const runId = (hit && hit.args && hit.args.instance) || ctx.activeInstanceId;
+      let runId = ctx.activeInstanceId;
+      if (hit && hit.args && hit.args.instance) {
+        const { resolveInstanceId } = require('../main/settings.js');
+        const resolved = resolveInstanceId(String(hit.args.instance));
+        if (!resolved) {
+          res.writeHead(404, { 'content-type': 'application/json' });
+          return res.end(JSON.stringify({ ok: false, error: `Unknown instance "${hit.args.instance}".` }));
+        }
+        runId = resolved;
+      }
       Promise.resolve().then(() => (typeof ctx.runInInstance === 'function' ? ctx.runInInstance(runId, () => resourceForUri(ctx, uri)) : resourceForUri(ctx, uri))).then(result => {
         const ok = result && result.ok !== false;
         res.writeHead(ok ? 200 : 404, { 'content-type': 'application/json' });
@@ -371,7 +401,7 @@ function startMcpServer(ctx) {
     }
     // Only POST /rpc is served beyond that. Anything else → 404.
     if (req.method !== 'POST' || req.url !== '/rpc') { res.writeHead(404); return res.end(); }
-    if (!tokenEquals(bearerToken(auth), token)) { res.writeHead(401); return res.end('unauthorized'); }
+    if (!checkAuth()) return;
     announceClient();
     const chunks = [];
     let receivedBytes = 0;
@@ -407,6 +437,7 @@ function startMcpServer(ctx) {
       res.end(out);
     });
   });
+  server.requestTimeout = 15000;
   server.on('error', err => { try { ctx.appendLog(`MCP server error: ${err?.message || err}`, 'error'); } catch {} });
   server.listen(0, '127.0.0.1', () => {
     const port = server.address().port;

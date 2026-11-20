@@ -10,6 +10,34 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [9.0.3] - 2026-11-20
+
+**Full-Project Security Audit & Hardening — SSRF/DNS-Rebinding Defense, Modpack Supply-Chain & Export Secret Sanitization, SkinsRestorer Hardening, MCP Server/Tool Guards, and Electron/Linux/UI Defense in Depth.**
+
+### SSRF, DNS-Rebinding & IPv6 Hardening (`src/main/validate.js`, `src/main/http.js`, `src/main/webhook.js`):
+- **Private-IP & DNS-Rebinding Guard:** Extracted `isPrivateIp(rawIp)` covering IPv4 loopback/private/link-local/CGNAT/multicast and IPv6 `::`, `::1`, `fe80::/10`, `fec0::/10`, `fc00::/7`, `ff00::/8` (fixing a regex false positive that blocked public hostnames starting with `ff`), `::ffff:*`, `64:ff9b:*`, `100::/64`, and expanded loopback. Added `assertPublicHost(url, opts)` checking every DNS A/AAAA record against `isPrivateIp()` before fetching.
+- **Downloader & Webhook Enforcement:** Wired `assertPublicHost()` into `downloadAttempt()` (`src/main/http.js`) and `postWithRedirects()` / `fire()` (`src/main/webhook.js`) on both the initial URL and every redirect hop.
+
+### Modpack Supply-Chain & Secret Sanitization (`src/main/modpacks.js`, `src/mcp/tools.js`):
+- **Executable & Script Blocking:** Added `isBlockedModpackFile(relPath)` refusing OS executables/scripts (`.bat`, `.cmd`, `.sh`, `.ps1`, `.exe`, `.dll`, `.so`, `.dylib`, `.vbs`, `.hta`, `.lnk`, `.jar.exe`, etc.) and root-level `.js`/`.mjs`/`.cjs` (while preserving nested `kubejs/*.js`) across `.mrpack` `index.files` and `copyOverridesWithConfirm()` (both Modrinth and CurseForge imports).
+- **Safe `.mrpack` Export:** Added `sanitizePropertiesForExport(rawText)` stripping `rcon.password`, `rcon.port`, `enable-rcon`, `server-ip`, and secret/token/API-key properties from exported `overrides/server.properties` in both GUI (`modpack:export`) and MCP (`export_modpack`). Added regular-file and 1 GB size caps on MCP `import_modpack_path`.
+
+### SkinsRestorer & Skin Download Hardening (`src/main/skins.js`, `src/main/skinsrestorer.js`):
+- **Shared Safe PNG Fetcher:** Added `fetchSafePngBuffer(url, opts)` (`MAX_SKIN_BYTES = 512 KB`) enforcing `isSafeDownloadUrl()`, `assertPublicHost()`, `redirect: 'manual'` (max 3 hops), size limits, and `isValidPngBuffer()` across both `skins.js` and `skinsrestorer.js`.
+- **Traversal & UUID Guards:** Confined `readSkinFile(srDir, skinUuid)` to plain basenames inside `plugins/SkinsRestorer/skins/` using `safeTarget()` and an exact parent-directory match, and enforced 32-hex UUID validation before cache path construction in `getSkin()`.
+
+### MCP Server & Tool Hardening (`src/mcp/server.js`, `src/mcp/tools.js`, `src/main/editor.js`, `src/main/http-guard.js`):
+- **Loopback, Auth Lockout & Resource Isolation:** Made `ipIsLoopback(req)` fail-closed on missing/empty `remoteAddress` (`http-guard.js`), enforced `ipIsLoopback(req)` in `mcp/server.js`, added 15-attempt/5-minute bearer-token brute-force lockout (`authLimiter`) across all 7 authenticated MCP routes, set `server.requestTimeout = 15000`, and validated `instance` IDs via `resolveInstanceId()` on `GET /resource`.
+- **Tool Input & Secret Guards:** Hardened `SETTABLE.jvmArgs` with `isSafeMcpJvmArgs()` blocking `-XX:OnError`, `-XX:OnOutOfMemoryError`, `-javaagent`, `-agentlib`, `-agentpath`, `-Xrunjdwp`, `-Xdebug`, `@argfile`, `jdwp`, and newlines; validated `kick_player` reasons with `isSafeReason()`; exported `editor.isSkippedPath()` and blocked `write_file`/`edit_file` from touching `SKIP_DIRS` or dotfiles; fixed `search_files` object-path iteration and applied `maskSecrets()` to matched lines.
+
+### Electron, File-Open, Protocol, Archive, Lifecycle & UI Defense in Depth (`src/main/app-lifecycle.js`, `src/main/content-handlers.js`, `src/main/textures.js`, `src/main/platform/linux.js`, `src/main/server-lifecycle.js`, `src/main/fs-utils.js`, `src/main/settings.js`, `src/main/world-ops.js`, `src/renderer/js/03-players.js`):
+- Locked `will-navigate` to exact `renderer/index.html` URL (`pathToFileURL`) and denied all Chromium permission requests (`setPermissionRequestHandler`).
+- Restricted `files:open` `shell.openPath()` to directories and non-executable extensions (`SAFE_OPEN_EXTS`), falling back to `shell.showItemInFolder()` for executables/scripts.
+- Strictly validated `tex://` hostname versions (`'auto'` or numeric semver) before cache path joins; locked Linux archive extraction (`extractVerifiedArchive` + `listArchiveEntriesWithFormat`) to the exact verified format to close zip/tar polyglot fallthrough; enforced `/^run\.(bat|sh)$/i` in `spawnServerProcess()` and single-line guard in `sendConsoleCommand()`; persisted settings with `0o600` POSIX permissions; fixed `cloneWorld()` `listInstances().instances` unwrapping; escaped `src` in `03-players.js` `itemCellInner()`.
+
+### Testing (`tests/`):
+- Added `tests/v903-security-audit.test.js` (`11/11` checks passed). Verified all `192/192` unit test files and `19/19` Playwright Electron E2E tests pass.
+
 ## [9.0.2] - 2026-11-18
 
 **Discord Webhook 2.0 (Rich Embeds & Encrypted URL Storage), Local Discord Rich Presence IPC Client, and Dedicated Discord Settings Tab.**
