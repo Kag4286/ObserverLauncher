@@ -40,9 +40,26 @@ function renderNswTemplates(){
   const box=$('#nswTemplates'),chips=$('#nswTemplateChips');if(!box||!chips)return;
   const list=nswTemplates||[];
   box.hidden=list.length===0;
-  chips.innerHTML=list.map(tp=>`<button type="button" class="nsw2-row" data-template="${esc(tp.id)}"><div class="nsw2-rowbody"><b>${esc(tp.name)}</b><span>${esc(tp.description||'')}</span><small class="nsw2-req">${esc(tp.software)} · ${esc(String(tp.memoryGB))} GB</small></div></button>`).join('');
+  chips.innerHTML=list.map(tp=>{
+    const delBtn=tp.user?`<span role="button" tabindex="0" class="nsw2-tpl-del" data-delete-template="${esc(tp.id)}" title="${esc(t('nsw.tplDelete'))}" aria-label="${esc(t('nsw.tplDelete'))}">&times;</span>`:'';
+    return `<button type="button" class="nsw2-row" data-template="${esc(tp.id)}"><div class="nsw2-rowbody"><b>${esc(tp.name)}</b><span>${esc(tp.description||'')}</span><small class="nsw2-req">${esc(tp.software)} · ${esc(String(tp.memoryGB))} GB</small></div>${delBtn}</button>`;
+  }).join('');
 }
 $('#nswTemplateChips')?.addEventListener('click',async e=>{
+  const del=e.target.closest('[data-delete-template]');
+  if(del){
+    e.preventDefault();e.stopPropagation();
+    const id=del.dataset.deleteTemplate;
+    const tp=(nswTemplates||[]).find(x=>x.id===id);
+    if(!tp||!tp.user)return;
+    if(!await confirmDialog({title:t('nsw.tplDelete'),body:esc(t('nsw.tplDeleteConfirm',{n:tp.name})),ok:t('wld.delete'),danger:true}))return;
+    const r=await window.observer.templatesDelete(id);
+    if(!r||!r.ok)return toast((r&&r.error)||'Failed','error');
+    nswTemplates=(nswTemplates||[]).filter(x=>x.id!==id);
+    renderNswTemplates();
+    toast(t('nsw.tplDeleted'),'success');
+    return;
+  }
   const b=e.target.closest('[data-template]');if(!b)return;
   const id=b.dataset.template;
   const tp=(nswTemplates||[]).find(x=>x.id===id);if(!tp)return;
@@ -62,10 +79,10 @@ $('#nswTemplateChips')?.addEventListener('click',async e=>{
   $('#nswLatestLabel').textContent=t('nsw.resolvingLatest');
   const mem=Math.max(1,Math.min(64,Number(tp.memoryGB)||4));
   const sl=$('#nswMemorySlider'); if(sl){sl.value=mem;const mv=$('#nswMemoryValue');if(mv)mv.textContent=String(mem);nswUpdateMemory()}
-  let extra=0;
-  try{const pr=await window.observer.templatesPlan(id);if(pr&&pr.ok&&pr.plan&&pr.plan.steps){extra=pr.plan.steps.filter(s=>s.step==='install_content').length}}catch{}
+  let extra=0,installSteps=[];
+  try{const pr=await window.observer.templatesPlan(id);if(pr&&pr.ok&&pr.plan&&pr.plan.steps){installSteps=pr.plan.steps.filter(s=>s.step==='install_content');extra=installSteps.length;}}catch{}
   // Banner on the Review step so the user knows it is pre-filled and can just Create (or Back to edit).
-  nswTplBanner={name:tp.name,extra};
+  nswTplBanner={id:tp.id,name:tp.name,extra,installSteps};
   nsw.step=5;nswRender();
 });
 async function loadNswVersions(software){
@@ -580,12 +597,30 @@ $('#nswNext').onclick=async()=>{
     nswRender();
     return;
   }
+  const pendingExtras=(nswTplBanner&&Array.isArray(nswTplBanner.installSteps)&&nswTplBanner.installSteps.length)?nswTplBanner.installSteps.slice():[];
   const _nm=$('#newServerModal'); if(_nm){_nm.hidden=true; if(typeof releaseFocus==='function')releaseFocus(_nm);}
-  nsw={step:1,software:'vanilla',folder:''};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};
+  nsw={step:1,software:'vanilla',folder:''};nswVersions={software:null,list:[],latest:null,raw:false,loading:false,failed:false,error:''};nswTplBanner=null;
   try{const s2=await window.observer.getState();state={...state,...s2}}catch{}
   if(r.building){toast(t('nsw.building',{n:r.name}));switchTab('console');return}
   state.files=r.files;refreshUI();switchTab('overview');
   toast(t('nsw.ready'),'success');
+  // v9.1.0 C2: offer 1-click install of the template's recommended plugins/mods right after creation.
+  if(pendingExtras.length && window.observer && window.observer.marketInstall){
+    const go=await confirmDialog({title:t('nsw.tplExtrasTitle'),body:esc(t('nsw.tplExtrasBody',{n:pendingExtras.length})),ok:t('nsw.tplExtrasOk')});
+    if(go){
+      let installed=0;
+      for(const step of pendingExtras){
+        const a=step&&step.args||{};
+        if(!a.id)continue;
+        try{
+          const ir=await window.observer.marketInstall({id:a.id,source:a.source||'modrinth',kind:a.kind||'plugin'});
+          if(ir&&ir.ok){installed++;if(ir.files)state.files=ir.files;}
+        }catch{}
+      }
+      refreshUI();
+      if(installed>0)toast(t('nsw.tplExtrasDone',{n:installed}),'success');
+    }
+  }
 };
 // The Add-instance flow (also used by the welcome / onboarding "Create a new server" buttons).
 function openNewServerWizard(folder){

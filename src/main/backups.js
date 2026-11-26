@@ -24,6 +24,24 @@ function resolveBackupFile(ctx, name) {
   return backup;
 }
 
+// Route save-off/save-all/save-on through sendConsoleCommand for adopted/RCON servers so
+// world chunks still flush cleanly even when ctx.serverProcess.stdin is null.
+async function sendBackupCommand(ctx, cmd) {
+  if (!ctx || !ctx.serverProcess) return;
+  if (ctx.serverProcess.adopted || (ctx.rcon && ctx.rcon.connected)) {
+    try {
+      const { sendConsoleCommand } = require('./server-lifecycle.js');
+      await sendConsoleCommand(ctx, cmd);
+      return;
+    } catch {}
+  }
+  try {
+    if (ctx.serverProcess.stdin && ctx.serverProcess.stdin.writable !== false) {
+      ctx.serverProcess.stdin.write(`${cmd}\r\n`);
+    }
+  } catch {}
+}
+
 async function createBackupInternal(ctx, opts = {}) {
   if (!ctx.currentServerPath) return { ok: false, error: 'Choose a server folder first.' };
   // Snapshot the root once — the renderer can change ctx.currentServerPath (settings:save)
@@ -34,7 +52,10 @@ async function createBackupInternal(ctx, opts = {}) {
   if (ctx.backupInProgress) return { ok: false, error: 'A backup is already in progress — wait for it to finish.' };
   ctx.backupInProgress = true;
   try {
-    if (ctx.serverProcess) { try { ctx.serverProcess.stdin.write('save-off\r\n'); ctx.serverProcess.stdin.write('save-all\r\n'); } catch {} }
+    if (ctx.serverProcess) {
+      await sendBackupCommand(ctx, 'save-off');
+      await sendBackupCommand(ctx, 'save-all');
+    }
     const dir = safeTarget(root, 'observerlauncher-backups');
     fs.mkdirSync(dir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -51,7 +72,7 @@ async function createBackupInternal(ctx, opts = {}) {
     }
     return { ok: false, error: r.error };
   } finally {
-    try { if (ctx.serverProcess && ctx.serverProcess.stdin.writable) ctx.serverProcess.stdin.write('save-on\r\n'); } catch {}
+    try { if (ctx.serverProcess) await sendBackupCommand(ctx, 'save-on'); } catch {}
     ctx.backupInProgress = false;
   }
 }

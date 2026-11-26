@@ -28,7 +28,7 @@ async function metricsTick(ctx, st) {
   }
   const used = process.memoryUsage().rss / 1024 / 1024;
   st.idleTicks = 0;
-  const isNative = ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'native';
+  const isNative = ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'pumpkin' || ctx.currentSoftware === 'native';
   if (!ctx.monitoredPid || (isNative && ctx.monitoredPid === ctx.serverProcess.pid && ((st.nativeScanCount = (st.nativeScanCount || 0) + 1) % 4 === 0))) {
     if (isNative) {
       let candidate = ctx.serverProcess.pid;

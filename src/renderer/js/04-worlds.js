@@ -27,13 +27,18 @@ function renderWorlds(worlds){
   $$('[data-clone-world]').forEach(b=>b.onclick=async()=>{
     if(state.running)return toast(t('wld.cantRunning'));
     const curr=b.dataset.cloneWorld;
-    const next=await promptDialog({title:t('wld.cloneTitle'),value:`${curr}_copy`,ok:t('wld.cloneBtn')});
-    if(!next||next===curr)return;
-    const r=await window.observer.worldClone(curr,'',next);
-    if(!r.ok)return toast(r.error||'Failed');
-    toast(t('wld.clonedSuccess'));
-    if(r.files)state.files=r.files;
-    refreshUI();
+    const choice=await openWorldCloneModal(curr);
+    if(!choice||!choice.next)return;
+    if(!choice.targetPath&&choice.next===curr)return;
+    const r=await window.observer.worldClone(curr,choice.targetPath,choice.next);
+    if(!r.ok)return toast(r.error||'Failed','error');
+    if(choice.targetPath){
+      toast(t('wld.clonedCross',{s:choice.targetLabel||choice.targetPath}),'success');
+    }else{
+      toast(t('wld.clonedSuccess'),'success');
+      if(r.files)state.files=r.files;
+      refreshUI();
+    }
   });
   $$('[data-seed-world]').forEach(b=>b.onclick=async()=>{
     if(state.running)return toast(t('wld.cantRunning'));
@@ -73,3 +78,49 @@ function renderBackups(items){
 }
 // The empty state's own Create button routes to the same handler as the header one.
 $$('[data-create-backup]').forEach(b=>b.onclick=()=>$('#createBackup')?.click());
+
+// v9.1.0 C1: Cross-instance World Clone modal controller.
+let _wcResolve=null;
+function closeWorldCloneModal(res){
+  const m=$('#worldCloneModal');if(!m||m.hidden)return;
+  m.classList.remove('show');m.hidden=true;
+  if(typeof releaseFocus==='function')releaseFocus(m);
+  if(_wcResolve){const r=_wcResolve;_wcResolve=null;r(res||null);}
+}
+function openWorldCloneModal(worldName){
+  const m=$('#worldCloneModal'),inp=$('#wcNameInput'),sel=$('#wcTargetSelect');
+  if(!m||!inp||!sel){
+    return promptDialog({title:t('wld.cloneTitle'),value:`${worldName}_copy`,ok:t('wld.cloneBtn')})
+      .then(v=>v?{next:v,targetPath:'',targetLabel:''}:null);
+  }
+  inp.value=`${worldName}_copy`;
+  const curPath=(state.settings&&state.settings.serverPath)||'';
+  const insts=Array.isArray(state.instances)?state.instances:[];
+  const opts=[`<option value="">${esc(t('wld.cloneSameServer'))}</option>`];
+  for(const inst of insts){
+    if(!inst||!inst.serverPath||inst.serverPath===curPath)continue;
+    const lbl=inst.name||inst.serverPath.split(/[\\/]/).filter(Boolean).pop()||inst.serverPath;
+    opts.push(`<option value="${esc(inst.serverPath)}">${esc(lbl)}</option>`);
+  }
+  sel.innerHTML=opts.join('');
+  sel.value='';
+  if(typeof window.enhanceSelect==='function')window.enhanceSelect(sel);
+  sel.closest('.ol-dd')?._olSync?.();
+  m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  if(typeof trapFocus==='function')trapFocus(m);
+  setTimeout(()=>{inp.focus();inp.select();},20);
+  return new Promise(resolve=>{_wcResolve=resolve;});
+}
+function _wcSubmit(){
+  const inp=$('#wcNameInput'),sel=$('#wcTargetSelect');
+  const next=(inp?.value||'').trim();
+  if(!next)return closeWorldCloneModal(null);
+  const targetPath=(sel?.value||'').trim();
+  const targetLabel=sel&&sel.selectedOptions&&sel.selectedOptions[0]?sel.selectedOptions[0].textContent:'';
+  closeWorldCloneModal({next,targetPath,targetLabel});
+}
+$('#wcOk')?.addEventListener('click',_wcSubmit);
+$('#wcCancel')?.addEventListener('click',()=>closeWorldCloneModal(null));
+$('#worldCloneModal')?.addEventListener('click',e=>{if(e.target.id==='worldCloneModal')closeWorldCloneModal(null);});
+$('#wcNameInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_wcSubmit();}});
+document.addEventListener('keydown',e=>{const m=$('#worldCloneModal');if(!m||m.hidden)return;if(e.key==='Escape'){if(typeof e.stopImmediatePropagation==='function')e.stopImmediatePropagation();closeWorldCloneModal(null);}});

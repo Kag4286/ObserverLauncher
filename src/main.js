@@ -61,6 +61,8 @@ const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
 const { registerMcpConfirm } = require('./mcp/confirm.js');
 const { runOrphanCleanup } = require('./main/orphan.js');
 const { registerOrphanPrompt } = require('./main/orphan-prompt.js');
+const { registerDoctor } = require('./main/gui-doctor.js');
+const { registerUpgrade } = require('./main/server-upgrade.js');
 
 // Custom tex:// icon scheme — MUST be registered as privileged before the
 // app is ready, or Chromium treats it as non-standard and <img> loads fail.
@@ -101,6 +103,8 @@ registerTunnel(ipcWrap, ctx);
 registerPinggy(ipcWrap, ctx);
 registerMcpConfirm(ipcWrap, ctx);
 registerOrphanPrompt(ipcWrap, ctx);
+registerDoctor(ipcWrap, ctx);
+registerUpgrade(ipcWrap, ctx);
 
 app.whenReady().then(async () => {
   // BUGFIX (Start dead on launch): initApp used to run AFTER createWindow, so the

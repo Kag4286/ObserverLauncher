@@ -231,6 +231,24 @@ function registerSettings(ipcMain, ctx) {
       const arr = Array.isArray(merged.scheduleDays) ? merged.scheduleDays : [];
       merged.scheduleDays = [...new Set(arr.map(d => typeof d === 'string' ? NAME_TO_NUM[d.toLowerCase().slice(0, 3)] : Number(d)).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))];
     }
+    // v9.1.0 D1: validate scheduled restart time, countdown warnings, and custom automation rules.
+    {
+      const { parseTime, sanitizeScheduleRules } = require('./scheduler.js');
+      if (merged.scheduleRestartTime !== undefined) {
+        const rt = String(merged.scheduleRestartTime || '').trim();
+        merged.scheduleRestartTime = (rt && parseTime(rt)) ? rt : '';
+      }
+      if (merged.scheduleCountdownSec !== undefined) {
+        const n = Math.trunc(Number(merged.scheduleCountdownSec));
+        merged.scheduleCountdownSec = Number.isFinite(n) ? Math.min(600, Math.max(0, n)) : 60;
+      }
+      if (merged.scheduleSkipCountdownIfEmpty !== undefined) {
+        merged.scheduleSkipCountdownIfEmpty = !!merged.scheduleSkipCountdownIfEmpty;
+      }
+      if (merged.scheduleRules !== undefined) {
+        merged.scheduleRules = sanitizeScheduleRules(merged.scheduleRules);
+      }
+    }
     // SECURITY: serverPath becomes the root for EVERY file operation (backup, editor save,
     // player data, content delete). It arrives from the renderer, so refuse anything that is
     // not an existing directory instead of trusting it verbatim.

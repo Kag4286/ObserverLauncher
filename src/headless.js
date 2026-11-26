@@ -29,6 +29,8 @@ const { registerSettings } = require('./main/settings-handlers.js');
 const { registerContent } = require('./main/content-handlers.js');
 const { registerTunnel, stopTunnel } = require('./main/tunnel.js');
 const { registerPinggy } = require('./main/pinggy-tunnel.js');
+const { registerDoctor } = require('./main/gui-doctor.js');
+const { registerUpgrade } = require('./main/server-upgrade.js');
 
 const { startMcpServer, stopMcpServer } = require('./mcp/server.js');
 const { loadSettings } = require('./main/settings.js');
@@ -55,6 +57,8 @@ function createHeadless() {
   registerContent(ipcWrap, ctx);
   registerTunnel(ipcWrap, ctx);
   registerPinggy(ipcWrap, ctx);
+  registerDoctor(ipcWrap, ctx);
+  registerUpgrade(ipcWrap, ctx);
 
   // B4 (v3.0.0): explicit confirm policy. Headless has no dialog, so write/destroy are DENIED by
   // default (deliberate, audited) instead of relying on ctx.onMcpConfirm being undefined. Override

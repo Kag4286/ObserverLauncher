@@ -128,6 +128,8 @@ const { mismatch, tooNew } = renderJavaNoticeUI(j, need, null);
 // Show Install when Java is missing, mismatched/too-new, OR still coming from PATH (no managed
 // javaPath set) - so a run.bat server with no jar can still pin a specific runtime.
 const isNatSetting=f.engineType==='native'||!!f.nativeBinary||(f.target&&(f.target.software==='horizon'||f.target.software==='pumpkin'));
+  const docBtn=$('#doctorOpenBtn'); if(docBtn) docBtn.hidden=!s.serverPath;
+  const upgBtn=$('#upgradeServerBtn'); if(upgBtn) upgBtn.hidden=!s.serverPath||isNatSetting||!(f.jar||f.launchScript);
 $('#javaAutoInstall').hidden=isNatSetting||!!(j.ok&&sPathSet&&!mismatch&&!tooNew);
   if(!isNatSetting) populateJavaPicker(j);
   else { const jpRow=$('#javaPickRow'); if(jpRow) jpRow.hidden=true; }
@@ -280,17 +282,48 @@ function renderSetupSteps(){
 }
 function syncAutoRestartFields(){const on=$('#autoRestartInput').checked;const f=$('#autoRestartFields');if(f)f.hidden=!on}
 $('#autoRestartInput').addEventListener('change',syncAutoRestartFields);
-// Scheduler settings sync: toggles the time/day rows and renders a plain-language "next run"
+// Scheduler settings sync: toggles the time/day/rules rows and renders a plain-language "next run"
 // line so the user can see what will actually happen without reasoning about weekdays.
-function syncScheduleFields(s){
+let _scheduleRulesDraft=[];
+function renderScheduleRules(){
+  const list=$('#scheduleRulesList'); if(!list) return;
+  if(!_scheduleRulesDraft.length){
+    list.innerHTML=`<div class="field-hint">${esc(t('sch.rulesEmpty'))}</div>`;
+    return;
+  }
+  const actLabel=a=>a==='backup'?t('sch.ruleActionBackup'):(a==='command'?t('sch.ruleActionCommand'):t('sch.ruleActionRestart'));
+  list.innerHTML=_scheduleRulesDraft.map((r,idx)=>{
+    const detail=r.action==='command'?`${actLabel(r.action)}: ${r.command}`:actLabel(r.action);
+    return `<div class="sch-rule-row"><span class="sch-rule-time">${esc(r.time)}</span><span class="sch-rule-desc" title="${esc(detail)}">${esc(detail)}</span><button type="button" class="btn xs danger-ghost" data-del-rule="${idx}">${esc(t('sch.ruleRemove'))}</button></div>`;
+  }).join('');
+  list.querySelectorAll('[data-del-rule]').forEach(b=>b.onclick=()=>{
+    const i=Number(b.dataset.delRule);
+    if(Number.isInteger(i)&&i>=0&&i<_scheduleRulesDraft.length){
+      _scheduleRulesDraft.splice(i,1);
+      renderScheduleRules();
+      syncScheduleFields(getSettings(),{keepDraft:true});
+      $('#settings')?.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  });
+}
+function syncScheduleFields(s,opts){
   s=s||state.settings||{};
   const en=$('#scheduleEnabledInput');if(en)en.checked=!!s.scheduleEnabled;
-  const st=$('#scheduleStartInput'),sp=$('#scheduleStopInput');
+  const st=$('#scheduleStartInput'),sp=$('#scheduleStopInput'),sr=$('#scheduleRestartInput');
   if(st)st.value=s.scheduleStartTime||'';
   if(sp)sp.value=s.scheduleStopTime||'';
+  if(sr)sr.value=s.scheduleRestartTime||'';
+  const cd=$('#scheduleCountdownSelect');
+  if(cd){cd.value=String(Number.isFinite(Number(s.scheduleCountdownSec))?Number(s.scheduleCountdownSec):60);cd.closest('.ol-dd')?._olSync?.();}
+  const se=$('#scheduleSkipEmptyInput');
+  if(se)se.checked=s.scheduleSkipCountdownIfEmpty!==false;
+  if(!(opts&&opts.keepDraft)){
+    _scheduleRulesDraft=Array.isArray(s.scheduleRules)?s.scheduleRules.map(r=>({...r})):[];
+  }
+  renderScheduleRules();
   const days=Array.isArray(s.scheduleDays)?s.scheduleDays:[];
   $$('#scheduleDaysRow .filter-chip').forEach(b=>b.classList.toggle('active',days.includes(Number(b.dataset.day))));
-  const rows=[$('#scheduleFields'),$('#scheduleDaysRow')];
+  const rows=[$('#scheduleFields'),$('#scheduleSkipEmptyRow'),$('#scheduleDaysRow'),$('#scheduleRulesBox')];
   rows.forEach(r=>{if(r)r.hidden=!s.scheduleEnabled});
   const next=$('#scheduleNext');
   if(next){
@@ -299,15 +332,35 @@ function syncScheduleFields(s){
       const parts=[];
       if(s.scheduleStartTime)parts.push(t('sch.nextStart',{t:s.scheduleStartTime}));
       if(s.scheduleStopTime)parts.push(t('sch.nextStop',{t:s.scheduleStopTime}));
+      if(s.scheduleRestartTime)parts.push(t('sch.nextRestart',{t:s.scheduleRestartTime}));
+      if(_scheduleRulesDraft.length)parts.push(`+${_scheduleRulesDraft.length}`);
       next.hidden=false;
       next.textContent=parts.length?parts.join(' · ')+(days.length?' · '+t('sch.nextDays',{n:days.length}):''):t('sch.nextNone');
     }
   }
 }
-$('#scheduleEnabledInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings())});
-$('#scheduleStartInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings())});
-$('#scheduleStopInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings())});
-$$('#scheduleDaysRow .filter-chip').forEach(c=>c.onclick=()=>{c.classList.toggle('active');syncScheduleFields(getSettings())});
+$('#scheduleEnabledInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings(),{keepDraft:true})});
+$('#scheduleStartInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings(),{keepDraft:true})});
+$('#scheduleStopInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings(),{keepDraft:true})});
+$('#scheduleRestartInput')?.addEventListener('change',()=>{syncScheduleFields(getSettings(),{keepDraft:true})});
+$('#scheduleRuleAction')?.addEventListener('change',()=>{
+  const cmd=$('#scheduleRuleCommand');
+  if(cmd)cmd.hidden=$('#scheduleRuleAction').value!=='command';
+});
+$('#scheduleRuleAddBtn')?.addEventListener('click',()=>{
+  const action=$('#scheduleRuleAction')?.value||'backup';
+  const time=($('#scheduleRuleTime')?.value||'').trim();
+  const command=($('#scheduleRuleCommand')?.value||'').trim();
+  if(!time)return toast(t('sch.ruleNeedTime'),'error');
+  if(action==='command'&&(!command||/[\r\n]/.test(command)))return toast(t('sch.ruleNeedCmd'),'error');
+  const days=$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day));
+  _scheduleRulesDraft.push({id:'rule-'+Date.now().toString(36),enabled:true,time,days,action,command:action==='command'?command:''});
+  if($('#scheduleRuleCommand'))$('#scheduleRuleCommand').value='';
+  renderScheduleRules();
+  syncScheduleFields(getSettings(),{keepDraft:true});
+  $('#settings')?.dispatchEvent(new Event('change',{bubbles:true}));
+});
+$$('#scheduleDaysRow .filter-chip').forEach(c=>c.onclick=()=>{c.classList.toggle('active');syncScheduleFields(getSettings(),{keepDraft:true})});
 // MCP settings: reflect enabled/auto-allow toggles and show live server status.
 function syncMcpFields(s){
   s=s||state.settings||{};
@@ -407,7 +460,7 @@ $$('.backup-chip-row .filter-chip').forEach(chip=>chip.onclick=()=>{
   $('#autoBackupMinutesInput').value=v;syncBackupChips(Number(v));
 });
 $('#autoBackupCustomInput')?.addEventListener('input',()=>{$('#autoBackupMinutesInput').value=Number($('#autoBackupCustomInput').value)||0});
-function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),pinggyPath:$('#pinggyPathInput').value.trim(),curseforgeApiKey:($('#cfKeyInput')?.value||'').trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,remoteEnabled:$('#remoteEnabledInput')?.checked||false,remoteReadOnly:$('#remoteReadOnlyInput')?.checked||false,remoteAllow:($('#remoteAllowInput')?.value||'').trim(),remotePort:Number($('#remotePortInput')?.value)||0,remoteBind:($('#remoteBindInput')?.value||'').trim(),remoteAllowedHosts:($('#remoteAllowedHostsInput')?.value||'').trim(),motionLevel:$('#motionLevelSelect')?.value||'full',updatePolicy:$('#updatePolicySelect')?.value||'ask',webhookUrl:($('#webhookUrlInput')?.value||'').trim(),webhookEvents:$$('#webhookEvents input[data-wh-event]:checked').map(x=>x.dataset.whEvent),webhookFormat:($('#webhookFormatSelect')?.value||'discord'),webhookUsername:($('#webhookUsernameInput')?.value||'').trim(),webhookCrashMention:($('#webhookCrashMentionInput')?.value||'').trim(),webhookPlayerAvatars:$('#webhookPlayerAvatarsInput')?$('#webhookPlayerAvatarsInput').checked:true,discordRpcEnabled:$('#discordRpcEnabledInput')?.checked||false,discordRpcClientId:($('#discordRpcClientIdInput')?.value||'').trim(),discordRpcShowIdle:$('#discordRpcShowIdleInput')?.checked||false,discordRpcShowServerName:$('#discordRpcShowServerNameInput')?$('#discordRpcShowServerNameInput').checked:true,discordRpcShowPlayers:$('#discordRpcShowPlayersInput')?$('#discordRpcShowPlayersInput').checked:true,prometheusEnabled:$('#prometheusEnabledInput')?.checked||false,prometheusPort:Number(($('#prometheusPortInput')?.value||'').replace(/[^0-9]/g,''))||0,beginnerMode:$('#beginnerModeInput')?.checked||false,worldmapCheatMode:$('#worldmapCheatModeInput')?.checked||false,locale:$('#languageSelect').value}}
+function getSettings(){return{serverPath:$('#serverFolderInput').value.trim(),javaPath:$('#javaPathInput').value.trim(),playitPath:$('#playitPathInput').value.trim(),pinggyPath:$('#pinggyPathInput').value.trim(),curseforgeApiKey:($('#cfKeyInput')?.value||'').trim(),autoTunnel:$('#autoTunnelInput')?.checked||false,memoryMin:Number($('#memoryMinInput').value)||2,memoryMax:Number($('#memoryMaxInput').value)||6,jvmArgs:$('#jvmArgsInput').value.trim(),autoEula:$('#autoEulaInput').checked,autoRestart:$('#autoRestartInput').checked,autoRestartMaxAttempts:Number($('#autoRestartMaxAttemptsInput').value)||3,autoRestartDelaySeconds:Number($('#autoRestartDelaySecondsInput').value)||5,autoBackupMinutes:Number($('#autoBackupMinutesInput').value)||0,backupRetention:Number($('#backupRetentionInput').value)||10,scheduleEnabled:$('#scheduleEnabledInput').checked,scheduleStartTime:$('#scheduleStartInput').value||'',scheduleStopTime:$('#scheduleStopInput').value||'',scheduleRestartTime:$('#scheduleRestartInput')?.value||'',scheduleCountdownSec:Number($('#scheduleCountdownSelect')?.value??60),scheduleSkipCountdownIfEmpty:$('#scheduleSkipEmptyInput')?$('#scheduleSkipEmptyInput').checked:true,scheduleRules:_scheduleRulesDraft.map(r=>({...r})),scheduleDays:$$('#scheduleDaysRow .filter-chip.active').map(b=>Number(b.dataset.day)),mcpEnabled:$('#mcpEnabledInput').checked,mcpAutoAllowWrite:$('#mcpAutoWriteInput').checked,mcpReadOnly:$('#mcpReadOnlyInput')?.checked||false,remoteEnabled:$('#remoteEnabledInput')?.checked||false,remoteReadOnly:$('#remoteReadOnlyInput')?.checked||false,remoteAllow:($('#remoteAllowInput')?.value||'').trim(),remotePort:Number($('#remotePortInput')?.value)||0,remoteBind:($('#remoteBindInput')?.value||'').trim(),remoteAllowedHosts:($('#remoteAllowedHostsInput')?.value||'').trim(),motionLevel:$('#motionLevelSelect')?.value||'full',updatePolicy:$('#updatePolicySelect')?.value||'ask',webhookUrl:($('#webhookUrlInput')?.value||'').trim(),webhookEvents:$$('#webhookEvents input[data-wh-event]:checked').map(x=>x.dataset.whEvent),webhookFormat:($('#webhookFormatSelect')?.value||'discord'),webhookUsername:($('#webhookUsernameInput')?.value||'').trim(),webhookCrashMention:($('#webhookCrashMentionInput')?.value||'').trim(),webhookPlayerAvatars:$('#webhookPlayerAvatarsInput')?$('#webhookPlayerAvatarsInput').checked:true,discordRpcEnabled:$('#discordRpcEnabledInput')?.checked||false,discordRpcClientId:($('#discordRpcClientIdInput')?.value||'').trim(),discordRpcShowIdle:$('#discordRpcShowIdleInput')?.checked||false,discordRpcShowServerName:$('#discordRpcShowServerNameInput')?$('#discordRpcShowServerNameInput').checked:true,discordRpcShowPlayers:$('#discordRpcShowPlayersInput')?$('#discordRpcShowPlayersInput').checked:true,prometheusEnabled:$('#prometheusEnabledInput')?.checked||false,prometheusPort:Number(($('#prometheusPortInput')?.value||'').replace(/[^0-9]/g,''))||0,beginnerMode:$('#beginnerModeInput')?.checked||false,worldmapCheatMode:$('#worldmapCheatModeInput')?.checked||false,locale:$('#languageSelect').value}}
 // Launcher settings polish: an "unsaved changes" dot on Apply, a folder health line and a live
 // preview of the exact command line the launcher will run for this server.
 let settingsDirty=false;
@@ -688,3 +741,193 @@ function renderJvmPreview(){
   sec.addEventListener('input',onEdit);sec.addEventListener('change',onEdit);
 })();
 $('#jvmArgsInput')?.addEventListener('input',renderJvmPreview);
+
+// ============ v9.1.0 D2: Interactive Server Doctor Modal ============
+let _lastDoctorScan=null;
+function closeDoctorModal(){
+  const m=$('#doctorModal');if(!m||m.hidden)return;
+  m.classList.remove('show');m.hidden=true;
+  if(typeof releaseFocus==='function')releaseFocus(m);
+}
+async function runDoctorScan(){
+  const sum=$('#docSummary'),pWrap=$('#docPlanWrap'),pList=$('#docPlanList'),cWrap=$('#docChecksWrap'),cList=$('#docChecksList'),rescan=$('#docRescanBtn');
+  if(!sum||!window.observer.doctorScan)return;
+  if(rescan)rescan.disabled=true;
+  sum.className='doc-summary';sum.textContent=t('doc.scanning');
+  if(pWrap)pWrap.hidden=true;if(cWrap)cWrap.hidden=true;
+  try{
+    const r=await window.observer.doctorScan();
+    _lastDoctorScan=r||null;
+    if(!r||!r.ok){
+      sum.className='doc-summary warn';sum.textContent=(r&&r.error)||'Scan failed';
+      return;
+    }
+    const plan=Array.isArray(r.plan)?r.plan:[];
+    const checks=Array.isArray(r.checks)?r.checks:[];
+    if(!plan.length&&r.healthy){
+      sum.className='doc-summary ok';sum.textContent=t('doc.healthy');
+    }else{
+      sum.className='doc-summary warn';sum.textContent=plan.length?t('doc.issuesFound',{n:plan.length}):(r.summary||t('doc.healthy'));
+    }
+    if(pWrap&&pList){
+      pWrap.hidden=!plan.length;
+      pList.innerHTML=plan.map((item,idx)=>{
+        const riskCls=item.risk==='destroy'?'destroy':'write';
+        const riskTxt=item.risk==='destroy'?t('doc.riskDestroy'):t('doc.riskWrite');
+        return `<li class="doc-item"><div class="doc-item-body"><b>${esc(item.action)}<span class="doc-risk ${riskCls}">${esc(riskTxt)}</span></b><small>${esc(item.reason||'')}</small></div><button type="button" class="btn sm ${item.risk==='destroy'?'danger':'primary'}" data-doc-apply="${idx}">${esc(t('doc.applyFix'))}</button></li>`;
+      }).join('');
+      pList.querySelectorAll('[data-doc-apply]').forEach(btn=>btn.onclick=async()=>{
+        const entry=plan[Number(btn.dataset.docApply)];
+        if(!entry||!window.observer.doctorApply)return;
+        const ok=await confirmDialog({
+          title:t('doc.confirmFixTitle'),
+          body:esc(t('doc.confirmFixBody',{a:entry.action,r:entry.reason||''})),
+          ok:t('doc.applyFix'),
+          danger:entry.risk==='destroy',
+        });
+        if(!ok)return;
+        btn.disabled=true;
+        try{
+          const ar=await window.observer.doctorApply({actions:[entry]});
+          if(!ar||!ar.ok)return toast(t('doc.appliedFail',{m:(ar&&ar.error)||'error'}),'error');
+          const first=Array.isArray(ar.results)?ar.results[0]:null;
+          if(first&&first.ok===false)return toast(t('doc.appliedFail',{m:first.error||'error'}),'error');
+          if(ar.files)state.files=ar.files;
+          toast(t('doc.appliedOk'),'success');
+          refreshUI();
+          await runDoctorScan();
+        }finally{btn.disabled=false;}
+      });
+    }
+    if(cWrap&&cList){
+      const shownChecks=checks.filter(c=>c&&(c.level==='error'||c.level==='warn'||c.detail));
+      cWrap.hidden=!shownChecks.length;
+      cList.innerHTML=shownChecks.map(c=>`<li class="doc-item"><div class="doc-item-body"><b>${esc(c.id||c.level||'check')}</b><small>${esc(c.detail||c.fix||'')}</small></div></li>`).join('');
+    }
+  }finally{if(rescan)rescan.disabled=false;}
+}
+function openDoctorModal(){
+  const m=$('#doctorModal');if(!m)return;
+  m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  if(typeof trapFocus==='function')trapFocus(m);
+  runDoctorScan();
+}
+$('#doctorOpenBtn')?.addEventListener('click',openDoctorModal);
+$('#docClose')?.addEventListener('click',closeDoctorModal);
+$('#docDoneBtn')?.addEventListener('click',closeDoctorModal);
+$('#docRescanBtn')?.addEventListener('click',runDoctorScan);
+$('#doctorModal')?.addEventListener('click',e=>{if(e.target.id==='doctorModal')closeDoctorModal();});
+document.addEventListener('keydown',e=>{const m=$('#doctorModal');if(!m||m.hidden)return;if(e.key==='Escape'){if(typeof e.stopImmediatePropagation==='function')e.stopImmediatePropagation();closeDoctorModal();}});
+
+// ============ v9.1.0 D3: Guided Minecraft Version Upgrade Assistant ============
+let _upgState={software:null,preflight:null};
+function closeUpgradeModal(){
+  const m=$('#upgradeModal');if(!m||m.hidden)return;
+  m.classList.remove('show');m.hidden=true;
+  if(typeof releaseFocus==='function')releaseFocus(m);
+}
+async function openUpgradeModal(){
+  if(state.running||state.status!=='stopped')return toast(t('upg.stopFirst'),'error');
+  const f=state.files||{};
+  const isNat=f.engineType==='native'||!!f.nativeBinary;
+  const sw=(f.target&&(f.target.software||f.target.loader))||'';
+  if(isNat||!sw||sw==='unknown')return toast(t('upg.unsupported'),'error');
+  _upgState={software:sw,preflight:null};
+  const m=$('#upgradeModal'),cur=$('#upgCurrentLabel'),sel=$('#upgVersionSelect'),rep=$('#upgReport'),runBtn=$('#upgRunBtn'),st=$('#upgStatusText');
+  if(!m||!sel)return;
+  if(cur)cur.textContent=`${sw} · ${(f.target&&f.target.mc)||f.jar||'?'}`;
+  if(rep)rep.hidden=true;
+  if(runBtn)runBtn.disabled=true;
+  if(st)st.textContent='';
+  sel.innerHTML='<option value="">…</option>';
+  if(typeof window.enhanceSelect==='function')window.enhanceSelect(sel);
+  sel.closest('.ol-dd')?._olSync?.();
+  m.hidden=false;void m.offsetWidth;m.classList.add('show');
+  if(typeof trapFocus==='function')trapFocus(m);
+  try{
+    const vr=await window.observer.wizardVersions(sw);
+    const list=(vr&&vr.ok&&Array.isArray(vr.versions))?vr.versions.slice(0,60):[];
+    sel.innerHTML=list.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')||'<option value="latest">latest</option>';
+    if(vr&&vr.latest&&list.includes(vr.latest))sel.value=vr.latest;
+  }catch{sel.innerHTML='<option value="latest">latest</option>';}
+  sel.closest('.ol-dd')?._olSync?.();
+}
+async function runUpgradePreflight(){
+  const sel=$('#upgVersionSelect'),btn=$('#upgPreflightBtn'),st=$('#upgStatusText'),rep=$('#upgReport'),jRow=$('#upgJavaRow'),cSum=$('#upgCompatSummary'),iList=$('#upgIncompatList'),runBtn=$('#upgRunBtn');
+  const targetVersion=(sel?.value||'').trim();
+  if(!targetVersion||!window.observer.upgradePreflight)return;
+  if(btn)btn.disabled=true;
+  if(runBtn)runBtn.disabled=true;
+  if(st)st.textContent=t('upg.checking');
+  try{
+    const r=await window.observer.upgradePreflight({software:_upgState.software,targetVersion});
+    if(!r||!r.ok){
+      if(st)st.textContent=(r&&r.error)||'Preflight failed';
+      return;
+    }
+    _upgState.preflight=r;
+    if(st)st.textContent='';
+    if(rep)rep.hidden=false;
+    if(jRow){
+      jRow.className='upg-java-row '+(r.javaOk?'ok':'bad');
+      const actualStr=r.javaActual!=null?String(r.javaActual):'?';
+      const reqStr=r.javaRequired!=null?String(r.javaRequired):'—';
+      const msg=r.javaOk?t('upg.javaOk',{a:actualStr,r:reqStr}):t('upg.javaBad',{a:actualStr,r:reqStr});
+      jRow.innerHTML=`<span>${esc(msg)}</span>${r.javaOk?'':`<button type="button" class="btn xs primary" id="upgInstallJavaBtn">${esc(t('upg.installJava'))}</button>`}`;
+      const jBtn=$('#upgInstallJavaBtn');
+      if(jBtn)jBtn.onclick=async()=>{
+        jBtn.disabled=true;
+        try{
+          const jr=await window.observer.javaAutoInstall();
+          if(jr&&jr.ok){state.java=jr.java||state.java;refreshUI();await runUpgradePreflight();}
+          else toast((jr&&jr.error)||'Java install failed','error');
+        }finally{jBtn.disabled=false;}
+      };
+    }
+    const compat=r.compatible||[],incompat=r.incompatible||[],untracked=r.untracked||[];
+    if(cSum)cSum.textContent=t('upg.compatSummary',{c:compat.length,i:incompat.length,u:untracked.length});
+    if(iList){
+      iList.hidden=!incompat.length;
+      iList.innerHTML=incompat.map(x=>`<li class="doc-item"><div class="doc-item-body"><b>${esc(x.title||x.fileName)}</b><small>${esc(x.reason||'')}</small></div></li>`).join('');
+    }
+    if(runBtn)runBtn.disabled=false;
+  }finally{if(btn)btn.disabled=false;}
+}
+async function runUpgradeExecution(){
+  const pf=_upgState.preflight;
+  if(!pf||!window.observer.upgradeRun)return;
+  const ok=await confirmDialog({
+    title:t('upg.confirmTitle',{v:pf.targetVersion}),
+    body:esc(t('upg.confirmBody',{s:pf.software,v:pf.targetVersion})),
+    ok:t('upg.runBtn'),
+  });
+  if(!ok)return;
+  const runBtn=$('#upgRunBtn'),st=$('#upgStatusText');
+  if(runBtn)runBtn.disabled=true;
+  if(st)st.textContent=t('upg.running');
+  try{
+    const r=await window.observer.upgradeRun({
+      software:pf.software,
+      targetVersion:pf.targetVersion,
+      createBackup:$('#upgOptBackup')?$('#upgOptBackup').checked:true,
+      updateContent:$('#upgOptUpdateContent')?$('#upgOptUpdateContent').checked:true,
+      disableIncompatible:$('#upgOptDisableIncompat')?$('#upgOptDisableIncompat').checked:false,
+      incompatibleFiles:pf.incompatible||[],
+    });
+    if(!r||!r.ok){
+      if(st)st.textContent=(r&&r.error)||'Upgrade failed';
+      return toast((r&&r.error)||'Upgrade failed','error');
+    }
+    if(r.files)state.files=r.files;
+    closeUpgradeModal();
+    refreshUI();
+    toast(t('upg.done',{s:r.software,v:r.targetVersion,u:(r.updatedContent||[]).length}),'success');
+  }finally{if(runBtn)runBtn.disabled=false;}
+}
+$('#upgradeServerBtn')?.addEventListener('click',openUpgradeModal);
+$('#upgClose')?.addEventListener('click',closeUpgradeModal);
+$('#upgCancelBtn')?.addEventListener('click',closeUpgradeModal);
+$('#upgPreflightBtn')?.addEventListener('click',runUpgradePreflight);
+$('#upgRunBtn')?.addEventListener('click',runUpgradeExecution);
+$('#upgradeModal')?.addEventListener('click',e=>{if(e.target.id==='upgradeModal')closeUpgradeModal();});
+document.addEventListener('keydown',e=>{const m=$('#upgradeModal');if(!m||m.hidden)return;if(e.key==='Escape'){if(typeof e.stopImmediatePropagation==='function')e.stopImmediatePropagation();closeUpgradeModal();}});

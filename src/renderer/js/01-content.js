@@ -116,14 +116,42 @@ function renderContentConflicts(){
   if(list){
     list.innerHTML=issues.map(iss=>{
       const info=issueBadgeInfo(iss.type);
-      const findBtn=(iss.type==='missing-dep'&&iss.requiredModId)
-        ?`<button type="button" class="btn xs secondary" data-find-dep="${esc(iss.requiredModId)}">${esc(t('cnt.findDep'))} ↗</button>`:'';
+      const depBtns=(iss.type==='missing-dep'&&iss.requiredModId)
+        ?`<button type="button" class="btn xs primary" data-install-dep="${esc(iss.requiredModId)}">${esc(t('cnt.installDep'))}</button><button type="button" class="btn xs secondary" data-find-dep="${esc(iss.requiredModId)}">${esc(t('cnt.findDep'))} ↗</button>`:'';
       const filesList=(Array.isArray(iss.affectedFiles)&&iss.affectedFiles.length?iss.affectedFiles:[iss.fileName||iss.neededBy||'']).filter(Boolean).join('|');
-      return `<li class="ccb-item" data-issue-files="${esc(filesList)}"><span class="ccb-badge ${info.cls}">${esc(info.text)}</span><span class="ccb-file mono" title="${esc(iss.fileName||iss.neededBy||'')}">${esc(iss.fileName||iss.neededBy||'')}</span><span class="ccb-detail">${esc(iss.detail)}</span>${findBtn}</li>`;
+      return `<li class="ccb-item" data-issue-files="${esc(filesList)}"><span class="ccb-badge ${info.cls}">${esc(info.text)}</span><span class="ccb-file mono" title="${esc(iss.fileName||iss.neededBy||'')}">${esc(iss.fileName||iss.neededBy||'')}</span><span class="ccb-detail">${esc(iss.detail)}</span>${depBtns}</li>`;
     }).join('');
     list.querySelectorAll('[data-find-dep]').forEach(b=>b.onclick=()=>{
       const q=depSearchQuery(b.dataset.findDep||'');
       jumpToMarket(contentKind==='plugin'?'plugin':'mod',q);
+    });
+    // v9.1.0 C3: 1-click confirmed missing-dependency installation right from the conflict banner.
+    list.querySelectorAll('[data-install-dep]').forEach(b=>b.onclick=async()=>{
+      const modId=b.dataset.installDep||'';
+      if(!modId||!window.observer.contentResolveDep||!window.observer.contentInstallDep)return;
+      if(state.running)return toast(t('cnt.installDepRunning'),'error');
+      b.disabled=true;
+      try{
+        const resolved=await window.observer.contentResolveDep({modId,kind:contentKind==='plugin'?'plugin':'mod'});
+        if(!resolved||!resolved.ok||!resolved.item){
+          toast((resolved&&resolved.error)||t('cnt.findDep'),'error');
+          jumpToMarket(contentKind==='plugin'?'plugin':'mod',depSearchQuery(modId));
+          return;
+        }
+        const item=resolved.item;
+        const ok=await confirmDialog({
+          title:t('cnt.installDepConfirmTitle'),
+          body:esc(t('cnt.installDepConfirmBody',{t:item.title||item.id,d:modId})),
+          ok:t('cnt.installDep'),
+        });
+        if(!ok)return;
+        const ir=await window.observer.contentInstallDep(item);
+        if(!ir||!ir.ok)return toast((ir&&ir.error)||'Failed','error');
+        if(ir.files)state.files=ir.files;
+        toast(t('cnt.installDepSuccess',{f:ir.fileName||item.title}),'success');
+        await loadContentConflicts();
+        refreshUI();
+      }finally{b.disabled=false;}
     });
   }
 }

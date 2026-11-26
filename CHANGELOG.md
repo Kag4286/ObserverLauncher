@@ -10,6 +10,40 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [9.1.0] - 2026-11-26
+
+**Major Feature, Lifecycle Reliability & Documentation Parity Release — Multi-Rule Scheduler with In-Game Countdown Warnings, Interactive GUI Server Doctor, Guided Minecraft Version Upgrade Assistant, Cross-Instance World Cloning UI, 1-Click Missing Dependency Installer, Adopted/Pumpkin Bug Fixes, and Full `README.md` Backfill.**
+
+### Major Features (Track D):
+- **Multi-Rule Scheduler & Pre-Restart In-Game Countdown Warnings (`src/main/scheduler.js`, `src/main/migrations.js`, `src/main/settings.js`, `src/main/settings-handlers.js`, `src/renderer/index.html`, `src/renderer/js/07-overview.js`):**
+  - Added daily `scheduleRestartTime`, configurable pre-stop/restart countdown broadcasts (`scheduleCountdownSec` with `countdownMilestones()` / `runCountdownThen()` sending `5m`, `2m`, `1m`, `30s`, `10s`, `5s` in-game `say` notices via `sendConsoleCommand()`), and `scheduleSkipCountdownIfEmpty` (skips wait when 0 players are online).
+  - Added per-instance `scheduleRules[]` (max 20 validated daily rules supporting `backup`, `command`, `restart`, `start`, `stop` validated through `sanitizeScheduleRules()` + `isSafeConsoleCommand()`).
+  - Added persistent `scheduler-state.json` tracking (`loadSchedulerState()` / `saveSchedulerState()` with 7-day pruning) so launcher restarts mid-minute never double-fire scheduled actions.
+- **Interactive GUI Server Doctor (`src/main/gui-doctor.js`, `src/main.js`, `src/headless.js`, `src/preload.js`, `src/renderer/index.html`, `src/renderer/js/07-overview.js`):**
+  - Bridged the Autonomous Doctor engine (`propose_fix` / `apply_fix` / `diagnose_server`) directly into the GUI via `doctor:scan` and `doctor:apply` IPC handlers (registered in both Electron and headless modes) without requiring MCP to be enabled.
+  - Added `#doctorOpenBtn` and `#doctorModal` on Overview displaying diagnostic checks and Suggest + Confirm repair cards (`change_port`, `install_dependency`, `tune_performance`, `restore_backup`) with risk labels and running-server safety guards.
+- **Guided Minecraft Version Upgrade Assistant (`src/main/server-upgrade.js`, `src/main.js`, `src/headless.js`, `src/preload.js`, `src/renderer/index.html`, `src/renderer/js/07-overview.js`):**
+  - Added `preflightUpgrade()` (`server:upgrade-preflight`) checking target Java compatibility (`mojang.javaVersionFor` / `requiredJavaForJar`) and scanning manifest plugins/mods in parallel into `compatible`, `incompatible`, and `untracked` buckets.
+  - Added transactional `executeUpgrade()` (`server:upgrade-run`) creating a pre-upgrade world backup, archiving the previous server JAR into `observerlauncher-content-backups/` (restored automatically on download or SHA-256 failure), downloading the target server build, optionally running `applyUpdates({ version })` (preserving 120s stability rollback), and optionally disabling incompatible JARs before first boot.
+
+### Upgrades & Partial-Wiring Completions (Track C):
+- **Cross-Instance World Clone Picker (`src/renderer/js/04-worlds.js`, `src/renderer/index.html`):** Replaced the single-name clone prompt with `#worldCloneModal` allowing users to clone a world into the current server or any other registered launcher instance (backed by `worldOps.cloneWorld(..., { requireRegisteredTarget: true })`).
+- **Custom Template Management & Post-Create Package Install (`src/renderer/js/12-wizard.js`, `src/renderer/css/06-modals.css`):** Added delete controls (`templatesDelete`) on user-saved template cards inside the wizard (keeping built-in presets protected) and a confirmed post-create prompt to install recommended template plugins/mods automatically.
+- **1-Click Missing Dependency Installer (`src/main/gui-doctor.js`, `src/renderer/js/01-content.js`):** Added `content:resolve-dep` and `content:install-dep` IPC handlers reusing `findMarketProject()` and hash-verified downloads, wired to an inline **Install** button next to missing-dependency rows in the Content conflict banner.
+
+### Bug Fixes (Track B):
+- **B1 — Scheduler Adopted/RCON Stop & Escalation (`src/main/scheduler.js`):** Replaced direct `ctx.serverProcess.stdin.write('stop\r\n')` in `stopServerInternal()` with `requestStop(ctx)` so scheduled stops work on adopted/RCON servers and arm `scheduleGracefulEscalation()`.
+- **B2 — Pumpkin Native Metrics Tracking (`src/main/server-metrics.js`):** Added `ctx.currentSoftware === 'pumpkin'` to `isNative` in `metricsTick()` so Pumpkin Rust servers monitor their native PID directly instead of searching for a Java descendant.
+- **B3 — Adopted/RCON Backup Chunk Flush (`src/main/backups.js`):** Added `sendBackupCommand()` in `createBackupInternal()` routing `save-off`, `save-all`, and `save-on` via `sendConsoleCommand()` for adopted/RCON servers.
+- **B4 — Pumpkin Pre-Start Validation Parity (`src/main/java.js`):** Added `info.hasPumpkinConfig` to `validateStart()`'s native-engine guard alongside `info.hasHorizonConfig`.
+
+### Documentation & Localization (Track A):
+- **Complete `README.md` Backfill:** Backfilled 18 previously undocumented or outdated capabilities into `README.md` (Spigot BuildTools, built-in & custom templates, startup orphan reconnect prompt, 3-tier 24h/7d/30d telemetry rollups, sequenced Start-All/Stop-All, 120s automatic content-update stability rollback, datapack validator/extractor + `level.dat` load-order editor, Adoptium & Modrinth/CurseForge hash verification, `.mrpack` secret stripping & blocked-executable guards, world cloning & Nether/End reset, 20-snapshot `server.properties` history & mtime guard, Player Analytics leaderboards, SkinsRestorer offline skins, MCP Apps `ui://observerlauncher/dashboard`, 10 MCP prompts & 10+6 resources + `plan_modpack`/`assemble_modpack` + `mcp-audit.log`, full Headless CLI commands, and v9.0.3/v9.1.0 security & operational features).
+- **7-Locale Parity:** Added 74 new i18n keys across all 7 locales (`en`, `vi`, `es`, `pt-BR`, `de`, `ru`, `zh-CN` — `1599` keys × 7 locales, 0 missing/dead/conflicting keys).
+
+### Testing (`tests/`):
+- Added `tests/v910-features.test.js` (`34` assertions covering B1–B4, C3, D1–D3, and `README.md` parity) and `tests/e2e/v910-ui.spec.js` (`4` Playwright Electron E2E flows).
+
 ## [9.0.3] - 2026-11-20
 
 **Full-Project Security Audit & Hardening — SSRF/DNS-Rebinding Defense, Modpack Supply-Chain & Export Secret Sanitization, SkinsRestorer Hardening, MCP Server/Tool Guards, and Electron/Linux/UI Defense in Depth.**

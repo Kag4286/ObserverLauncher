@@ -37,7 +37,8 @@ function defaultInstanceFields() {
     serverPath: '', javaPath: '', memoryMin: min, memoryMax: max, jvmArgs: '',
     autoEula: true, autoRestart: false, autoRestartMaxAttempts: 3, autoRestartDelaySeconds: 5,
     autoBackupMinutes: 0, backupRetention: 10,
-    scheduleEnabled: false, scheduleStartTime: '', scheduleStopTime: '', scheduleDays: [],
+    scheduleEnabled: false, scheduleStartTime: '', scheduleStopTime: '', scheduleRestartTime: '', scheduleDays: [],
+    scheduleCountdownSec: 60, scheduleSkipCountdownIfEmpty: true, scheduleRules: [],
     autoTunnel: false, tunnelAddress: '',
     rconPort: 0, rconPassword: '',
     // 4.5.0 appearance: accent palette key ('' = --brand default) + avatar art seed (0 = derive

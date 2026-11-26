@@ -11,7 +11,8 @@ const PER_INSTANCE_KEYS = [
   'serverPath', 'javaPath', 'memoryMin', 'memoryMax', 'jvmArgs',
   'autoEula', 'autoRestart', 'autoRestartMaxAttempts', 'autoRestartDelaySeconds',
   'autoBackupMinutes', 'backupRetention',
-  'scheduleEnabled', 'scheduleStartTime', 'scheduleStopTime', 'scheduleDays',
+  'scheduleEnabled', 'scheduleStartTime', 'scheduleStopTime', 'scheduleRestartTime', 'scheduleDays',
+  'scheduleCountdownSec', 'scheduleSkipCountdownIfEmpty', 'scheduleRules',
   'autoTunnel', 'tunnelAddress',
   // v2.0.0 M6: per-instance RCON (rconPort 0 = not assigned yet; rconPassword '' = none).
   'rconPort', 'rconPassword',

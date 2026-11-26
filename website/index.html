@@ -3,34 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ObserverLauncher: Desktop Minecraft Server Manager for Windows &amp; Linux</title>
-  <meta name="description" content="Open-source desktop launcher to host Java and Rust Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, offline World Map, 3D Player Inspector, and an 80-tool MCP server.">
+  <title>ObserverLauncher v9.1.0: Desktop Minecraft Server Manager for Windows &amp; Linux</title>
+  <meta name="description" content="Open-source desktop launcher to host Java and Rust Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, Server Doctor, version upgrades, Discord Rich Presence, offline .mca World Map, 3D Player Inspector, hardened security, and an 80-tool local MCP server.">
   <meta name="theme-color" content="#0C0D0F">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ObserverLauncher v9.0.0: Desktop Minecraft Server Manager">
-  <meta property="og:description" content="Host Java and Rust (Pumpkin/Horizon) Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, offline .mca World Map, 3D Player Inspector, and an 80-tool MCP server.">
+  <meta property="og:title" content="ObserverLauncher v9.1.0: Desktop Minecraft Server Manager">
+  <meta property="og:description" content="Host Java and Rust (Pumpkin/Horizon) Minecraft servers on Windows or Linux with Playit/Pinggy tunnels, Discord Rich Presence, offline .mca World Map, 3D Player Inspector, and an 80-tool MCP server.">
   <meta property="og:url" content="https://kag4286.github.io/ObserverLauncher/">
   <meta property="og:image" content="https://kag4286.github.io/ObserverLauncher/docs/screenshot-overview.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link id="faviconLink" rel="icon" href="build/icon.png">
+  <link rel="icon" type="image/png" href="assets/icon-64.png">
+  <link id="fontPreload" rel="preload" as="font" type="font/woff2" href="fonts/manrope-latin-wght-normal.woff2" crossorigin>
+  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/shots/screenshot-overview-680.webp 680w, assets/shots/screenshot-overview.webp 1360w" imagesizes="(max-width: 1040px) 100vw, 660px" fetchpriority="high">
   <link id="fontsStylesheet" rel="stylesheet" href="fonts/fonts.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <a class="skip-link" href="#top" data-i18n="a11y.skip">Skip to content</a>
-  <header class="site-header">
+
+  <header class="site-header" id="siteHeader">
     <div class="wrap header-inner">
       <a class="brand" href="#top">
-        <img data-asset="build/icon.png" src="build/icon.png" width="28" height="28" alt="ObserverLauncher icon">
+        <picture>
+          <source type="image/webp" srcset="assets/icon-64.webp">
+          <img src="assets/icon-64.png" width="28" height="28" decoding="async" alt="ObserverLauncher icon">
+        </picture>
         <span>ObserverLauncher</span>
-        <span class="ver-badge" id="headerVersion">v9.0.0</span>
+        <span class="ver-badge" id="headerVersion">v9.1.0</span>
       </a>
 
-      <nav class="nav-links" aria-label="Main navigation">
-        <a href="#workbench" data-i18n="nav.workbench">Workflow</a>
-        <a href="#spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
-        <a href="#ecosystem" data-i18n="nav.engines">Engines</a>
-        <a href="#preflight" data-i18n="nav.faq">SmartScreen &amp; Scope</a>
+      <nav class="nav-links" id="desktopNav" aria-label="Main navigation">
+        <span class="nav-glide" id="navGlide" aria-hidden="true"></span>
+        <a href="#workbench" data-section="workbench" data-i18n="nav.workbench">Workflow</a>
+        <a href="#spotlight" data-section="spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
+        <a href="#systems" data-section="systems" data-i18n="nav.systems">Discord</a>
+        <a href="#ecosystem" data-section="ecosystem" data-i18n="nav.engines">Engines</a>
+        <a href="#preflight" data-section="preflight" data-i18n="nav.faq">Setup</a>
       </nav>
 
       <div class="header-actions">
@@ -51,7 +59,7 @@
         </select>
         <a class="btn sm header-gh" href="https://github.com/Kag4286/ObserverLauncher" target="_blank" rel="noopener noreferrer" aria-label="ObserverLauncher GitHub repository">
           <svg class="gh-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-          <span class="gh-label">GitHub ↗</span>
+          <span class="gh-label">GitHub</span>
         </a>
       </div>
     </div>
@@ -64,10 +72,11 @@
           <button type="button" class="tone-btn" data-tone="tech" role="radio" aria-checked="false" data-i18n="tone.tech">Technical</button>
         </div>
         <div class="mobile-subnav-links">
-          <a href="#workbench" data-i18n="nav.workbench">Workflow</a>
-          <a href="#spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
-          <a href="#ecosystem" data-i18n="nav.engines">Engines</a>
-          <a href="#preflight" data-i18n="nav.faq">SmartScreen &amp; Scope</a>
+          <a href="#workbench" data-section="workbench" data-i18n="nav.workbench">Workflow</a>
+          <a href="#spotlight" data-section="spotlight" data-i18n="nav.spotlight">Map &amp; 3D</a>
+          <a href="#systems" data-section="systems" data-i18n="nav.systems">Discord</a>
+          <a href="#ecosystem" data-section="ecosystem" data-i18n="nav.engines">Engines</a>
+          <a href="#preflight" data-section="preflight" data-i18n="nav.faq">Setup</a>
         </div>
       </div>
     </nav>
@@ -75,22 +84,22 @@
   </header>
 
   <main id="top">
-    <!-- Band 1: Asymmetric Split Hero (44% Copy & Release / 56% Interactive Control Deck) -->
+    <!-- Band 1: Asymmetric Split Hero (44% Copy & Release / 56% Interactive Control Deck with Architectural Callouts) -->
     <section class="hero-band">
       <div class="wrap hero-split">
         <div class="hero-copy">
           <p class="hero-kicker mono hero-shutter" style="--si:0" data-i18n="hero.kicker">Windows 10/11 &amp; Linux x86_64 · Apache-2.0 · No telemetry</p>
-          <h1 class="hero-shutter" style="--si:1" data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
-          <p class="lead hero-shutter" style="--si:2" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window with offline .mca cartography, 3D player inspection, and an 80-tool local MCP server.</p>
+          <h1 class="hero-glide-in" style="--si:1" data-i18n="hero.title">Host Java or Rust Minecraft servers on your PC without touching router settings.</h1>
+          <p class="lead hero-glide-in" style="--si:2" data-i18n="hero.sub">Stop juggling batch scripts, manual Java downloads, external tunnels, and Dynmap plugins. Run Paper, Fabric, Forge, Pumpkin, or Horizon from one desktop window, or headless via CLI and Docker with offline .mca maps, 3D inspection, and an 80-tool MCP server.</p>
 
           <div class="hero-actions hero-shutter" id="heroActions" style="--si:3">
             <a id="dlWin" class="btn primary" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
               <span data-i18n="hero.dlWin">Download Windows (.exe)</span>
-              <span class="btn-sub" id="dlWinMeta">v9.0.0</span>
+              <span class="btn-sub" id="dlWinMeta">v9.1.0</span>
             </a>
             <a id="dlLinux" class="btn" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
               <span data-i18n="hero.dlLinux">Download Linux (.AppImage)</span>
-              <span class="btn-sub" id="dlLinuxMeta">v9.0.0</span>
+              <span class="btn-sub" id="dlLinuxMeta">v9.1.0</span>
             </a>
           </div>
           <p class="release-status mono" id="releaseStatus" aria-live="polite" data-i18n="rel.loading">Checking latest GitHub release...</p>
@@ -106,15 +115,15 @@
           <dl class="hero-facts">
             <div>
               <dt data-i18n="fact.testsLbl">Automated tests</dt>
-              <dd class="mono" data-i18n="fact.testsVal">185 unit + 17 E2E</dd>
+              <dd class="mono" data-i18n="fact.testsVal">193 unit + 23 E2E</dd>
             </div>
             <div>
               <dt data-i18n="fact.versionsLbl">Minecraft range</dt>
               <dd class="mono" data-i18n="fact.versionsVal">1.12 to 26.3</dd>
             </div>
             <div>
-              <dt data-i18n="fact.mcpLbl">Local automation</dt>
-              <dd class="mono" data-i18n="fact.mcpVal">80 MCP tools + CLI</dd>
+              <dt data-i18n="fact.mcpLbl">Automation stack</dt>
+              <dd class="mono" data-i18n="fact.mcpVal">CLI + Docker + 80 MCP</dd>
             </div>
           </dl>
         </div>
@@ -123,66 +132,90 @@
           <div class="deck-toolbar">
             <div class="deck-tabs" role="tablist" aria-label="Core application screens" id="heroDeckTabs">
               <span class="deck-glide" id="deckGlide" aria-hidden="true"></span>
-              <button type="button" class="deck-tab active" data-shot="0" role="tab" aria-selected="true" data-i18n="sc.0.tab">Overview</button>
-              <button type="button" class="deck-tab" data-shot="1" role="tab" aria-selected="false" data-i18n="sc.1.tab">Create Wizard</button>
-              <button type="button" class="deck-tab" data-shot="2" role="tab" aria-selected="false" data-i18n="sc.2.tab">Console</button>
-              <button type="button" class="deck-tab" data-shot="3" role="tab" aria-selected="false" data-i18n="sc.3.tab">Performance</button>
+              <button type="button" id="heroTab0" class="deck-tab active" data-shot="0" role="tab" aria-selected="true" aria-controls="heroDeckPanel" tabindex="0" data-i18n="sc.0.tab">Overview</button>
+              <button type="button" id="heroTab1" class="deck-tab" data-shot="1" role="tab" aria-selected="false" aria-controls="heroDeckPanel" tabindex="-1" data-i18n="sc.1.tab">Create Wizard</button>
+              <button type="button" id="heroTab2" class="deck-tab" data-shot="2" role="tab" aria-selected="false" aria-controls="heroDeckPanel" tabindex="-1" data-i18n="sc.2.tab">Console</button>
+              <button type="button" id="heroTab3" class="deck-tab" data-shot="3" role="tab" aria-selected="false" aria-controls="heroDeckPanel" tabindex="-1" data-i18n="sc.3.tab">Performance</button>
             </div>
-            <button type="button" class="deck-inspect-btn" id="heroZoomBtn" data-i18n="sc.zoom">Full view</button>
-          </div>
-
-          <div class="deck-stage" id="heroDeckStage">
-            <button type="button" class="shot-trigger" id="heroShotTrigger" aria-label="Inspect screenshot fullscreen">
-              <img id="heroDeckImg" data-asset="docs/screenshot-overview.png" src="docs/screenshot-overview.png" width="1360" height="860" fetchpriority="high" decoding="sync" alt="ObserverLauncher Overview Control Deck">
-            </button>
-            <div class="stage-hud" id="heroStageHud" aria-hidden="true">
-              <span class="hud-line hud-x" id="hudLineX"></span>
-              <span class="hud-line hud-y" id="hudLineY"></span>
-              <span class="hud-coords mono" id="hudCoords">PX: 680, 430 · 1360x860</span>
+            <div class="deck-toolbar-right">
+              <button type="button" class="deck-inspect-btn" id="heroPinsToggle" aria-pressed="false" data-i18n="pin.hint">Inspect zones</button>
+              <button type="button" class="deck-inspect-btn" id="heroZoomBtn" data-i18n="sc.zoom">Full view</button>
             </div>
           </div>
 
-          <div class="deck-caption">
-            <div>
-              <h2 id="heroDeckTitle" data-i18n="sc.0.title">Overview Control Deck</h2>
-              <p id="heroDeckDesc" data-i18n="sc.0.desc">Multi-instance sidebar with group filters, live server status, LAN sharing, Playit/Pinggy tunnel controls, and Geyser status.</p>
+          <div id="heroDeckPanel" role="tabpanel" aria-labelledby="heroTab0">
+            <div class="deck-stage" id="heroDeckStage">
+              <button type="button" class="shot-trigger" id="heroShotTrigger" aria-label="Inspect screenshot fullscreen">
+                <picture>
+                  <source id="heroDeckWebp" type="image/webp" srcset="assets/shots/screenshot-overview-680.webp 680w, assets/shots/screenshot-overview.webp 1360w" sizes="(max-width: 1040px) 100vw, 660px">
+                  <img id="heroDeckImg" src="assets/shots/screenshot-overview.webp" width="1360" height="860" fetchpriority="high" decoding="async" alt="ObserverLauncher Overview Control Deck">
+                </picture>
+              </button>
+
+              <!-- Interactive Architectural Callout Pins (toggled on demand via Inspect zones) -->
+              <div class="callout-layer is-hidden" id="heroCalloutLayer" aria-label="Interactive UI annotations">
+                <button type="button" class="callout-pin" data-pin="0" aria-expanded="false" aria-controls="calloutPopover"><span>1</span></button>
+                <button type="button" class="callout-pin" data-pin="1" aria-expanded="false" aria-controls="calloutPopover"><span>2</span></button>
+                <button type="button" class="callout-pin" data-pin="2" aria-expanded="false" aria-controls="calloutPopover"><span>3</span></button>
+              </div>
+
+              <div class="callout-popover" id="calloutPopover" hidden role="region" aria-live="polite">
+                <div class="callout-pop-head">
+                  <strong id="calloutTitle">Multi-Instance Rail</strong>
+                  <button type="button" class="callout-close" id="calloutClose" aria-label="Close callout">&times;</button>
+                </div>
+                <p id="calloutDesc">Switch servers, groups, and independent RCON or port leases from one sidebar.</p>
+              </div>
             </div>
-            <span class="mono deck-index" id="heroDeckCounter">01 / 04</span>
+
+            <div class="deck-caption">
+              <div>
+                <h2 id="heroDeckTitle" data-i18n="sc.0.title">Overview Control Deck</h2>
+                <p id="heroDeckDesc" data-i18n="sc.0.desc">Multi-instance sidebar with group filters, live server status, LAN sharing, Playit/Pinggy tunnel controls, and Geyser status.</p>
+              </div>
+              <span class="mono deck-index" id="heroDeckCounter">01 / 04</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Band 2: Contrast Obsidian-Slate Workbench (Manual Host vs ObserverLauncher Convergence) -->
-    <section id="workbench" class="band-stone rule-band">
+    <section id="workbench" class="band-stone rule-band" data-spy-section="workbench">
       <div class="wrap workbench-layout">
         <div class="workbench-intro">
           <span class="band-code mono" data-i18n="band.wb">01 / WORKBENCH</span>
           <h2 data-i18n="wb.title">What you normally wire up by hand versus one desktop workspace.</h2>
           <p data-i18n="wb.sub">Pick how your group plays below to compare the fragmented manual setup against what ObserverLauncher automates locally.</p>
 
-          <div class="wb-scenarios" role="tablist" aria-label="Hosting scenarios" id="wbScenarioTabs">
+          <div class="wb-scenarios" role="tablist" aria-label="Hosting scenarios" aria-orientation="vertical" id="wbScenarioTabs">
             <span class="wb-glide" id="wbGlide" aria-hidden="true"></span>
-            <button type="button" class="wb-btn active" data-scenario="cgnat" role="tab" aria-selected="true" data-i18n="wb.sc.cgnat">Friends SMP behind CGNAT</button>
-            <button type="button" class="wb-btn" data-scenario="modpack" role="tab" aria-selected="false" data-i18n="wb.sc.modpack">100+ Modpack testing</button>
-            <button type="button" class="wb-btn" data-scenario="crossplay" role="tab" aria-selected="false" data-i18n="wb.sc.crossplay">PC (Java) + Phone (Bedrock)</button>
-            <button type="button" class="wb-btn" data-scenario="rust" role="tab" aria-selected="false" data-i18n="wb.sc.rust">Lightweight Rust server</button>
+            <button type="button" id="wbTab-cgnat" class="wb-btn active" data-scenario="cgnat" role="tab" aria-selected="true" aria-controls="wbDiffPanel" tabindex="0" data-i18n="wb.sc.cgnat">Friends SMP behind CGNAT</button>
+            <button type="button" id="wbTab-modpack" class="wb-btn" data-scenario="modpack" role="tab" aria-selected="false" aria-controls="wbDiffPanel" tabindex="-1" data-i18n="wb.sc.modpack">100+ Modpack testing</button>
+            <button type="button" id="wbTab-crossplay" class="wb-btn" data-scenario="crossplay" role="tab" aria-selected="false" aria-controls="wbDiffPanel" tabindex="-1" data-i18n="wb.sc.crossplay">PC (Java) + Phone (Bedrock)</button>
+            <button type="button" id="wbTab-rust" class="wb-btn" data-scenario="rust" role="tab" aria-selected="false" aria-controls="wbDiffPanel" tabindex="-1" data-i18n="wb.sc.rust">Lightweight Rust server</button>
           </div>
         </div>
 
-        <div class="workbench-diff" id="wbDiffPanel">
+        <div class="workbench-diff" id="wbDiffPanel" role="tabpanel" aria-labelledby="wbTab-cgnat">
           <div class="diff-col diff-manual">
             <div class="diff-col-head">
               <span class="mono" data-i18n="wb.manualTag">TYPICAL MANUAL STEPS</span>
               <span class="mono" id="wbManualCount">5 separate tools</span>
             </div>
-            <ul class="diff-list" id="wbManualList"></ul>
+            <ul class="diff-list" id="wbManualList">
+              <li style="--di:0"></li>
+              <li style="--di:1"></li>
+              <li style="--di:2"></li>
+              <li style="--di:3"></li>
+              <li style="--di:4"></li>
+            </ul>
           </div>
 
           <div class="wb-bus-col" aria-hidden="true">
             <svg class="wb-bus" id="wbBusSvg" viewBox="0 0 44 260" preserveAspectRatio="none">
               <path class="bus-track" d="M0,34 C22,34 18,130 44,130 M0,82 C22,82 20,130 44,130 M0,130 L44,130 M0,178 C22,178 20,130 44,130 M0,226 C22,226 18,130 44,130"/>
-              <path class="bus-pulse" pathLength="100" d="M0,34 C22,34 18,130 44,130 M0,82 C22,82 20,130 44,130 M0,130 L44,130 M0,178 C22,178 20,130 44,130 M0,226 C22,226 18,130 44,130"/>
+              <path class="bus-pulse" id="wbBusPulse" pathLength="100" d="M0,34 C22,34 18,130 44,130 M0,82 C22,82 20,130 44,130 M0,130 L44,130 M0,178 C22,178 20,130 44,130 M0,226 C22,226 18,130 44,130"/>
             </svg>
           </div>
 
@@ -203,7 +236,7 @@
     </section>
 
     <!-- Band 3: Asymmetric Flagship Spotlight (Cartography + Interactive 1:8 Portal Radar & 3D Player Data) -->
-    <section id="spotlight" class="band-dark rule-band">
+    <section id="spotlight" class="band-dark rule-band" data-spy-section="spotlight">
       <div class="wrap">
         <div class="section-head-split">
           <div>
@@ -217,7 +250,7 @@
         <div class="spot-row-a">
           <div class="spot-media">
             <button type="button" class="shot-trigger" data-lightbox-idx="8" aria-label="Open World Map screenshot fullscreen">
-              <img data-asset="docs/screenshot-worldmap.png" src="docs/screenshot-worldmap.png" width="1360" height="860" loading="lazy" alt="ObserverLauncher offline .mca World Map">
+              <img src="assets/shots/screenshot-worldmap.webp" width="1360" height="860" loading="lazy" decoding="async" alt="ObserverLauncher offline .mca World Map">
             </button>
             <div class="spot-media-bar">
               <div>
@@ -236,8 +269,8 @@
             </div>
 
             <div class="calc-dir-row">
-              <button type="button" class="calc-dir-btn active" id="calcDirO2N" data-dir="o2n" data-i18n="calc.o2n">Overworld to Nether</button>
-              <button type="button" class="calc-dir-btn" id="calcDirN2O" data-dir="n2o" data-i18n="calc.n2o">Nether to Overworld</button>
+              <button type="button" class="calc-dir-btn active" id="calcDirO2N" data-dir="o2n" aria-pressed="true" data-i18n="calc.o2n">Overworld to Nether</button>
+              <button type="button" class="calc-dir-btn" id="calcDirN2O" data-dir="n2o" aria-pressed="false" data-i18n="calc.n2o">Nether to Overworld</button>
             </div>
 
             <div class="calc-inputs">
@@ -269,7 +302,8 @@
                   </g>
                 </g>
                 <g class="radar-bridge">
-                  <path id="radarBridgeLine" d="M142 48 L178 48" class="bridge-line" pathLength="100"/>
+                  <path d="M142 48 L178 48" class="bridge-track"/>
+                  <path id="radarBridgeLine" d="M142 48 L178 48" class="bridge-pulse" pathLength="100"/>
                   <text x="160" y="39" text-anchor="middle" class="bridge-ratio" id="radarRatioLbl">1:8</text>
                 </g>
                 <g class="radar-pad">
@@ -305,8 +339,8 @@
             <p data-i18n="ply.spotDesc">Inspect Mojang or SkinsRestorer skins, equipped armor, XP, and Ender Chests offline or live (including native Rust players before .dat files exist).</p>
 
             <div class="ply-switch" role="tablist" aria-label="Player preview modes" id="plySwitch">
-              <button type="button" class="ply-tab active" data-shot="6" role="tab" aria-selected="true" data-i18n="sc.6.tab">3D Inspector</button>
-              <button type="button" class="ply-tab" data-shot="7" role="tab" aria-selected="false" data-i18n="sc.7.tab">Inventory</button>
+              <button type="button" id="plyTab6" class="ply-tab active" data-shot="6" role="tab" aria-selected="true" aria-controls="plyPanel" tabindex="0" data-i18n="sc.6.tab">3D Inspector</button>
+              <button type="button" id="plyTab7" class="ply-tab" data-shot="7" role="tab" aria-selected="false" aria-controls="plyPanel" tabindex="-1" data-i18n="sc.7.tab">Inventory</button>
             </div>
 
             <dl class="nbt-ledger">
@@ -325,30 +359,185 @@
             </dl>
           </div>
 
-          <div class="spot-media">
+          <div class="spot-media" id="plyPanel" role="tabpanel" aria-labelledby="plyTab6">
             <button type="button" class="shot-trigger" id="plySpotTrigger" data-lightbox-idx="6" aria-label="Open Player screenshot fullscreen">
-              <img id="plySpotImg" data-asset="docs/screenshot-player-inspector.png" src="docs/screenshot-player-inspector.png" width="1360" height="860" loading="lazy" alt="ObserverLauncher 3D Player Inspector">
+              <img id="plySpotImg" src="assets/shots/screenshot-player-inspector.webp" width="1360" height="860" loading="lazy" decoding="async" alt="ObserverLauncher 3D Player Inspector">
             </button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Band 4: Ecosystem Filmstrip & Interactive Runtime Ledger -->
-    <section id="ecosystem" class="band-dark rule-band">
+    <!-- Band 4: NEW v9.0.2–v9.0.3 Live Systems Lab (Discord Rich Presence & Webhook 2.0 + Security Redaction & MCP Trust) -->
+    <section id="systems" class="band-systems rule-band" data-spy-section="systems">
       <div class="wrap">
         <div class="section-head-split">
           <div>
-            <span class="band-code mono" data-i18n="band.eco">03 / MODS, AUTOMATION &amp; SELF-HOST</span>
-            <h2 data-i18n="eco.title">Paginated mod folders, Modrinth/CurseForge, Remote Web UI, and 80 MCP tools.</h2>
+            <span class="band-code mono" data-i18n="band.sys">03 / DISCORD &amp; SECURITY</span>
+            <h2 data-i18n="sys.title">Discord Rich Presence, Webhook 2.0, and v9.0.3 local-first security.</h2>
           </div>
-          <p data-i18n="eco.sub">Scroll or swipe the remaining screens horizontally. Tap any capture to inspect full resolution.</p>
+          <p data-i18n="sys.sub">Test the exact state rules from discord-rpc.js and the export secret-stripping filter from modpacks.js directly in your browser.</p>
+        </div>
+
+        <div class="systems-split">
+          <!-- Left: Live Discord Rich Presence & Webhook 2.0 Simulator -->
+          <div class="sys-pane discord-lab">
+            <div class="sys-pane-head">
+              <div>
+                <span class="mono calc-kicker" data-i18n="rpc.kicker">LIVE DISCORD SIMULATOR (V9.0.2)</span>
+                <h3 data-i18n="rpc.title">Rich Presence &amp; Webhook 2.0</h3>
+                <p data-i18n="rpc.sub">Connects locally over Discord desktop IPC pipes with zero external telemetry. Toggle server state and privacy switches below.</p>
+              </div>
+            </div>
+
+            <div class="rpc-mode-bar" role="tablist" aria-label="Discord preview mode" id="rpcModeTabs">
+              <span class="rpc-glide" id="rpcGlide" aria-hidden="true"></span>
+              <button type="button" id="rpcTabPresence" class="rpc-tab active" data-rpc-view="presence" role="tab" aria-selected="true" aria-controls="rpcSimPanel" tabindex="0" data-i18n="rpc.tabPresence">Playing Status (IPC)</button>
+              <button type="button" id="rpcTabWebhook" class="rpc-tab" data-rpc-view="webhook" role="tab" aria-selected="false" aria-controls="rpcSimPanel" tabindex="-1" data-i18n="rpc.tabWebhook">Webhook 2.0 Embed</button>
+            </div>
+
+            <div class="rpc-controls">
+              <div class="rpc-states" role="group" aria-label="Simulated server state">
+                <button type="button" class="rpc-state-btn active" data-rpc-state="running" aria-pressed="true" data-i18n="rpc.stateRunning">Running</button>
+                <button type="button" class="rpc-state-btn" data-rpc-state="starting" aria-pressed="false" data-i18n="rpc.stateStarting">Starting</button>
+                <button type="button" class="rpc-state-btn" data-rpc-state="idle" aria-pressed="false" data-i18n="rpc.stateIdle">Idle</button>
+              </div>
+              <div class="rpc-privacy" id="rpcPrivacyRow">
+                <label class="rpc-check">
+                  <input type="checkbox" id="rpcOptName" checked>
+                  <span data-i18n="rpc.optName">Show server name</span>
+                </label>
+                <label class="rpc-check">
+                  <input type="checkbox" id="rpcOptPlayers" checked>
+                  <span data-i18n="rpc.optPlayers">Show players &amp; TPS</span>
+                </label>
+              </div>
+            </div>
+
+            <div id="rpcSimPanel" role="tabpanel" aria-labelledby="rpcTabPresence" class="rpc-stage">
+              <!-- Discord Profile Activity Preview -->
+              <div class="discord-card" id="rpcPresenceCard">
+                <div class="dc-kicker mono" data-i18n="rpc.playing">PLAYING A GAME</div>
+                <div class="dc-row">
+                  <div class="dc-art">
+                    <picture>
+                      <source type="image/webp" srcset="assets/icon-64.webp">
+                      <img src="assets/icon-64.png" width="56" height="56" decoding="async" alt="ObserverLauncher artwork">
+                    </picture>
+                    <span class="dc-dot is-running" id="dcStatusDot" aria-hidden="true"></span>
+                  </div>
+                  <div class="dc-meta">
+                    <strong class="dc-app">ObserverLauncher</strong>
+                    <span class="dc-detail" id="dcDetail">Hosting Survival SMP</span>
+                    <span class="dc-state" id="dcState">4 / 20 players · 20.0 TPS</span>
+                    <span class="dc-elapsed mono" id="dcElapsed" data-i18n="rpc.elapsed">01:42:18 elapsed</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Discord Webhook 2.0 Embed Preview -->
+              <div class="webhook-card" id="rpcWebhookCard" hidden>
+                <div class="wh-author">
+                  <picture>
+                    <source type="image/webp" srcset="assets/icon-64.webp">
+                    <img src="assets/icon-64.png" width="28" height="28" decoding="async" alt="ObserverLauncher webhook avatar">
+                  </picture>
+                  <strong data-i18n="rpc.whBot">ObserverLauncher</strong>
+                  <span class="wh-app-tag mono" data-i18n="rpc.whBadge">APP</span>
+                </div>
+                <div class="wh-embed is-running" id="whEmbedBox">
+                  <strong class="wh-title" id="whTitle">[Survival SMP] Server Started</strong>
+                  <p class="wh-desc" id="whDesc">Server is online and accepting connections.</p>
+                  <div class="wh-fields">
+                    <div>
+                      <span class="wh-f-name" data-i18n="rpc.whEnv">Environment</span>
+                      <span class="wh-f-val mono">Fabric · 1.21.1</span>
+                    </div>
+                    <div>
+                      <span class="wh-f-name" data-i18n="rpc.whPlayers">Players</span>
+                      <span class="wh-f-val mono" id="whPlayersVal">4 / 20</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <dl class="ipc-ledger">
+              <div>
+                <dt>IPC Transport</dt>
+                <dd class="mono">\\.\pipe\discord-ipc-0..9 · XDG_RUNTIME_DIR</dd>
+              </div>
+              <div>
+                <dt>Events</dt>
+                <dd class="mono">start · stop · crash · join/leave · backup · low-tps · tunnel</dd>
+              </div>
+              <div>
+                <dt>Delivery</dt>
+                <dd class="mono">safeStorage URL encryption · HTTP 429 retry · 5s RPC dedupe</dd>
+              </div>
+            </dl>
+
+            <p class="sys-footnote mono" data-i18n="rpc.whNote">Webhook URL is encrypted at rest via Electron safeStorage and retries HTTP 429 automatically.</p>
+          </div>
+
+          <!-- Right: v9.0.3 Security Redaction & MCP Trust Inspector -->
+          <div class="sys-pane security-lab">
+            <div class="sys-pane-head">
+              <div>
+                <span class="mono calc-kicker" data-i18n="sec.kicker">SECURITY HARDENING (V9.0.3)</span>
+                <h3 data-i18n="sec.title">Secret Redaction &amp; MCP Trust Tiers</h3>
+                <p data-i18n="sec.sub">Toggle disk vs sanitized output to see how v9.0.3 strips credentials before .mrpack exports and MCP tool reads.</p>
+              </div>
+            </div>
+
+            <div class="sec-toggle-bar">
+              <div class="sec-btn-group" role="group" aria-label="Security redaction comparison">
+                <button type="button" id="secRawBtn" class="sec-view-btn" data-sec-mode="raw" aria-pressed="false" data-i18n="sec.btnRaw">Raw on disk</button>
+                <button type="button" id="secSafeBtn" class="sec-view-btn active" data-sec-mode="safe" aria-pressed="true" data-i18n="sec.btnSafe">Exported / MCP safe</button>
+              </div>
+              <span class="sec-state-tag mono" id="secStateTag" data-i18n="sec.badgeSafe">REDACTED &amp; SANITIZED</span>
+            </div>
+
+            <div class="redact-well" id="redactWell" aria-live="polite">
+              <span class="redact-beam" id="redactBeam" aria-hidden="true"></span>
+              <pre class="mono redact-code" id="redactCode"></pre>
+            </div>
+
+            <div class="mcp-tiers">
+              <span class="mono tier-kicker" data-i18n="sec.tierLabel">MCP 80-tool confirmation model</span>
+              <div class="tier-tabs" role="tablist" aria-label="MCP tool risk tiers" id="secTierTabs">
+                <button type="button" id="tierTabRead" class="tier-tab active" data-tier="read" role="tab" aria-selected="true" aria-controls="secTierPanel" tabindex="0" data-i18n="sec.tierRead">Read</button>
+                <button type="button" id="tierTabWrite" class="tier-tab" data-tier="write" role="tab" aria-selected="false" aria-controls="secTierPanel" tabindex="-1" data-i18n="sec.tierWrite">Write</button>
+                <button type="button" id="tierTabDestroy" class="tier-tab" data-tier="destroy" role="tab" aria-selected="false" aria-controls="secTierPanel" tabindex="-1" data-i18n="sec.tierDestroy">Destroy</button>
+              </div>
+              <p class="tier-desc" id="secTierPanel" role="tabpanel" aria-labelledby="tierTabRead" data-i18n="sec.tierReadDesc">Free loopback inspection (status, logs, crash doctor, mod compat) with secret masking.</p>
+            </div>
+
+            <ul class="sec-check-list">
+              <li data-i18n="sec.chk1">DNS-rebinding and IPv6 SSRF guard on downloads, skins, and webhooks</li>
+              <li data-i18n="sec.chk2">Blocks .bat, .sh, .ps1, .exe, and .dll inside imported .mrpack bundles</li>
+              <li data-i18n="sec.chk3">Loopback-only MCP with 15-fail bearer lockout and POSIX 0600 settings</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Band 5: Ecosystem Filmstrip & Interactive Runtime Ledger -->
+    <section id="ecosystem" class="band-dark rule-band" data-spy-section="ecosystem">
+      <div class="wrap">
+        <div class="section-head-split">
+          <div>
+            <span class="band-code mono" data-i18n="band.eco">04 / MODS, AUTOMATION &amp; SELF-HOST</span>
+            <h2 data-i18n="eco.title">Mod folders, Modrinth/CurseForge, Remote Web UI, CLI, Docker &amp; 80 MCP tools.</h2>
+          </div>
+          <p data-i18n="eco.sub">Scroll or drag the remaining desktop screens sideways. Tap any capture to inspect full resolution.</p>
         </div>
 
         <div class="filmstrip" id="filmstrip" aria-label="Additional interface screens">
           <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="4" aria-label="Inspect Content pagination screenshot">
-              <img data-asset="docs/screenshot-content.png" src="docs/screenshot-content.png" width="1360" height="860" loading="lazy" alt="Paginated Content Manager">
+              <img src="assets/shots/screenshot-content.webp" width="1360" height="860" loading="lazy" decoding="async" alt="Paginated Content Manager">
             </button>
             <div class="film-meta">
               <span class="mono" data-i18n="film.tag4">05 / CONTENT</span>
@@ -359,7 +548,7 @@
 
           <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="5" aria-label="Inspect Marketplace screenshot">
-              <img data-asset="docs/screenshot-marketplace.png" src="docs/screenshot-marketplace.png" width="1360" height="860" loading="lazy" alt="Modrinth and CurseForge Marketplace">
+              <img src="assets/shots/screenshot-marketplace.webp" width="1360" height="860" loading="lazy" decoding="async" alt="Modrinth and CurseForge Marketplace">
             </button>
             <div class="film-meta">
               <span class="mono" data-i18n="film.tag5">06 / MARKETPLACE</span>
@@ -370,7 +559,7 @@
 
           <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="9" aria-label="Inspect 80-tool MCP settings screenshot">
-              <img data-asset="docs/screenshot-MCP.png" src="docs/screenshot-MCP.png" width="1360" height="860" loading="lazy" alt="Local MCP Server Settings">
+              <img src="assets/shots/screenshot-MCP.webp" width="1360" height="860" loading="lazy" decoding="async" alt="Local MCP Server Settings">
             </button>
             <div class="film-meta">
               <span class="mono" data-i18n="film.tag6">07 / LOCAL MCP</span>
@@ -381,7 +570,7 @@
 
           <article class="film-card">
             <button type="button" class="shot-trigger" data-lightbox-idx="10" aria-label="Inspect Remote Web Dashboard screenshot">
-              <img data-asset="docs/screenshot-remote-ui.png" src="docs/screenshot-remote-ui.png" width="1360" height="860" loading="lazy" alt="Remote Web Dashboard">
+              <img src="assets/shots/screenshot-remote-ui.webp" width="1360" height="860" loading="lazy" decoding="async" alt="Remote Web Dashboard">
             </button>
             <div class="film-meta">
               <span class="mono" data-i18n="film.tag7">08 / REMOTE WEB</span>
@@ -397,40 +586,42 @@
           <div class="engines-head">
             <h3 data-i18n="eng.title">Supported engines by runtime mode</h3>
             <div class="mode-bar" role="tablist" aria-label="Runtime profiles" id="modeBar">
-              <button type="button" class="mode-pill active" data-mode="all" role="tab" aria-selected="true" data-i18n="mode.all">All Engines</button>
-              <button type="button" class="mode-pill" data-mode="java" role="tab" aria-selected="false" data-i18n="mode.java">Java (Paper/Fabric)</button>
-              <button type="button" class="mode-pill" data-mode="rust" role="tab" aria-selected="false" data-i18n="mode.rust">Rust (Pumpkin/Horizon)</button>
-              <button type="button" class="mode-pill" data-mode="crossplay" role="tab" aria-selected="false" data-i18n="mode.crossplay">Crossplay (Geyser)</button>
-              <button type="button" class="mode-pill" data-mode="automation" role="tab" aria-selected="false" data-i18n="mode.automation">Headless (CLI/MCP)</button>
+              <button type="button" id="modeTab-all" class="mode-pill active" data-mode="all" role="tab" aria-selected="true" aria-controls="modeSpecsPanel" tabindex="0" data-i18n="mode.all">All Engines</button>
+              <button type="button" id="modeTab-java" class="mode-pill" data-mode="java" role="tab" aria-selected="false" aria-controls="modeSpecsPanel" tabindex="-1" data-i18n="mode.java">Java (Paper/Fabric)</button>
+              <button type="button" id="modeTab-rust" class="mode-pill" data-mode="rust" role="tab" aria-selected="false" aria-controls="modeSpecsPanel" tabindex="-1" data-i18n="mode.rust">Rust (Pumpkin/Horizon)</button>
+              <button type="button" id="modeTab-crossplay" class="mode-pill" data-mode="crossplay" role="tab" aria-selected="false" aria-controls="modeSpecsPanel" tabindex="-1" data-i18n="mode.crossplay">Crossplay (Geyser)</button>
+              <button type="button" id="modeTab-automation" class="mode-pill" data-mode="automation" role="tab" aria-selected="false" aria-controls="modeSpecsPanel" tabindex="-1" data-i18n="mode.automation">Headless (CLI/Docker/MCP)</button>
             </div>
           </div>
 
-          <div class="mode-specs" id="modeSpecs">
-            <div class="mode-spec">
-              <span class="mode-spec-lbl" data-i18n="spec.bootLbl">BOOT / RUNTIME</span>
-              <strong class="mono" id="specBoot">Java 8 to 25 &amp; Rust</strong>
-              <span class="spec-meter" aria-hidden="true"><span class="spec-meter-fill" id="meterBoot"></span></span>
+          <div id="modeSpecsPanel" role="tabpanel" aria-labelledby="modeTab-all">
+            <div class="mode-specs" id="modeSpecs">
+              <div class="mode-spec">
+                <span class="mode-spec-lbl" data-i18n="spec.bootLbl">BOOT / RUNTIME</span>
+                <strong class="mono" id="specBoot">Java 8 to 25 &amp; Rust</strong>
+                <span class="spec-meter" aria-hidden="true"><span class="spec-meter-fill" id="meterBoot"></span></span>
+              </div>
+              <div class="mode-spec">
+                <span class="mode-spec-lbl" data-i18n="spec.ramLbl">TYPICAL IDLE RAM</span>
+                <strong class="mono" id="specRam">~120 MB to 4 GB</strong>
+                <span class="spec-meter" aria-hidden="true"><span class="spec-meter-fill" id="meterRam"></span></span>
+              </div>
+              <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.setupLbl">JAVA PROVISIONING</span><strong class="mono" id="specJava" data-i18n="spec.javaAll">Auto OpenJDK / None on Rust</strong></div>
+              <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.netLbl">SHARING &amp; CONTROL</span><strong class="mono" id="specNet">Playit, Pinggy, SSE, CLI, Docker, MCP</strong></div>
             </div>
-            <div class="mode-spec">
-              <span class="mode-spec-lbl" data-i18n="spec.ramLbl">TYPICAL IDLE RAM</span>
-              <strong class="mono" id="specRam">~120 MB to 4 GB</strong>
-              <span class="spec-meter" aria-hidden="true"><span class="spec-meter-fill" id="meterRam"></span></span>
-            </div>
-            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.setupLbl">JAVA PROVISIONING</span><strong class="mono" id="specJava" data-i18n="spec.javaAll">Auto OpenJDK / None on Rust</strong></div>
-            <div class="mode-spec"><span class="mode-spec-lbl" data-i18n="spec.netLbl">SHARING &amp; CONTROL</span><strong class="mono" id="specNet">Playit, Pinggy, SSE, MCP</strong></div>
-          </div>
 
-          <div class="engine-strip" id="engineStrip">
-            <div class="engine-item" data-modes="all java crossplay automation"><img data-asset="software/paper.png" src="software/paper.png" width="24" height="24" alt="Paper"><div><b>Paper</b><span data-i18n="eng.paper">Java 17 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/purpur.png" src="software/purpur.png" width="24" height="24" alt="Purpur"><div><b>Purpur / Leaf</b><span data-i18n="eng.purpur">Java 17 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/folia.png" src="software/folia.png" width="24" height="24" alt="Folia"><div><b>Folia</b><span data-i18n="eng.folia">Regionized JVM</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/fabric.png" src="software/fabric.png" width="24" height="24" alt="Fabric"><div><b>Fabric / Quilt</b><span data-i18n="eng.fabric">Mods Java 8 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/forge.png" src="software/forge.png" width="24" height="24" alt="Forge"><div><b>Forge</b><span data-i18n="eng.forge">Mods Java 8 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java"><img data-asset="software/neoforge.png" src="software/neoforge.png" width="24" height="24" alt="NeoForge"><div><b>NeoForge</b><span data-i18n="eng.neoforge">Mods Java 21 to 25</span></div></div>
-            <div class="engine-item" data-modes="all java automation"><img data-asset="software/vanilla.png" src="software/vanilla.png" width="24" height="24" alt="Vanilla"><div><b>Vanilla / Spigot</b><span data-i18n="eng.vanilla">Official Mojang</span></div></div>
-            <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/velocity.png" src="software/velocity.png" width="24" height="24" alt="Velocity"><div><b>Velocity</b><span data-i18n="eng.velocity">velocity.toml proxy</span></div></div>
-            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/pumpkin.png" src="software/pumpkin.png" width="24" height="24" alt="Pumpkin"><div><b>Pumpkin 0.2.2</b><span data-i18n="eng.pumpkin">Rust, zero Java</span></div></div>
-            <div class="engine-item" data-modes="all rust automation"><img data-asset="software/horizon.png" src="software/horizon.png" width="24" height="24" alt="Horizon"><div><b>Horizon</b><span data-i18n="eng.horizon">Rust, MC 26.3</span></div></div>
+            <div class="engine-strip" id="engineStrip">
+              <div class="engine-item" data-modes="all java crossplay automation"><img data-asset="software/paper.png" src="software/paper.png" width="24" height="24" loading="lazy" decoding="async" alt="Paper"><div><b>Paper</b><span data-i18n="eng.paper">Java 17 to 25</span></div></div>
+              <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/purpur.png" src="software/purpur.png" width="24" height="24" loading="lazy" decoding="async" alt="Purpur"><div><b>Purpur / Leaf</b><span data-i18n="eng.purpur">Java 17 to 25</span></div></div>
+              <div class="engine-item" data-modes="all java"><img data-asset="software/folia.png" src="software/folia.png" width="24" height="24" loading="lazy" decoding="async" alt="Folia"><div><b>Folia</b><span data-i18n="eng.folia">Regionized JVM</span></div></div>
+              <div class="engine-item" data-modes="all java"><img data-asset="software/fabric.png" src="software/fabric.png" width="24" height="24" loading="lazy" decoding="async" alt="Fabric"><div><b>Fabric / Quilt</b><span data-i18n="eng.fabric">Mods Java 8 to 25</span></div></div>
+              <div class="engine-item" data-modes="all java"><img data-asset="software/forge.png" src="software/forge.png" width="24" height="24" loading="lazy" decoding="async" alt="Forge"><div><b>Forge</b><span data-i18n="eng.forge">Mods Java 8 to 25</span></div></div>
+              <div class="engine-item" data-modes="all java"><img data-asset="software/neoforge.png" src="software/neoforge.png" width="24" height="24" loading="lazy" decoding="async" alt="NeoForge"><div><b>NeoForge</b><span data-i18n="eng.neoforge">Mods Java 21 to 25</span></div></div>
+              <div class="engine-item" data-modes="all java automation"><img data-asset="software/vanilla.png" src="software/vanilla.png" width="24" height="24" loading="lazy" decoding="async" alt="Vanilla"><div><b>Vanilla / Spigot</b><span data-i18n="eng.vanilla">Official Mojang</span></div></div>
+              <div class="engine-item" data-modes="all java crossplay"><img data-asset="software/velocity.png" src="software/velocity.png" width="24" height="24" loading="lazy" decoding="async" alt="Velocity"><div><b>Velocity</b><span data-i18n="eng.velocity">velocity.toml proxy</span></div></div>
+              <div class="engine-item" data-modes="all rust automation"><img data-asset="software/pumpkin.png" src="software/pumpkin.png" width="24" height="24" loading="lazy" decoding="async" alt="Pumpkin"><div><b>Pumpkin 0.2.2</b><span data-i18n="eng.pumpkin">Rust, zero Java</span></div></div>
+              <div class="engine-item" data-modes="all rust automation"><img data-asset="software/horizon.png" src="software/horizon.png" width="24" height="24" loading="lazy" decoding="async" alt="Horizon"><div><b>Horizon</b><span data-i18n="eng.horizon">Rust, MC 26.3</span></div></div>
+            </div>
           </div>
 
           <!-- CLI, Docker, Headless & MCP Self-Host Stack Switcher -->
@@ -442,14 +633,14 @@
               </div>
               <div class="ops-tabs" role="tablist" aria-label="Automation and self-host modes" id="opsTabs">
                 <span class="ops-glide" id="opsGlide" aria-hidden="true"></span>
-                <button type="button" class="ops-tab active" data-ops="cli" role="tab" aria-selected="true" data-i18n="ops.tab.cli">CLI (observer)</button>
-                <button type="button" class="ops-tab" data-ops="docker" role="tab" aria-selected="false" data-i18n="ops.tab.docker">Docker Compose</button>
-                <button type="button" class="ops-tab" data-ops="headless" role="tab" aria-selected="false" data-i18n="ops.tab.headless">Headless Daemon</button>
-                <button type="button" class="ops-tab" data-ops="mcp" role="tab" aria-selected="false" data-i18n="ops.tab.mcp">MCP (80 Tools)</button>
+                <button type="button" id="opsTab-cli" class="ops-tab active" data-ops="cli" role="tab" aria-selected="true" aria-controls="opsBodyPanel" tabindex="0" data-i18n="ops.tab.cli">CLI (observer)</button>
+                <button type="button" id="opsTab-docker" class="ops-tab" data-ops="docker" role="tab" aria-selected="false" aria-controls="opsBodyPanel" tabindex="-1" data-i18n="ops.tab.docker">Docker Compose</button>
+                <button type="button" id="opsTab-headless" class="ops-tab" data-ops="headless" role="tab" aria-selected="false" aria-controls="opsBodyPanel" tabindex="-1" data-i18n="ops.tab.headless">Headless Daemon</button>
+                <button type="button" id="opsTab-mcp" class="ops-tab" data-ops="mcp" role="tab" aria-selected="false" aria-controls="opsBodyPanel" tabindex="-1" data-i18n="ops.tab.mcp">MCP (80 Tools)</button>
               </div>
             </div>
 
-            <div class="ops-body">
+            <div class="ops-body" id="opsBodyPanel" role="tabpanel" aria-labelledby="opsTab-cli">
               <div class="ops-cmd-row">
                 <code class="mono" id="opsCmdText">node src/cli.js status --json &amp;&amp; node src/cli.js install luckperms --kind plugin</code>
                 <button type="button" id="copyOpsBtn" class="cli-copy" data-i18n="hero.copy">Copy</button>
@@ -461,22 +652,22 @@
       </div>
     </section>
 
-    <!-- Band 5: Pre-flight Technical Sheet (SmartScreen & Honest Scope) -->
-    <section id="preflight" class="band-dark rule-band">
+    <!-- Band 6: Pre-flight Technical Sheet (SmartScreen & Honest Scope) -->
+    <section id="preflight" class="band-dark rule-band" data-spy-section="preflight">
       <div class="wrap preflight-grid">
         <div class="preflight-col">
-          <span class="band-code mono" data-i18n="band.faq">04 / BEFORE YOU RUN</span>
+          <span class="band-code mono" data-i18n="band.faq">05 / BEFORE YOU RUN</span>
           <h2 data-i18n="faq.title">Windows SmartScreen &amp; Linux setup</h2>
           <div class="faq-list">
             <details class="faq-item" open>
               <summary data-i18n="faq.q1">Why does Windows SmartScreen warn when opening the .exe?</summary>
-              <div class="faq-body" data-i18n-html="faq.a1">
+              <div class="faq-body" data-i18n-rich="faq.a1">
                 Open-source installers without a paid EV code-signing certificate trigger Windows SmartScreen initially. Click <strong>More info</strong>, then <strong>Run anyway</strong>, or launch straight from source via <code>npm install &amp;&amp; npm start</code>.
               </div>
             </details>
             <details class="faq-item">
               <summary data-i18n="faq.q2">How do I run the Linux .AppImage?</summary>
-              <div class="faq-body" data-i18n-html="faq.a2">
+              <div class="faq-body" data-i18n-rich="faq.a2">
                 Download the latest <code>.AppImage</code> (or <code>.deb</code>), run <code>chmod +x ObserverLauncher-*.AppImage</code>, and launch normally on Ubuntu or Debian <code>x86_64</code> (glibc 2.31+).
               </div>
             </details>
@@ -490,7 +681,7 @@
         </div>
 
         <div class="preflight-col">
-          <span class="band-code mono" data-i18n="band.scope">05 / HONEST SCOPE</span>
+          <span class="band-code mono" data-i18n="band.scope">06 / HONEST SCOPE</span>
           <h2 data-i18n="scope.title">Where it fits, and where it does not</h2>
           <div class="scope-ledger">
             <div class="scope-group">
@@ -515,21 +706,22 @@
     </section>
   </main>
 
-  <footer class="site-footer">
+  <footer class="site-footer" id="siteFooter">
     <div class="wrap footer-inner">
       <span data-i18n="footer.copy">ObserverLauncher. Independent open-source project (Apache-2.0). Not affiliated with Mojang or Microsoft.</span>
       <div class="footer-links">
-        <a href="https://github.com/Kag4286/ObserverLauncher" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">Releases ↗</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog ↗</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-9.0.0.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.notes">Release Notes ↗</a>
-        <a href="https://github.com/Kag4286/ObserverLauncher/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues">Issues ↗</a>
+        <button type="button" id="motionToggle" class="motion-toggle mono" aria-pressed="false" data-i18n="motion.full">Motion: Full</button>
+        <a href="https://github.com/Kag4286/ObserverLauncher" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">Releases</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/blob/main/docs/release-9.1.0.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.notes">Release Notes</a>
+        <a href="https://github.com/Kag4286/ObserverLauncher/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues">Issues</a>
       </div>
     </div>
   </footer>
 
-  <!-- Fullscreen Lightbox (Zero Blur Overlay) -->
-  <div id="shotLightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-labelledby="lbTitle">
+  <!-- Fullscreen Lightbox (Zero Blur Overlay, inert siblings on open) -->
+  <div id="shotLightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-labelledby="lbTitle" aria-describedby="lbDesc">
     <div class="lightbox-card">
       <div class="lightbox-head">
         <div>
@@ -544,7 +736,7 @@
         </div>
       </div>
       <div class="lightbox-stage">
-        <img id="lbImg" width="1360" height="860" src="" alt="">
+        <img id="lbImg" width="1360" height="860" decoding="async" src="assets/shots/screenshot-overview.webp" alt="">
       </div>
     </div>
   </div>
@@ -553,12 +745,14 @@
   <div id="mobileDock" class="mobile-dock" aria-label="Quick download bar">
     <a id="dockDl" class="btn primary dock-dl" href="https://github.com/Kag4286/ObserverLauncher/releases/latest" target="_blank" rel="noopener noreferrer">
       <span id="dockDlLabel" data-i18n="hero.dlWin">Download Windows (.exe)</span>
-      <span class="btn-sub" id="dockDlMeta">v9.0.0</span>
+      <span class="btn-sub" id="dockDlMeta">v9.1.0</span>
     </a>
     <a class="btn dock-faq" href="#preflight" data-i18n="dock.faq">SmartScreen</a>
   </div>
 
-  <script src="i18n.js"></script>
-  <script src="app.js"></script>
+  <div id="srStatus" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <script defer src="locales/en.js"></script>
+  <script defer src="app.js"></script>
 </body>
 </html>

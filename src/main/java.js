@@ -62,7 +62,7 @@ function javaBinName(osName = javaRuntimeOs()) { return osName === 'windows' ? '
 function validateStart(settings, javaInfo, serverFilesFn, requiredJavaFn) {
   if (!settings.serverPath || !require('fs').existsSync(settings.serverPath)) return 'Choose a valid server folder first.';
   const info = serverFilesFn(settings.serverPath);
-  if (info.engineType === 'native' || info.nativeBinary || (info.hasHorizonConfig && !info.jar && !info.launchScript)) {
+  if (info.engineType === 'native' || info.nativeBinary || ((info.hasHorizonConfig || info.hasPumpkinConfig) && !info.jar && !info.launchScript)) {
     if (info.nativeBinary && !require('fs').existsSync(require('path').join(settings.serverPath, info.nativeBinary))) {
       return `Native executable "${info.nativeBinary}" not found in server folder.`;
     }

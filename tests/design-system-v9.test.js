@@ -74,7 +74,13 @@ for (const sel of ['.ol-dd-panel', '.ol-dd.ol-dd-wide', '.ol-dd-opt.active']) {
   assert.ok(ddCss.includes(sel), `10-dropdown.css missing required 00-dropdown.js selector: ${sel}`);
 }
 
-// 5. DESIGN.md documents v9.0.0 Architectural system
+// 6. Every visible <select> in index.html must use .ol-select (never raw OS dropdown popups)
+const rawSelects = [...html.matchAll(/<select\b[^>]*>/gi)]
+  .map(m => m[0])
+  .filter(tag => !/\bhidden\b/i.test(tag) && !/display\s*:\s*none/i.test(tag) && !/\bol-select\b/.test(tag));
+assert.strictEqual(rawSelects.length, 0, `Visible <select> missing .ol-select:\n${rawSelects.join('\n')}`);
+
+// 7. DESIGN.md documents v9.0.0 Architectural system
 const designMd = fs.readFileSync(DESIGN_MD, 'utf8');
 assert.ok(designMd.includes('#0C0D0F'), 'DESIGN.md must specify #0C0D0F background');
 assert.ok(designMd.includes('#22C55E'), 'DESIGN.md must preserve #22C55E brand green');

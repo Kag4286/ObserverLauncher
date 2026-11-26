@@ -90,6 +90,8 @@
           <div class="welcome-actions">
             <button class="btn secondary" id="chooseFolder" data-i18n="ov.choose">Choose folder</button>
             <button class="btn secondary" id="welcomeCreateBtn" data-i18n="ov.create">Create new server</button>
+            <button class="btn secondary" id="doctorOpenBtn" data-i18n="doc.openBtn">Server Doctor</button>
+            <button class="btn secondary" id="upgradeServerBtn" data-i18n="upg.openBtn" hidden>Upgrade version</button>
             <button class="btn primary" id="heroStartBtn" data-i18n="top.start">Start server</button>
             <button class="btn secondary" id="heroConsoleBtn" data-i18n="ov.openConsole" hidden>Open console</button>
           </div>
@@ -1195,7 +1197,21 @@
                 <div id="scheduleFields" class="restart-grid" hidden>
                   <label><span data-i18n="sch.startT">Start at</span><input id="scheduleStartInput" type="time"><small data-i18n="sch.startSub">Leave empty to disable auto-start</small></label>
                   <label><span data-i18n="sch.stopT">Stop at</span><input id="scheduleStopInput" type="time"><small data-i18n="sch.stopSub">Leave empty to disable auto-stop</small></label>
+                  <label><span data-i18n="sch.restartT">Restart at</span><input id="scheduleRestartInput" type="time"><small data-i18n="sch.restartSub">Leave empty to disable daily restart</small></label>
+                  <label><span data-i18n="sch.countdownT">Pre-stop / restart warning</span>
+                    <select id="scheduleCountdownSelect" class="launcher-select ol-select" aria-label="Pre-stop warning countdown">
+                      <option value="0" data-i18n="sch.countdownOff">Off (immediate)</option>
+                      <option value="30" data-i18n="sch.countdown30s">30 seconds</option>
+                      <option value="60" data-i18n="sch.countdown1m" selected>1 minute</option>
+                      <option value="300" data-i18n="sch.countdown5m">5 minutes</option>
+                    </select>
+                    <small data-i18n="sch.countdownSub">Broadcast in-game countdown warnings before scheduled stop or restart.</small>
+                  </label>
                 </div>
+                <label id="scheduleSkipEmptyRow" class="set-check" hidden>
+                  <input type="checkbox" id="scheduleSkipEmptyInput" checked>
+                  <span data-i18n="sch.skipEmpty">Skip countdown when 0 players are online</span>
+                </label>
                 <div id="scheduleDaysRow" class="schedule-days-row set-chips" hidden>
                   <span class="hint" data-i18n="sch.days">Days</span>
                   <button type="button" class="filter-chip" data-day="1" data-i18n="sch.day1">Mon</button>
@@ -1205,6 +1221,23 @@
                   <button type="button" class="filter-chip" data-day="5" data-i18n="sch.day5">Fri</button>
                   <button type="button" class="filter-chip" data-day="6" data-i18n="sch.day6">Sat</button>
                   <button type="button" class="filter-chip" data-day="0" data-i18n="sch.day0">Sun</button>
+                </div>
+                <div id="scheduleRulesBox" class="sch-rules-box" hidden>
+                  <div class="sch-rules-head">
+                    <b data-i18n="sch.rulesTitle">Custom daily rules</b>
+                    <small data-i18n="sch.rulesSub">Schedule daily backups or console commands at specific times.</small>
+                  </div>
+                  <div id="scheduleRulesList" class="sch-rules-list"></div>
+                  <div class="sch-rule-composer">
+                    <select id="scheduleRuleAction" class="launcher-select ol-select" aria-label="Rule action">
+                      <option value="backup" data-i18n="sch.ruleActionBackup">World backup</option>
+                      <option value="command" data-i18n="sch.ruleActionCommand">Console command</option>
+                      <option value="restart" data-i18n="sch.ruleActionRestart">Restart server</option>
+                    </select>
+                    <input id="scheduleRuleTime" type="time" aria-label="Rule time">
+                    <input id="scheduleRuleCommand" type="text" maxlength="500" data-i18n-placeholder="sch.ruleCommandPh" placeholder="e.g. say Daily reminder! or save-all" aria-label="Rule console command" hidden>
+                    <button type="button" class="btn secondary sm" id="scheduleRuleAddBtn" data-i18n="sch.ruleAdd">Add rule</button>
+                  </div>
                 </div>
                 <div id="scheduleNext" class="field-hint" hidden></div>
               </div>
@@ -1889,6 +1922,77 @@
     <div class="confirm-actions">
       <button type="button" class="btn secondary" id="pmCancel" data-i18n="cf.cancel">Cancel</button>
       <button type="button" class="btn primary" id="pmOk" data-i18n="cf.ok">OK</button>
+    </div>
+  </div>
+</div>
+<!-- v9.1.0 C1: Cross-instance World Clone modal -->
+<div id="worldCloneModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="wcTitle">
+  <div class="modal confirm-modal">
+    <div class="confirm-head"><span class="confirm-ico">◫</span><h2 id="wcTitle" data-i18n="wld.cloneTitle">Clone world</h2></div>
+    <label class="set-field"><span data-i18n="wld.cloneNameLabel">New world folder name</span><input type="text" id="wcNameInput" autocomplete="off" maxlength="64" aria-label="New world folder name"></label>
+    <label class="set-field"><span data-i18n="wld.cloneTarget">Target server instance</span><select id="wcTargetSelect" class="launcher-select ol-select" aria-label="Target server instance"></select></label>
+    <div class="confirm-actions">
+      <button type="button" class="btn secondary" id="wcCancel" data-i18n="cf.cancel">Cancel</button>
+      <button type="button" class="btn primary" id="wcOk" data-i18n="wld.cloneBtn">Clone</button>
+    </div>
+  </div>
+</div>
+<!-- v9.1.0 D2: Interactive Server Doctor modal -->
+<div id="doctorModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="docTitle">
+  <div class="modal wide doc-modal">
+    <button type="button" class="modal-close" id="docClose" aria-label="Close">&times;</button>
+    <div class="doc-head">
+      <div>
+        <h2 id="docTitle" data-i18n="doc.title">Server Doctor</h2>
+        <p class="text-muted" data-i18n="doc.sub">Checks port conflicts, RAM pressure, crash loops, and missing mod dependencies.</p>
+      </div>
+      <button type="button" class="btn secondary sm" id="docRescanBtn" data-i18n="doc.rescan">Re-scan</button>
+    </div>
+    <div id="docSummary" class="doc-summary"></div>
+    <div id="docPlanWrap" hidden>
+      <p class="eyebrow" data-i18n="doc.fixesTitle">Suggested repairs</p>
+      <ul id="docPlanList" class="doc-list"></ul>
+    </div>
+    <div id="docChecksWrap" hidden>
+      <p class="eyebrow" data-i18n="doc.checksTitle">Diagnostic checks</p>
+      <ul id="docChecksList" class="doc-list"></ul>
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="btn secondary" id="docDoneBtn" data-i18n="cf.cancel">Close</button>
+    </div>
+  </div>
+</div>
+<!-- v9.1.0 D3: Guided Minecraft Version Upgrade Assistant modal -->
+<div id="upgradeModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="upgTitle">
+  <div class="modal wide upg-modal">
+    <button type="button" class="modal-close" id="upgClose" aria-label="Close">&times;</button>
+    <div class="doc-head">
+      <div>
+        <h2 id="upgTitle" data-i18n="upg.title">Upgrade Minecraft Version</h2>
+        <p class="text-muted" data-i18n="upg.sub">Preflights Java &amp; mod/plugin compatibility, backs up your world, and upgrades safely.</p>
+      </div>
+    </div>
+    <div class="upg-grid">
+      <div class="set-field"><span data-i18n="upg.current">Current setup</span><div id="upgCurrentLabel" class="upg-current mono">—</div></div>
+      <label class="set-field"><span data-i18n="upg.target">Target version</span><select id="upgVersionSelect" class="launcher-select ol-select" aria-label="Target Minecraft version"></select></label>
+    </div>
+    <div class="upg-actions-row">
+      <button type="button" class="btn secondary sm" id="upgPreflightBtn" data-i18n="upg.preflightBtn">Run preflight check</button>
+      <span id="upgStatusText" class="text-muted"></span>
+    </div>
+    <div id="upgReport" class="upg-report" hidden>
+      <div id="upgJavaRow" class="upg-java-row"></div>
+      <div id="upgCompatSummary" class="upg-compat-summary"></div>
+      <ul id="upgIncompatList" class="doc-list" hidden></ul>
+      <div class="upg-options">
+        <label class="set-check"><input type="checkbox" id="upgOptBackup" checked><span data-i18n="upg.optBackup">Create world backup before upgrading</span></label>
+        <label class="set-check"><input type="checkbox" id="upgOptUpdateContent" checked><span data-i18n="upg.optUpdateContent">Auto-update compatible plugins/mods to target version</span></label>
+        <label class="set-check"><input type="checkbox" id="upgOptDisableIncompat"><span data-i18n="upg.optDisableIncompat">Disable incompatible plugins/mods before first boot</span></label>
+      </div>
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="btn secondary" id="upgCancelBtn" data-i18n="cf.cancel">Cancel</button>
+      <button type="button" class="btn primary" id="upgRunBtn" disabled data-i18n="upg.runBtn">Upgrade server</button>
     </div>
   </div>
 </div>
