@@ -93,6 +93,9 @@ function collectFolderEntries(folder, fileList, kind, disabledScanned, issues, s
   const active = [];
   for (const name of fileList) {
     const isDisabled = /\.disabled$/i.test(name);
+    // Pumpkin Dedicated Server uses sandboxed WebAssembly (.wasm) plugins inside plugins/.
+    // They are valid native binaries, not ZIP/JAR archives, so never flag them as corrupt jars.
+    if (kind === 'plugin' && /\.wasm(?:\.disabled)?$/i.test(name)) continue;
     const cls = safeClassify(folder, name, kind === 'mod' ? serverLoader : null);
     if (!cls) continue;
     if (isDisabled) {

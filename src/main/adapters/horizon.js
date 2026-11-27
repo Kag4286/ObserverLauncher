@@ -161,6 +161,7 @@ async function resolve(version) {
     version: resolvedTag,
     platform: plat,
     sha256,
+    upstreamAvailable: !!rel,
   };
 }
 

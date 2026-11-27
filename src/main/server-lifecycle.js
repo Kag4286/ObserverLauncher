@@ -163,7 +163,7 @@ function checkRamBudget(ctx, instId, settings) {
     for (const [id, st] of ctx.instances) {
       if (id === instId) continue;
       if (st && (st.serverStatus === 'running' || st.serverStatus === 'starting' || st.serverStatus === 'stopping')) {
-        if (st.tpsUnsupported || st.currentSoftware === 'horizon' || st.currentSoftware === 'native') continue;
+        if (st.tpsUnsupported || st.currentSoftware === 'horizon' || st.currentSoftware === 'pumpkin' || st.currentSoftware === 'native') continue;
         otherGB += Number(st.memoryMax) || 0;
       }
     }
@@ -760,7 +760,7 @@ async function forceStopServer(ctx) {
   // Best effort: when monitoredPid was never resolved (a fast force-stop), hunt a descendant once.
   try {
     const javaPid = await Promise.race([
-      ((ctx.tpsUnsupported || ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'native') && typeof platform.findServerDescendant === 'function')
+      ((ctx.tpsUnsupported || ctx.currentSoftware === 'horizon' || ctx.currentSoftware === 'pumpkin' || ctx.currentSoftware === 'native') && typeof platform.findServerDescendant === 'function')
         ? platform.findServerDescendant(rootPid)
         : platform.findJavaDescendant(rootPid),
       new Promise(resolve => setTimeout(() => resolve(null), 4000))

@@ -184,6 +184,25 @@ function ck(name, condition) {
     ck('parseServerLine parses Pumpkin MSPT', live.mspt === 0.15);
   }
 
+  // 8. Pumpkin WASM plugins & encryption invariant (upstream 0.2.2+ / master maintenance)
+  {
+    const wasmDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-wasm-test-'));
+    try {
+      fs.mkdirSync(path.join(wasmDir, 'plugins'), { recursive: true });
+      fs.writeFileSync(path.join(wasmDir, 'pumpkin.toml'), defaultToml);
+      fs.writeFileSync(path.join(wasmDir, 'plugins', 'my-plugin.wasm'), Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]));
+      const { scanContentConflicts } = require('../src/main/content-conflicts.js');
+      const scan = await scanContentConflicts(wasmDir);
+      ck('scanContentConflicts does not misflag Pumpkin .wasm plugins as corrupt-jar', !scan.issues.some(i => i.type === 'corrupt-jar'));
+
+      const encBroken = defaultToml.replace('encryption = true', 'encryption = false');
+      const fixedToml = syncPropertiesToPumpkinToml(encBroken, { 'online-mode': 'true' });
+      ck('syncPropertiesToPumpkinToml enforces encryption=true when online-mode=true', /encryption\s*=\s*true/.test(fixedToml));
+    } finally {
+      fs.rmSync(wasmDir, { recursive: true, force: true });
+    }
+  }
+
   console.log(`\n${pass} passed, 0 failed`);
 })().catch(err => {
   console.error(err);

@@ -197,7 +197,7 @@ async function prepareHorizonServer(serverPath, onProgress = null, ctx = null) {
       const lockData = await json('https://raw.githubusercontent.com/horizon-rust/horizon/main/research-lock.json');
       require('./fs-utils.js').writeFileAtomic(lockPath, JSON.stringify(lockData, null, 2));
     } catch (e) {
-      return { ok: false, error: `Missing research-lock.json: ${e?.message || e}` };
+      return { ok: false, error: `Missing research-lock.json and upstream horizon-rust/horizon is unavailable (${e?.message || e}). Keep your existing local research-lock.json / prepared resources folder if migrating a server.` };
     }
   }
 

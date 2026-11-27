@@ -13,7 +13,7 @@ Create Java or Rust servers on your own PC, invite friends without touching rout
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square&logo=apache)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows_%7C_Linux-2ea44f?style=flat-square&logo=windows&logoColor=white)](https://github.com/Kag4286/ObserverLauncher/releases/latest)
 
-[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.1.0.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
+[Releases](https://github.com/Kag4286/ObserverLauncher/releases/latest) · [Release Notes](docs/release-9.1.1.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md)
 
 <br>
 
@@ -123,8 +123,8 @@ Personal settings also include 7 UI languages (`en`, `vi`, `es`, `pt-BR`, `de`, 
 | **Spigot / CraftBukkit** | Java 8 to 25 (via BuildTools) | Bukkit plugins | Heap memory, player list |
 | **Vanilla** | Java 8 to 25 | Official Mojang server | Player list, console stream |
 | **Velocity** | Java 17 to 25 | Multi-server proxy | Proxy routes, connection status |
-| **Pumpkin** | Rust Native | Vanilla protocol clean-room | Process RAM/CPU, console TPS & MSPT |
-| **Horizon** | Rust Native | MC 26.3 clean-room | Process RAM/CPU, `server.toml` sync |
+| **Pumpkin** | Rust Native | WASM (`.wasm`) plugins & Java/Bedrock | Process RAM/CPU, console TPS & MSPT |
+| **Horizon** | Rust Native | MC 26.3 clean-room (local binaries; upstream GitHub offline) | Process RAM/CPU, `server.toml` sync |
 
 ---
 
@@ -184,7 +184,7 @@ ObserverLauncher exposes 80 server-management tools via `src/mcp/bridge.js` (std
 
 - **Desktop platforms only:** Prebuilt packages target Windows 10/11 (64-bit) and Linux `x86_64` (`.AppImage`). There is no macOS build yet.
 - **Built for local PCs, not 24/7 VPS clusters:** Designed for hosting on a personal machine or testing modpacks locally. For multi-node Linux servers running 24/7 in Docker or Proxmox, use a dedicated web panel such as Crafty Controller or Pterodactyl.
-- **Native Rust engines are upstream WIP:** Pumpkin and Horizon compatibility depends on upstream server progress; Bukkit/Paper plugins relying on JVM internals may not behave identically to Paper.
+- **Native Rust engines & upstream status:** Pumpkin supports WebAssembly (`.wasm`) plugins, syncs `pumpkin.toml` (`encryption = true` when `online_mode = true`), and remains under active upstream development; Bukkit/Paper plugins relying on JVM internals do not run directly on Rust engines. Horizon's upstream GitHub repository (`horizon-rust/horizon`) currently returns HTTP 404 for fresh downloads, while existing local Horizon installations continue to run via **Add existing folder**.
 
 ## System Requirements
 

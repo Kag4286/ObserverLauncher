@@ -311,7 +311,7 @@ function check(name, cond) {
   {
     const readme = fs.readFileSync(path.join(__dirname, '../README.md'), 'utf8');
     const mustContain = [
-      'docs/release-9.1.0.md',
+      'docs/release-9.1.',
       'BuildTools',
       'survival-5',
       'modded-performance',

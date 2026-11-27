@@ -130,10 +130,17 @@ async function createServerFiles(ctx, { software, version }) {
 
     if (software === 'horizon') {
       const resolved = await (RESOLVERS.horizon)(targetVersion);
-      const { url, name, version: resolvedVersion, sha256, archiveName } = resolved;
+      const { url, name, version: resolvedVersion, sha256, archiveName, upstreamAvailable } = resolved;
       const archiveExt = archiveName ? path.extname(archiveName) : '.zip';
       const tempArchive = path.join(ctx.currentServerPath, `horizon-download${archiveExt}`);
-      await download(url, tempArchive, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
+      try {
+        await download(url, tempArchive, onProgress, signal, { maxBytes: 1024 * 1024 * 1024 });
+      } catch (dlErr) {
+        if (upstreamAvailable === false || /\b404\b/.test(String(dlErr?.message || ''))) {
+          throw new Error('Could not download Horizon: the upstream GitHub repository (horizon-rust/horizon) is currently returning HTTP 404. Existing local Horizon folders can still be added via "Add existing folder", or choose Pumpkin / Paper instead.');
+        }
+        throw dlErr;
+      }
       if (sha256) {
         try {
           const got = crypto.createHash('sha256').update(fs.readFileSync(tempArchive)).digest('hex');
@@ -322,8 +329,13 @@ function registerWizard(ipcMain, ctx) {
       }
       if (s === 'horizon') {
         const { fetchVersions } = require('./adapters/horizon.js');
+        const { fetchGitHubReleases } = require('./adapters/github-releases.js');
+        const liveRels = await fetchGitHubReleases('horizon-rust/horizon', { perPage: 10 });
         const v = await fetchVersions();
-        return { ok: true, versions: v, latest: v[0] || 'v0.2.97', raw: false };
+        const note = (!Array.isArray(liveRels) || liveRels.length === 0)
+          ? 'Upstream github.com/horizon-rust/horizon currently returns 404; fresh downloads may fail unless you import an existing local Horizon server.'
+          : '';
+        return { ok: true, versions: v, latest: v[0] || 'v0.2.97', raw: false, note };
       }
       if (s === 'spigot') {
         const m = await json('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');

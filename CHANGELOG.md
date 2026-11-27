@@ -10,6 +10,21 @@ All notable changes to ObserverLauncher are documented here. Format follows
 > sync: a change lands here and in the release summary. Starting with 1.3.0, no release ships
 > without its user-facing summary.
 
+## [9.1.1] - 2026-11-27
+
+**Horizon & Pumpkin Upstream Alignment — WASM Plugin Guard, Pumpkin Encryption Validation Sync, Native Lifecycle Parity, and Upstream Horizon 404 Handling.**
+
+### Pumpkin Dedicated Server (`Pumpkin-MC/Pumpkin`) Compatibility (`src/main/content-conflicts.js`, `src/main/pumpkin-config.js`, `src/main/server-lifecycle.js`):
+- **WebAssembly (`.wasm`) Plugin Conflict Guard:** Updated `collectFolderEntries()` in `src/main/content-conflicts.js` to skip `.wasm` / `.wasm.disabled` plugin binaries so Pumpkin's sandboxed WASM plugins are never misflagged as `corrupt-jar`.
+- **Online-Mode Encryption Invariant:** Updated `syncPropertiesToPumpkinToml()` in `src/main/pumpkin-config.js` to automatically enforce `encryption = true` inside `[networking.java]` whenever `online-mode` is enabled, preventing startup panics in Pumpkin's `PumpkinConfig::validate()`.
+- **Native Engine Parity:** Included `currentSoftware === 'pumpkin'` alongside `'horizon'` and `'native'` in `checkRamBudget()` and `forceStopServer()` (`src/main/server-lifecycle.js`).
+
+### Horizon Dedicated Server Upstream Maintenance (`src/main/adapters/horizon.js`, `src/main/wizard.js`, `src/main/horizon-prepare.js`):
+- **Upstream GitHub 404 Detection & Clear Errors:** `resolve()` now exposes `upstreamAvailable` when `horizon-rust/horizon` returns no live releases (HTTP 404); `wizard:versions` surfaces a friendly note, and `createServerFiles()` / `prepareHorizonServer()` report actionable messages guiding users to import pre-existing local Horizon folders or select Pumpkin/Paper instead of showing raw 404 download failures.
+
+### Documentation & Testing (`README.md`, `docs/release-9.1.1.md`, `tests/pumpkin.test.js`, `tests/horizon-adapter.test.js`):
+- Updated `README.md` (Pumpkin `.wasm` plugin/encryption notes, Horizon upstream availability note, `release-9.1.1.md` link), added `docs/release-9.1.1.md`, bumped `package.json` and `website/index.html` to `9.1.1`, and expanded unit coverage in `tests/pumpkin.test.js` (`59/59`) and `tests/horizon-adapter.test.js` (`16/16`).
+
 ## [9.1.0] - 2026-11-26
 
 **Major Feature, Lifecycle Reliability & Documentation Parity Release — Multi-Rule Scheduler with In-Game Countdown Warnings, Interactive GUI Server Doctor, Guided Minecraft Version Upgrade Assistant, Cross-Instance World Cloning UI, 1-Click Missing Dependency Installer, Adopted/Pumpkin Bug Fixes, and Full `README.md` Backfill.**

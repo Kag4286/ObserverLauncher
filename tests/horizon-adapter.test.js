@@ -72,6 +72,7 @@ function ck(name, cond) {
   ck('resolve("nightly") returns archive and nightly tag', resolvedNightly.url && resolvedNightly.version.startsWith('nightly'));
   const resolvedDefault = await resolve('latest');
   ck('resolve("latest") does not point to launcher@ release', resolvedDefault.url && !resolvedDefault.url.includes('launcher@'));
+  ck('resolve("latest") exposes boolean upstreamAvailable status', typeof resolvedDefault.upstreamAvailable === 'boolean');
 
   console.log(`\n${pass} passed, 0 failed`);
 })().catch(err => {

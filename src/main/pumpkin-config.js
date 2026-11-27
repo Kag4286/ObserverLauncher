@@ -268,6 +268,11 @@ function syncPropertiesToPumpkinToml(tomlText, props) {
           outLines.push(`online_mode = ${props['online-mode'] === 'false' ? 'false' : 'true'}`);
           continue;
         }
+        // PumpkinConfig::validate() panics on startup if online_mode=true while encryption=false.
+        if (key === 'encryption' && props['online-mode'] !== undefined && props['online-mode'] !== 'false') {
+          outLines.push('encryption = true');
+          continue;
+        }
         if (key === 'motd' && props['motd'] !== undefined) {
           outLines.push(`motd = ${JSON.stringify(String(props['motd']))}`);
           continue;
